@@ -1,6 +1,6 @@
 import './App.css'
 import logo from './assets/uniq-logo.png'
-import campus from './assets/campus-uniq.webp'
+import campus from './assets/uniq_logo.jpg'
 
 function Icon({ name, size = 20, ...props }) {
   const paths = {
