@@ -1,0 +1,9 @@
+import { BrowserRouter, Link, Route, Routes } from 'react-router-dom'
+import AdminLayout from '../layouts/AdminLayout'
+import DashboardPage from '../features/dashboard/DashboardPage'
+import UsersPage from '../features/users/UsersPage'
+import SettingsPage from '../features/settings/SettingsPage'
+
+export default function App() {
+  return <BrowserRouter><Routes><Route element={<AdminLayout />}><Route index element={<DashboardPage />} /><Route path="personal" element={<UsersPage />} /><Route path="configuracion" element={<SettingsPage />} /><Route path="*" element={<div className="rounded-2xl border border-slate-200 bg-white p-10 text-center"><h1 className="text-2xl font-bold">Página no encontrada</h1><Link to="/" className="mt-5 inline-block text-teal-700 underline">Volver al inicio</Link></div>} /></Route></Routes></BrowserRouter>
+}

@@ -1,8 +1,13 @@
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
-  server: { host: true, watch: { usePolling: true } },
+  plugins: [react(), tailwindcss()],
+  server: {
+    host: true,
+    watch: { usePolling: true },
+    proxy: { '/api': { target: 'http://nginx', changeOrigin: true } },
+  },
 })
