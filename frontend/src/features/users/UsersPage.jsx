@@ -10,6 +10,7 @@ import {
   parseUsersCsv,
   validateUser,
 } from './usuariosCsv'
+import { filterUsers } from './usuariosFiltering'
 
 const emptyUser = Object.fromEntries(
   columns.map((key) => [key, key === 'tipo_personal' ? 'docente' : '']),
@@ -38,6 +39,7 @@ export default function UsersPage() {
     setSearchParams(value ? { q: value } : {}, { replace: true })
   }
   const [filter, setFilter] = useState('todos')
+  const [statusFilter, setStatusFilter] = useState('todos')
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
   const fileInput = useRef(null)
@@ -86,13 +88,11 @@ export default function UsersPage() {
     return { user, errors }
   })
   const invalid = checked.filter((item) => item.errors.length).length
-  const visible = users.filter(
-    (user) =>
-      (filter === 'todos' || user.tipo_personal === filter) &&
-      `${user.nombres} ${user.apellido_paterno} ${user.apellido_materno} ${user.numero_doc_identidad} ${user.email_institucional}`
-        .toLocaleLowerCase()
-        .includes(query.toLocaleLowerCase()),
-  )
+  const visible = filterUsers(users, {
+    query,
+    tipoPersonal: filter,
+    estado: statusFilter,
+  })
 
   async function readFile(file) {
     if (!file || busy || savingRef.current) return
@@ -553,6 +553,15 @@ export default function UsersPage() {
                 <option value="docente">Docentes</option>
                 <option value="administrativo">Administrativos</option>
               </select>
+              <select
+                aria-label="Filtrar por estado"
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value)}
+              >
+                <option value="todos">Todo estado</option>
+                <option value="activo">Activos</option>
+                <option value="inactivo">Inactivos</option>
+              </select>
             </div>
             <div className="overflow-x-auto">
               <table>
@@ -563,6 +572,7 @@ export default function UsersPage() {
                     <th>Correo institucional</th>
                     <th>Tipo de personal</th>
                     <th>Régimen laboral</th>
+                    <th>Estado</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -586,6 +596,13 @@ export default function UsersPage() {
                         </span>
                       </td>
                       <td>{user.regimen_laboral}</td>
+                      <td>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[10px] ${user.activo ? 'bg-[#eaf4ee] text-[#3d8060]' : 'bg-[#faf3e5] text-[#9b7a37]'}`}
+                        >
+                          {user.activo ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
