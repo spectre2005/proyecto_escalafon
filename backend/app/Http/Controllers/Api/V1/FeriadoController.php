@@ -2,9 +2,14 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Http\Controllers\Controller;
+use App\Models\Feriado;
 
-class FeriadoController extends Controller
+class FeriadoController extends ResourceController
 {
-    //
+    protected string $model = Feriado::class;
+
+    protected array $rules = [
+        'fecha' => 'required|date',
+        'descripcion' => 'required|string|max:120',
+    ];
 }

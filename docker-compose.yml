@@ -4,6 +4,8 @@ services:
     user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     volumes:
       - ./backend:/var/www/html
+      - php_vendor:/var/www/html/vendor
+      - ./docker/php/performance.ini:/usr/local/etc/php/conf.d/zz-performance.ini:ro
     depends_on:
       - db
 
@@ -41,3 +43,5 @@ services:
 
 volumes:
   dbdata:
+  php_vendor:
+    name: proyecto_escalafon_vendor

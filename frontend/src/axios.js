@@ -6,6 +6,20 @@ const api = axios.create({
   headers: { Accept: 'application/json' },
 })
 
+const updates = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('escalafon-updates') : null
+function notifyUpdate() {
+  window.dispatchEvent(new Event('records-updated'))
+}
+if (updates) updates.onmessage = notifyUpdate
+api.interceptors.response.use(response => {
+  if (['post', 'put', 'patch', 'delete'].includes(response.config.method)) {
+    notifyUpdate()
+    updates?.postMessage('updated')
+  }
+  return response
+})
+if (import.meta.hot) import.meta.hot.dispose(() => updates?.close())
+
 export function apiErrorMessage(error) {
   const errors = error.response?.data?.errors
   if (errors) {

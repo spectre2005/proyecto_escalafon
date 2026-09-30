@@ -3,7 +3,7 @@ import { apiErrorMessage } from '../../axios'
 import { saveUsers } from './usuariosApi'
 import { useUsers } from './useUsers'
 import Icon from '../../components/ui/Icon'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   columns,
   downloadCsv,
@@ -11,6 +11,7 @@ import {
   validateUser,
 } from './usuariosCsv'
 import { filterUsers } from './usuariosFiltering'
+import { updateUserDraft } from './usuariosEmail'
 
 const emptyUser = Object.fromEntries(
   columns.map((key) => [key, key === 'tipo_personal' ? 'docente' : '']),
@@ -200,7 +201,7 @@ export default function UsersPage() {
           </section>
 
           <div
-            className="grid scroll-mt-5 grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_275px]"
+            className="grid scroll-mt-5 grid-cols-1 gap-6"
             id="carga"
           >
             <section className="overflow-hidden rounded-xl border border-[#e0e9e4] bg-white">
@@ -305,6 +306,7 @@ export default function UsersPage() {
                           ' *'}
                         <input
                           name={key}
+                          placeholder={key === 'email_institucional' ? 'nombre-apellido@uniq.edu.pe' : undefined}
                           value={draft[key]}
                           type={
                             key === 'email_institucional' ? 'email' : 'text'
@@ -329,9 +331,12 @@ export default function UsersPage() {
                             !['apellido_materno', 'telefono'].includes(key)
                           }
                           onChange={(event) =>
-                            setDraft({ ...draft, [key]: event.target.value })
+                            setDraft(updateUserDraft(draft, key, event.target.value))
                           }
                         />
+                        {key === 'email_institucional' && (
+                          <small>Se completa con el primer nombre y apellido paterno. Puedes editarlo.</small>
+                        )}
                       </label>
                     ))}
                     <label>
@@ -363,40 +368,7 @@ export default function UsersPage() {
                 </form>
               )}
             </section>
-            <aside className="rounded-xl border border-[#dceae1] bg-[#edf5f1] px-6 py-7 [&_h2]:mt-3 [&_h2]:text-base [&_ol]:mt-6 [&_ol]:[counter-reset:steps] md:[&_ol]:grid md:[&_ol]:grid-cols-3 md:[&_ol]:gap-5 xl:[&_ol]:block [&_li]:relative [&_li]:mb-5 [&_li]:pl-8 [&_li]:[counter-increment:steps] md:[&_li]:mb-0 xl:[&_li]:mb-6 [&_li]:before:absolute [&_li]:before:-top-1 [&_li]:before:left-0 [&_li]:before:grid [&_li]:before:size-5.5 [&_li]:before:place-items-center [&_li]:before:rounded-full [&_li]:before:bg-[#dfede4] [&_li]:before:text-[10px] [&_li]:before:text-[#5b8870] [&_li]:before:content-[counter(steps)] [&_li_strong]:text-xs [&_li_strong]:font-semibold [&_li_p]:mt-1.5 [&_li_p]:text-[11px] [&_li_p]:leading-loose [&_li_p]:text-[#7d9485]">
-              <span className="text-[9px] tracking-[1.7px] text-[#729580]">
-                GUÍA DE CARGA
-              </span>
-              <h2>Todo listo para empezar</h2>
-              <ol>
-                <li>
-                  <strong>Prepara la información</strong>
-                  <p>
-                    Usa la plantilla y conserva los encabezados. Completa una
-                    fila por usuario.
-                  </p>
-                </li>
-                <li>
-                  <strong>Revisa los datos</strong>
-                  <p>
-                    El DNI debe tener 8 dígitos. El DNI y el correo no deben
-                    repetirse.
-                  </p>
-                </li>
-                <li>
-                  <strong>Confirma la carga</strong>
-                  <p>
-                    Revisa la vista previa y corrige los errores antes de
-                    agregar los registros.
-                  </p>
-                </li>
-              </ol>
-              <div className="mt-5 border-t border-[#d6e6db] pt-4.5 text-[10px] leading-loose text-[#718978]">
-                En <strong>tipo_personal</strong>, escribe{' '}
-                <strong>docente</strong> o <strong>administrativo</strong>.
-                Conserva los ceros iniciales del DNI.
-              </div>
-            </aside>
+
           </div>
 
           <div
@@ -579,10 +551,10 @@ export default function UsersPage() {
                   {visible.map((user) => (
                     <tr key={user.numero_doc_identidad}>
                       <td>
-                        <strong>
+                        <Link to={`/legajos/${user.id}`} className="font-semibold text-teal-800 hover:underline">
                           {user.nombres} {user.apellido_paterno}{' '}
                           {user.apellido_materno}
-                        </strong>
+                        </Link>
                       </td>
                       <td>{user.numero_doc_identidad}</td>
                       <td>{user.email_institucional}</td>

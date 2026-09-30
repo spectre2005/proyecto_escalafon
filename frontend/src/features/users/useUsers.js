@@ -18,6 +18,21 @@ export function useUsers() {
     })
     return () => controller.abort()
   }, [revision])
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === 'visible') setRevision(value => value + 1)
+    }
+    window.addEventListener('records-updated', refresh)
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    const interval = setInterval(refresh, 5000)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('records-updated', refresh)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [])
   function refreshUsers() {
     if (loading) return
     setLoading(true)

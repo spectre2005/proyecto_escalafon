@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Legajo;
 use App\Models\Usuario;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -108,6 +109,30 @@ class UsuariosApiTest extends TestCase
         $rows[100]['numero_doc_identidad'] = '99999999';
         $this->postJson('/api/v1/usuarios', ['usuarios' => $rows])->assertStatus(500);
         $this->assertDatabaseCount('usuarios', 0);
+    }
+
+    public function test_user_can_be_read_updated_and_deleted(): void
+    {
+        $usuario = Usuario::factory()->create();
+        $uri = '/api/v1/usuarios/'.$usuario->id;
+        $this->getJson($uri)->assertOk()->assertJsonPath('data.id', $usuario->id);
+        $this->patchJson($uri, ['nombres' => 'Ana', 'email_institucional' => 'ANA@uniq.edu.pe'])
+            ->assertOk()->assertJsonPath('data.nombres', 'Ana')
+            ->assertJsonPath('data.email_institucional', 'ana@uniq.edu.pe');
+        $this->assertDatabaseHas('usuarios', ['id' => $usuario->id, 'nombres' => 'Ana']);
+        $this->patchJson($uri, ['activo' => true])->assertUnprocessable();
+        $other = Usuario::factory()->create();
+        $this->patchJson($uri, ['email_institucional' => strtoupper($other->email_institucional)])
+            ->assertUnprocessable();
+        $this->deleteJson($uri)->assertNoContent();
+        $this->getJson($uri)->assertNotFound();
+    }
+
+    public function test_user_with_related_records_cannot_be_deleted(): void
+    {
+        $legajo = Legajo::factory()->create();
+        $this->deleteJson('/api/v1/usuarios/'.$legajo->usuario_id)->assertConflict();
+        $this->assertDatabaseHas('usuarios', ['id' => $legajo->usuario_id]);
     }
 
     public function test_api_is_disabled_outside_local_development(): void

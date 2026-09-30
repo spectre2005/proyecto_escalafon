@@ -6,12 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreUsuariosRequest;
 use App\Http\Resources\UsuarioResource;
 use App\Models\Usuario;
+use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Unique;
 use Illuminate\Validation\ValidationException;
 
 class UsuarioController extends Controller
@@ -19,6 +23,61 @@ class UsuarioController extends Controller
     public function index(): AnonymousResourceCollection
     {
         return UsuarioResource::collection(Usuario::query()->orderBy('id')->paginate(100));
+    }
+
+    public function show(string $record): UsuarioResource
+    {
+        return new UsuarioResource(Usuario::query()->findOrFail($record));
+    }
+
+    public function update(Request $request, string $record): UsuarioResource
+    {
+        $usuario = Usuario::query()->findOrFail($record);
+        $rules = [];
+        foreach ((new StoreUsuariosRequest)->rules() as $field => $fieldRules) {
+            if (! str_starts_with($field, 'usuarios.*.')) {
+                continue;
+            }
+            $field = substr($field, strlen('usuarios.*.'));
+            $rules[$field] = ['sometimes', ...array_filter($fieldRules, fn (mixed $rule): bool => ! $rule instanceof Unique
+                && ! (is_string($rule) && str_starts_with($rule, 'distinct:'))
+            )];
+        }
+        $rules['numero_doc_identidad'][] = Rule::unique('usuarios', 'numero_doc_identidad')->ignore($usuario);
+        $unknown = array_diff(array_keys($request->all()), array_keys($rules));
+        if ($unknown !== []) {
+            throw ValidationException::withMessages(array_fill_keys($unknown, 'Campo no permitido.'));
+        }
+        $data = $request->validate($rules);
+        if (isset($data['email_institucional'])) {
+            $data['email_institucional'] = strtolower($data['email_institucional']);
+            if (Usuario::query()->whereKeyNot($usuario->id)->whereRaw('LOWER(email_institucional) = ?', [$data['email_institucional']])->exists()) {
+                throw ValidationException::withMessages(['email_institucional' => 'Este correo ya está registrado.']);
+            }
+        }
+        try {
+            $usuario->update($data);
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages(['usuario' => 'Un DNI o correo ya está registrado.']);
+        }
+
+        return new UsuarioResource($usuario->refresh());
+    }
+
+    public function destroy(string $record): JsonResponse
+    {
+        $usuario = Usuario::query()->findOrFail($record);
+        try {
+            $usuario->delete();
+        } catch (QueryException $exception) {
+            if (! str_starts_with((string) $exception->getCode(), '23')) {
+                throw $exception;
+            }
+
+            return response()->json(['message' => 'El usuario tiene registros relacionados.'], 409);
+        }
+
+        return response()->json(null, 204);
     }
 
     public function store(StoreUsuariosRequest $request): JsonResponse
