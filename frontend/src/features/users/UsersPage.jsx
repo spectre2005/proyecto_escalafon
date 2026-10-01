@@ -55,7 +55,7 @@ export default function UsersPage() {
     setMessage(null)
     try {
       const saved = await saveUsers(records)
-      setUsers((previous) => [...saved, ...previous])
+      setUsers((previous) => [...saved, ...previous.filter(user => !saved.some(record => record.id === user.id))])
       setMessage({
         text: `${saved.length} registro(s) guardado(s) en la base de datos.`,
       })

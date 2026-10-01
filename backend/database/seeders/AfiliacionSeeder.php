@@ -12,7 +12,9 @@ class AfiliacionSeeder extends Seeder
         if (! app()->environment(['local', 'testing'])) {
             return;
         }
-
+        if (Afiliacion::count() > 0) {
+            return;
+        }
         Afiliacion::factory()->create();
     }
 }

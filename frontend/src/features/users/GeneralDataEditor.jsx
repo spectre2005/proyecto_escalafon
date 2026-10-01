@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import api, { apiErrorMessage } from '../../axios'
 import { useLiveQuery } from './useLiveQuery'
 
@@ -19,8 +19,14 @@ function LocationInput({ field, title, value, onChange, region, provincia, disab
   const query = new URLSearchParams()
   if (field !== 'region' && region) query.set('region', region)
   if (field === 'distrito' && provincia) query.set('provincia', provincia)
-  const request = useLiveQuery(`/ubicaciones?${query}`)
-  return <label className="flex flex-col gap-2 text-xs font-medium text-slate-600">{title}<input className={inputClass} list={`ubicacion-${field}`} value={value} onChange={event => onChange(event.target.value)} maxLength={100} disabled={disabled} placeholder={`Selecciona o escribe ${title.toLowerCase()}`} autoComplete="off" /><datalist id={`ubicacion-${field}`}>{request.data?.data.map(option => <option key={option} value={option} />)}</datalist>{request.error && <span className="text-amber-700">No se cargaron las sugerencias. Puedes escribir la ubicación.</span>}</label>
+  const url = `/ubicaciones?${query}`
+  const [debouncedUrl, setDebouncedUrl] = useState(url)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedUrl(url), 250)
+    return () => clearTimeout(timer)
+  }, [url])
+  const request = useLiveQuery(debouncedUrl)
+  return <label className="flex flex-col gap-2 text-xs font-medium text-slate-600">{title}<input className={inputClass} list={`ubicacion-${field}`} value={value} onChange={event => onChange(event.target.value)} maxLength={100} disabled={disabled} placeholder={`Selecciona o escribe ${title.toLowerCase()}`} autoComplete="off" /><datalist id={`ubicacion-${field}`}>{debouncedUrl === url && request.data?.data.map(option => <option key={option} value={option} />)}</datalist>{request.error && <span className="text-amber-700">No se cargaron las sugerencias. Puedes escribir la ubicación.</span>}</label>
 }
 
 export default function GeneralDataEditor({ usuario, data, onSaved, onCancel }) {

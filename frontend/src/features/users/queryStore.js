@@ -42,8 +42,13 @@ export function createQueryStore(load, { maxEntries = 40, now = Date.now } = {})
     subscribe(url, listener) {
       const item = entry(url)
       item.listeners.add(listener)
-      if (!item.checkedAt || now() - item.checkedAt >= 5000) void refresh(url)
-      return () => item.listeners.delete(listener)
+      void refresh(url)
+      return () => {
+        item.listeners.delete(listener)
+        queueMicrotask(() => {
+          if (!item.listeners.size && item.pending) cancel(item)
+        })
+      }
     },
     refresh,
     setData(url, data) {
