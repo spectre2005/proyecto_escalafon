@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\RegimenNormativo;
 use App\Models\Ubigeo;
+use App\Models\UnidadOrganica;
 use App\Models\Usuario;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -61,7 +63,7 @@ class UpdateExpedienteTest extends TestCase
     {
         $person = Usuario::factory()->create();
         $uri = '/api/v1/expedientes/'.$person->id;
-        foreach ([['password' => 'secret'], ['activo' => true], ['tipo_personal' => 'docente'], ['ubicacion' => []], ['ubicacion' => ['region' => 'X']], ['fecha_nacimiento' => '2999-01-01']] as $invalid) {
+        foreach ([['password' => 'secret'], ['activo' => 'invalid'], ['tipo_personal' => 'invalid'], ['ubicacion' => []], ['ubicacion' => ['region' => 'X']], ['fecha_nacimiento' => '2999-01-01']] as $invalid) {
             $this->patchJson($uri, ['nombres' => 'No guardar', ...$invalid])->assertUnprocessable();
         }
         $this->assertNotSame('No guardar', $person->refresh()->nombres);
@@ -77,6 +79,45 @@ class UpdateExpedienteTest extends TestCase
             'ubicacion' => ['region' => 'X', 'provincia' => 'Y', 'distrito' => 'Z'],
         ])->assertUnprocessable()->assertJsonValidationErrors('email_institucional');
         $this->assertDatabaseCount('ubigeo', 0);
+    }
+
+    public function test_labor_fields_and_flags_can_be_edited_and_cleared(): void
+    {
+        $unit = UnidadOrganica::factory()->create();
+        $regime = RegimenNormativo::factory()->create();
+        $person = Usuario::factory()->create();
+        $uri = '/api/v1/expedientes/'.$person->id;
+        $this->patchJson($uri, [
+            'nombre_puesto' => 'Puesto de prueba', 'unidad_organica_id' => $unit->id,
+            'regimen_normativo_id' => $regime->id, 'regimen_laboral' => 'Prueba',
+            'tipo_personal' => 'administrativo', 'con_discapacidad' => true,
+            'activo' => false, 'obligado_djbr' => true, 'exige_colegiatura' => true,
+            'tiene_periodo_prueba' => true, 'tiene_derechohabientes' => true,
+        ])->assertOk()->assertJsonPath('data.usuario.values.unidad_organica_id', $unit->nombre)
+            ->assertJsonPath('data.edit_values.unidad_organica_id', $unit->id)
+            ->assertJsonPath('data.usuario.values.nombre_puesto', 'Puesto de prueba')
+            ->assertJsonPath('data.usuario.values.con_discapacidad', true)
+            ->assertJsonPath('data.usuario.values.activo', false);
+        $this->assertDatabaseHas('usuarios', ['id' => $person->id, 'unidad_organica_id' => $unit->id, 'regimen_normativo_id' => $regime->id]);
+        $this->patchJson($uri, ['unidad_organica_id' => null, 'regimen_normativo_id' => null, 'con_discapacidad' => false, 'activo' => true])
+            ->assertOk()->assertJsonPath('data.edit_values.unidad_organica_id', null)
+            ->assertJsonPath('data.usuario.values.con_discapacidad', false)->assertJsonPath('data.usuario.values.activo', true);
+        $this->patchJson($uri, ['unidad_organica_id' => '00000000-0000-4000-8000-000000000000'])
+            ->assertUnprocessable()->assertJsonValidationErrors('unidad_organica_id');
+        $this->getJson('/api/v1/expediente-opciones')->assertOk()
+            ->assertJsonPath('data.unidades.0.id', $unit->id)->assertJsonPath('data.regimenes.0.id', $regime->id);
+    }
+
+    public function test_identity_edits_validate_dni_and_duplicates(): void
+    {
+        $person = Usuario::factory()->create(['numero_doc_identidad' => '12345678']);
+        $other = Usuario::factory()->create(['numero_doc_identidad' => '87654321']);
+        $uri = '/api/v1/expedientes/'.$person->id;
+        $this->patchJson($uri, ['numero_doc_identidad' => $other->numero_doc_identidad])->assertUnprocessable();
+        $this->patchJson($uri, ['numero_doc_identidad' => '123'])->assertUnprocessable();
+        $this->patchJson($uri, ['numero_doc_identidad' => '00112233'])->assertOk()->assertJsonPath('data.usuario.values.numero_doc_identidad', '00112233');
+        $this->patchJson($uri, ['tipo_doc_identidad' => 'pasaporte', 'numero_doc_identidad' => 'TEST-1234'])->assertOk();
+        $this->patchJson($uri, ['tipo_doc_identidad' => 'dni'])->assertUnprocessable();
     }
 
     public function test_stale_edit_cannot_overwrite_a_more_recent_update(): void
@@ -95,5 +136,6 @@ class UpdateExpedienteTest extends TestCase
         $this->app->instance('env', 'production');
         $this->patchJson('/api/v1/expedientes/'.$person->id, ['nombres' => 'No guardar'])->assertForbidden();
         $this->getJson('/api/v1/ubicaciones')->assertForbidden();
+        $this->getJson('/api/v1/expediente-opciones')->assertForbidden();
     }
 }
