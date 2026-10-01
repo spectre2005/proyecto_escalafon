@@ -56,9 +56,10 @@ export default function PersonalPhoto({ usuario, nombre }) {
     }
   }
 
-  return <aside className="w-44 shrink-0 self-start sm:ml-auto" aria-label="Foto del personal">
-    <div className="flex aspect-[3/4] items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-teal-200 bg-white text-center text-sm text-slate-400">
-      {photo ? <img src={photo} alt={`Foto de ${nombre}`} className="h-full w-full object-cover" /> : <span className="p-4">Foto del personal</span>}
+  return <aside className="w-40 shrink-0 self-start md:ml-auto" aria-label="Foto del personal">
+    <p className="mb-2 text-xs font-medium text-slate-500">Fotografía del personal</p>
+    <div className={`flex aspect-[3/4] items-center justify-center overflow-hidden rounded-xl border bg-slate-50 text-center text-sm text-slate-400 ${photo ? 'border-slate-200' : 'border-dashed border-teal-200'}`}>
+      {photo ? <img src={photo} alt={`Foto de ${nombre}`} className="h-full w-full object-cover" /> : <span className="p-4">Sin fotografía registrada</span>}
     </div>
     <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" aria-label="Seleccionar foto del personal" className="sr-only" disabled={busy} onChange={upload} />
     <button type="button" disabled={busy} onClick={() => input.current?.click()} className="mt-3 w-full rounded-xl border border-teal-200 bg-white px-3 py-2 text-sm font-semibold text-teal-800 disabled:opacity-50">{busy ? 'Subiendo…' : photo ? 'Cambiar foto' : 'Subir foto'}</button>

@@ -25,6 +25,7 @@ class Usuario extends Authenticatable
     protected $table = 'usuarios';
 
     protected $fillable = [
+        'foto_path',
         'tipo_doc_identidad',
         'numero_doc_identidad',
         'apellido_paterno',

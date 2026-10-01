@@ -7,7 +7,8 @@ services:
       - php_vendor:/var/www/html/vendor
       - ./docker/php/performance.ini:/usr/local/etc/php/conf.d/zz-performance.ini:ro
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   nginx:
     image: nginx:alpine
@@ -32,6 +33,11 @@ services:
 
   db:
     image: postgres:16-alpine
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
     environment:
       POSTGRES_DB: ${DB_DATABASE:-escalafon}
       POSTGRES_USER: ${DB_USERNAME:-app}
