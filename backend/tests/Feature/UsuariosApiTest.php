@@ -54,6 +54,23 @@ class UsuariosApiTest extends TestCase
         $this->assertDatabaseCount('usuarios', 0);
     }
 
+    public function test_regime_must_belong_to_the_staff_type(): void
+    {
+        $this->postJson('/api/v1/usuarios', ['usuarios' => [
+            $this->payload(['tipo_personal' => 'docente', 'regimen_laboral' => '30220']),
+            $this->payload(['tipo_personal' => 'administrativo', 'regimen_laboral' => '30057']),
+        ]])->assertCreated();
+
+        $this->postJson('/api/v1/usuarios', ['usuarios' => [
+            $this->payload(['tipo_personal' => 'docente', 'regimen_laboral' => '276']),
+            $this->payload(['tipo_personal' => 'administrativo', 'regimen_laboral' => '30220']),
+            $this->payload(['tipo_personal' => 'administrativo', 'regimen_laboral' => 'Otro']),
+        ]])->assertUnprocessable()->assertJsonValidationErrors([
+            'usuarios.0.regimen_laboral', 'usuarios.1.regimen_laboral', 'usuarios.2.regimen_laboral',
+        ]);
+        $this->assertDatabaseCount('usuarios', 2);
+    }
+
     public function test_duplicates_in_the_file_are_rejected_case_insensitively(): void
     {
         $this->postJson('/api/v1/usuarios', ['usuarios' => [

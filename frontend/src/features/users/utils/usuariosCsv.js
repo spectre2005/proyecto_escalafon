@@ -1,3 +1,5 @@
+import { regimenesPorTipo } from './regimenesLaborales'
+
 export const columns = ['numero_doc_identidad', 'nombres', 'apellido_paterno', 'apellido_materno', 'email_institucional', 'tipo_personal', 'regimen_laboral', 'telefono']
 
 export function validateUser(user) {
@@ -8,7 +10,8 @@ export function validateUser(user) {
   if (user.apellido_materno.length > 80) errors.push('El apellido materno admite hasta 80 caracteres.')
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.email_institucional) || user.email_institucional.length > 255) errors.push('El correo no es válido.')
   if (!['docente', 'administrativo'].includes(user.tipo_personal)) errors.push('El tipo debe ser docente o administrativo.')
-  if (!user.regimen_laboral || user.regimen_laboral.length > 20) errors.push('El régimen laboral es obligatorio (máximo 20 caracteres).')
+  const regimenes = (regimenesPorTipo[user.tipo_personal] || []).map(regimen => regimen.value)
+  if (regimenes.length && !regimenes.includes(user.regimen_laboral)) errors.push(`El régimen laboral debe ser uno de: ${regimenes.join(', ')}.`)
   if (user.telefono && !/^[+\d()\s-]{6,20}$/.test(user.telefono)) errors.push('El teléfono no es válido.')
   return errors
 }
