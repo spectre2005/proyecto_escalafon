@@ -63,6 +63,7 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->middleware(LocalDevelopmentOnly::class)->group(function (): void {
     Route::get('expedientes', [ExpedienteController::class, 'index']);
     Route::get('ubicaciones', [ExpedienteController::class, 'locations']);
+    Route::get('expediente-opciones', [ExpedienteController::class, 'editOptions']);
     Route::patch('expedientes/{usuario}', [ExpedienteController::class, 'update'])->whereUuid('usuario');
     Route::get('expedientes/{usuario}', [ExpedienteController::class, 'show'])->whereUuid('usuario');
     Route::get('expedientes/{usuario}/{section}', [ExpedienteController::class, 'section'])->whereUuid('usuario');

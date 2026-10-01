@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Usuario;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class UpdateExpedienteRequest extends FormRequest
@@ -24,6 +26,8 @@ class UpdateExpedienteRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'tipo_doc_identidad' => 'sometimes|required|string|max:15',
+            'numero_doc_identidad' => ['sometimes', 'required', 'string', 'max:20', Rule::unique('usuarios', 'numero_doc_identidad')->ignore($this->route('usuario'))],
             'nombres' => 'sometimes|required|string|max:120',
             'apellido_paterno' => 'sometimes|required|string|max:80',
             'apellido_materno' => 'sometimes|nullable|string|max:80',
@@ -33,6 +37,17 @@ class UpdateExpedienteRequest extends FormRequest
             'domicilio' => 'sometimes|nullable|string|max:250',
             'telefono' => ['sometimes', 'nullable', 'string', 'regex:/^[+0-9()\s-]{6,20}$/'],
             'email_institucional' => 'sometimes|required|string|email:rfc|max:255',
+            'tipo_personal' => 'sometimes|required|in:docente,administrativo',
+            'regimen_laboral' => 'sometimes|required|string|max:20',
+            'nombre_puesto' => 'sometimes|nullable|string|max:150',
+            'unidad_organica_id' => 'sometimes|nullable|uuid|exists:unidades_organicas,id',
+            'regimen_normativo_id' => 'sometimes|nullable|uuid|exists:regimenes_normativos,id',
+            'activo' => 'sometimes|required|boolean',
+            'con_discapacidad' => 'sometimes|required|boolean',
+            'obligado_djbr' => 'sometimes|required|boolean',
+            'exige_colegiatura' => 'sometimes|required|boolean',
+            'tiene_periodo_prueba' => 'sometimes|required|boolean',
+            'tiene_derechohabientes' => 'sometimes|required|boolean',
             'ubicacion' => 'sometimes|nullable|array:region,provincia,distrito|min:3',
             'ubicacion.region' => 'required_with:ubicacion|string|max:100',
             'ubicacion.provincia' => 'required_with:ubicacion|string|max:100',
@@ -45,6 +60,14 @@ class UpdateExpedienteRequest extends FormRequest
         $validator->after(function (Validator $validator): void {
             foreach (array_diff(array_keys($this->all()), array_keys($this->rules())) as $field) {
                 $validator->errors()->add($field, 'Campo no editable desde la ficha general.');
+            }
+            if ($this->hasAny(['tipo_doc_identidad', 'numero_doc_identidad'])) {
+                $person = Usuario::query()->findOrFail($this->route('usuario'));
+                $type = $this->input('tipo_doc_identidad', $person->tipo_doc_identidad);
+                $number = $this->input('numero_doc_identidad', $person->numero_doc_identidad);
+                if ($type === 'dni' && (! is_string($number) || ! preg_match('/^[0-9]{8}$/', $number))) {
+                    $validator->errors()->add('numero_doc_identidad', 'El DNI debe contener 8 dígitos.');
+                }
             }
         });
     }

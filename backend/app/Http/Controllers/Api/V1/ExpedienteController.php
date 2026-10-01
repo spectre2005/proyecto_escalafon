@@ -41,6 +41,7 @@ use App\Models\ProgresionCarrera;
 use App\Models\RatificacionDocente;
 use App\Models\Reconocimiento;
 use App\Models\ReferenciaLegajoPasivo;
+use App\Models\RegimenNormativo;
 use App\Models\RegistroSstBienestar;
 use App\Models\RequerimientoDocumento;
 use App\Models\Sancion;
@@ -50,16 +51,17 @@ use App\Models\SolicitudFiscalizacion;
 use App\Models\TiempoServicioReconocido;
 use App\Models\TipoDocumento;
 use App\Models\Ubigeo;
+use App\Models\UnidadOrganica;
 use App\Models\Usuario;
 use App\Models\UsuarioRol;
 use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Validation\ValidationException;
 
 class ExpedienteController extends Controller
@@ -202,6 +204,7 @@ class ExpedienteController extends Controller
         return response()->json(['data' => [
             'version' => $this->version($person),
             'usuario' => $this->present($person),
+            'edit_values' => $person->only(['unidad_organica_id', 'regimen_normativo_id']),
             'nombre' => trim($person->nombres.' '.$person->apellido_paterno.' '.$person->apellido_materno),
             'document_sections' => SeccionLegajo::query()->orderBy('orden')->get(['id', 'nombre']),
             'document_states' => DocumentoUsuario::query()->where('usuario_id', $usuario)->whereHas('legajo', fn (Builder $query): Builder => $query->where('usuario_id', $usuario))->distinct()->orderBy('estado')->pluck('estado'),
@@ -245,14 +248,23 @@ class ExpedienteController extends Controller
                 $person->update($data);
             });
         } catch (UniqueConstraintViolationException) {
-            throw ValidationException::withMessages(['email_institucional' => 'Este correo ya está registrado.']);
+            throw ValidationException::withMessages(['usuario' => 'El documento de identidad o correo ya está registrado.']);
         }
+
         return $this->show($usuario);
     }
 
     private function version(Usuario $person): string
     {
         return hash('sha256', json_encode($person->only(array_diff($person->getFillable(), ['password', 'ultimo_acceso'])), JSON_THROW_ON_ERROR));
+    }
+
+    public function editOptions(): JsonResponse
+    {
+        return response()->json(['data' => [
+            'unidades' => UnidadOrganica::query()->orderBy('nombre')->get(['id', 'nombre', 'activo']),
+            'regimenes' => RegimenNormativo::query()->orderBy('nombre')->get(['id', 'nombre', 'activo']),
+        ]]);
     }
 
     public function locations(Request $request): JsonResponse
@@ -266,6 +278,7 @@ class ExpedienteController extends Controller
             $query->where('provincia', $filters['provincia']);
         }
         $column = ! empty($filters['region']) ? (! empty($filters['provincia']) ? 'distrito' : 'provincia') : 'region';
+
         return response()->json(['data' => $query->distinct()->orderBy($column)->pluck($column)]);
     }
 
@@ -341,6 +354,7 @@ class ExpedienteController extends Controller
                 foreach (['region', 'provincia', 'distrito'] as $part) {
                     $values[$part] = $record->ubigeo?->{$part};
                 }
+
                 continue;
             }
             if (isset($relations[$field])) {
