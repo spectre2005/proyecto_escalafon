@@ -16,7 +16,6 @@ use App\Http\Controllers\Api\V1\DesplazamientoController;
 use App\Http\Controllers\Api\V1\DesvinculacionController;
 use App\Http\Controllers\Api\V1\DocumentoUsuarioController;
 use App\Http\Controllers\Api\V1\EvaluacionDesempenoController;
-use App\Http\Controllers\Api\V1\ExpedienteController;
 use App\Http\Controllers\Api\V1\ExperienciaLaboralController;
 use App\Http\Controllers\Api\V1\FamiliarController;
 use App\Http\Controllers\Api\V1\FeriadoController;
@@ -25,6 +24,8 @@ use App\Http\Controllers\Api\V1\GoceVacacionalController;
 use App\Http\Controllers\Api\V1\HistorialEstadoDocumentoController;
 use App\Http\Controllers\Api\V1\InduccionController;
 use App\Http\Controllers\Api\V1\LegajoController;
+use App\Http\Controllers\Api\V1\Legajos\ExpedienteController;
+use App\Http\Controllers\Api\V1\Legajos\FotoPersonalController;
 use App\Http\Controllers\Api\V1\LegajoSeccionController;
 use App\Http\Controllers\Api\V1\LicenciaPermisoController;
 use App\Http\Controllers\Api\V1\MovimientoCustodiaLegajoController;
@@ -66,6 +67,8 @@ Route::prefix('v1')->middleware(LocalDevelopmentOnly::class)->group(function ():
     Route::get('expediente-opciones', [ExpedienteController::class, 'editOptions']);
     Route::patch('expedientes/{usuario}', [ExpedienteController::class, 'update'])->whereUuid('usuario');
     Route::get('expedientes/{usuario}', [ExpedienteController::class, 'show'])->whereUuid('usuario');
+    Route::get('expedientes/{usuario}/foto', [FotoPersonalController::class, 'show'])->whereUuid('usuario');
+    Route::post('expedientes/{usuario}/foto', [FotoPersonalController::class, 'store'])->whereUuid('usuario');
     Route::get('expedientes/{usuario}/{section}', [ExpedienteController::class, 'section'])->whereUuid('usuario');
 
     Route::apiResource('usuarios', UsuarioController::class)->only(['show', 'update', 'destroy'])->parameters(['usuarios' => 'record'])->whereUuid('record')->names('api.v1.usuarios');

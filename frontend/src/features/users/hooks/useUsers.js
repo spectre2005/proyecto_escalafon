@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { apiErrorMessage } from '../../axios'
-import { listUsers } from './usuariosApi'
+import { apiErrorMessage } from '../../../axios'
+import { listUsers } from '../api/usuariosApi'
 
 export function useUsers() {
   const [users, setUsers] = useState([])

@@ -30,6 +30,14 @@ return [
 
     'disks' => [
 
+        'personal_photos' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/fotos-personal'),
+            'visibility' => 'private',
+            'throw' => false,
+            'report' => false,
+        ],
+
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),

@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
-import api, { apiErrorMessage } from '../../axios'
-import { useLiveQuery } from './useLiveQuery'
+import api, { apiErrorMessage } from '../../../axios'
+import { useLiveQuery } from '../../../shared/queries/useLiveQuery'
 
 const inputClass = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-teal-600 disabled:bg-slate-50 disabled:text-slate-400'
 const fields = [
-  ['tipo_doc_identidad', 'Tipo de documento de identidad', 'text', 15, true],
-  ['numero_doc_identidad', 'Número de documento de identidad', 'text', 20, true],
   ['nombres', 'Nombres', 'text', 120, true],
   ['apellido_paterno', 'Apellido paterno', 'text', 80, true],
   ['apellido_materno', 'Apellido materno', 'text', 80],
+  ['tipo_doc_identidad', 'Tipo de documento de identidad', 'text', 15, true],
+  ['numero_doc_identidad', 'Número de documento de identidad', 'text', 20, true],
   ['fecha_nacimiento', 'Fecha de nacimiento', 'date'],
   ['nacionalidad', 'Nacionalidad', 'text', 60],
   ['estado_civil', 'Estado civil', 'text', 15],

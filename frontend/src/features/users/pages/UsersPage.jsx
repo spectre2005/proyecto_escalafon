@@ -1,17 +1,17 @@
 import { useRef, useState } from 'react'
-import { apiErrorMessage } from '../../axios'
-import { saveUsers } from './usuariosApi'
-import { useUsers } from './useUsers'
-import Icon from '../../components/ui/Icon'
+import { apiErrorMessage } from '../../../axios'
+import { saveUsers } from '../api/usuariosApi'
+import { useUsers } from '../hooks/useUsers'
+import Icon from '../../../components/ui/Icon'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   columns,
   downloadCsv,
   parseUsersCsv,
   validateUser,
-} from './usuariosCsv'
-import { filterUsers } from './usuariosFiltering'
-import { updateUserDraft } from './usuariosEmail'
+} from '../utils/usuariosCsv'
+import { filterUsers } from '../utils/usuariosFiltering'
+import { updateUserDraft } from '../utils/usuariosEmail'
 
 const emptyUser = Object.fromEntries(
   columns.map((key) => [key, key === 'tipo_personal' ? 'docente' : '']),

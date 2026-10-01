@@ -1,8 +1,8 @@
 import { BrowserRouter, Link, Route, Routes } from 'react-router-dom'
 import AdminLayout from '../layouts/AdminLayout'
 import DashboardPage from '../features/dashboard/DashboardPage'
-import UsersPage from '../features/users/UsersPage'
-import LegajosPage from '../features/users/LegajosPage'
+import UsersPage from '../features/users/pages/UsersPage'
+import LegajosPage from '../features/legajos/pages/LegajosPage'
 import SettingsPage from '../features/settings/SettingsPage'
 
 export default function App() {

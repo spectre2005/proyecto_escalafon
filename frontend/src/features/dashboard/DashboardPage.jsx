@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import Icon from '../../components/ui/Icon'
-import { useUsers } from '../users/useUsers'
+import { useUsers } from '../users/hooks/useUsers'
 
 const pendingModules = [
   { name: 'Evaluaciones', text: 'Seguimiento del desarrollo profesional', icon: 'chart', color: 'bg-violet-50 text-violet-700' },
