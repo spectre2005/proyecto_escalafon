@@ -242,7 +242,11 @@ class ExpedienteController extends Controller
                             $location[$field] = mb_strtoupper(trim($value));
                             $existing->whereRaw('LOWER('.$field.') = ?', [mb_strtolower(trim($value))]);
                         }
-                        $data['ubigeo_id'] = ($existing->first() ?? Ubigeo::query()->create($location))->id;
+                        $matched = $existing->first();
+                        if (! $matched) {
+                            throw ValidationException::withMessages(['ubicacion.distrito' => 'Selecciona una región, provincia y distrito del catálogo.']);
+                        }
+                        $data['ubigeo_id'] = $matched->id;
                     }
                 }
                 $person->update($data);

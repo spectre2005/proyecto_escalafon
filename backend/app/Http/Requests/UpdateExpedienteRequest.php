@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\Usuario;
+use App\Models\Ubigeo;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -67,6 +68,16 @@ class UpdateExpedienteRequest extends FormRequest
                 $number = $this->input('numero_doc_identidad', $person->numero_doc_identidad);
                 if ($type === 'dni' && (! is_string($number) || ! preg_match('/^[0-9]{8}$/', $number))) {
                     $validator->errors()->add('numero_doc_identidad', 'El DNI debe contener 8 dígitos.');
+                }
+            }
+            $location = $this->input('ubicacion');
+            if (is_array($location) && isset($location['region'], $location['provincia'], $location['distrito'])) {
+                $exists = Ubigeo::query();
+                foreach (['region', 'provincia', 'distrito'] as $field) {
+                    $exists->whereRaw('LOWER('.$field.') = ?', [mb_strtolower(trim($location[$field]))]);
+                }
+                if (! $exists->exists()) {
+                    $validator->errors()->add('ubicacion.distrito', 'Selecciona una región, provincia y distrito del catálogo.');
                 }
             }
         });
