@@ -10,6 +10,8 @@ use App\Models\Legajo;
 use App\Models\SeccionLegajo;
 use App\Models\Usuario;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -65,7 +67,7 @@ class Seccion01ApiTest extends TestCase
         $this->postJson($url, ['persona' => 'servidor', 'numero_conadis' => 'C-1', 'fecha_emision' => '2024-05-01', 'vigente_hasta' => '2024-01-01'])->assertUnprocessable()->assertJsonValidationErrors('vigente_hasta');
     }
 
-    public function test_records_are_annulled_with_reason_never_edited_or_deleted(): void
+    public function test_records_are_annulled_with_reason_and_cannot_be_deleted(): void
     {
         $this->actuarComo();
         $persona = Usuario::factory()->create();
@@ -77,14 +79,113 @@ class Seccion01ApiTest extends TestCase
             $url = $this->url($persona, $tipo).'/'.$registro->id;
             $this->postJson($url.'/anular', ['motivo_anulacion' => 'no'])->assertUnprocessable()->assertJsonValidationErrors('motivo_anulacion');
             $this->postJson($this->url($otra, $tipo).'/'.$registro->id.'/anular', ['motivo_anulacion' => 'Ficha ajena'])->assertNotFound();
-            // No existe ruta para editar ni borrar estos registros desde la ficha.
-            $this->patchJson($url, ['numero_conadis' => 'X'])->assertNotFound();
-            $this->deleteJson($url)->assertNotFound();
+            if ($tipo === 'declaraciones-verificaciones') {
+                $this->patchJson($url, ['numero_conadis' => 'X'])->assertNotFound();
+                $this->deleteJson($url)->assertNotFound();
+            } else {
+                $this->deleteJson($url)->assertStatus(405);
+            }
             $this->postJson($url.'/anular', ['motivo_anulacion' => 'Fecha mal registrada'])->assertOk()->assertJsonPath('data.anulado', true);
             $this->postJson($url.'/anular', ['motivo_anulacion' => 'Segundo intento'])->assertConflict();
             $this->assertDatabaseHas($registro->getTable(), ['id' => $registro->id, 'anulado' => true, 'motivo_anulacion' => 'Fecha mal registrada']);
         }
         $this->postJson($this->url($persona, 'sanciones').'/'.$declaracion->id.'/anular', ['motivo_anulacion' => 'No aplica'])->assertNotFound();
+    }
+
+    public function test_certificate_pdf_can_be_uploaded_downloaded_preserved_and_replaced(): void
+    {
+        Storage::fake('local');
+        $autor = $this->actuarComo();
+        $persona = Usuario::factory()->create();
+        $url = $this->url($persona, 'certificados-discapacidad');
+        $data = ['persona' => 'servidor', 'numero_conadis' => 'C-PDF', 'fecha_emision' => '2024-01-15'];
+        $contenido = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF";
+        $response = $this->post($url, $data + ['pdf' => UploadedFile::fake()->createWithContent('certificado.pdf', $contenido)], ['Accept' => 'application/json'])
+            ->assertCreated()->assertJsonPath('data.pdf_nombre', 'certificado.pdf')->assertJsonMissingPath('data.pdf_path');
+        $record = CertificadoDiscapacidad::findOrFail($response->json('data.id'));
+        $path = $record->pdf_path;
+        Storage::disk('local')->assertExists($path);
+        $this->getJson($url)->assertOk()->assertJsonPath('data.0.values.pdf_nombre', 'certificado.pdf')->assertJsonMissingPath('data.0.values.pdf_path');
+        $download = $this->get($url.'/'.$record->id.'/pdf')->assertOk()->assertDownload('certificado.pdf')->assertHeader('Content-Type', 'application/pdf');
+        $this->assertSame($contenido, $download->streamedContent());
+
+        $this->patchJson($url.'/'.$record->id, ['numero_conadis' => 'C-CORREGIDO', 'registrado_por' => $persona->id] + $data)
+            ->assertOk()->assertJsonPath('data.numero_conadis', 'C-CORREGIDO')->assertJsonPath('data.registrado_por', $autor->id);
+        $this->assertSame($path, $record->refresh()->pdf_path);
+        Storage::disk('local')->assertExists($path);
+
+        $this->post($url.'/'.$record->id, $data + ['_method' => 'PATCH', 'pdf' => UploadedFile::fake()->createWithContent('nuevo.pdf', $contenido)], ['Accept' => 'application/json'])
+            ->assertOk()->assertJsonPath('data.pdf_nombre', 'nuevo.pdf');
+        Storage::disk('local')->assertMissing($path);
+        Storage::disk('local')->assertExists($record->refresh()->pdf_path);
+        $this->get($url.'/'.$record->id.'/pdf')->assertOk()->assertDownload('nuevo.pdf');
+        $this->assertDatabaseCount('certificados_discapacidad', 1);
+    }
+
+    public function test_certificate_pdf_rejects_invalid_files_without_changing_the_record(): void
+    {
+        Storage::fake('local');
+        $this->actuarComo();
+        $persona = Usuario::factory()->create();
+        $url = $this->url($persona, 'certificados-discapacidad');
+        $data = ['persona' => 'servidor', 'numero_conadis' => 'C-VALIDO'];
+        $id = $this->postJson($url, $data)->assertCreated()->json('data.id');
+        $this->getJson($url.'/'.$id.'/pdf')->assertNotFound();
+        foreach ([
+            UploadedFile::fake()->createWithContent('falso.pdf', 'Esto no es un PDF')->mimeType('text/plain'),
+            UploadedFile::fake()->create('grande.pdf', 2049, 'application/pdf'),
+        ] as $file) {
+            $this->post($url.'/'.$id, ['_method' => 'PATCH', 'pdf' => $file, 'numero_conadis' => 'NO-GUARDAR'] + $data, ['Accept' => 'application/json'])
+                ->assertUnprocessable()->assertJsonValidationErrors('pdf');
+        }
+        $this->assertDatabaseHas('certificados_discapacidad', ['id' => $id, 'numero_conadis' => 'C-VALIDO', 'pdf_path' => null]);
+        $this->assertSame([], Storage::disk('local')->allFiles());
+    }
+
+    public function test_certificate_edit_and_pdf_require_permissions_and_the_correct_person(): void
+    {
+        Storage::fake('local');
+        $this->actuarComo();
+        $persona = Usuario::factory()->create();
+        $otra = Usuario::factory()->create();
+        $url = $this->url($persona, 'certificados-discapacidad');
+        $data = ['persona' => 'servidor', 'numero_conadis' => 'C-PRIVADO'];
+        $id = $this->post($url, $data + ['pdf' => UploadedFile::fake()->createWithContent('privado.pdf', "%PDF-1.4\n%%EOF")], ['Accept' => 'application/json'])
+            ->assertCreated()->json('data.id');
+        $ajena = $this->url($otra, 'certificados-discapacidad').'/'.$id;
+        $this->patchJson($ajena, $data)->assertNotFound();
+        $this->getJson($ajena.'/pdf')->assertNotFound();
+
+        $this->actuarComo(Usuario::factory()->create(), 'asistente_legajo');
+        $this->patchJson($url.'/'.$id, $data)->assertForbidden();
+        $this->getJson($url.'/'.$id.'/pdf')->assertForbidden();
+
+        config(['permisos.roles.lector_prueba' => ['legajo.ver']]);
+        $lector = $this->asignarRol(Usuario::factory()->create(), 'lector_prueba', [], ['ve_datos_sensibles' => true])->refresh();
+        Sanctum::actingAs($lector);
+        $this->get($url.'/'.$id.'/pdf')->assertOk();
+        $this->patchJson($url.'/'.$id, $data)->assertForbidden();
+
+        $this->actuarComo();
+        $this->postJson($url.'/'.$id.'/anular', ['motivo_anulacion' => 'Certificado duplicado'])->assertOk();
+        $this->patchJson($url.'/'.$id, $data)->assertConflict();
+        $this->get($url.'/'.$id.'/pdf')->assertOk();
+    }
+
+    public function test_certificate_edit_preserves_relative_id_and_validates_changes(): void
+    {
+        $this->actuarComo();
+        $persona = Usuario::factory()->create();
+        $hijo = Familiar::factory()->create(['usuario_id' => $persona->id, 'anulado' => false]);
+        $ajeno = Familiar::factory()->create(['anulado' => false]);
+        $url = $this->url($persona, 'certificados-discapacidad');
+        $data = ['persona' => 'familiar', 'familiar_id' => $hijo->id, 'numero_conadis' => 'C-FAMILIAR'];
+        $id = $this->postJson($url, $data)->assertCreated()->json('data.id');
+        $this->getJson($url)->assertOk()->assertJsonPath('data.0.familiar_id', $hijo->id)->assertJsonPath('data.0.values.familiar_id', $hijo->apellidos_nombres);
+        $this->patchJson($url.'/'.$id, ['numero_conadis' => 'C-EDITADO'] + $data)->assertOk()->assertJsonPath('data.familiar_id', $hijo->id);
+        $this->patchJson($url.'/'.$id, ['familiar_id' => $ajeno->id] + $data)->assertUnprocessable()->assertJsonValidationErrors('familiar_id');
+        $this->patchJson($url.'/'.$id, ['persona' => 'servidor', 'familiar_id' => null, 'numero_conadis' => 'C-SERVIDOR'])->assertOk()->assertJsonPath('data.familiar_id', null);
+        $this->patchJson($url.'/'.$id, ['fecha_emision' => '2024-05-01', 'vigente_hasta' => '2024-01-01'] + $data)->assertUnprocessable()->assertJsonValidationErrors('vigente_hasta');
     }
 
     public function test_only_administration_can_annul(): void

@@ -20,7 +20,7 @@ function AnularForm({ record, titulo, onCancel, onConfirm, busy }) {
  * registrar, opcionalmente corregir, y anular con motivo. Nunca se eliminan.
  * El backend valida cada permiso; aquí solo se ocultan los botones.
  */
-export default function RegistrosPanel({ usuario, tipo, titulo, agregar, vacio, tituloRegistro, subtitulo, campos, renderForm, editable = false }) {
+export default function RegistrosPanel({ usuario, tipo, titulo, agregar, vacio, tituloRegistro, subtitulo, campos, renderForm, editable = false, editarLabel = 'Corregir', renderAdjunto }) {
   const [page, setPage] = useState(1)
   const request = useLiveQuery(`/expedientes/${usuario}/${tipo}?page=${page}`)
   const puedeRegistrar = usePuede('legajo.editar')
@@ -70,8 +70,9 @@ export default function RegistrosPanel({ usuario, tipo, titulo, agregar, vacio, 
           <div><dt className="text-xs text-slate-500">Registrado por</dt><dd className="mt-1 break-words text-slate-800">{values.registrado_por || 'No registrado'}</dd></div>
           {values.anulado && <div className="sm:col-span-2"><dt className="text-xs text-rose-700">Motivo de anulación</dt><dd className="mt-1 break-words text-slate-800">{values.motivo_anulacion}</dd></div>}
         </dl>
+        {renderAdjunto?.(record)}
         {!values.anulado && (editable && puedeRegistrar || puedeAnular) && <div className="mt-5 flex gap-4">
-          {editable && puedeRegistrar && <button disabled={ocupado} onClick={() => start(record, setEditing)} className="text-sm font-semibold text-teal-700 disabled:opacity-50">Corregir</button>}
+          {editable && puedeRegistrar && <button disabled={ocupado} onClick={() => start(record, setEditing)} className="text-sm font-semibold text-teal-700 disabled:opacity-50">{editarLabel}</button>}
           {puedeAnular && <button disabled={ocupado} onClick={() => start(record, setAnulando)} className="text-sm font-semibold text-rose-700 disabled:opacity-50">Anular</button>}
         </div>}
         {anulando?.id === record.id && <AnularForm record={record} titulo={tituloRegistro} busy={busy} onCancel={() => setAnulando(null)} onConfirm={anular} />}

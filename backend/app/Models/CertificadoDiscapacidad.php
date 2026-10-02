@@ -17,6 +17,8 @@ class CertificadoDiscapacidad extends Model
 
     protected $table = 'certificados_discapacidad';
 
+    protected $hidden = ['pdf_path'];
+
     protected $fillable = [
         'usuario_id',
         'documento_id',

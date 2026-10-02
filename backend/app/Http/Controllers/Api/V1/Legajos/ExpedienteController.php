@@ -387,6 +387,12 @@ class ExpedienteController extends Controller
             }
         }
 
+        if ($record instanceof CertificadoDiscapacidad) {
+            $values['pdf_nombre'] = $record->pdf_nombre;
+
+            return ['id' => $record->getKey(), 'values' => $values, 'familiar_id' => $record->familiar_id];
+        }
+
         return ['id' => $record->getKey(), 'values' => $values];
     }
 
