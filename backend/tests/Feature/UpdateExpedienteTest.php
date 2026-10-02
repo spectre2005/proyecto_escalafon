@@ -21,6 +21,7 @@ class UpdateExpedienteTest extends TestCase
 
     public function test_edit_saves_contact_and_location_and_returns_fresh_general_data(): void
     {
+        Ubigeo::factory()->create(['region' => 'REGION FICTICIA', 'provincia' => 'PROVINCIA FICTICIA', 'distrito' => 'DISTRITO FICTICIO']);
         $person = Usuario::factory()->create();
         $this->patchJson('/api/v1/expedientes/'.$person->id, [
             'nombres' => 'Persona de prueba',
@@ -41,14 +42,15 @@ class UpdateExpedienteTest extends TestCase
     public function test_reuses_location_case_insensitively_and_does_not_change_other_people(): void
     {
         $location = Ubigeo::factory()->create(['region' => 'Region de prueba', 'provincia' => 'Provincia de prueba', 'distrito' => 'Distrito de prueba']);
+        $replacement = Ubigeo::factory()->create(['region' => 'Otra region', 'provincia' => 'Otra provincia', 'distrito' => 'Otro distrito']);
         $other = Usuario::factory()->create(['ubigeo_id' => $location->id]);
         $person = Usuario::factory()->create();
         $uri = '/api/v1/expedientes/'.$person->id;
         $this->patchJson($uri, ['ubicacion' => ['region' => 'REGION DE PRUEBA', 'provincia' => 'PROVINCIA DE PRUEBA', 'distrito' => 'DISTRITO DE PRUEBA']])->assertOk();
         $this->assertSame($location->id, $person->refresh()->ubigeo_id);
-        $this->assertDatabaseCount('ubigeo', 1);
+        $this->assertDatabaseCount('ubigeo', 2);
         $this->patchJson($uri, ['ubicacion' => ['region' => 'Otra region', 'provincia' => 'Otra provincia', 'distrito' => 'Otro distrito']])->assertOk();
-        $this->assertNotSame($location->id, $person->refresh()->ubigeo_id);
+        $this->assertSame($replacement->id, $person->refresh()->ubigeo_id);
         $this->assertSame($location->id, $other->refresh()->ubigeo_id);
         $this->assertSame('Distrito de prueba', $location->refresh()->distrito);
         $this->patchJson($uri, ['ubicacion' => null])->assertOk()->assertJsonPath('data.usuario.values.region', null);
@@ -76,15 +78,26 @@ class UpdateExpedienteTest extends TestCase
         $this->assertDatabaseCount('ubigeo', 0);
     }
 
+    public function test_location_not_in_catalog_is_rejected_without_creating_a_record(): void
+    {
+        $person = Usuario::factory()->create();
+        $this->patchJson('/api/v1/expedientes/'.$person->id, [
+            'ubicacion' => ['region' => 'Inventada', 'provincia' => 'Inventada', 'distrito' => 'Inventado'],
+        ])->assertUnprocessable()->assertJsonValidationErrors('ubicacion.distrito');
+        $this->assertNull($person->refresh()->ubigeo_id);
+        $this->assertDatabaseCount('ubigeo', 0);
+    }
+
     public function test_duplicate_email_is_rejected_before_creating_location(): void
     {
         Usuario::factory()->create(['email_institucional' => 'existente@example.test']);
+        Ubigeo::factory()->create(['region' => 'X', 'provincia' => 'Y', 'distrito' => 'Z']);
         $person = Usuario::factory()->create();
         $this->patchJson('/api/v1/expedientes/'.$person->id, [
             'email_institucional' => 'EXISTENTE@example.test',
             'ubicacion' => ['region' => 'X', 'provincia' => 'Y', 'distrito' => 'Z'],
         ])->assertUnprocessable()->assertJsonValidationErrors('email_institucional');
-        $this->assertDatabaseCount('ubigeo', 0);
+        $this->assertDatabaseCount('ubigeo', 1);
     }
 
     public function test_labor_fields_and_flags_can_be_edited_and_cleared(): void

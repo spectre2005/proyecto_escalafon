@@ -4,6 +4,7 @@ services:
     user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     environment:
       SESSION_DRIVER: file
+      CACHE_STORE: file
     volumes:
       - ./backend:/var/www/html
       - ./docker/php/performance.ini:/usr/local/etc/php/conf.d/zz-performance.ini:ro
