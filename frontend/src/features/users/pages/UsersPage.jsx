@@ -13,17 +13,19 @@ import {
 } from '../utils/usuariosCsv'
 import { filterUsers } from '../utils/usuariosFiltering'
 import { updateUserDraft } from '../utils/usuariosEmail'
+import { regimenesPorTipo, regimenInicial } from '../utils/regimenesLaborales'
 
-const emptyUser = Object.fromEntries(
-  columns.map((key) => [key, key === 'tipo_personal' ? 'docente' : '']),
-)
+const emptyUser = {
+  ...Object.fromEntries(columns.map((key) => [key, ''])),
+  tipo_personal: 'docente',
+  regimen_laboral: regimenInicial('docente'),
+}
 const labels = {
   numero_doc_identidad: 'DNI',
   nombres: 'Nombres',
   apellido_paterno: 'Apellido paterno',
   apellido_materno: 'Apellido materno',
   email_institucional: 'Correo institucional',
-  regimen_laboral: 'Régimen laboral',
   telefono: 'Teléfono',
 }
 
@@ -320,7 +322,7 @@ export default function UsersPage() {
                           maxLength={
                             key === 'numero_doc_identidad'
                               ? 8
-                              : key === 'regimen_laboral' || key === 'telefono'
+                              : key === 'telefono'
                                 ? 20
                                 : key === 'nombres'
                                   ? 120
@@ -348,11 +350,37 @@ export default function UsersPage() {
                           setDraft({
                             ...draft,
                             tipo_personal: event.target.value,
+                            regimen_laboral: regimenInicial(event.target.value),
                           })
                         }
                       >
                         <option value="docente">Docente</option>
                         <option value="administrativo">Administrativo</option>
+                      </select>
+                    </label>
+                    <label>
+                      Régimen laboral *
+                      <select
+                        name="regimen_laboral"
+                        required
+                        value={draft.regimen_laboral}
+                        onChange={(event) =>
+                          setDraft({
+                            ...draft,
+                            regimen_laboral: event.target.value,
+                          })
+                        }
+                      >
+                        <option value="" disabled>
+                          Selecciona un régimen
+                        </option>
+                        {(regimenesPorTipo[draft.tipo_personal] || []).map(
+                          (regimen) => (
+                            <option key={regimen.value} value={regimen.value}>
+                              {regimen.label}
+                            </option>
+                          ),
+                        )}
                       </select>
                     </label>
                     <div className="col-span-full flex items-center justify-between gap-2.5 [&_small]:text-[10px] [&_small]:text-[#8b9c91]">

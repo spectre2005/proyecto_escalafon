@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests;
 
+use App\Support\RegimenesLaborales;
+use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -32,9 +34,18 @@ class StoreUsuariosRequest extends FormRequest
             'usuarios.*.apellido_materno' => ['nullable', 'string', 'max:80'],
             'usuarios.*.email_institucional' => ['bail', 'required', 'string', 'email:rfc', 'max:255', 'distinct:ignore_case'],
             'usuarios.*.tipo_personal' => ['required', Rule::in(['docente', 'administrativo'])],
-            'usuarios.*.regimen_laboral' => ['required', 'string', 'max:20'],
+            'usuarios.*.regimen_laboral' => ['bail', 'required', 'string', 'max:20', $this->regimenDelTipo(...)],
             'usuarios.*.telefono' => ['nullable', 'string', 'regex:/^[+0-9()\s-]{6,20}$/'],
         ];
+    }
+
+    private function regimenDelTipo(string $attribute, mixed $value, Closure $fail): void
+    {
+        $index = explode('.', $attribute)[1];
+        $codigos = RegimenesLaborales::codigos($this->input("usuarios.$index.tipo_personal"));
+        if ($codigos !== [] && ! in_array($value, $codigos, true)) {
+            $fail('El régimen laboral debe ser uno de: '.implode(', ', $codigos).'.');
+        }
     }
 
     /** @return array<string, string> */
