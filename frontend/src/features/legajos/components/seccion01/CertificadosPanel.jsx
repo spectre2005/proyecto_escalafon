@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
-import { descargarCertificado, saveCertificado } from '../../api/seccion01Api'
+import { saveCertificado } from '../../api/seccion01Api'
 import { etiqueta, parentescos, personasCertificado } from '../../config/seccion01'
 import Campo, { Formulario, Opciones } from './Campo'
 import RegistrosPanel from './RegistrosPanel'
+import RegistroPdf from './RegistroPdf'
 import { hoy, useBorrador, useGuardar } from './useGuardar'
 
 const fecha = value => value ? value.split('-').reverse().join('/') : 'No registrada'
@@ -44,35 +45,6 @@ function CertificadoForm({ usuario, record, onSaved, onCancel }) {
   </Formulario>
 }
 
-function CertificadoPdf({ usuario, record }) {
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  async function descargar() {
-    if (busy) return
-    setBusy(true)
-    setError('')
-    try {
-      const response = await descargarCertificado(usuario, record.id)
-      const url = URL.createObjectURL(response.data)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = record.values.pdf_nombre
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 1000)
-    } catch {
-      setError('No se pudo descargar el PDF. Inténtalo nuevamente.')
-    } finally {
-      setBusy(false)
-    }
-  }
-  return <div className="mt-4 text-sm">
-    {record.values.pdf_nombre ? <button type="button" disabled={busy} onClick={descargar} className="break-words text-left font-semibold text-teal-700 disabled:opacity-50">{busy ? 'Descargando…' : `Descargar PDF: ${record.values.pdf_nombre}`}</button> : <p className="text-slate-500">Sin PDF adjunto</p>}
-    {error && <p role="alert" className="mt-2 text-rose-700">{error}</p>}
-  </div>
-}
-
 export default function CertificadosPanel({ usuario }) {
   return <RegistrosPanel
     usuario={usuario}
@@ -89,6 +61,6 @@ export default function CertificadosPanel({ usuario }) {
       ['Vigente hasta', v => v.vigente_hasta ? fecha(v.vigente_hasta) : 'Sin vencimiento registrado'],
     ]}
     renderForm={props => <CertificadoForm key={props.record?.id || 'nuevo'} usuario={usuario} {...props} />}
-    renderAdjunto={record => <CertificadoPdf usuario={usuario} record={record} />}
+    renderAdjunto={record => <RegistroPdf usuario={usuario} record={record} tipo="certificados-discapacidad" />}
   />
 }

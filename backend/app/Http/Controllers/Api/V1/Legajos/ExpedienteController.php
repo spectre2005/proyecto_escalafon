@@ -391,6 +391,9 @@ class ExpedienteController extends Controller
             }
         }
 
+        if ($record instanceof DeclaracionVerificacion) {
+            $values['pdf_nombre'] = $record->pdf_nombre;
+        }
         if ($record instanceof CertificadoDiscapacidad) {
             $values['pdf_nombre'] = $record->pdf_nombre;
 

@@ -17,6 +17,8 @@ class DeclaracionVerificacion extends Model
 
     protected $table = 'declaraciones_verificaciones';
 
+    protected $hidden = ['pdf_path'];
+
     protected $fillable = [
         'usuario_id',
         'documento_id',

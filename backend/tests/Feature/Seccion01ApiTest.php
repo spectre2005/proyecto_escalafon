@@ -79,12 +79,7 @@ class Seccion01ApiTest extends TestCase
             $url = $this->url($persona, $tipo).'/'.$registro->id;
             $this->postJson($url.'/anular', ['motivo_anulacion' => 'no'])->assertUnprocessable()->assertJsonValidationErrors('motivo_anulacion');
             $this->postJson($this->url($otra, $tipo).'/'.$registro->id.'/anular', ['motivo_anulacion' => 'Ficha ajena'])->assertNotFound();
-            if ($tipo === 'declaraciones-verificaciones') {
-                $this->patchJson($url, ['numero_conadis' => 'X'])->assertNotFound();
-                $this->deleteJson($url)->assertNotFound();
-            } else {
-                $this->deleteJson($url)->assertStatus(405);
-            }
+            $this->deleteJson($url)->assertStatus(405);
             $this->postJson($url.'/anular', ['motivo_anulacion' => 'Fecha mal registrada'])->assertOk()->assertJsonPath('data.anulado', true);
             $this->postJson($url.'/anular', ['motivo_anulacion' => 'Segundo intento'])->assertConflict();
             $this->assertDatabaseHas($registro->getTable(), ['id' => $registro->id, 'anulado' => true, 'motivo_anulacion' => 'Fecha mal registrada']);
@@ -186,6 +181,73 @@ class Seccion01ApiTest extends TestCase
         $this->patchJson($url.'/'.$id, ['familiar_id' => $ajeno->id] + $data)->assertUnprocessable()->assertJsonValidationErrors('familiar_id');
         $this->patchJson($url.'/'.$id, ['persona' => 'servidor', 'familiar_id' => null, 'numero_conadis' => 'C-SERVIDOR'])->assertOk()->assertJsonPath('data.familiar_id', null);
         $this->patchJson($url.'/'.$id, ['fecha_emision' => '2024-05-01', 'vigente_hasta' => '2024-01-01'] + $data)->assertUnprocessable()->assertJsonValidationErrors('vigente_hasta');
+    }
+
+    public function test_declaration_can_be_edited_with_pdf_upload_preservation_and_replacement(): void
+    {
+        Storage::fake('local');
+        $autor = $this->actuarComo();
+        $persona = Usuario::factory()->create();
+        $url = $this->url($persona, 'declaraciones-verificaciones');
+        $data = ['tipo' => 'djbr', 'fecha' => '2025-01-10', 'resultado' => 'presentada', 'anio' => 2025, 'observacion' => 'Original'];
+        $contenido = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF";
+        $id = $this->post($url, $data + ['pdf' => UploadedFile::fake()->createWithContent('declaracion.pdf', $contenido)], ['Accept' => 'application/json'])
+            ->assertCreated()->assertJsonMissingPath('data.pdf_path')->json('data.id');
+        $record = DeclaracionVerificacion::findOrFail($id);
+        $path = $record->pdf_path;
+        Storage::disk('local')->assertExists($path);
+        $this->getJson($url)->assertOk()->assertJsonPath('data.0.values.pdf_nombre', 'declaracion.pdf')->assertJsonMissingPath('data.0.values.pdf_path');
+        $download = $this->get($url.'/'.$id.'/pdf')->assertOk()->assertDownload('declaracion.pdf')->assertHeader('Content-Type', 'application/pdf');
+        $this->assertSame($contenido, $download->streamedContent());
+        $this->post($url.'/'.$id, ['_method' => 'PATCH', 'observacion' => 'Corregida', 'registrado_por' => $persona->id] + $data, ['Accept' => 'application/json'])
+            ->assertOk()->assertJsonPath('data.observacion', 'Corregida')->assertJsonPath('data.registrado_por', $autor->id);
+        $this->assertSame($path, $record->refresh()->pdf_path);
+        $this->post($url.'/'.$id, $data + ['_method' => 'PATCH', 'pdf' => UploadedFile::fake()->createWithContent('nueva.pdf', $contenido)], ['Accept' => 'application/json'])
+            ->assertOk()->assertJsonPath('data.pdf_nombre', 'nueva.pdf');
+        Storage::disk('local')->assertMissing($path);
+        Storage::disk('local')->assertExists($record->refresh()->pdf_path);
+        $this->assertDatabaseCount('declaraciones_verificaciones', 1);
+
+        $sinPdf = $this->postJson($url, $data)->assertCreated()->json('data.id');
+        $this->getJson($url.'/'.$sinPdf.'/pdf')->assertNotFound();
+        $this->post($url.'/'.$sinPdf, $data + ['_method' => 'PATCH', 'pdf' => UploadedFile::fake()->createWithContent('adjunto.pdf', $contenido)], ['Accept' => 'application/json'])
+            ->assertOk()->assertJsonPath('data.pdf_nombre', 'adjunto.pdf');
+    }
+
+    public function test_declaration_edit_validates_files_dates_ownership_and_permissions(): void
+    {
+        Storage::fake('local');
+        $this->actuarComo();
+        $persona = Usuario::factory()->create();
+        $otra = Usuario::factory()->create();
+        $url = $this->url($persona, 'declaraciones-verificaciones');
+        $data = ['tipo' => 'djbr', 'fecha' => '2025-01-10', 'resultado' => 'presentada'];
+        $id = $this->postJson($url, $data)->assertCreated()->json('data.id');
+        foreach ([
+            UploadedFile::fake()->createWithContent('falso.pdf', 'Texto')->mimeType('text/plain'),
+            UploadedFile::fake()->create('grande.pdf', 2049, 'application/pdf'),
+        ] as $file) {
+            $this->post($url.'/'.$id, $data + ['_method' => 'PATCH', 'pdf' => $file], ['Accept' => 'application/json'])
+                ->assertUnprocessable()->assertJsonValidationErrors('pdf');
+        }
+        $this->assertSame([], Storage::disk('local')->allFiles());
+        $this->patchJson($url.'/'.$id, ['tipo' => 'invalido', 'fecha' => now()->addDay()->toDateString(), 'resultado' => 'invalido'] + $data)
+            ->assertUnprocessable()->assertJsonValidationErrors(['tipo', 'fecha', 'resultado']);
+        $this->patchJson($url.'/'.$id, ['vigente_hasta' => '2024-01-01'] + $data)->assertUnprocessable()->assertJsonValidationErrors('vigente_hasta');
+        $ajena = $this->url($otra, 'declaraciones-verificaciones').'/'.$id;
+        $this->patchJson($ajena, $data)->assertNotFound();
+        $this->getJson($ajena.'/pdf')->assertNotFound();
+        $this->actuarComo(Usuario::factory()->create(), 'asistente_legajo');
+        $this->patchJson($url.'/'.$id, $data)->assertForbidden();
+        $this->getJson($url.'/'.$id.'/pdf')->assertForbidden();
+        config(['permisos.roles.lector_declaraciones' => ['legajo.ver']]);
+        $lector = $this->asignarRol(Usuario::factory()->create(), 'lector_declaraciones', [], ['ve_datos_sensibles' => true])->refresh();
+        Sanctum::actingAs($lector);
+        $this->patchJson($url.'/'.$id, $data)->assertForbidden();
+        $this->actuarComo();
+        $this->postJson($url.'/'.$id.'/anular', ['motivo_anulacion' => 'Registro duplicado'])->assertOk();
+        $this->patchJson($url.'/'.$id, $data)->assertConflict();
+        $this->assertDatabaseHas('declaraciones_verificaciones', ['id' => $id, 'tipo' => 'djbr', 'pdf_path' => null]);
     }
 
     public function test_only_administration_can_annul(): void
