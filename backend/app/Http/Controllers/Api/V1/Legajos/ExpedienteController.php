@@ -56,6 +56,7 @@ use App\Models\Usuario;
 use App\Models\UsuarioRol;
 use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
+use App\Support\PerfilDocumental;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -221,6 +222,8 @@ class ExpedienteController extends Controller
             'usuario' => $presented,
             'edit_values' => $person->only(['unidad_organica_id', 'regimen_normativo_id']),
             'nombre' => trim($person->nombres.' '.$person->apellido_paterno.' '.$person->apellido_materno),
+            // La subsección 2.4 (período de prueba) solo se muestra si la persona lo tiene.
+            'tiene_periodo_prueba' => PerfilDocumental::de($person, $person->vinculosLaborales()->get())->tienePeriodoPrueba(),
             'document_sections' => SeccionLegajo::query()->orderBy('orden')->get(['id', 'nombre']),
             'document_states' => DocumentoUsuario::query()->where('usuario_id', $usuario)->whereHas('legajo', fn (Builder $query): Builder => $query->where('usuario_id', $usuario))->distinct()->orderBy('estado')->pluck('estado'),
             'legajos' => $person->legajos()->orderByDesc('fecha_apertura')->get()->map(fn (Model $row): array => $this->present($row)),

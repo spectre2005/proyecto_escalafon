@@ -6,7 +6,7 @@ import { anularRegistro } from '../../api/seccion01Api'
 
 const button = 'rounded-xl bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50'
 
-function AnularForm({ record, titulo, onCancel, onConfirm, busy }) {
+export function AnularForm({ record, titulo, onCancel, onConfirm, busy }) {
   const [motivo, setMotivo] = useState('')
   return <form role="alertdialog" aria-label="Anular registro" onSubmit={event => { event.preventDefault(); onConfirm(motivo.trim()) }} className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4">
     <p className="text-sm text-rose-900">Anular «{titulo(record)}». El registro no se borra: queda en el legajo marcado como anulado, con el motivo y tu nombre.</p>

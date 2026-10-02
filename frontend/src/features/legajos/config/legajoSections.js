@@ -1,6 +1,7 @@
 export const legajoSections = [
   { number: '01', title: 'Información personal y familiar', categories: ['general', 'familiares', 'declaraciones-verificaciones', 'certificados-discapacidad'] },
-  { number: '02', title: 'Incorporación', categories: ['vinculos-laborales', 'perfil-docente', 'perfil-administrativo', 'vinculo-adendas', 'inducciones', 'periodos-prueba'] },
+  // Subsecciones 2.1 a 2.4 de la directiva; cada una muestra sus datos y sus documentos (sin entrada aparte).
+  { number: '02', title: 'Incorporación', categories: ['s02-seleccion', 's02-vinculo', 's02-induccion', 's02-prueba'], sinDocumentos: true },
   { number: '03', title: 'Formación académica y capacitación', categories: ['formacion-academica', 'capacitaciones', 'colegiaturas'] },
   { number: '04', title: 'Experiencia laboral', categories: ['experiencia-laboral', 'tiempo-servicios-reconocidos'] },
   { number: '05', title: 'Movimientos del Personal', categories: ['licencias-permisos', 'periodos-vacacionales', 'goces-vacacionales'] },

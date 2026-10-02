@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\V1\Legajos\ExpedienteController;
 use App\Http\Controllers\Api\V1\Legajos\FamiliarPersonalController;
 use App\Http\Controllers\Api\V1\Legajos\FotoPersonalController;
 use App\Http\Controllers\Api\V1\Legajos\Seccion01Controller;
+use App\Http\Controllers\Api\V1\Legajos\Seccion02Controller;
 use App\Http\Controllers\Api\V1\LegajoSeccionController;
 use App\Http\Controllers\Api\V1\LicenciaPermisoController;
 use App\Http\Controllers\Api\V1\MovimientoCustodiaLegajoController;
@@ -78,6 +79,9 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum'])->
         Route::get('expediente-opciones', [ExpedienteController::class, 'editOptions']);
         Route::get('expedientes/{usuario}', [ExpedienteController::class, 'show'])->whereUuid('usuario');
         Route::get('expedientes/{usuario}/foto', [FotoPersonalController::class, 'show'])->whereUuid('usuario');
+        // Antes de la ruta genérica {section}.
+        Route::get('expedientes/{usuario}/seccion-02', [Seccion02Controller::class, 'show'])->whereUuid('usuario');
+        Route::get('expedientes/{usuario}/seccion-02/anulados', [Seccion02Controller::class, 'anulados'])->whereUuid('usuario')->middleware('can:sistema.administrar');
         Route::get('expedientes/{usuario}/{section}', [ExpedienteController::class, 'section'])->whereUuid('usuario');
     });
 
@@ -92,6 +96,22 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum'])->
         Route::patch('expedientes/{usuario}/familiares/{familiar}', [FamiliarPersonalController::class, 'updateForPerson'])->whereUuid(['usuario', 'familiar']);
         Route::post('expedientes/{usuario}/declaraciones-verificaciones', [Seccion01Controller::class, 'storeDeclaracion'])->whereUuid('usuario');
         Route::post('expedientes/{usuario}/certificados-discapacidad', [Seccion01Controller::class, 'storeCertificado'])->whereUuid('usuario');
+    });
+
+    // Sección 02 (incorporación): no tiene datos sensibles.
+    Route::middleware('can:legajo.editar')->group(function (): void {
+        Route::post('expedientes/{usuario}/vinculos-laborales', [Seccion02Controller::class, 'storeVinculo'])->whereUuid('usuario');
+        Route::patch('expedientes/{usuario}/vinculos-laborales/{vinculo}', [Seccion02Controller::class, 'updateVinculo'])->whereUuid(['usuario', 'vinculo']);
+        Route::post('expedientes/{usuario}/vinculo-adendas', [Seccion02Controller::class, 'storeAdenda'])->whereUuid('usuario');
+        Route::post('expedientes/{usuario}/inducciones', [Seccion02Controller::class, 'storeInduccion'])->whereUuid('usuario');
+        Route::post('expedientes/{usuario}/periodos-prueba', [Seccion02Controller::class, 'storePeriodo'])->whereUuid('usuario');
+        Route::patch('expedientes/{usuario}/periodos-prueba/{periodo}', [Seccion02Controller::class, 'updatePeriodo'])->whereUuid(['usuario', 'periodo']);
+    });
+
+    Route::middleware('can:sistema.administrar')->group(function (): void {
+        // URI propia: la misma forma que la de la sección 01 la reemplazaría.
+        Route::post('expedientes/{usuario}/seccion-02/{tipo}/{registro}/anular', [Seccion02Controller::class, 'anularRegistro'])
+            ->whereUuid(['usuario', 'registro'])->whereIn('tipo', ['inducciones', 'periodos-prueba']);
     });
 
     // Anular (no se elimina): solo administración.
