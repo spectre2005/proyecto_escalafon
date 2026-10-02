@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Models\DeclaracionVerificacion;
 
-class DeclaracionVerificacionController extends ResourceController
+class DeclaracionVerificacionController extends RegistroAnulableController
 {
     protected string $model = DeclaracionVerificacion::class;
+
+    protected string $orden = 'fecha';
 
     protected array $rules = [
         'usuario_id' => 'required|uuid|exists:usuarios,id',
@@ -17,8 +19,5 @@ class DeclaracionVerificacionController extends ResourceController
         'resultado' => 'required|string|max:15',
         'vigente_hasta' => 'nullable|date',
         'observacion' => 'nullable|string|max:300',
-        'registrado_por' => 'required|uuid|exists:usuarios,id',
-        'anulado' => 'sometimes|boolean',
-        'motivo_anulacion' => 'nullable|string',
     ];
 }

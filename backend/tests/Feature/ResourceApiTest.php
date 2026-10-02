@@ -35,10 +35,10 @@ class ResourceApiTest extends TestCase
         return $resources;
     }
 
-    /** Sección 07: registros que solo se crean y se anulan. */
+    /** Secciones 01 y 07: registros que solo se crean y se anulan. */
     public static function anulables(): array
     {
-        return collect(['EvaluacionDesempeno', 'ProgresionCarrera', 'RatificacionDocente', 'Desplazamiento'])
+        return collect(['EvaluacionDesempeno', 'ProgresionCarrera', 'RatificacionDocente', 'Desplazamiento', 'DeclaracionVerificacion', 'CertificadoDiscapacidad'])
             ->mapWithKeys(fn (string $name): array => [$name => ['App\\Models\\'.$name]])->all();
     }
 
@@ -88,6 +88,13 @@ class ResourceApiTest extends TestCase
         $this->getJson($uri)->assertOk()->assertJsonStructure(['data', 'links', 'meta']);
         unset($payload['id']);
         $this->patchJson($uri.'/'.$id, $payload)->assertOk();
+        if ($model instanceof Familiar) {
+            // Los familiares se corrigen, pero no se eliminan (se anulan desde la ficha).
+            $this->deleteJson($uri.'/'.$id)->assertStatus(405);
+            $this->assertDatabaseHas($model->getTable(), ['id' => $id]);
+
+            return;
+        }
         $this->deleteJson($uri.'/'.$id)->assertNoContent();
         $this->assertDatabaseMissing($model->getTable(), ['id' => $id]);
         $this->getJson($uri.'/'.$id)->assertNotFound();

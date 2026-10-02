@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import api, { apiErrorMessage } from '../../../axios'
 import { useLiveQuery } from '../../../shared/queries/useLiveQuery'
+import { estadosCiviles, nacionalidades, tiposDocIdentidad } from '../config/seccion01'
+import { Opciones } from './seccion01/Campo'
 
 const inputClass = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-teal-600 disabled:bg-slate-50 disabled:text-slate-400'
 const fields = [
@@ -18,6 +20,9 @@ const fields = [
   ['nombre_puesto', 'Puesto', 'text', 150],
   ['regimen_laboral', 'Régimen laboral', 'text', 20, true],
 ]
+
+// Listas cerradas (el backend las valida); nacionalidad solo sugiere valores.
+const listas = { tipo_doc_identidad: tiposDocIdentidad, estado_civil: estadosCiviles }
 
 const flags = [
   ['activo', 'Activo'],
@@ -90,7 +95,14 @@ export default function GeneralDataEditor({ usuario, data, onSaved, onCancel }) 
     <div className="mb-6 flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold text-slate-800">Editar información personal</h2><p className="mt-2 text-xs text-slate-500">Los cambios se mostrarán al guardar.</p></div><button type="button" disabled={saving} onClick={onCancel} className="text-sm text-slate-500 hover:text-slate-800">Cancelar</button></div>
     {error && <p role="alert" className="mb-5 rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{error}</p>}
     <fieldset disabled={saving} className="grid gap-5 sm:grid-cols-2">
-      {fields.map(([key, title, type, maxLength, required]) => <label key={key} className="flex flex-col gap-2 text-xs font-medium text-slate-600">{title}{required ? ' *' : ''}<input name={key} className={inputClass} type={type} maxLength={maxLength} required={required} value={draft[key]} onChange={event => setDraft(previous => ({ ...previous, [key]: event.target.value }))} aria-invalid={!!fieldErrors[key]} />{fieldErrors[key] && <span className="text-rose-700">{fieldErrors[key].join(' ')}</span>}</label>)}
+      {fields.map(([key, title, type, maxLength, required]) => {
+        const props = { name: key, className: inputClass, required, value: draft[key], onChange: event => setDraft(previous => ({ ...previous, [key]: event.target.value })), 'aria-invalid': !!fieldErrors[key] }
+        const lista = listas[key]
+        return <label key={key} className="flex flex-col gap-2 text-xs font-medium text-slate-600">{title}{required ? ' *' : ''}
+          {lista ? <select {...props}><Opciones lista={lista} actual={draft[key]} vacio={required ? undefined : 'No registrado'} /></select> : <input {...props} type={type} maxLength={maxLength} list={key === 'nacionalidad' ? 'nacionalidades' : undefined} />}
+          {fieldErrors[key] && <span className="text-rose-700">{fieldErrors[key].join(' ')}</span>}</label>
+      })}
+      <datalist id="nacionalidades">{nacionalidades.map(value => <option key={value} value={value} />)}</datalist>
       <label className="flex flex-col gap-2 text-xs font-medium text-slate-600">Tipo de personal *<select name="tipo_personal" className={inputClass} value={draft.tipo_personal} onChange={event => setDraft(previous => ({ ...previous, tipo_personal: event.target.value }))}><option value="docente">Docente</option><option value="administrativo">Administrativo</option></select></label>
       {[['unidad_organica_id', 'Unidad orgánica', 'unidades'], ['regimen_normativo_id', 'Régimen normativo', 'regimenes']].map(([key, title, catalog]) => <label key={key} className="flex flex-col gap-2 text-xs font-medium text-slate-600">{title}<select name={key} className={inputClass} value={draft[key]} disabled={!options.data} onChange={event => setDraft(previous => ({ ...previous, [key]: event.target.value }))}><option value="">Sin asignar</option>{!options.data && draft[key] && <option value={draft[key]}>{data.usuario.values[key]}</option>}{options.data?.data[catalog].map(item => <option key={item.id} value={item.id}>{item.nombre}{item.activo ? '' : ' (inactivo)'}</option>)}</select>{fieldErrors[key] && <span className="text-rose-700">{fieldErrors[key].join(' ')}</span>}</label>)}
       {options.error && <p role="alert" className="col-span-full text-xs text-rose-700">No se pudieron cargar las unidades y regímenes. <button type="button" className="underline" onClick={options.retry}>Reintentar</button></p>}

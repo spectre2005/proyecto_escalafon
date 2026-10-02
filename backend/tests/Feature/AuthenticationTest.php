@@ -97,7 +97,7 @@ class AuthenticationTest extends TestCase
         $this->login()->assertOk();
         $this->getJson('/api/v1/expedientes')->assertOk();
 
-        $payload = ['apellidos_nombres' => 'Familiar ficticio', 'parentesco' => 'Hija', 'es_derechohabiente' => false];
+        $payload = ['apellidos_nombres' => 'Familiar ficticio', 'parentesco' => 'hijo', 'es_derechohabiente' => false];
         $url = '/api/v1/expedientes/'.$person->id.'/familiares';
         $this->postJson($url, $payload + ['registrado_por' => $person->id])->assertUnprocessable();
         $response = $this->postJson($url, $payload)->assertCreated()->assertJsonPath('data.registrado_por', $admin->id);

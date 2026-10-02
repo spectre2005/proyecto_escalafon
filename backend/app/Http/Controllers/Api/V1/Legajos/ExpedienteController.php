@@ -116,6 +116,15 @@ class ExpedienteController extends Controller
         'auditoria-eventos' => ['model' => AuditoriaEvento::class, 'label' => 'Eventos de auditoría', 'group' => 'Custodia y acceso', 'field' => 'usuario_titular_id', 'scope' => 'persona'],
     ];
 
+    /** Categorías de las secciones 01, 09 y 10: solo con datos_sensibles.ver. */
+    private const SENSIBLES = ['familiares', 'declaraciones-verificaciones', 'certificados-discapacidad', 'afiliaciones', 'controversias', 'registros-sst-bienestar'];
+
+    /** Secciones documentales que se ocultan sin datos_sensibles.ver. */
+    private const SECCIONES_SENSIBLES = [1, 9, 10];
+
+    /** Datos de la ficha general (sección 01) que se ocultan sin datos_sensibles.ver. */
+    private const DATOS_PERSONALES_SENSIBLES = ['fecha_nacimiento', 'nacionalidad', 'estado_civil', 'domicilio', 'region', 'provincia', 'distrito', 'telefono', 'con_discapacidad', 'tiene_derechohabientes'];
+
     private const RELATIONS = [
         'Legajo' => ['usuario_id' => 'usuario'],
         'LegajoSeccion' => ['legajo_id' => 'legajo', 'seccion_legajo_id' => 'seccionLegajo'],
@@ -197,13 +206,19 @@ class ExpedienteController extends Controller
         return response()->json($query->orderBy('apellido_paterno')->orderBy('nombres')->orderBy('id')->paginate(20)->withQueryString());
     }
 
-    public function show(string $usuario): JsonResponse
+    public function show(Request $request, string $usuario): JsonResponse
     {
         $person = Usuario::query()->with(['unidadOrganica', 'regimenNormativo', 'ubigeo'])->findOrFail($usuario);
+        $veSensibles = $request->user()->can('datos_sensibles.ver');
+        $presented = $this->present($person);
+        if (! $veSensibles) {
+            $presented['values'] = array_diff_key($presented['values'], array_flip(self::DATOS_PERSONALES_SENSIBLES));
+        }
 
         return response()->json(['data' => [
             'version' => $this->version($person),
-            'usuario' => $this->present($person),
+            'datos_sensibles_ocultos' => ! $veSensibles,
+            'usuario' => $presented,
             'edit_values' => $person->only(['unidad_organica_id', 'regimen_normativo_id']),
             'nombre' => trim($person->nombres.' '.$person->apellido_paterno.' '.$person->apellido_materno),
             'document_sections' => SeccionLegajo::query()->orderBy('orden')->get(['id', 'nombre']),
@@ -251,7 +266,7 @@ class ExpedienteController extends Controller
             throw ValidationException::withMessages(['usuario' => 'El documento de identidad o correo ya está registrado.']);
         }
 
-        return $this->show($usuario);
+        return $this->show($request, $usuario);
     }
 
     private function version(Usuario $person): string
@@ -286,6 +301,8 @@ class ExpedienteController extends Controller
     {
         Usuario::query()->findOrFail($usuario);
         abort_unless(isset(self::SECTIONS[$section]), 404);
+        $veSensibles = $request->user()->can('datos_sensibles.ver');
+        abort_if(in_array($section, self::SENSIBLES, true) && ! $veSensibles, 403, 'Esta sección contiene datos sensibles.');
         $filters = $request->validate([
             'legajo_id' => 'nullable|uuid', 'page' => 'sometimes|integer|min:1',
             'seccion_id' => 'nullable|integer|exists:secciones_legajo,id',
@@ -320,6 +337,9 @@ class ExpedienteController extends Controller
             $query->where('usuario_id', $usuario);
         }
         if ($section === 'documentos-usuario') {
+            if (! $veSensibles) {
+                $query->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES);
+            }
             if (! empty($filters['seccion_id'])) {
                 $query->where('seccion_legajo_id', $filters['seccion_id']);
             }
@@ -330,7 +350,7 @@ class ExpedienteController extends Controller
         $relations = self::RELATIONS[class_basename($query->getModel())] ?? [];
         foreach ($relations as $relation) {
             $related = $query->getModel()->{$relation}()->getRelated();
-            $columns = array_values(array_intersect(['id', 'nombre', 'nombres', 'apellido_paterno', 'apellido_materno', 'numero_legajo', 'nombre_original', 'codigo', 'descripcion', 'numero_documento_vinculo', 'nombre_puesto', 'fecha_inicio', 'tipo', 'tipo_documento_id', 'num_resolucion'], array_merge(['id'], $related->getFillable())));
+            $columns = array_values(array_intersect(['id', 'nombre', 'apellidos_nombres', 'nombres', 'apellido_paterno', 'apellido_materno', 'numero_legajo', 'nombre_original', 'codigo', 'descripcion', 'numero_documento_vinculo', 'nombre_puesto', 'fecha_inicio', 'tipo', 'tipo_documento_id', 'num_resolucion'], array_merge(['id'], $related->getFillable())));
             $query->with($relation.':'.implode(',', $columns));
             if ($related instanceof DocumentoUsuario) {
                 $query->with($relation.'.tipoDocumento:id,nombre');
@@ -384,7 +404,7 @@ class ExpedienteController extends Controller
         if ($record instanceof VinculoLaboral) {
             return trim(($record->nombre_puesto ?? 'Vínculo laboral').' '.($record->numero_documento_vinculo ?? ''));
         }
-        foreach (['nombre', 'numero_legajo', 'nombre_original', 'numero_documento_vinculo', 'codigo', 'descripcion', 'tipo'] as $field) {
+        foreach (['nombre', 'apellidos_nombres', 'numero_legajo', 'nombre_original', 'numero_documento_vinculo', 'codigo', 'descripcion', 'tipo'] as $field) {
             if ($record->getAttribute($field)) {
                 return (string) $record->getAttribute($field);
             }

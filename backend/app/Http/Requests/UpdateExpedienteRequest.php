@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\Usuario;
+use App\Support\Catalogos;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -26,14 +27,14 @@ class UpdateExpedienteRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tipo_doc_identidad' => 'sometimes|required|string|max:15',
+            'tipo_doc_identidad' => ['sometimes', 'required', Rule::in(Catalogos::TIPOS_DOC_IDENTIDAD)],
             'numero_doc_identidad' => ['sometimes', 'required', 'string', 'max:20', Rule::unique('usuarios', 'numero_doc_identidad')->ignore($this->route('usuario'))],
             'nombres' => 'sometimes|required|string|max:120',
             'apellido_paterno' => 'sometimes|required|string|max:80',
             'apellido_materno' => 'sometimes|nullable|string|max:80',
             'fecha_nacimiento' => 'sometimes|nullable|date_format:Y-m-d|before_or_equal:today',
             'nacionalidad' => 'sometimes|nullable|string|max:60',
-            'estado_civil' => 'sometimes|nullable|string|max:15',
+            'estado_civil' => ['sometimes', 'nullable', Rule::in(Catalogos::ESTADOS_CIVILES)],
             'domicilio' => 'sometimes|nullable|string|max:250',
             'telefono' => ['sometimes', 'nullable', 'string', 'regex:/^[+0-9()\s-]{6,20}$/'],
             'email_institucional' => 'sometimes|required|string|email:rfc|max:255',

@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from '../../../shared/queries/useLiveQuery'
-import FamiliaresPanel from '../components/familiares/FamiliaresPanel'
+import FamiliaresPanel from '../components/seccion01/FamiliaresPanel'
+import DeclaracionesPanel from '../components/seccion01/DeclaracionesPanel'
+import CertificadosPanel from '../components/seccion01/CertificadosPanel'
+import { categoriasSensibles } from '../config/seccion01'
+import { usePuede } from '../../auth/session'
 import PersonalHeader from '../components/PersonalHeader'
 import GeneralDataEditor from '../components/GeneralDataEditor'
 import { legajoSections, findDocumentSection } from '../config/legajoSections'
@@ -104,12 +108,21 @@ function SectionRecords({ usuario, section, page, onPage, filters, onFilter, doc
   </section>
 }
 
+const panelesSeccion01 = { familiares: FamiliaresPanel, 'declaraciones-verificaciones': DeclaracionesPanel, 'certificados-discapacidad': CertificadosPanel }
+
+function Bloqueado() {
+  return <section className={`${panel} p-10 text-center`}><span className="mx-auto mb-3 grid size-12 place-items-center rounded-2xl bg-slate-50 text-slate-400"><Icon name="shield" /></span><h2 className="text-sm font-semibold text-slate-700">Sección con datos sensibles</h2><p className="mt-2 text-xs text-slate-500">Tu perfil no tiene acceso a datos sensibles ni de salud (Directiva, art. 6.2). Solicita el acceso a la jefatura de la ORH.</p></section>
+}
+
 function Detail({ usuario }) {
+  const veSensibles = usePuede('datos_sensibles.ver')
+  const puedeEditar = usePuede('legajo.editar') && veSensibles
   const [editing, setEditing] = useState(false)
   const [saved, setSaved] = useState(false)
   const request = useRead(`/expedientes/${usuario}`)
   const [params, setParams] = useSearchParams()
   const selected = params.get('categoria') || 'general'
+  const PanelSeccion01 = panelesSeccion01[selected]
   function change(key, value) {
     const next = new URLSearchParams(params)
     if (value) next.set(key, value)
@@ -130,7 +143,7 @@ function Detail({ usuario }) {
     {data && <>
       <PersonalHeader data={data} usuario={usuario} />
       <div className="grid items-start gap-6 lg:grid-cols-[280px_minmax(0,1fr)]"><nav aria-label="Secciones del legajo" className={`${panel} p-3`}>{legajoSections.map(item => <details key={item.number} open={group?.number === item.number} className="border-b border-slate-100 py-2 last:border-b-0"><summary className="cursor-pointer px-3 py-2 text-xs font-semibold leading-relaxed text-slate-700">{item.title}</summary><div className="mt-1 space-y-1">{[...item.categories, `documentos-${item.number}`].map(key => <button key={key} aria-current={selected === key ? 'page' : undefined} onClick={() => change('categoria', key)} className={`w-full rounded-lg px-3 py-2.5 text-left text-xs ${selected === key ? 'bg-teal-50 font-semibold text-teal-800' : 'text-slate-500 hover:bg-slate-50'}`}>{key === 'general' ? 'Información personal' : key.startsWith('documentos-') ? 'Documentos de la sección' : data.sections.find(category => category.key === key)?.label}</button>)}</div></details>)}</nav>
-        <div className="min-w-0">{selected === 'familiares' ? <FamiliaresPanel key={usuario} usuario={usuario} /> : selected === 'general' ? <section className={`${panel} p-6`}>{editing ? <GeneralDataEditor usuario={usuario} data={data} onCancel={() => setEditing(false)} onSaved={updated => { request.setData(updated); setEditing(false); setSaved(true) }} /> : <><div className="mb-6 flex items-center justify-between gap-4"><h2 className="text-lg font-semibold text-slate-800">Información personal</h2><button onClick={() => { setEditing(true); setSaved(false) }} className="rounded-xl border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-100">Editar</button></div>{saved && <p role="status" className="mb-5 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">Cambios guardados.</p>}<Fields values={Object.fromEntries([...['nombres', 'apellido_paterno', 'apellido_materno'].map(key => [key, data.usuario.values[key]]), ...Object.entries(data.usuario.values).filter(([key]) => !['nombres', 'apellido_paterno', 'apellido_materno', 'foto_path'].includes(key))])} /></>}</section> : group && isDocuments && !documentSection ? <section className={`${panel} p-6`}><h2 className="text-lg font-semibold text-slate-800">Documentos: {group?.title}</h2><p className="mt-3 text-sm text-slate-500">Esta sección todavía no tiene un catálogo documental asociado en la base de datos.</p></section> : section ? <SectionRecords key={`${usuario}:${section.key}`} usuario={usuario} section={section} filters={sectionFilters} onFilter={change} documentSections={isDocuments ? [documentSection] : data.document_sections} documentStates={data.document_states} page={params.get('page') || '1'} onPage={page => change('page', page)} /> : <p role="alert" className="p-6 text-sm text-slate-500">La categoría solicitada no existe. Selecciona una categoría del menú.</p>}</div>
+        <div className="min-w-0">{categoriasSensibles.includes(selected) && !veSensibles ? <Bloqueado /> : PanelSeccion01 ? <PanelSeccion01 key={`${usuario}:${selected}`} usuario={usuario} /> : selected === 'general' ? <section className={`${panel} p-6`}>{editing ? <GeneralDataEditor usuario={usuario} data={data} onCancel={() => setEditing(false)} onSaved={updated => { request.setData(updated); setEditing(false); setSaved(true) }} /> : <><div className="mb-6 flex items-center justify-between gap-4"><h2 className="text-lg font-semibold text-slate-800">Información personal</h2>{puedeEditar && <button onClick={() => { setEditing(true); setSaved(false) }} className="rounded-xl border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-100">Editar</button>}</div>{data.datos_sensibles_ocultos && <p className="mb-5 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">Se muestran solo los datos de identificación. Los datos personales sensibles (nacimiento, domicilio, teléfono, estado civil, discapacidad) requieren acceso a datos sensibles.</p>}{saved && <p role="status" className="mb-5 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">Cambios guardados.</p>}<Fields values={Object.fromEntries([...['nombres', 'apellido_paterno', 'apellido_materno'].map(key => [key, data.usuario.values[key]]), ...Object.entries(data.usuario.values).filter(([key]) => !['nombres', 'apellido_paterno', 'apellido_materno', 'foto_path'].includes(key))])} /></>}</section> : group && isDocuments && !documentSection ? <section className={`${panel} p-6`}><h2 className="text-lg font-semibold text-slate-800">Documentos: {group?.title}</h2><p className="mt-3 text-sm text-slate-500">Esta sección todavía no tiene un catálogo documental asociado en la base de datos.</p></section> : section ? <SectionRecords key={`${usuario}:${section.key}`} usuario={usuario} section={section} filters={sectionFilters} onFilter={change} documentSections={isDocuments ? [documentSection] : data.document_sections} documentStates={data.document_states} page={params.get('page') || '1'} onPage={page => change('page', page)} /> : <p role="alert" className="p-6 text-sm text-slate-500">La categoría solicitada no existe. Selecciona una categoría del menú.</p>}</div>
       </div>
     </>}
   </>

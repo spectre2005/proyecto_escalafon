@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Models\Familiar;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class FamiliarController extends ResourceController
@@ -21,6 +22,13 @@ class FamiliarController extends ResourceController
         'anulado' => 'sometimes|boolean',
         'motivo_anulacion' => 'nullable|string',
     ];
+
+    public function destroy(string $record): JsonResponse
+    {
+        Familiar::query()->findOrFail($record);
+
+        return response()->json(['message' => 'Los familiares no se eliminan; se anulan con motivo.'], 405);
+    }
 
     protected function validatedData(Request $request, bool $updating = false): array
     {

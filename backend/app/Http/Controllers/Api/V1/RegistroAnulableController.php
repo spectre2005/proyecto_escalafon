@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Api\V1\Concerns\AnulaConMotivo;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,6 +15,8 @@ use Illuminate\Validation\ValidationException;
  */
 abstract class RegistroAnulableController extends ResourceController
 {
+    use AnulaConMotivo;
+
     /** Columna por la que se ordena el listado, del más reciente al más antiguo. */
     protected string $orden = 'created_at';
 
@@ -29,16 +32,9 @@ abstract class RegistroAnulableController extends ResourceController
         if ($unknown !== []) {
             throw ValidationException::withMessages(array_fill_keys($unknown, 'Este registro no se edita: solo se puede anular con un motivo.'));
         }
-        $data = $request->validate([
-            'anulado' => 'required|accepted',
-            'motivo_anulacion' => 'required|string|min:5|max:1000',
-        ]);
-        if ($model->anulado) {
-            return response()->json(['message' => 'El registro ya está anulado.'], 409);
-        }
-        $model->update(['anulado' => true, 'motivo_anulacion' => trim($data['motivo_anulacion'])]);
+        $request->validate(['anulado' => 'required|accepted']);
 
-        return new JsonResource($model->refresh());
+        return $this->anular($request, $model);
     }
 
     public function destroy(string $record): JsonResponse

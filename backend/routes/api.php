@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\V1\LegajoController;
 use App\Http\Controllers\Api\V1\Legajos\ExpedienteController;
 use App\Http\Controllers\Api\V1\Legajos\FamiliarPersonalController;
 use App\Http\Controllers\Api\V1\Legajos\FotoPersonalController;
+use App\Http\Controllers\Api\V1\Legajos\Seccion01Controller;
 use App\Http\Controllers\Api\V1\LegajoSeccionController;
 use App\Http\Controllers\Api\V1\LicenciaPermisoController;
 use App\Http\Controllers\Api\V1\MovimientoCustodiaLegajoController;
@@ -81,11 +82,22 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum'])->
     });
 
     Route::middleware('can:legajo.editar')->group(function (): void {
-        Route::patch('expedientes/{usuario}', [ExpedienteController::class, 'update'])->whereUuid('usuario');
         Route::post('expedientes/{usuario}/foto', [FotoPersonalController::class, 'store'])->whereUuid('usuario');
+    });
+
+    // Sección 01 (datos personales y familiares): además del permiso de la acción, datos_sensibles.ver.
+    Route::middleware(['can:legajo.editar', 'can:datos_sensibles.ver'])->group(function (): void {
+        Route::patch('expedientes/{usuario}', [ExpedienteController::class, 'update'])->whereUuid('usuario');
         Route::post('expedientes/{usuario}/familiares', [FamiliarPersonalController::class, 'storeForPerson'])->whereUuid('usuario');
         Route::patch('expedientes/{usuario}/familiares/{familiar}', [FamiliarPersonalController::class, 'updateForPerson'])->whereUuid(['usuario', 'familiar']);
-        Route::delete('expedientes/{usuario}/familiares/{familiar}', [FamiliarPersonalController::class, 'destroyForPerson'])->whereUuid(['usuario', 'familiar']);
+        Route::post('expedientes/{usuario}/declaraciones-verificaciones', [Seccion01Controller::class, 'storeDeclaracion'])->whereUuid('usuario');
+        Route::post('expedientes/{usuario}/certificados-discapacidad', [Seccion01Controller::class, 'storeCertificado'])->whereUuid('usuario');
+    });
+
+    // Anular (no se elimina): solo administración.
+    Route::middleware(['can:sistema.administrar', 'can:datos_sensibles.ver'])->group(function (): void {
+        Route::post('expedientes/{usuario}/{tipo}/{registro}/anular', [Seccion01Controller::class, 'anularRegistro'])
+            ->whereUuid(['usuario', 'registro'])->whereIn('tipo', ['familiares', 'declaraciones-verificaciones', 'certificados-discapacidad']);
     });
 
     Route::middleware('can:seccion07.ver')->group(function (): void {
