@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import api from '../../axios'
 import '../../App.css'
 import logo from '../../assets/uniq-logo.png'
 import campus from '../../assets/uniq_logo.jpg'
@@ -26,7 +29,28 @@ const features = [
   { icon: 'document', title: 'Documentos y resoluciones', text: 'Todo organizado para ti' },
 ]
 
-export default function App() {
+export default function LoginPrincipal() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [visible, setVisible] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const navigate = useNavigate()
+  async function login(event) {
+    event.preventDefault()
+    if (busy) return
+    setBusy(true)
+    setError('')
+    try {
+      await api.get('/auth/csrf')
+      await api.post('/auth/login', { email: email.trim(), password })
+      navigate('/', { replace: true })
+    } catch (failure) {
+      const status = failure.response?.status
+      setError(status === 422 ? 'Correo o contrase\u00f1a incorrectos.' : status === 429 ? 'Demasiados intentos. Espera un minuto.' : status === 403 ? 'Esta cuenta no tiene acceso administrativo.' : 'No se pudo iniciar sesi\u00f3n. Comprueba la conexi\u00f3n e intenta nuevamente.')
+    } finally { setBusy(false) }
+  }
+
   return (
     <main className="login-page">
       <div className="login-shell">
@@ -58,13 +82,13 @@ export default function App() {
           <div className="login-content">
             <div className="system-brand"><div className="system-logo"><img src={logo} alt="" /></div><div><span>SISTEMA DE</span><strong>Escalafón<span className="brand-dot">.</span></strong><p>PERSONAL DOCENTE Y NO DOCENTE</p></div></div>
             <div className="login-heading"><span className="section-marker" /><p className="small-label">TE DAMOS LA BIENVENIDA</p><h2 id="login-title">Iniciar sesión</h2><p>Ingresa con tu cuenta institucional para acceder<br className="desktop-break" /> a tu información académica y laboral.</p></div>
-            <form className="login-form" onSubmit={(event) => event.preventDefault()}>
+            <form className="login-form" onSubmit={login} aria-busy={busy}>
               <label htmlFor="email">Correo institucional</label>
-              <div className="input-wrap"><Icon name="mail" /><input id="email" name="email" type="email" placeholder="nombre@uniq.edu.pe" autoComplete="username" /></div>
+              <div className="input-wrap"><Icon name="mail" /><input id="email" name="email" type="email" placeholder="nombre@uniq.edu.pe" autoComplete="username" required value={email} onChange={event => setEmail(event.target.value)} disabled={busy} /></div>
               <label htmlFor="password">Contraseña</label>
-              <div className="input-wrap"><Icon name="lock" /><input id="password" name="password" type="password" placeholder="Ingresa tu contraseña" autoComplete="current-password" /><span className="password-decoration"><Icon name="eye" /></span></div>
-              <div className="form-options"><label className="remember"><input type="checkbox" defaultChecked /> Recordarme</label><button className="text-button" type="button">¿Olvidaste tu contraseña?</button></div>
-              <button className="login-button" type="button">Ingresar al sistema <Icon name="arrow" /></button>
+              <div className="input-wrap"><Icon name="lock" /><input id="password" name="password" type={visible ? 'text' : 'password'} placeholder="Ingresa tu contraseña" autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} disabled={busy} /><button type="button" className="password-decoration" aria-label="Mostrar u ocultar contraseña" onClick={() => setVisible(!visible)}><Icon name="eye" /></button></div>
+              {error && <p role="alert" className="mb-4 text-sm text-rose-700">{error}</p>}
+              <button className="login-button" type="submit" disabled={busy}>{busy ? 'Ingresando…' : 'Ingresar al sistema'} <Icon name="arrow" /></button>
             </form>
             <div className="security-note"><Icon name="shield" size={16} /><span>Tu información en un entorno institucional.</span></div>
             <div className="support-card"><span className="support-icon"><Icon name="help" size={23} /></span><div><strong>¿Necesitas ayuda para ingresar?</strong><p>Contacta al área de Escalafón o Recursos Humanos.</p></div></div>

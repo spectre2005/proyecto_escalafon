@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\RequireAdministrator;
 use App\Models\Legajo;
 use App\Models\Usuario;
+use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -13,6 +16,16 @@ use Tests\TestCase;
 class UsuariosApiTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutMiddleware([
+            Authenticate::class,
+            RequireAdministrator::class,
+            ValidateCsrfToken::class,
+        ]);
+    }
 
     /** @return array<string, string> */
     private function payload(array $overrides = []): array

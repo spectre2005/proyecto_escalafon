@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Usuario;
-use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\UsuarioSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -14,7 +13,7 @@ class UsuarioSeederTest extends TestCase
 
     public function test_it_seeds_ten_fictional_users_repeatably_for_dashboard_and_directory(): void
     {
-        $this->seed(DatabaseSeeder::class);
+        $this->seed(UsuarioSeeder::class);
         $this->seed(UsuarioSeeder::class);
 
         $this->assertDatabaseCount('usuarios', 10);

@@ -1,0 +1,35 @@
+export const personalGroups = [
+  ['Identificación personal', [
+    ['nombres', 'Nombres'], ['apellido_paterno', 'Apellido paterno'], ['apellido_materno', 'Apellido materno'],
+    ['tipo_doc_identidad', 'Tipo de documento'], ['numero_doc_identidad', 'Número de documento'],
+    ['fecha_nacimiento', 'Fecha de nacimiento'], ['nacionalidad', 'Nacionalidad'], ['estado_civil', 'Estado civil'],
+  ]],
+  ['Contacto y domicilio', [
+    ['email_institucional', 'Correo institucional'], ['telefono', 'Teléfono'], ['domicilio', 'Domicilio'],
+    ['region', 'Región'], ['provincia', 'Provincia'], ['distrito', 'Distrito'],
+  ]],
+  ['Información laboral', [
+    ['tipo_personal', 'Tipo de personal'], ['nombre_puesto', 'Puesto'], ['unidad_organica_id', 'Unidad orgánica'],
+    ['regimen_laboral', 'Régimen laboral'], ['regimen_normativo_id', 'Régimen normativo'], ['activo', 'Activo'],
+  ]],
+  ['Condiciones del personal', [
+    ['con_discapacidad', 'Con discapacidad'], ['tiene_derechohabientes', 'Tiene derechohabientes'],
+    ['obligado_djbr', 'Obligado a declarar bienes y rentas'], ['exige_colegiatura', 'Requiere colegiatura'],
+    ['tiene_periodo_prueba', 'Tiene período de prueba'],
+  ]],
+]
+
+export const familyFields = [
+  ['apellidos_nombres', 'Apellidos y nombres'], ['parentesco', 'Parentesco'],
+  ['tipo_doc_identidad', 'Tipo de documento'], ['numero_doc_identidad', 'Número de documento'],
+  ['fecha_nacimiento', 'Fecha de nacimiento'], ['es_derechohabiente', 'Derechohabiente'],
+  ['anulado', 'Registro anulado'], ['motivo_anulacion', 'Motivo de anulación'],
+]
+
+export function reportValue(value, blank = false) {
+  if (blank) return ''
+  if (value === null || value === undefined || value === '') return 'No registrado'
+  if (typeof value === 'boolean') return value ? 'Sí' : 'No'
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return value.split('-').reverse().join('/')
+  return String(value)
+}

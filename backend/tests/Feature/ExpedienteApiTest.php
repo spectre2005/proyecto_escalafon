@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\RequireAdministrator;
 use App\Models\ArchivoDocumento;
 use App\Models\BitacoraAccesoLegajo;
 use App\Models\Capacitacion;
@@ -16,12 +17,24 @@ use App\Models\ProcesoFiscalizacion;
 use App\Models\SolicitudFiscalizacion;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
+use Illuminate\Auth\Middleware\Authenticate;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ExpedienteApiTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutMiddleware([
+            Authenticate::class,
+            RequireAdministrator::class,
+            ValidateCsrfToken::class,
+        ]);
+    }
 
     public function test_directory_searches_people_and_legajo_numbers_and_paginates(): void
     {

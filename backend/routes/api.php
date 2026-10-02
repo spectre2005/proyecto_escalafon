@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AfiliacionController;
 use App\Http\Controllers\Api\V1\ArchivoDocumentoController;
 use App\Http\Controllers\Api\V1\AuditoriaEventoController;
+use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BitacoraAccesoLegajoController;
 use App\Http\Controllers\Api\V1\CapacitacionController;
 use App\Http\Controllers\Api\V1\CertificadoDiscapacidadController;
@@ -25,6 +26,7 @@ use App\Http\Controllers\Api\V1\HistorialEstadoDocumentoController;
 use App\Http\Controllers\Api\V1\InduccionController;
 use App\Http\Controllers\Api\V1\LegajoController;
 use App\Http\Controllers\Api\V1\Legajos\ExpedienteController;
+use App\Http\Controllers\Api\V1\Legajos\FamiliarPersonalController;
 use App\Http\Controllers\Api\V1\Legajos\FotoPersonalController;
 use App\Http\Controllers\Api\V1\LegajoSeccionController;
 use App\Http\Controllers\Api\V1\LicenciaPermisoController;
@@ -59,9 +61,18 @@ use App\Http\Controllers\Api\V1\UsuarioRolController;
 use App\Http\Controllers\Api\V1\VinculoAdendaController;
 use App\Http\Controllers\Api\V1\VinculoLaboralController;
 use App\Http\Middleware\LocalDevelopmentOnly;
+use App\Http\Middleware\RequireAdministrator;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('v1')->middleware(LocalDevelopmentOnly::class)->group(function (): void {
+Route::prefix('v1/auth')->middleware(['web', LocalDevelopmentOnly::class])->group(function (): void {
+    Route::get('csrf', fn (): Response => response()->noContent());
+    Route::post('login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+    Route::get('me', [AuthController::class, 'me'])->middleware(['auth', RequireAdministrator::class]);
+    Route::post('logout', [AuthController::class, 'logout'])->middleware('auth');
+});
+
+Route::prefix('v1')->middleware(['web', LocalDevelopmentOnly::class, 'auth', RequireAdministrator::class])->group(function (): void {
     Route::get('expedientes', [ExpedienteController::class, 'index']);
     Route::get('ubicaciones', [ExpedienteController::class, 'locations']);
     Route::get('expediente-opciones', [ExpedienteController::class, 'editOptions']);
@@ -69,6 +80,9 @@ Route::prefix('v1')->middleware(LocalDevelopmentOnly::class)->group(function ():
     Route::get('expedientes/{usuario}', [ExpedienteController::class, 'show'])->whereUuid('usuario');
     Route::get('expedientes/{usuario}/foto', [FotoPersonalController::class, 'show'])->whereUuid('usuario');
     Route::post('expedientes/{usuario}/foto', [FotoPersonalController::class, 'store'])->whereUuid('usuario');
+    Route::post('expedientes/{usuario}/familiares', [FamiliarPersonalController::class, 'storeForPerson'])->whereUuid('usuario');
+    Route::patch('expedientes/{usuario}/familiares/{familiar}', [FamiliarPersonalController::class, 'updateForPerson'])->whereUuid(['usuario', 'familiar']);
+    Route::delete('expedientes/{usuario}/familiares/{familiar}', [FamiliarPersonalController::class, 'destroyForPerson'])->whereUuid(['usuario', 'familiar']);
     Route::get('expedientes/{usuario}/{section}', [ExpedienteController::class, 'section'])->whereUuid('usuario');
 
     Route::apiResource('usuarios', UsuarioController::class)->only(['show', 'update', 'destroy'])->parameters(['usuarios' => 'record'])->whereUuid('record')->names('api.v1.usuarios');

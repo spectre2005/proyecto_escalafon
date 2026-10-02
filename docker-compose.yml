@@ -2,6 +2,8 @@ services:
   app:
     build: ./docker/php
     user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+    environment:
+      SESSION_DRIVER: file
     volumes:
       - ./backend:/var/www/html
       - php_vendor:/var/www/html/vendor

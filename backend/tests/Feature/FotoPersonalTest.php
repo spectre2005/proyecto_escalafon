@@ -2,7 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\RequireAdministrator;
 use App\Models\Usuario;
+use Illuminate\Auth\Middleware\Authenticate;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -11,6 +14,16 @@ use Tests\TestCase;
 class FotoPersonalTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutMiddleware([
+            Authenticate::class,
+            RequireAdministrator::class,
+            ValidateCsrfToken::class,
+        ]);
+    }
 
     public function test_photo_is_loaded_from_the_database_path(): void
     {

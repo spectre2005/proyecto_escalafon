@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\UsuarioFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -69,6 +70,15 @@ class Usuario extends Authenticatable
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
+    }
+
+    public function isAdministrator(): bool
+    {
+        return $this->usuarioRolesPorUsuario()
+            ->where('vigente_desde', '<=', today()->toDateString())
+            ->where(fn (Builder $query): Builder => $query->whereNull('vigente_hasta')->orWhere('vigente_hasta', '>=', today()->toDateString()))
+            ->whereHas('rol', fn (Builder $query): Builder => $query->where('codigo', 'ADMIN')->where('activo', true))
+            ->exists();
     }
 
     public function regimenNormativo(): BelongsTo

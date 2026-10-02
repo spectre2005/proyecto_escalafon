@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\DocumentoUsuario;
 use App\Models\Ubigeo;
 use App\Models\UnidadOrganica;
-use App\Models\User;
 use App\Models\Usuario;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -72,7 +71,7 @@ class ModelPersistenceTest extends TestCase
         $this->assertSame($usuario->email_institucional, $usuario->routeNotificationFor('mail'));
         $this->assertSame('', $usuario->getRememberTokenName());
         $this->assertTrue($usuario->activo);
-        $this->assertInstanceOf(User::class, User::findOrFail($usuario->id));
+        $this->assertSame(Usuario::class, config('auth.providers.users.model'));
     }
 
     public function test_ubigeo_and_self_references_can_be_traversed_in_both_directions(): void

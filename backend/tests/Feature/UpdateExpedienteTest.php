@@ -2,16 +2,29 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\RequireAdministrator;
 use App\Models\RegimenNormativo;
 use App\Models\Ubigeo;
 use App\Models\UnidadOrganica;
 use App\Models\Usuario;
+use Illuminate\Auth\Middleware\Authenticate;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class UpdateExpedienteTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutMiddleware([
+            Authenticate::class,
+            RequireAdministrator::class,
+            ValidateCsrfToken::class,
+        ]);
+    }
 
     public function test_edit_saves_contact_and_location_and_returns_fresh_general_data(): void
     {
