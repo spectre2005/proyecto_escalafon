@@ -2,12 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Http\Middleware\RequireAdministrator;
 use App\Models\Legajo;
 use App\Models\Usuario;
-use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Database\UniqueConstraintViolationException;
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -20,11 +17,13 @@ class UsuariosApiTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->withoutMiddleware([
-            Authenticate::class,
-            RequireAdministrator::class,
-            ValidateCsrfToken::class,
-        ]);
+        $this->actuarComo();
+    }
+
+    /** Cuenta usuarios sin el usuario autenticado que crea setUp(). */
+    private function assertUsuariosCreados(int $count): void
+    {
+        $this->assertDatabaseCount('usuarios', $count + 1);
     }
 
     /** @return array<string, string> */
@@ -46,17 +45,16 @@ class UsuariosApiTest extends TestCase
         $this->assertArrayNotHasKey('password', $response->json('data.0'));
         $record = Usuario::query()->findOrFail($response->json('data.0.id'));
         $this->assertNotSame('unknown', Hash::info($record->password)['algoName']);
-        $this->getJson('/api/v1/usuarios')->assertOk()
-            ->assertJsonPath('data.0.id', $record->id)
-            ->assertJsonPath('data.0.apellido_materno', '')
-            ->assertJsonPath('data.0.telefono', '');
+        $listed = collect($this->getJson('/api/v1/usuarios')->assertOk()->json('data'))->firstWhere('id', $record->id);
+        $this->assertSame('', $listed['apellido_materno']);
+        $this->assertSame('', $listed['telefono']);
     }
 
     public function test_bulk_records_persist_together(): void
     {
         $this->postJson('/api/v1/usuarios', ['usuarios' => [$this->payload(), $this->payload()]])
             ->assertCreated()->assertJsonCount(2, 'data');
-        $this->assertDatabaseCount('usuarios', 2);
+        $this->assertUsuariosCreados(2);
     }
 
     public function test_invalid_row_prevents_the_whole_batch_from_being_saved(): void
@@ -64,7 +62,7 @@ class UsuariosApiTest extends TestCase
         $this->postJson('/api/v1/usuarios', ['usuarios' => [
             $this->payload(), $this->payload(['numero_doc_identidad' => '123']),
         ]])->assertUnprocessable()->assertJsonValidationErrors('usuarios.1.numero_doc_identidad');
-        $this->assertDatabaseCount('usuarios', 0);
+        $this->assertUsuariosCreados(0);
     }
 
     public function test_regime_must_belong_to_the_staff_type(): void
@@ -81,7 +79,7 @@ class UsuariosApiTest extends TestCase
         ]])->assertUnprocessable()->assertJsonValidationErrors([
             'usuarios.0.regimen_laboral', 'usuarios.1.regimen_laboral', 'usuarios.2.regimen_laboral',
         ]);
-        $this->assertDatabaseCount('usuarios', 2);
+        $this->assertUsuariosCreados(2);
     }
 
     public function test_duplicates_in_the_file_are_rejected_case_insensitively(): void
@@ -90,7 +88,7 @@ class UsuariosApiTest extends TestCase
             $this->payload(['email_institucional' => 'Ana@uniq.edu.pe']),
             $this->payload(['email_institucional' => 'ana@uniq.edu.pe']),
         ]])->assertUnprocessable()->assertJsonValidationErrors('usuarios.1.email_institucional');
-        $this->assertDatabaseCount('usuarios', 0);
+        $this->assertUsuariosCreados(0);
     }
 
     public function test_existing_document_and_email_cannot_be_reimported(): void
@@ -102,7 +100,7 @@ class UsuariosApiTest extends TestCase
         $this->postJson('/api/v1/usuarios', ['usuarios' => [
             $this->payload(['email_institucional' => 'ANA@uniq.edu.pe']),
         ]])->assertUnprocessable()->assertJsonValidationErrors('usuarios.0.email_institucional');
-        $this->assertDatabaseCount('usuarios', 1);
+        $this->assertUsuariosCreados(1);
     }
 
     public function test_extra_fields_and_empty_batches_are_rejected(): void
@@ -110,7 +108,7 @@ class UsuariosApiTest extends TestCase
         $this->postJson('/api/v1/usuarios', ['usuarios' => [$this->payload(['activo' => true])]])
             ->assertUnprocessable()->assertJsonValidationErrors('usuarios.0');
         $this->postJson('/api/v1/usuarios', ['usuarios' => []])->assertUnprocessable();
-        $this->assertDatabaseCount('usuarios', 0);
+        $this->assertUsuariosCreados(0);
     }
 
     public function test_list_is_paginated_and_never_exposes_passwords(): void
@@ -119,7 +117,8 @@ class UsuariosApiTest extends TestCase
         $response = $this->getJson('/api/v1/usuarios')->assertOk()
             ->assertJsonCount(100, 'data')->assertJsonPath('meta.last_page', 2);
         $this->assertArrayNotHasKey('password', $response->json('data.0'));
-        $this->getJson('/api/v1/usuarios?page=2')->assertOk()->assertJsonCount(1, 'data');
+        // 101 creados + el usuario autenticado del test.
+        $this->getJson('/api/v1/usuarios?page=2')->assertOk()->assertJsonCount(2, 'data');
     }
 
     public function test_database_index_prevents_duplicate_emails_even_without_api_validation(): void
@@ -138,7 +137,7 @@ class UsuariosApiTest extends TestCase
         }
         $rows[100]['numero_doc_identidad'] = '99999999';
         $this->postJson('/api/v1/usuarios', ['usuarios' => $rows])->assertStatus(500);
-        $this->assertDatabaseCount('usuarios', 0);
+        $this->assertUsuariosCreados(0);
     }
 
     public function test_user_can_be_read_updated_and_deleted(): void
@@ -170,6 +169,6 @@ class UsuariosApiTest extends TestCase
         $this->app->instance('env', 'production');
         $this->getJson('/api/v1/usuarios')->assertForbidden();
         $this->postJson('/api/v1/usuarios', ['usuarios' => [$this->payload()]])->assertForbidden();
-        $this->assertDatabaseCount('usuarios', 0);
+        $this->assertUsuariosCreados(0);
     }
 }

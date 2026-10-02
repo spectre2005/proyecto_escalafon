@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import api from '../../axios'
+import api, { pedirCookieCsrf } from '../../axios'
 import '../../App.css'
-import logo from '../../assets/uniq-logo.png'
-import campus from '../../assets/uniq_logo.jpg'
+import { readInstitution } from '../../config/institution'
 
 function Icon({ name, size = 20, ...props }) {
   const paths = {
@@ -35,6 +34,7 @@ export default function LoginPrincipal() {
   const [visible, setVisible] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [institution] = useState(readInstitution)
   const navigate = useNavigate()
   async function login(event) {
     event.preventDefault()
@@ -42,12 +42,12 @@ export default function LoginPrincipal() {
     setBusy(true)
     setError('')
     try {
-      await api.get('/auth/csrf')
+      await pedirCookieCsrf()
       await api.post('/auth/login', { email: email.trim(), password })
       navigate('/', { replace: true })
     } catch (failure) {
       const status = failure.response?.status
-      setError(status === 422 ? 'Correo o contrase\u00f1a incorrectos.' : status === 429 ? 'Demasiados intentos. Espera un minuto.' : status === 403 ? 'Esta cuenta no tiene acceso administrativo.' : 'No se pudo iniciar sesi\u00f3n. Comprueba la conexi\u00f3n e intenta nuevamente.')
+      setError(status === 422 ? 'Correo o contrase\u00f1a incorrectos.' : status === 429 ? (failure.response?.data?.message || 'Demasiados intentos. Espera un momento.') : 'No se pudo iniciar sesi\u00f3n. Comprueba la conexi\u00f3n e intenta nuevamente.')
     } finally { setBusy(false) }
   }
 
@@ -55,11 +55,10 @@ export default function LoginPrincipal() {
     <main className="login-page">
       <div className="login-shell">
         <section className="institution-panel" aria-labelledby="welcome-title">
-          <img className="campus-image" src={campus} alt="Vista aérea del campus de la UNIQ en Quillabamba" />
           <div className="panel-overlay" />
           <header className="institution-brand">
-            <img src={logo} alt="Emblema UNIQ" className="brand-logo" />
-            <div><strong>UNIQ</strong><span>Universidad Nacional Intercultural<br />de Quillabamba</span></div>
+            <span aria-hidden="true" className="brand-logo grid place-items-center text-lg font-bold text-[#145958]">{institution.initials}</span>
+            <div><strong>{institution.name}</strong><span>{institution.area}</span></div>
           </header>
           <div className="institution-content">
             <span className="eyebrow"><span /> SISTEMA DE ESCALAFÓN</span>
@@ -74,17 +73,17 @@ export default function LoginPrincipal() {
               ))}
             </div>
           </div>
-          <footer className="institution-footer"><span><Icon name="pin" size={15} /> Quillabamba, Cusco · Perú</span><span className="footer-line" /></footer>
+          <footer className="institution-footer"><span><Icon name="pin" size={15} /> {institution.area}</span><span className="footer-line" /></footer>
         </section>
 
         <section className="access-panel" aria-labelledby="login-title">
           <div className="access-topline"><span>PORTAL DEL PERSONAL</span><span className="institutional-badge"><span /> Acceso institucional</span></div>
           <div className="login-content">
-            <div className="system-brand"><div className="system-logo"><img src={logo} alt="" /></div><div><span>SISTEMA DE</span><strong>Escalafón<span className="brand-dot">.</span></strong><p>PERSONAL DOCENTE Y NO DOCENTE</p></div></div>
+            <div className="system-brand"><div className="system-logo"><span aria-hidden="true" className="grid size-[51px] place-items-center text-lg font-bold text-[#214b4b]">{institution.initials}</span></div><div><span>SISTEMA DE</span><strong>Escalafón<span className="brand-dot">.</span></strong><p>PERSONAL DOCENTE Y NO DOCENTE</p></div></div>
             <div className="login-heading"><span className="section-marker" /><p className="small-label">TE DAMOS LA BIENVENIDA</p><h2 id="login-title">Iniciar sesión</h2><p>Ingresa con tu cuenta institucional para acceder<br className="desktop-break" /> a tu información académica y laboral.</p></div>
             <form className="login-form" onSubmit={login} aria-busy={busy}>
               <label htmlFor="email">Correo institucional</label>
-              <div className="input-wrap"><Icon name="mail" /><input id="email" name="email" type="email" placeholder="nombre@uniq.edu.pe" autoComplete="username" required value={email} onChange={event => setEmail(event.target.value)} disabled={busy} /></div>
+              <div className="input-wrap"><Icon name="mail" /><input id="email" name="email" type="email" placeholder="nombre@institucion.edu.pe" autoComplete="username" required value={email} onChange={event => setEmail(event.target.value)} disabled={busy} /></div>
               <label htmlFor="password">Contraseña</label>
               <div className="input-wrap"><Icon name="lock" /><input id="password" name="password" type={visible ? 'text' : 'password'} placeholder="Ingresa tu contraseña" autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} disabled={busy} /><button type="button" className="password-decoration" aria-label="Mostrar u ocultar contraseña" onClick={() => setVisible(!visible)}><Icon name="eye" /></button></div>
               {error && <p role="alert" className="mb-4 text-sm text-rose-700">{error}</p>}
@@ -93,7 +92,7 @@ export default function LoginPrincipal() {
             <div className="security-note"><Icon name="shield" size={16} /><span>Tu información en un entorno institucional.</span></div>
             <div className="support-card"><span className="support-icon"><Icon name="help" size={23} /></span><div><strong>¿Necesitas ayuda para ingresar?</strong><p>Contacta al área de Escalafón o Recursos Humanos.</p></div></div>
           </div>
-          <footer className="access-footer"><span>© {new Date().getFullYear()} UNIQ · Todos los derechos reservados</span><span>Gestión del talento humano</span></footer>
+          <footer className="access-footer"><span>© {new Date().getFullYear()} {institution.name} · Todos los derechos reservados</span><span>Gestión del talento humano</span></footer>
         </section>
       </div>
     </main>

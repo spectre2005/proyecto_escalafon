@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Icon from '../components/ui/Icon'
 import AccountMenu from './AccountMenu'
+import { usePuede } from '../features/auth/session'
 
 export default function Topbar({ title, institution, onOpenMenu, user }) {
   const [closing, setClosing] = useState(false)
@@ -13,9 +14,13 @@ export default function Topbar({ title, institution, onOpenMenu, user }) {
     setClosing(true)
     try {
       await api.post('/auth/logout')
-      window.location.assign('/login_principal')
-    } catch { setError('No se pudo cerrar la sesi\u00f3n. Intenta nuevamente.'); setClosing(false) }
+    } catch (failure) {
+      // 401/419: la sesión ya estaba cerrada o vencida; igual se sale.
+      if (![401, 419].includes(failure.response?.status)) { setError('No se pudo cerrar la sesi\u00f3n. Intenta nuevamente.'); setClosing(false); return }
+    }
+    window.location.assign('/login_principal')
   }
+  const esAdministrador = usePuede('sistema.administrar')
   const [search, setSearch] = useState('')
   const navigate = useNavigate()
   function submit(event) {
@@ -32,7 +37,7 @@ export default function Topbar({ title, institution, onOpenMenu, user }) {
       name: [user.nombres, user.apellido_paterno, user.apellido_materno].filter(Boolean).join(' '),
       initials: [user.nombres, user.apellido_paterno].filter(Boolean).map(value => value.charAt(0)).join('').toUpperCase(),
       email: user.email_institucional,
-      role: 'Administrador',
+      role: esAdministrador ? 'Administrador' : 'Personal autorizado',
     }} onLogout={logout} closing={closing} />
     {error && <p role="alert" className="text-xs text-rose-700">{error}</p>}
   </header>

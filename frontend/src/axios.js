@@ -25,6 +25,12 @@ api.interceptors.response.use(response => {
 })
 if (import.meta.hot) import.meta.hot.dispose(() => updates?.close())
 
+// Sanctum (SPA): pide la cookie XSRF-TOKEN en el mismo servidor que la API, fuera de /api/v1.
+export function pedirCookieCsrf() {
+  const apiUrl = new URL(api.defaults.baseURL, window.location.origin)
+  return api.get(new URL('/sanctum/csrf-cookie', apiUrl).href)
+}
+
 export function apiErrorMessage(error) {
   const errors = error.response?.data?.errors
   if (errors) {
@@ -40,7 +46,7 @@ export function apiErrorMessage(error) {
       .join(' ')
   }
   if (error.response?.status === 403)
-    return 'La API de usuarios está habilitada únicamente en desarrollo local.'
+    return 'No tienes permiso para esta acción.'
   if (error.code === 'ECONNABORTED' || !error.response) {
     return 'No se pudo confirmar la operación. Comprueba la conexión y actualiza la lista antes de volver a guardar.'
   }

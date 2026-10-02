@@ -61,34 +61,47 @@ use App\Http\Controllers\Api\V1\UsuarioRolController;
 use App\Http\Controllers\Api\V1\VinculoAdendaController;
 use App\Http\Controllers\Api\V1\VinculoLaboralController;
 use App\Http\Middleware\LocalDevelopmentOnly;
-use App\Http\Middleware\RequireAdministrator;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('v1/auth')->middleware(['web', LocalDevelopmentOnly::class])->group(function (): void {
-    Route::get('csrf', fn (): Response => response()->noContent());
-    Route::post('login', [AuthController::class, 'login'])->middleware('throttle:10,1');
-    Route::get('me', [AuthController::class, 'me'])->middleware(['auth', RequireAdministrator::class]);
-    Route::post('logout', [AuthController::class, 'logout'])->middleware('auth');
+Route::prefix('v1/auth')->middleware(LocalDevelopmentOnly::class)->group(function (): void {
+    Route::post('login', [AuthController::class, 'login'])->middleware('throttle:20,1');
+    Route::get('me', [AuthController::class, 'me'])->middleware('auth:sanctum');
+    Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 });
 
-Route::prefix('v1')->middleware(['web', LocalDevelopmentOnly::class, 'auth', RequireAdministrator::class])->group(function (): void {
-    Route::get('expedientes', [ExpedienteController::class, 'index']);
-    Route::get('ubicaciones', [ExpedienteController::class, 'locations']);
-    Route::get('expediente-opciones', [ExpedienteController::class, 'editOptions']);
-    Route::patch('expedientes/{usuario}', [ExpedienteController::class, 'update'])->whereUuid('usuario');
-    Route::get('expedientes/{usuario}', [ExpedienteController::class, 'show'])->whereUuid('usuario');
-    Route::get('expedientes/{usuario}/foto', [FotoPersonalController::class, 'show'])->whereUuid('usuario');
-    Route::post('expedientes/{usuario}/foto', [FotoPersonalController::class, 'store'])->whereUuid('usuario');
-    Route::post('expedientes/{usuario}/familiares', [FamiliarPersonalController::class, 'storeForPerson'])->whereUuid('usuario');
-    Route::patch('expedientes/{usuario}/familiares/{familiar}', [FamiliarPersonalController::class, 'updateForPerson'])->whereUuid(['usuario', 'familiar']);
-    Route::delete('expedientes/{usuario}/familiares/{familiar}', [FamiliarPersonalController::class, 'destroyForPerson'])->whereUuid(['usuario', 'familiar']);
-    Route::get('expedientes/{usuario}/{section}', [ExpedienteController::class, 'section'])->whereUuid('usuario');
+Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum'])->group(function (): void {
+    Route::middleware('can:legajo.ver')->group(function (): void {
+        Route::get('expedientes', [ExpedienteController::class, 'index']);
+        Route::get('ubicaciones', [ExpedienteController::class, 'locations']);
+        Route::get('expediente-opciones', [ExpedienteController::class, 'editOptions']);
+        Route::get('expedientes/{usuario}', [ExpedienteController::class, 'show'])->whereUuid('usuario');
+        Route::get('expedientes/{usuario}/foto', [FotoPersonalController::class, 'show'])->whereUuid('usuario');
+        Route::get('expedientes/{usuario}/{section}', [ExpedienteController::class, 'section'])->whereUuid('usuario');
+    });
 
-    Route::apiResource('usuarios', UsuarioController::class)->only(['show', 'update', 'destroy'])->parameters(['usuarios' => 'record'])->whereUuid('record')->names('api.v1.usuarios');
-    Route::get('usuarios', [UsuarioController::class, 'index'])->name('api.v1.usuarios.index');
-    Route::post('usuarios', [UsuarioController::class, 'store'])->name('api.v1.usuarios.store');
+    Route::middleware('can:legajo.editar')->group(function (): void {
+        Route::patch('expedientes/{usuario}', [ExpedienteController::class, 'update'])->whereUuid('usuario');
+        Route::post('expedientes/{usuario}/foto', [FotoPersonalController::class, 'store'])->whereUuid('usuario');
+        Route::post('expedientes/{usuario}/familiares', [FamiliarPersonalController::class, 'storeForPerson'])->whereUuid('usuario');
+        Route::patch('expedientes/{usuario}/familiares/{familiar}', [FamiliarPersonalController::class, 'updateForPerson'])->whereUuid(['usuario', 'familiar']);
+        Route::delete('expedientes/{usuario}/familiares/{familiar}', [FamiliarPersonalController::class, 'destroyForPerson'])->whereUuid(['usuario', 'familiar']);
+    });
 
+    Route::middleware('can:personal.ver')->group(function (): void {
+        Route::get('usuarios', [UsuarioController::class, 'index'])->name('api.v1.usuarios.index');
+        Route::get('usuarios/{record}', [UsuarioController::class, 'show'])->whereUuid('record')->name('api.v1.usuarios.show');
+    });
+
+    Route::middleware('can:usuarios.gestionar')->group(function (): void {
+        Route::post('usuarios', [UsuarioController::class, 'store'])->name('api.v1.usuarios.store');
+        Route::match(['put', 'patch'], 'usuarios/{record}', [UsuarioController::class, 'update'])->whereUuid('record')->name('api.v1.usuarios.update');
+        Route::delete('usuarios/{record}', [UsuarioController::class, 'destroy'])->whereUuid('record')->name('api.v1.usuarios.destroy');
+    });
+});
+
+// CRUD genérico por tabla: solo para sistema.administrar. LocalDevelopmentOnly sigue en todas las
+// rutas hasta decidir qué se abre en producción; aquí no se quita hasta que cada recurso esté protegido.
+Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', 'can:sistema.administrar'])->group(function (): void {
     Route::apiResource('afiliaciones', AfiliacionController::class)->parameters(['afiliaciones' => 'record'])->whereUuid('record')->names('api.v1.afiliaciones');
     Route::apiResource('archivos-documento', ArchivoDocumentoController::class)->parameters(['archivos-documento' => 'record'])->whereUuid('record')->names('api.v1.archivos-documento');
     Route::apiResource('auditoria-eventos', AuditoriaEventoController::class)->parameters(['auditoria-eventos' => 'record'])->whereUuid('record')->names('api.v1.auditoria-eventos');

@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Http\Middleware\RequireAdministrator;
 use App\Models\ArchivoDocumento;
 use App\Models\BitacoraAccesoLegajo;
 use App\Models\Capacitacion;
@@ -17,8 +16,6 @@ use App\Models\ProcesoFiscalizacion;
 use App\Models\SolicitudFiscalizacion;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
-use Illuminate\Auth\Middleware\Authenticate;
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -29,11 +26,7 @@ class ExpedienteApiTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->withoutMiddleware([
-            Authenticate::class,
-            RequireAdministrator::class,
-            ValidateCsrfToken::class,
-        ]);
+        $this->actuarComo();
     }
 
     public function test_directory_searches_people_and_legajo_numbers_and_paginates(): void
@@ -41,10 +34,11 @@ class ExpedienteApiTest extends TestCase
         $person = Usuario::factory()->create(['nombres' => 'Persona Ficticia', 'apellido_paterno' => 'Ejemplo']);
         Legajo::factory()->create(['usuario_id' => $person->id, 'numero_legajo' => 'DEMO-001']);
         Usuario::factory()->count(21)->create();
-        $this->getJson('/api/v1/expedientes')->assertOk()->assertJsonCount(20, 'data')->assertJsonPath('total', 22);
+        // Totales incluyen al usuario autenticado del test (sin legajo).
+        $this->getJson('/api/v1/expedientes')->assertOk()->assertJsonCount(20, 'data')->assertJsonPath('total', 23);
         $this->getJson('/api/v1/expedientes?q=demo-001')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $person->id);
         $this->getJson('/api/v1/expedientes?q=Persona%20Ficticia%20Ejemplo')->assertOk()->assertJsonCount(1, 'data');
-        $this->getJson('/api/v1/expedientes?legajo=sin')->assertOk()->assertJsonPath('total', 21);
+        $this->getJson('/api/v1/expedientes?legajo=sin')->assertOk()->assertJsonPath('total', 22);
     }
 
     public function test_person_without_legajo_has_general_data_and_empty_sections(): void

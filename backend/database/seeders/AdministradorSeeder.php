@@ -12,15 +12,27 @@ class AdministradorSeeder extends Seeder
 {
     public function run(): void
     {
-        DB::transaction(function (): void {
-            $admin = Usuario::query()->firstOrCreate(['email_institucional' => 'admin@uniq.edu.pe'], [
+        if (! app()->environment(['local', 'testing'])) {
+            return;
+        }
+
+        $email = mb_strtolower(trim((string) config('auth.administrador_inicial.email')));
+        $password = (string) config('auth.administrador_inicial.password');
+        if ($email === '' || $password === '') {
+            $this->command?->warn('AdministradorSeeder: define ADMIN_EMAIL y ADMIN_PASSWORD en backend/.env. No se creó el administrador.');
+
+            return;
+        }
+
+        DB::transaction(function () use ($email, $password): void {
+            $admin = Usuario::query()->firstOrCreate(['email_institucional' => $email], [
                 'tipo_doc_identidad' => 'sistema',
                 'numero_doc_identidad' => 'ADMIN-SISTEMA',
                 'nombres' => 'Administrador',
                 'apellido_paterno' => 'Sistema',
                 'tipo_personal' => 'administrativo',
                 'regimen_laboral' => 'No aplica',
-                'password' => '123456',
+                'password' => $password,
                 'activo' => true,
             ]);
             $role = Rol::query()->firstOrCreate(['codigo' => 'ADMIN'], [

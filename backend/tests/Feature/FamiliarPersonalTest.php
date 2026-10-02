@@ -2,12 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Http\Middleware\RequireAdministrator;
 use App\Models\CertificadoDiscapacidad;
 use App\Models\Familiar;
 use App\Models\Usuario;
-use Illuminate\Auth\Middleware\Authenticate;
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -18,18 +15,14 @@ class FamiliarPersonalTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->withoutMiddleware([
-            Authenticate::class,
-            RequireAdministrator::class,
-            ValidateCsrfToken::class,
-        ]);
+        $this->actuarComo();
     }
 
     public function test_family_can_be_created_updated_listed_and_deleted_for_its_owner(): void
     {
         $person = Usuario::factory()->create();
         $registrar = Usuario::factory()->create();
-        $this->actingAs($registrar);
+        $this->actuarComo($registrar);
         $url = '/api/v1/expedientes/'.$person->id.'/familiares';
         $id = $this->postJson($url, [
             'apellidos_nombres' => 'Familiar ficticio', 'parentesco' => 'Hija',

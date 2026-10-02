@@ -10,12 +10,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
+use Laravel\Sanctum\HasApiTokens;
 
 class Usuario extends Authenticatable
 {
+    // Solo para Sanctum en modo SPA (cookie). No hay tabla de tokens: no usar createToken().
+    use HasApiTokens;
+
     /** @use HasFactory<UsuarioFactory> */
     use HasFactory;
-
     use HasUuids;
     use Notifiable;
 
@@ -72,13 +76,68 @@ class Usuario extends Authenticatable
         ];
     }
 
+    /** @var array<int, string>|null Permisos calculados una sola vez por petición. */
+    private ?array $permisosCalculados = null;
+
+    /** @var Collection<int, Rol>|null */
+    private ?Collection $rolesVigentesCalculados = null;
+
+    /** @return Collection<int, Rol> Roles activos con asignación vigente hoy. */
+    public function rolesVigentes(): Collection
+    {
+        if ($this->rolesVigentesCalculados !== null) {
+            return $this->rolesVigentesCalculados;
+        }
+        $hoy = today()->toDateString();
+
+        return $this->rolesVigentesCalculados = Rol::query()
+            ->where('activo', true)
+            ->whereIn('id', $this->usuarioRolesPorUsuario()
+                ->where('vigente_desde', '<=', $hoy)
+                ->where(fn (Builder $query): Builder => $query->whereNull('vigente_hasta')->orWhere('vigente_hasta', '>=', $hoy))
+                ->select('rol_id'))
+            ->get();
+    }
+
+    /** @return array<int, string> Permisos del catálogo que dan sus roles vigentes. */
+    public function permisos(): array
+    {
+        if ($this->permisosCalculados !== null) {
+            return $this->permisosCalculados;
+        }
+        if (! $this->activo) {
+            return $this->permisosCalculados = [];
+        }
+        $catalogo = array_keys(config('permisos.catalogo'));
+        $derivados = config('permisos.derivados');
+        $asignables = array_diff($catalogo, array_keys($derivados), config('permisos.pendientes'));
+        $permisos = [];
+        foreach ($this->rolesVigentes() as $rol) {
+            $delRol = config('permisos.roles.'.$rol->codigo, []);
+            $permisos = [...$permisos, ...($delRol === '*' ? $asignables : array_intersect($delRol, $asignables))];
+            foreach ($derivados as $permiso => $columna) {
+                if ($rol->{$columna}) {
+                    $permisos[] = $permiso;
+                }
+            }
+        }
+
+        return $this->permisosCalculados = array_values(array_unique($permisos));
+    }
+
+    public function tienePermiso(string $permiso): bool
+    {
+        return in_array($permiso, $this->permisos(), true);
+    }
+
+    public function veDatosSensibles(): bool
+    {
+        return $this->tienePermiso('datos_sensibles.ver');
+    }
+
     public function isAdministrator(): bool
     {
-        return $this->usuarioRolesPorUsuario()
-            ->where('vigente_desde', '<=', today()->toDateString())
-            ->where(fn (Builder $query): Builder => $query->whereNull('vigente_hasta')->orWhere('vigente_hasta', '>=', today()->toDateString()))
-            ->whereHas('rol', fn (Builder $query): Builder => $query->where('codigo', 'ADMIN')->where('activo', true))
-            ->exists();
+        return $this->tienePermiso('sistema.administrar');
     }
 
     public function regimenNormativo(): BelongsTo

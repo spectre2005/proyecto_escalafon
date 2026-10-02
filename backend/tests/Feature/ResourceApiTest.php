@@ -2,14 +2,11 @@
 
 namespace Tests\Feature;
 
-use App\Http\Middleware\RequireAdministrator;
 use App\Models\Familiar;
 use App\Models\Legajo;
 use App\Models\LegajoSeccion;
 use App\Models\Rol;
 use App\Models\Usuario;
-use Illuminate\Auth\Middleware\Authenticate;
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -21,11 +18,7 @@ class ResourceApiTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->withoutMiddleware([
-            Authenticate::class,
-            RequireAdministrator::class,
-            ValidateCsrfToken::class,
-        ]);
+        $this->actuarComo();
     }
 
     public static function resources(): array
@@ -48,7 +41,7 @@ class ResourceApiTest extends TestCase
         $model = $class::factory()->make();
         $payload = $model->getAttributes();
         if ($model instanceof Familiar) {
-            $this->actingAs(Usuario::findOrFail($payload['registrado_por']));
+            $this->actuarComo(Usuario::findOrFail($payload['registrado_por']));
             unset($payload['registrado_por']);
         }
         $uri = '/api/v1/'.str_replace('_', '-', $model->getTable());
