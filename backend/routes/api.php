@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\V1\DesplazamientoController;
 use App\Http\Controllers\Api\V1\DesvinculacionController;
 use App\Http\Controllers\Api\V1\DocumentoUsuarioController;
 use App\Http\Controllers\Api\V1\EvaluacionDesempenoController;
+use App\Http\Controllers\Api\V1\Evaluaciones\Seccion07Controller;
 use App\Http\Controllers\Api\V1\ExperienciaLaboralController;
 use App\Http\Controllers\Api\V1\FamiliarController;
 use App\Http\Controllers\Api\V1\FeriadoController;
@@ -85,6 +86,11 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum'])->
         Route::post('expedientes/{usuario}/familiares', [FamiliarPersonalController::class, 'storeForPerson'])->whereUuid('usuario');
         Route::patch('expedientes/{usuario}/familiares/{familiar}', [FamiliarPersonalController::class, 'updateForPerson'])->whereUuid(['usuario', 'familiar']);
         Route::delete('expedientes/{usuario}/familiares/{familiar}', [FamiliarPersonalController::class, 'destroyForPerson'])->whereUuid(['usuario', 'familiar']);
+    });
+
+    Route::middleware('can:seccion07.ver')->group(function (): void {
+        Route::get('seccion07-opciones', [Seccion07Controller::class, 'options']);
+        Route::get('seccion07/{tipo}', [Seccion07Controller::class, 'index'])->whereIn('tipo', ['evaluaciones', 'progresiones', 'ratificaciones', 'desplazamientos']);
     });
 
     Route::middleware('can:personal.ver')->group(function (): void {

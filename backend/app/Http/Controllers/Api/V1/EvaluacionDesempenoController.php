@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Models\EvaluacionDesempeno;
 
-class EvaluacionDesempenoController extends ResourceController
+class EvaluacionDesempenoController extends RegistroAnulableController
 {
     protected string $model = EvaluacionDesempeno::class;
+
+    protected string $orden = 'ciclo_anio';
 
     protected array $rules = [
         'usuario_id' => 'required|uuid|exists:usuarios,id',
@@ -17,8 +19,5 @@ class EvaluacionDesempenoController extends ResourceController
         'puntaje' => 'nullable|numeric',
         'plan_mejora' => 'sometimes|boolean',
         'evaluador_id' => 'nullable|uuid|exists:usuarios,id',
-        'registrado_por' => 'required|uuid|exists:usuarios,id',
-        'anulado' => 'sometimes|boolean',
-        'motivo_anulacion' => 'nullable|string',
     ];
 }

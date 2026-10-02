@@ -26,13 +26,49 @@ class ResourceApiTest extends TestCase
         $resources = [];
         foreach (glob(__DIR__.'/../../app/Models/*.php') as $path) {
             $name = pathinfo($path, PATHINFO_FILENAME);
-            if (! ctype_alnum($name) || in_array($name, ['Usuario', 'User'], true)) {
+            if (! ctype_alnum($name) || in_array($name, ['Usuario', 'User', ...array_keys(self::anulables())], true)) {
                 continue;
             }
             $resources[$name] = ['App\\Models\\'.$name];
         }
 
         return $resources;
+    }
+
+    /** Sección 07: registros que solo se crean y se anulan. */
+    public static function anulables(): array
+    {
+        return collect(['EvaluacionDesempeno', 'ProgresionCarrera', 'RatificacionDocente', 'Desplazamiento'])
+            ->mapWithKeys(fn (string $name): array => [$name => ['App\\Models\\'.$name]])->all();
+    }
+
+    #[DataProvider('anulables')]
+    public function test_section_07_records_are_annulled_never_edited_or_deleted(string $class): void
+    {
+        $autor = $this->actuarComo();
+        $model = $class::factory()->make();
+        $payload = array_diff_key($model->getAttributes(), array_flip(['id', 'registrado_por', 'anulado', 'motivo_anulacion']));
+        $uri = '/api/v1/'.str_replace('_', '-', $model->getTable());
+
+        $this->postJson($uri, $payload + ['registrado_por' => Usuario::factory()->create()->id])
+            ->assertUnprocessable()->assertJsonValidationErrors('registrado_por');
+        $this->postJson($uri, $payload + ['anulado' => true])->assertUnprocessable()->assertJsonValidationErrors('anulado');
+        $id = $this->postJson($uri, $payload)->assertCreated()->assertJsonPath('data.registrado_por', $autor->id)->json('data.id');
+        $this->getJson($uri)->assertOk()->assertJsonPath('data.0.id', $id);
+
+        $this->patchJson($uri.'/'.$id, $payload)->assertUnprocessable();
+        $this->patchJson($uri.'/'.$id, ['anulado' => true])->assertUnprocessable()->assertJsonValidationErrors('motivo_anulacion');
+        $this->patchJson($uri.'/'.$id, ['anulado' => false, 'motivo_anulacion' => 'Sin motivo real'])->assertUnprocessable();
+        $this->deleteJson($uri.'/'.$id)->assertStatus(405);
+        $this->assertDatabaseHas($model->getTable(), ['id' => $id, 'anulado' => false]);
+
+        $this->patchJson($uri.'/'.$id, ['anulado' => true, 'motivo_anulacion' => 'Registrado por error'])
+            ->assertOk()->assertJsonPath('data.anulado', true)->assertJsonPath('data.motivo_anulacion', 'Registrado por error');
+        $this->patchJson($uri.'/'.$id, ['anulado' => true, 'motivo_anulacion' => 'Segundo intento'])->assertConflict();
+        // El anulado sigue en la base, pero ya no aparece en el listado.
+        $this->assertDatabaseHas($model->getTable(), ['id' => $id, 'anulado' => true]);
+        $this->getJson($uri)->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson($uri.'/'.$id)->assertOk();
     }
 
     #[DataProvider('resources')]

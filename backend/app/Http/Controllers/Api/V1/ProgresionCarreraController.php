@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Models\ProgresionCarrera;
 
-class ProgresionCarreraController extends ResourceController
+class ProgresionCarreraController extends RegistroAnulableController
 {
     protected string $model = ProgresionCarrera::class;
+
+    protected string $orden = 'fecha_efectiva';
 
     protected array $rules = [
         'usuario_id' => 'required|uuid|exists:usuarios,id',
@@ -16,8 +18,5 @@ class ProgresionCarreraController extends ResourceController
         'nivel_nuevo' => 'required|string|max:20',
         'fecha_efectiva' => 'required|date',
         'numero_resolucion' => 'required|string|max:60',
-        'registrado_por' => 'required|uuid|exists:usuarios,id',
-        'anulado' => 'sometimes|boolean',
-        'motivo_anulacion' => 'nullable|string',
     ];
 }

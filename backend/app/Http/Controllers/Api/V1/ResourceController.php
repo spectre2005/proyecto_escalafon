@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -21,7 +22,13 @@ abstract class ResourceController extends Controller
 
     public function index(): AnonymousResourceCollection
     {
-        return JsonResource::collection($this->model::query()->orderBy('id')->paginate(100));
+        return JsonResource::collection($this->indexQuery()->paginate(100));
+    }
+
+    /** Consulta del listado; las subclases pueden filtrar u ordenar distinto. */
+    protected function indexQuery(): Builder
+    {
+        return $this->model::query()->orderBy('id');
     }
 
     public function show(string $record): JsonResource

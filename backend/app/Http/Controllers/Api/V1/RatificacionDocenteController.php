@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Models\RatificacionDocente;
 
-class RatificacionDocenteController extends ResourceController
+class RatificacionDocenteController extends RegistroAnulableController
 {
     protected string $model = RatificacionDocente::class;
+
+    protected string $orden = 'fecha_resolucion';
 
     protected array $rules = [
         'usuario_id' => 'required|uuid|exists:usuarios,id',
@@ -20,8 +22,5 @@ class RatificacionDocenteController extends ResourceController
         'fecha_inicio_periodo' => 'required|date',
         'fecha_vencimiento_periodo' => 'required|date',
         'resultado' => 'sometimes|string|max:15',
-        'registrado_por' => 'required|uuid|exists:usuarios,id',
-        'anulado' => 'sometimes|boolean',
-        'motivo_anulacion' => 'nullable|string',
     ];
 }

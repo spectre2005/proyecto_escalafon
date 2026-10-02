@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Models\Desplazamiento;
 
-class DesplazamientoController extends ResourceController
+class DesplazamientoController extends RegistroAnulableController
 {
     protected string $model = Desplazamiento::class;
+
+    protected string $orden = 'fecha_inicio';
 
     protected array $rules = [
         'usuario_id' => 'required|uuid|exists:usuarios,id',
@@ -18,8 +20,5 @@ class DesplazamientoController extends ResourceController
         'fecha_inicio' => 'required|date',
         'fecha_fin' => 'nullable|date',
         'numero_documento' => 'nullable|string|max:60',
-        'registrado_por' => 'required|uuid|exists:usuarios,id',
-        'anulado' => 'sometimes|boolean',
-        'motivo_anulacion' => 'nullable|string',
     ];
 }
