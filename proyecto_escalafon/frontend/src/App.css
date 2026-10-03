@@ -1,0 +1,66 @@
+.login-page { min-height: 100svh; padding: 28px; display: grid; place-items: center; background: radial-gradient(ellipse at 0% 0%, #cee7e1 0, transparent 50%), radial-gradient(ellipse at 100% 100%, #dfebe5 0, transparent 55%), #edf4f3; }
+.login-shell { width: 100%; max-width: 1440px; min-height: min(850px, calc(100svh - 56px)); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); border-radius: 26px; overflow: hidden; background: #fff; box-shadow: 0 22px 65px #16494712, 0 0 0 1px #ffffffad; }
+.institution-panel { position: relative; isolation: isolate; color: #fff; padding: 40px 48px 30px; display: flex; flex-direction: column; overflow: hidden; background: #145958; }
+.campus-image { position: absolute; inset: 0; height: 100%; width: 100%; object-fit: cover; object-position: 57% center; z-index: -3; }
+.panel-overlay { position: absolute; inset: 0; z-index: -2; background: linear-gradient(145deg, #063f48ed 0%, #125e63e0 38%, #176966a8 69%, #103c46d9 100%); }
+.institution-panel::after { content: ''; position: absolute; z-index: -1; width: 580px; height: 580px; border: 1px solid #b2e7d52b; border-radius: 50%; right: -330px; top: -160px; box-shadow: 0 0 0 55px #b2e7d509, 0 0 0 110px #b2e7d506; pointer-events: none; }
+.institution-brand { display: flex; align-items: center; gap: 15px; }
+.brand-logo { width: 62px; height: 62px; object-fit: contain; border-radius: 13px; background: #fff; padding: 3px; }
+.institution-brand strong { font-family: 'Manrope', sans-serif; display: block; font-size: 25px; letter-spacing: 3px; line-height: 1.25; }
+.institution-brand span { font-size: 11px; line-height: 1.55; display: block; color: #d1e7e6; margin-top: 4px; }
+.institution-content { margin: auto 0; padding: 52px 0 38px; }
+.eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 2px; display: inline-flex; align-items: center; gap: 9px; padding: 9px 13px; border: 1px solid #badcd238; background: #c0e7dd0b; border-radius: 30px; color: #d5eee7; }
+.eyebrow > span { height: 5px; width: 5px; border-radius: 50%; background: #a3dccc; }
+.login-page h1 { font-family: 'Manrope', sans-serif; font-size: clamp(38px, 3.9vw, 58px); line-height: 1.15; letter-spacing: -2px; font-weight: 750; margin: 24px 0 20px; }
+.login-page h1 em { color: #b4e6d5; font-style: normal; }
+.welcome-copy { font-size: 14px; line-height: 1.8; color: #daebe8; margin: 0; max-width: 385px; }
+.features { display: grid; grid-template-columns: 1fr; gap: 18px; margin-top: 32px; }
+.feature { display: flex; gap: 13px; align-items: center; }
+.feature-icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 11px; color: #cceade; background: linear-gradient(135deg, #e2f6ec1f, #cee8e30a); border: 1px solid #cfeee122; flex-shrink: 0; }
+.feature h2 { font-size: 13px; font-weight: 600; margin: 0 0 3px; }
+.feature p { font-size: 11px; color: #c3ddda; margin: 0; }
+.institution-footer { display: flex; align-items: center; gap: 22px; color: #c4dcd8; }
+.institution-footer > span:first-child { display: flex; align-items: center; gap: 6px; font-size: 10px; white-space: nowrap; }
+.footer-line { width: 100%; height: 1px; background: #bdded32c; }
+.access-panel { padding: 33px 40px 24px; display: flex; flex-direction: column; background: radial-gradient(ellipse at 100% 0%, #f0f8f5 0%, transparent 44%), #fff; }
+.access-topline { display: flex; justify-content: space-between; gap: 12px; align-items: center; font-size: 9px; color: #81928f; font-weight: 600; letter-spacing: 1.3px; }
+.institutional-badge { display: flex; gap: 6px; align-items: center; background: #eef6f1; color: #497867; border: 1px solid #e0eee5; border-radius: 25px; padding: 7px 10px; letter-spacing: 0; font-weight: 500; }
+.institutional-badge > span { width: 5px; height: 5px; border-radius: 50%; background: #669a82; }
+.login-content { width: 100%; max-width: 388px; margin: auto; padding: 42px 0 34px; }
+.system-brand { display: flex; align-items: center; gap: 14px; margin-bottom: 38px; }
+.system-logo { padding: 8px; background: #f2f7f5; border-radius: 16px; border: 1px solid #e7efea; }
+.system-logo img { width: 51px; height: 51px; object-fit: contain; display: block; }
+.system-brand > div > span { font-size: 9px; font-weight: 600; letter-spacing: 2.4px; color: #688080; }
+.system-brand strong { font-family: 'Manrope', sans-serif; display: block; font-size: 30px; font-weight: 800; line-height: 1.25; letter-spacing: -1px; color: #214b4b; }
+.brand-dot { color: #65aa96; }
+.system-brand p { font-size: 7.5px; letter-spacing: 1px; color: #78908b; margin: 5px 0 0; }
+.section-marker { display: block; height: 3px; width: 29px; background: linear-gradient(90deg, #408e90, #9aceb2); border-radius: 5px; margin-bottom: 20px; }
+.small-label { font-size: 9px !important; letter-spacing: 1.7px; font-weight: 600; color: #658682 !important; }
+.login-heading h2 { font-family: 'Manrope', sans-serif; font-size: 32px; letter-spacing: -1.2px; margin: 8px 0 12px; font-weight: 750; color: #183e40; }
+.login-heading p { color: #768583; font-size: 12px; line-height: 1.8; margin: 0; }
+.login-form { margin-top: 28px; }
+.login-form > label { display: block; font-size: 11px; font-weight: 600; margin-bottom: 9px; color: #34504e; }
+.input-wrap { display: flex; align-items: center; gap: 12px; border: 1px solid #dce6e2; border-radius: 10px; padding: 0 15px; color: #88a39c; background: #fafcfb; height: 51px; margin-bottom: 22px; transition: border-color .2s, box-shadow .2s; }
+.input-wrap:focus-within { border-color: #619e91; box-shadow: 0 0 0 3px #74ac9c18; }
+.input-wrap input { min-width: 0; width: 100%; border: 0; background: transparent; outline: none; height: 100%; color: #2a5550; font-size: 12px; }
+.input-wrap input:focus-visible { outline: none; }
+.input-wrap > svg { flex-shrink: 0; }
+.input-wrap input::placeholder { color: #98a7a2; }
+.password-decoration { display: flex; color: #8fa29c; }
+.form-options { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: -3px; margin-bottom: 28px; }
+.remember { display: inline-flex; align-items: center; gap: 7px; color: #738681; font-size: 11px; cursor: pointer; }
+.remember input { accent-color: #468f88; width: 14px; height: 14px; margin: 0; }
+.text-button { padding: 3px 0; font-size: 10px; background: none; color: #397f78; font-weight: 600; }
+.text-button:hover { color: #17584f; text-decoration: underline; }
+.login-button { display: flex; align-items: center; justify-content: center; gap: 22px; width: 100%; height: 51px; border-radius: 10px; background: linear-gradient(110deg, #21696e, #428f85); box-shadow: 0 6px 16px #266e6922; color: white; font-size: 12px; font-weight: 600; transition: box-shadow .2s, transform .2s; }
+.login-button:hover { box-shadow: 0 8px 22px #266e6938; transform: translateY(-1px); }
+.security-note { display: flex; align-items: center; justify-content: center; gap: 6px; color: #879c95; font-size: 9px; margin: 17px 0 28px; }
+.support-card { display: flex; align-items: center; gap: 12px; padding: 16px 14px; border: 1px solid #e8efeb; border-radius: 11px; background: linear-gradient(110deg, #f2f7f3, #fafcf9); }
+.support-icon { color: #658b7b; display: flex; }
+.support-card strong { display: block; color: #49675c; font-size: 11px; font-weight: 600; }
+.support-card p { color: #82958b; font-size: 9px; line-height: 1.6; margin: 4px 0 0; }
+.access-footer { display: flex; justify-content: space-between; gap: 14px; font-size: 8px; color: #93a29b; }
+@media (min-width: 1500px) { .login-page { padding: 48px; } .institution-panel { padding: 48px 60px 34px; } }
+@media (max-width: 1050px) { .login-page { padding: 18px; } .institution-panel { padding: 30px; } .access-panel { padding: 30px; } .access-topline { font-size: 8px; letter-spacing: .6px; } .institutional-badge { font-size: 8px; } .access-footer { flex-direction: column; gap: 5px; } .desktop-break { display: none; } }
+@media (max-width: 760px) { .login-page { padding: 0; display: block; } .login-shell { border-radius: 0; grid-template-columns: minmax(0, 1fr); } .institution-panel { padding: 24px; } .institution-brand .brand-logo { width: 46px; height: 46px; border-radius: 10px; } .institution-brand strong { font-size: 20px; } .institution-brand span { font-size: 9px; } .institution-content { padding: 28px 0 8px; } .eyebrow { font-size: 8px; padding: 7px 11px; } .login-page h1 { font-size: 38px; margin: 18px 0 14px; letter-spacing: -1.4px; } .login-page h1 br:first-child { display: initial; } .welcome-copy { font-size: 12px; max-width: 320px; } .features { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px 10px; margin: 24px 0 16px; } .feature { gap: 8px; } .feature-icon { width: 32px; height: 32px; border-radius: 8px; } .feature-icon svg { width: 17px; } .feature h2 { font-size: 10px; margin: 0; } .feature p, .institution-footer { display: none; } .access-panel { padding: 26px 24px 20px; } .login-content { max-width: 430px; padding: 32px 0; } .system-brand { margin-bottom: 26px; } .access-footer { text-align: center; } .login-heading h2 { font-size: 30px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
