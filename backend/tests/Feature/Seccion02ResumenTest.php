@@ -67,7 +67,7 @@ class Seccion02ResumenTest extends TestCase
         $sinPrueba = Usuario::factory()->create(['tiene_periodo_prueba' => false]);
         $data = $this->seccion($sinPrueba);
         // 2.4 no aplica: no cuenta como pendiente ni se exige.
-        $this->assertSame(['tipos' => 12, 'pendientes' => 12, 'exigidos_cargados' => 0, 'exigidos_verificados' => 0, 'por_determinar' => 0],
+        $this->assertSame(['tipos' => 12, 'pendientes' => 12, 'exigidos_cargados' => 0, 'exigidos_recepcionados' => 0, 'exigidos_verificados' => 0, 'por_determinar' => 0],
             array_diff_key($data['resumen'], ['exigidos' => true]));
         $this->assertSame(['a', 'b', 'c', 'e', 'f', 'h', 'i', 'j', 'k'], array_column($data['resumen']['exigidos'], 'literal'));
         $this->assertSame(['sin_datos', 'sin_datos', 'sin_datos', 'no_aplica'], array_column($data['subsecciones'], 'estado'));

@@ -27,6 +27,8 @@ class VinculoAdenda extends Model
         'fecha_fin',
         'documento_id',
         'registrado_por',
+        'anulado',
+        'motivo_anulacion',
     ];
 
     /** @return array<string, string> */
@@ -35,6 +37,7 @@ class VinculoAdenda extends Model
         return [
             'fecha_inicio' => 'date',
             'fecha_fin' => 'date',
+            'anulado' => 'boolean',
             'created_at' => 'datetime',
         ];
     }

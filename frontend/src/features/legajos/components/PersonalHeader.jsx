@@ -1,3 +1,4 @@
+import AbrirLegajo from './AbrirLegajo'
 import PersonalPhoto from './PersonalPhoto'
 
 function SummaryField({ title, value }) {
@@ -35,6 +36,7 @@ export default function PersonalHeader({ data, usuario }) {
               <span className="mt-1 block text-teal-700">Estado: {legajo.values.estado_legajo ? legajo.values.estado_legajo.replaceAll('_', ' ') : 'No registrado'}</span>
             </li>)}
           </ul> : <p className="mt-2 text-sm text-slate-500">No hay legajos registrados para esta persona.</p>}
+          {!data.legajos.some(legajo => legajo.values.estado_legajo === 'activo') && <AbrirLegajo usuario={usuario} className="mt-3" />}
         </section>
       </div>
       <PersonalPhoto usuario={usuario} nombre={data.nombre} />

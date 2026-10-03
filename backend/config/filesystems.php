@@ -38,6 +38,16 @@ return [
             'report' => false,
         ],
 
+        // PDF del legajo (documentos_usuario): privado, sin URL ni 'serve'. Solo se entregan por un
+        // endpoint autenticado que valida permisos y deja registro en bitacora_accesos_legajo.
+        'documentos' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/documentos'),
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => false,
+        ],
+
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),

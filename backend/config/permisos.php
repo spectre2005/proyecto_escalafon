@@ -19,6 +19,7 @@ return [
         'usuarios.gestionar' => 'Crear, editar y desactivar personal y cuentas.',
         'legajo.ver' => 'Ver el legajo de una persona.',
         'legajo.editar' => 'Llenar y corregir datos del legajo (datos generales, foto, familiares).',
+        'legajo.abrir' => 'Abrir el legajo de una persona que no tiene uno activo.',
         'documento.subir' => 'Subir documentos al legajo.',
         'documento.recepcionar' => 'Registrar la recepción de un documento.',
         'seccion07.ver' => 'Ver la sección 07: evaluación, progresión y desplazamiento.',

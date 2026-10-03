@@ -34,6 +34,9 @@ class VinculoLaboral extends Model
         'fecha_inicio',
         'fecha_fin_prevista',
         'fecha_cese',
+        'anulado',
+        'motivo_anulacion',
+        'registrado_por',
     ];
 
     /** @return array<string, string> */
@@ -47,6 +50,7 @@ class VinculoLaboral extends Model
             'fecha_inicio' => 'date',
             'fecha_fin_prevista' => 'date',
             'fecha_cese' => 'date',
+            'anulado' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
@@ -85,6 +89,11 @@ class VinculoLaboral extends Model
     public function referenciasLegajoPasivo(): HasMany
     {
         return $this->hasMany(ReferenciaLegajoPasivo::class, 'vinculo_laboral_id', 'id');
+    }
+
+    public function registradoPor(): BelongsTo
+    {
+        return $this->belongsTo(Usuario::class, 'registrado_por', 'id');
     }
 
     public function vinculoAdendas(): HasMany

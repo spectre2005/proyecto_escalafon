@@ -38,7 +38,8 @@ final class PerfilDocumental
     /** @param Collection<int, VinculoLaboral> $vinculos */
     public static function de(Usuario $usuario, Collection $vinculos): self
     {
-        $vigentes = $vinculos->whereNull('fecha_cese');
+        // Los vínculos anulados no cuentan para el perfil.
+        $vigentes = $vinculos->whereNull('fecha_cese')->reject(fn (VinculoLaboral $vinculo): bool => (bool) $vinculo->anulado);
         $origen = $vigentes->isEmpty() ? collect([$usuario]) : $vigentes;
         $banderas = [];
         foreach (['obligado_djbr', 'exige_colegiatura', 'tiene_periodo_prueba'] as $bandera) {

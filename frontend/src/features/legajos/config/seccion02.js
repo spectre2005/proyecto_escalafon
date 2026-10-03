@@ -16,7 +16,11 @@ export const tiposInduccion = { general: 'General', especifica: 'Específica' }
 
 export const resultadosPeriodo = { pendiente: 'Pendiente', aprobado: 'Aprobado', no_aprobado: 'No aprobado' }
 
-export const estadosDocumento = { pendiente: 'Pendiente', cargado: 'Cargado', en_fiscalizacion: 'En fiscalización', verificado: 'Verificado', observado: 'Observado', falso: 'Falso' }
+// Estado visible del documento (backend: App\Support\Documentos\EstadoDocumento::visible). "Recepcionado" es un
+// documento cargado con recepción registrada. Los estados de fiscalización quedan preparados, sin acciones todavía.
+export const estadosDocumento = { pendiente: 'Pendiente', cargado: 'Cargado', recepcionado: 'Recepcionado', en_fiscalizacion: 'En fiscalización', verificado: 'Verificado', observado: 'Observado', falso: 'Falso' }
+
+export const coloresEstadoDocumento = { pendiente: 'bg-slate-100 text-slate-600', cargado: 'bg-amber-50 text-amber-800', recepcionado: 'bg-teal-50 text-teal-800' }
 
 // Estado de cada subsección en el resumen (backend: App\Support\ResumenSeccion02).
 export const estadosSubseccion = {
@@ -38,7 +42,15 @@ export const estadosVencimiento = {
 
 export const formulariosDatos = { vinculos_laborales: 'Vínculo laboral', vinculo_adendas: 'Adenda', inducciones: 'Inducción', periodos_prueba: 'Período de prueba' }
 
-// Datos del puesto (perfil_docente / perfil_administrativo), solo lectura.
+// Enums del esquema para los datos del puesto (perfil_docente / perfil_administrativo).
+export const condicionesDocente = { ordinario: 'Ordinario', extraordinario: 'Extraordinario', contratado: 'Contratado' }
+export const categoriasDocente = { principal: 'Principal', asociado: 'Asociado', auxiliar: 'Auxiliar' }
+export const dedicacionesDocente = { exclusiva: 'Exclusiva', tiempo_completo: 'Tiempo completo', tiempo_parcial: 'Tiempo parcial' }
+export const subtiposExtraordinario = { emerito: 'Emérito', honorario: 'Honorario', investigador: 'Investigador', visitante: 'Visitante', experto: 'Experto' }
+export const funcionesPrevias = { jefe_practica: 'Jefe de práctica', ayudante_catedra: 'Ayudante de cátedra', ayudante_laboratorio: 'Ayudante de laboratorio' }
+export const gruposOcupacionales = { profesional: 'Profesional', tecnico: 'Técnico', auxiliar: 'Auxiliar' }
+
+// Etiquetas de los datos del puesto.
 export const camposDatosPuesto = {
   condicion_docente: 'Condición docente', categoria: 'Categoría', dedicacion: 'Dedicación',
   subtipo_extraordinario: 'Subtipo (extraordinario)', funcion_previa: 'Función previa', codigo_renacyt: 'Código RENACYT',

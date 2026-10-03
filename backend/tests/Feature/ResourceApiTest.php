@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\ArchivoDocumento;
+use App\Models\DocumentoUsuario;
 use App\Models\Familiar;
 use App\Models\Legajo;
 use App\Models\LegajoSeccion;
@@ -87,6 +89,14 @@ class ResourceApiTest extends TestCase
         $this->getJson($uri.'/'.$id)->assertOk()->assertJsonPath('data.id', $id);
         $this->getJson($uri)->assertOk()->assertJsonStructure(['data', 'links', 'meta']);
         unset($payload['id']);
+        if ($model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento) {
+            // Documentos y archivos: no se editan ni se eliminan (Directiva, arts. 2.3 y 5.3).
+            $this->patchJson($uri.'/'.$id, $payload)->assertStatus(405);
+            $this->deleteJson($uri.'/'.$id)->assertStatus(405);
+            $this->assertDatabaseHas($model->getTable(), ['id' => $id]);
+
+            return;
+        }
         $this->patchJson($uri.'/'.$id, $payload)->assertOk();
         if ($model instanceof Familiar) {
             // Los familiares se corrigen, pero no se eliminan (se anulan desde la ficha).

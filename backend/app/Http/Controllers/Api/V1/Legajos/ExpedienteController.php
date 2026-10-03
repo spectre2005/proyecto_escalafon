@@ -343,6 +343,10 @@ class ExpedienteController extends Controller
         if ($config['scope'] === 'legajo' && in_array('usuario_id', $query->getModel()->getFillable(), true) && $section !== 'bitacora-accesos-legajo') {
             $query->where('usuario_id', $usuario);
         }
+        // Vínculos y adendas anulados no salen en los listados (se ven aparte, en la sección 02).
+        if (in_array($section, ['vinculos-laborales', 'vinculo-adendas'], true)) {
+            $query->where('anulado', false);
+        }
         if ($section === 'documentos-usuario') {
             if (! $veSensibles) {
                 $query->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES);

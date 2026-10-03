@@ -26,6 +26,8 @@ use App\Http\Controllers\Api\V1\GoceVacacionalController;
 use App\Http\Controllers\Api\V1\HistorialEstadoDocumentoController;
 use App\Http\Controllers\Api\V1\InduccionController;
 use App\Http\Controllers\Api\V1\LegajoController;
+use App\Http\Controllers\Api\V1\Legajos\AperturaLegajoController;
+use App\Http\Controllers\Api\V1\Legajos\DocumentoLegajoController;
 use App\Http\Controllers\Api\V1\Legajos\ExpedienteController;
 use App\Http\Controllers\Api\V1\Legajos\FamiliarPersonalController;
 use App\Http\Controllers\Api\V1\Legajos\FotoPersonalController;
@@ -109,16 +111,30 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum'])->
     Route::middleware('can:legajo.editar')->group(function (): void {
         Route::post('expedientes/{usuario}/vinculos-laborales', [Seccion02Controller::class, 'storeVinculo'])->whereUuid('usuario');
         Route::patch('expedientes/{usuario}/vinculos-laborales/{vinculo}', [Seccion02Controller::class, 'updateVinculo'])->whereUuid(['usuario', 'vinculo']);
+        Route::put('expedientes/{usuario}/vinculos-laborales/{vinculo}/datos-puesto', [Seccion02Controller::class, 'guardarDatosPuesto'])->whereUuid(['usuario', 'vinculo']);
         Route::post('expedientes/{usuario}/vinculo-adendas', [Seccion02Controller::class, 'storeAdenda'])->whereUuid('usuario');
         Route::post('expedientes/{usuario}/inducciones', [Seccion02Controller::class, 'storeInduccion'])->whereUuid('usuario');
         Route::post('expedientes/{usuario}/periodos-prueba', [Seccion02Controller::class, 'storePeriodo'])->whereUuid('usuario');
         Route::patch('expedientes/{usuario}/periodos-prueba/{periodo}', [Seccion02Controller::class, 'updatePeriodo'])->whereUuid(['usuario', 'periodo']);
     });
 
+    Route::post('expedientes/{usuario}/legajo', [AperturaLegajoController::class, 'store'])->middleware('can:legajo.abrir')->whereUuid('usuario');
+
+    // Documentos del legajo (PDF + metadatos), común a todas las secciones. Las secciones 01, 09 y 10
+    // exigen además datos_sensibles.ver (lo valida el controlador según la sección y el tipo).
+    Route::middleware('can:documento.subir')->group(function (): void {
+        Route::get('expedientes/{usuario}/documentos/folio-sugerido', [DocumentoLegajoController::class, 'folio'])->whereUuid('usuario');
+        Route::post('expedientes/{usuario}/documentos', [DocumentoLegajoController::class, 'store'])->whereUuid('usuario');
+    });
+    Route::post('expedientes/{usuario}/documentos/{documento}/recepcionar', [DocumentoLegajoController::class, 'recepcionar'])
+        ->middleware('can:documento.recepcionar')->whereUuid(['usuario', 'documento']);
+    Route::get('expedientes/{usuario}/documentos/{documento}/archivo', [DocumentoLegajoController::class, 'archivo'])
+        ->middleware('can:legajo.ver')->whereUuid(['usuario', 'documento']);
+
     Route::middleware('can:sistema.administrar')->group(function (): void {
         // URI propia: la misma forma que la de la sección 01 la reemplazaría.
         Route::post('expedientes/{usuario}/seccion-02/{tipo}/{registro}/anular', [Seccion02Controller::class, 'anularRegistro'])
-            ->whereUuid(['usuario', 'registro'])->whereIn('tipo', ['inducciones', 'periodos-prueba']);
+            ->whereUuid(['usuario', 'registro'])->whereIn('tipo', ['vinculos-laborales', 'vinculo-adendas', 'inducciones', 'periodos-prueba']);
     });
 
     // Anular (no se elimina): solo administración.
@@ -146,9 +162,11 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum'])->
 
 // CRUD genérico por tabla: solo para sistema.administrar. LocalDevelopmentOnly sigue en todas las
 // rutas hasta decidir qué se abre en producción; aquí no se quita hasta que cada recurso esté protegido.
+// documentos-usuario y archivos-documento no tienen update ni destroy (Directiva, arts. 2.3 y 5.3:
+// un documento no se elimina ni se altera).
 Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', 'can:sistema.administrar'])->group(function (): void {
     Route::apiResource('afiliaciones', AfiliacionController::class)->parameters(['afiliaciones' => 'record'])->whereUuid('record')->names('api.v1.afiliaciones');
-    Route::apiResource('archivos-documento', ArchivoDocumentoController::class)->parameters(['archivos-documento' => 'record'])->whereUuid('record')->names('api.v1.archivos-documento');
+    Route::apiResource('archivos-documento', ArchivoDocumentoController::class)->parameters(['archivos-documento' => 'record'])->whereUuid('record')->names('api.v1.archivos-documento')->except(['update', 'destroy']);
     Route::apiResource('auditoria-eventos', AuditoriaEventoController::class)->parameters(['auditoria-eventos' => 'record'])->whereUuid('record')->names('api.v1.auditoria-eventos');
     Route::apiResource('bitacora-accesos-legajo', BitacoraAccesoLegajoController::class)->parameters(['bitacora-accesos-legajo' => 'record'])->whereUuid('record')->names('api.v1.bitacora-accesos-legajo');
     Route::apiResource('capacitaciones', CapacitacionController::class)->parameters(['capacitaciones' => 'record'])->whereUuid('record')->names('api.v1.capacitaciones');
@@ -161,7 +179,7 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', 'c
     Route::apiResource('declaraciones-verificaciones', DeclaracionVerificacionController::class)->parameters(['declaraciones-verificaciones' => 'record'])->whereUuid('record')->names('api.v1.declaraciones-verificaciones');
     Route::apiResource('desplazamientos', DesplazamientoController::class)->parameters(['desplazamientos' => 'record'])->whereUuid('record')->names('api.v1.desplazamientos');
     Route::apiResource('desvinculaciones', DesvinculacionController::class)->parameters(['desvinculaciones' => 'record'])->whereUuid('record')->names('api.v1.desvinculaciones');
-    Route::apiResource('documentos-usuario', DocumentoUsuarioController::class)->parameters(['documentos-usuario' => 'record'])->whereUuid('record')->names('api.v1.documentos-usuario');
+    Route::apiResource('documentos-usuario', DocumentoUsuarioController::class)->parameters(['documentos-usuario' => 'record'])->whereUuid('record')->names('api.v1.documentos-usuario')->except(['update', 'destroy']);
     Route::apiResource('evaluaciones-desempeno', EvaluacionDesempenoController::class)->parameters(['evaluaciones-desempeno' => 'record'])->whereUuid('record')->names('api.v1.evaluaciones-desempeno');
     Route::apiResource('experiencia-laboral', ExperienciaLaboralController::class)->parameters(['experiencia-laboral' => 'record'])->whereUuid('record')->names('api.v1.experiencia-laboral');
     Route::apiResource('familiares', FamiliarController::class)->parameters(['familiares' => 'record'])->whereUuid('record')->names('api.v1.familiares');

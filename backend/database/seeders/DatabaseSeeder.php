@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             UbigeoSeeder::class,
+            SeccionesLegajoCatalogoSeeder::class,
             Seccion02CatalogoSeeder::class,
             AdministradorSeeder::class,
             UsuarioSeeder::class,
