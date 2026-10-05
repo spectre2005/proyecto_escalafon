@@ -10,9 +10,10 @@ import { hoy, useBorrador, useGuardar } from '../seccion01/useGuardar'
  * El folio inicial es siempre el siguiente de la sección (sin huecos ni solapes); lo calcula el backend.
  * tipo: { id, nombre, literal, requiere_num_resolucion, permite_multiples, formulario_datos, lista }
  * enlaces: registros existentes que el documento puede acreditar ({ id, etiqueta }), o null si el tipo no tiene formulario.
+ * relacion: relación con el titular que se propone (por defecto, el propio servidor).
  * onSaved(documento): recibe la respuesta del backend (formulario_datos, enlazado) para abrir el formulario de datos.
  */
-export default function SubirDocumentoForm({ usuario, seccion, tipo, titular, enlaces, onSaved, onCancel }) {
+export default function SubirDocumentoForm({ usuario, seccion, tipo, titular, enlaces, relacion = 'servidor', onSaved, onCancel }) {
   const folio = useLiveQuery(`/expedientes/${usuario}/documentos/folio-sugerido?seccion=${seccion}`)
   const sugerido = folio.data?.data.folio_sugerido
   const maximoKb = folio.data?.data.tamano_maximo_kb
@@ -23,7 +24,7 @@ export default function SubirDocumentoForm({ usuario, seccion, tipo, titular, en
   const respuesta = useRef(null)
   const [draft, set] = useBorrador({
     folio_fin: '', fecha_incorporacion: hoy(), emisor: '', fecha_emision: '', num_resolucion: '',
-    titular_nombre: titular?.nombre || '', titular_documento: titular?.documento || '', relacion_titular: 'servidor',
+    titular_nombre: titular?.nombre || '', titular_documento: titular?.documento || '', relacion_titular: relacion,
     modalidad_presentacion: '', motivo_incorporacion: '', subsana_a_documento_id: debeSubsanar && vigentes.length === 1 ? vigentes[0].id : '', enlace_id: '',
   })
   const { busy, error, errors, guardar } = useGuardar(async data => {
