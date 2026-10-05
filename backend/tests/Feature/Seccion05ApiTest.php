@@ -107,12 +107,18 @@ class Seccion05ApiTest extends TestCase
 
         $this->postJson($url, $this->licencia())->assertCreated()->assertJsonPath('data.registrado_por', $autor->id)
             ->assertJsonPath('data.usuario_id', $persona->id)->assertJsonPath('data.con_goce', true);
+        // Permiso: la forma (papeleta, memorándum u otro) es obligatoria y solo la llevan los permisos.
+        $permiso = ['tipo' => 'permiso', 'fecha_inicio' => '2026-04-06', 'fecha_fin' => '2026-04-06', 'dias' => 0, 'con_goce' => false];
+        $this->postJson($url, $permiso)->assertUnprocessable()->assertJsonValidationErrors('forma_permiso');
+        $this->postJson($url, [...$permiso, 'forma_permiso' => 'oficio'])->assertUnprocessable()->assertJsonValidationErrors('forma_permiso');
+        $this->postJson($url, $this->licencia(['forma_permiso' => 'papeleta']))->assertUnprocessable()->assertJsonValidationErrors('forma_permiso');
+        $this->postJson($url, $this->licencia(['tipo' => 'suspension', 'forma_permiso' => 'memorandum']))->assertUnprocessable()->assertJsonValidationErrors('forma_permiso');
         // Permiso por horas (papeleta): 0 días dentro de la fecha.
-        $this->postJson($url, ['tipo' => 'permiso', 'fecha_inicio' => '2026-04-06', 'fecha_fin' => '2026-04-06', 'dias' => 0, 'con_goce' => false])->assertCreated();
-        $this->postJson($url, $this->licencia(['tipo' => 'suspension', 'con_goce' => false]))->assertCreated();
+        $this->postJson($url, [...$permiso, 'forma_permiso' => 'papeleta'])->assertCreated()->assertJsonPath('data.forma_permiso', 'papeleta');
+        $this->postJson($url, $this->licencia(['tipo' => 'suspension', 'con_goce' => false]))->assertCreated()->assertJsonPath('data.forma_permiso', null);
 
         $this->getJson($this->url($persona))->assertOk()->assertJsonCount(3, 'data.licencias')
-            ->assertJsonPath('data.licencias.0.values.tipo', 'permiso')->assertJsonPath('data.licencias.0.values.registrado_por', trim($autor->nombres.' '.$autor->apellido_paterno.' '.$autor->apellido_materno));
+            ->assertJsonPath('data.licencias.0.values.tipo', 'permiso')->assertJsonPath('data.licencias.0.values.forma_permiso', 'papeleta')->assertJsonPath('data.licencias.0.values.registrado_por', trim($autor->nombres.' '.$autor->apellido_paterno.' '.$autor->apellido_materno));
     }
 
     public function test_vacation_periods_and_leave_days_belong_to_the_person(): void
@@ -170,7 +176,7 @@ class Seccion05ApiTest extends TestCase
         // Documento subido primero y movimiento registrado después, enlazado a él.
         $rol = $this->subir($persona, $this->metadatos($this->tipo05('S05_D_ROL_VACACIONES'), 3, 3))->assertCreated()->assertJsonPath('data.formulario_datos', null)->json('data.id');
         $otorgada = $this->subir($persona, $this->metadatos($this->tipo05('S05_E_LICENCIA_OTORGADA'), 4, 5))->assertCreated()->json('data.id');
-        $this->postJson($this->url($persona, 'licencias-permisos'), $this->licencia(['tipo' => 'permiso', 'documento_id' => $otorgada]))->assertUnprocessable()->assertJsonValidationErrors('documento_id');
+        $this->postJson($this->url($persona, 'licencias-permisos'), $this->licencia(['tipo' => 'permiso', 'forma_permiso' => 'memorandum', 'documento_id' => $otorgada]))->assertUnprocessable()->assertJsonValidationErrors('documento_id');
         $this->postJson($this->url($persona, 'licencias-permisos'), $this->licencia(['documento_id' => $rol]))->assertUnprocessable()->assertJsonValidationErrors('documento_id');
         $this->postJson($this->url($persona, 'licencias-permisos'), $this->licencia(['tipo' => 'lactancia', 'documento_id' => $otorgada]))->assertCreated()->assertJsonPath('data.documento_id', $otorgada);
 
@@ -243,7 +249,7 @@ class Seccion05ApiTest extends TestCase
         $this->actuarComo();
         $persona = $this->personaConLegajo();
         $descanso = $this->postJson($this->url($persona, 'licencias-permisos'), $this->licencia(['tipo' => 'descanso_medico']))->assertCreated()->json('data.id');
-        $this->postJson($this->url($persona, 'licencias-permisos'), $this->licencia(['tipo' => 'permiso']))->assertCreated();
+        $this->postJson($this->url($persona, 'licencias-permisos'), $this->licencia(['tipo' => 'permiso', 'forma_permiso' => 'otro']))->assertCreated();
         $documento = $this->subir($persona, $this->metadatos($this->tipo05('S05_DESCANSO_MEDICO'), 1, 1, ['enlace_id' => $descanso]))->assertCreated()->json('data.id');
         $this->getJson($this->url($persona))->assertOk()->assertJsonCount(2, 'data.licencias');
 

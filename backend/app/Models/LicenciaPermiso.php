@@ -21,6 +21,7 @@ class LicenciaPermiso extends Model
         'usuario_id',
         'documento_id',
         'tipo',
+        'forma_permiso',
         'con_goce',
         'fecha_inicio',
         'fecha_fin',

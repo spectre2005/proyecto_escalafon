@@ -41,7 +41,7 @@ class Seccion05Controller extends Controller
     private const ANULABLES = ['licencias-permisos' => LicenciaPermiso::class, 'periodos-vacacionales' => PeriodoVacacional::class,
         'goces-vacacionales' => GoceVacacional::class];
 
-    private const CAMPOS_LICENCIA = ['tipo', 'con_goce', 'fecha_inicio', 'fecha_fin', 'dias', 'numero_documento', 'documento_id', 'created_at'];
+    private const CAMPOS_LICENCIA = ['tipo', 'forma_permiso', 'con_goce', 'fecha_inicio', 'fecha_fin', 'dias', 'numero_documento', 'documento_id', 'created_at'];
 
     private const CAMPOS_PERIODO = ['vinculo_laboral_id', 'periodo_anio', 'dias_derecho', 'created_at'];
 
@@ -106,6 +106,8 @@ class Seccion05Controller extends Controller
         $request->mergeIfMissing(['con_goce' => true]);
         $data = $this->validar($request, [
             'tipo' => ['required', Rule::in(Seccion05::TIPOS_LICENCIA)],
+            // Obligatoria en los permisos nuevos; los demás movimientos no la llevan.
+            'forma_permiso' => ['required_if:tipo,permiso', 'prohibited_unless:tipo,permiso', 'nullable', Rule::in(Seccion05::FORMAS_PERMISO)],
             'con_goce' => 'boolean',
             ...$this->reglasPeriodoDias(0),
             'numero_documento' => 'nullable|string|max:60',

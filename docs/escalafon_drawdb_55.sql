@@ -484,6 +484,7 @@ CREATE TABLE licencias_permisos (   -- sensible cuando es descanso médico (solo
     usuario_id        UUID NOT NULL REFERENCES usuarios(id),
     documento_id      UUID REFERENCES documentos_usuario(id),
     tipo              VARCHAR(30) NOT NULL,   -- enum: permiso, suspension, descanso_medico, licencia_maternidad, licencia_paternidad, lactancia, adopcion, sindical, familiar_grave, comite_sst, asistencia_medica_familiar, bombero_voluntario, otra
+    forma_permiso     VARCHAR(15),            -- enum: papeleta, memorandum, otro (solo si tipo = permiso; migración 2026_10_05_120000)
     con_goce          BOOLEAN NOT NULL DEFAULT true,
     fecha_inicio      DATE NOT NULL,
     fecha_fin         DATE NOT NULL,

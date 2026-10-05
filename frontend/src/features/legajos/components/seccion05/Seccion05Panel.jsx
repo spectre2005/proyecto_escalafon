@@ -5,7 +5,7 @@ import { anularSeccion05 } from '../../api/seccion05Api'
 import { folios } from '../../config/documentos'
 import { etiqueta } from '../../config/seccion01'
 import { coloresEstadoDocumento, estadosDocumento } from '../../config/seccion02'
-import { categoriasSeccion05, formulariosSeccion05, tiposGoce, tiposLicencia } from '../../config/seccion05'
+import { categoriasSeccion05, coloresGoce, formasPermiso, formulariosSeccion05, movimientosLicencia, movimientoDe, tiposGoce, tiposLicencia } from '../../config/seccion05'
 import AbrirLegajo from '../AbrirLegajo'
 import ListaDocumentos from '../documentos/ListaDocumentos'
 import SubirDocumentoForm from '../documentos/SubirDocumentoForm'
@@ -36,7 +36,9 @@ function documentoDe(data, id) {
   return 'Documento enlazado'
 }
 
-const etiquetaLicencia = v => `${etiqueta(tiposLicencia, v.tipo)} · ${rango(v)}`
+// Permiso con su forma (papeleta, memorándum u otro); los registrados antes de existir el campo, sin forma.
+const nombreLicencia = v => v.tipo === 'permiso' ? `Permiso · ${formasPermiso[v.forma_permiso]?.etiqueta || 'forma no registrada'}` : etiqueta(tiposLicencia, v.tipo)
+const etiquetaLicencia = v => `${nombreLicencia(v)} · ${rango(v)}`
 const etiquetaGoce = (v, data) => `${etiqueta(tiposGoce, v.tipo)} · ${rango(v)} · período ${data.periodos.find(p => p.id === v.periodo_vacacional_id)?.values.periodo_anio ?? 'anulado'}`
 
 // Registros sin documento que un tipo de documento puede acreditar (según los tipos de movimiento que admite).
@@ -65,9 +67,9 @@ function FormularioEnlazado({ usuario, data, tipo, documentoId, onDone }) {
 
 // Tipos de documento del bloque (literales del Anexo 01): estado, documentos cargados y carga por el mecanismo común.
 // Un documento no se elimina ni se reemplaza: se subsana con otro.
-function Documentos({ usuario, data, tipos, sinLegajo }) {
+// subiendo/setSubiendo: tipo cuyo formulario de carga está abierto (lo controla el panel para abrir el rol de vacaciones).
+function Documentos({ usuario, data, tipos, sinLegajo, subiendo, setSubiendo }) {
   const puedeSubir = usePuede('documento.subir')
-  const [subiendo, setSubiendo] = useState(null)
   const [enlazando, setEnlazando] = useState(null)
   const [aviso, setAviso] = useState('')
   if (!tipos.length) return <Aviso>El catálogo de documentos de la sección 05 no está cargado en la base de datos (Seccion05CatalogoSeeder).</Aviso>
@@ -86,7 +88,7 @@ function Documentos({ usuario, data, tipos, sinLegajo }) {
     <h3 className="mb-1 text-base font-semibold text-slate-800">Documentos</h3>
     <p className="mb-4 text-xs text-slate-500">Cada documento se sube en PDF con sus metadatos y puede acreditar un movimiento registrado. Los folios son correlativos en toda la sección 05. Cada tipo admite varios documentos a lo largo del tiempo.{sinLegajo && puedeSubir ? ` ${sinLegajo}` : ''}</p>
     {aviso && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
-    <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">{tipos.map(tipo => <li key={tipo.id} className="p-4">
+    <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">{tipos.map(tipo => <li key={tipo.id} id={`tipo-${tipo.id}`} className="p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-slate-800">{tipo.literal && <span className="mr-1 text-slate-500">{tipo.literal})</span>}{tipo.nombre}</p>
@@ -136,8 +138,8 @@ function Licencias({ usuario, data, sinLegajo }) {
   return <>
     <Registros titulo="Licencias, permisos y suspensiones" agregar="Registrar movimiento" registros={data.licencias} bloqueo={sinLegajo}
       vacio="No hay licencias, permisos, suspensiones ni descansos médicos registrados."
-      tituloRegistro={record => etiqueta(tiposLicencia, record.values.tipo)} subtitulo={record => rango(record.values)}
-      campos={[['Con goce de remuneraciones', v => texto(v.con_goce)], ['N.º de documento', v => texto(v.numero_documento)], ['Documento que lo acredita', v => documentoDe(data, v.documento_id)]]}
+      tituloRegistro={record => nombreLicencia(record.values)} subtitulo={record => rango(record.values)}
+      campos={[['Con goce de remuneraciones', v => movimientosLicencia[movimientoDe(v.tipo)]?.conGoce === false ? 'Sin definir (pendiente de validar con la universidad)' : texto(v.con_goce)], ['N.º de documento', v => texto(v.numero_documento)], ['Documento que lo acredita', v => documentoDe(data, v.documento_id)]]}
       onAnular={(record, motivo) => anularSeccion05(usuario, 'licencias-permisos', record.id, motivo)}
       renderForm={props => <LicenciaForm usuario={usuario} veSalud={data.ve_datos_salud} {...props} />} />
     {!data.ve_datos_salud && <p className="-mt-6 mb-8 text-xs text-slate-500">Los descansos médicos son datos de salud y no se muestran sin acceso a datos sensibles.</p>}
@@ -145,7 +147,8 @@ function Licencias({ usuario, data, sinLegajo }) {
   </>
 }
 
-function Vacaciones({ usuario, data, sinLegajo }) {
+// onRol: abre la carga del documento d) Rol de vacaciones en la lista de documentos.
+function Vacaciones({ usuario, data, sinLegajo, onRol }) {
   const sinVinculo = !data.vinculos.length && 'Primero registra un vínculo laboral en 2.2: el período vacacional pertenece a un vínculo.'
   const vinculo = id => data.vinculos.find(v => v.id === id)
   return <>
@@ -156,23 +159,32 @@ function Vacaciones({ usuario, data, sinLegajo }) {
       onAnular={(record, motivo) => anularSeccion05(usuario, 'periodos-vacacionales', record.id, motivo)}
       renderForm={props => <PeriodoVacacionalForm usuario={usuario} vinculos={data.vinculos} {...props} />} />
     <Anulados usuario={usuario} clave="periodos_vacacionales" nombre="períodos anulados" titulo={v => `Período ${v.periodo_anio}`} />
-    <Registros titulo="Goces, adelantos y postergaciones" agregar="Registrar goce, adelanto o postergación" registros={data.goces} bloqueo={sinLegajo || (!data.periodos.length && 'Primero registra el período vacacional.')}
+    <Registros titulo="Goces, adelantos y postergaciones" agregar="Registrar movimiento vacacional" registros={data.goces} bloqueo={sinLegajo}
       vacio="No hay goces, adelantos ni postergaciones registrados."
-      tituloRegistro={record => etiqueta(tiposGoce, record.values.tipo)} subtitulo={record => rango(record.values)}
+      tituloRegistro={record => etiqueta(tiposGoce, record.values.tipo)}
+      subtitulo={record => <><Etiqueta clase={coloresGoce[record.values.tipo] || 'bg-slate-100 text-slate-700'}>{record.values.tipo === 'goce' ? 'b) Goce' : 'c) Adelanto o postergación'}</Etiqueta><span className="ml-2">{rango(record.values)}</span></>}
       campos={[['Período', v => data.periodos.find(p => p.id === v.periodo_vacacional_id)?.values.periodo_anio ?? 'No encontrado'], ['N.º de documento', v => texto(v.numero_documento)], ['Documento que lo acredita', v => documentoDe(data, v.documento_id)]]}
       onAnular={(record, motivo) => anularSeccion05(usuario, 'goces-vacacionales', record.id, motivo)}
-      renderForm={props => <GoceForm usuario={usuario} periodos={data.periodos} {...props} />} />
+      renderForm={props => <GoceForm usuario={usuario} periodos={data.periodos} onRol={onRol && (() => { props.onCancel(); onRol() })} {...props} />} />
     <Anulados usuario={usuario} clave="goces_vacacionales" nombre="goces anulados" titulo={v => `${etiqueta(tiposGoce, v.tipo)} · ${rango(v)}`} />
   </>
 }
 
 export default function Seccion05Panel({ usuario, categoria }) {
   const request = useLiveQuery(`/expedientes/${usuario}/seccion-05`)
+  const [subiendo, setSubiendo] = useState(null)
+  const puedeSubir = usePuede('documento.subir')
   const data = request.data?.data
   const { bloque, titulo, literales } = categoriasSeccion05[categoria]
   const error = request.error && <p role="alert" className="mb-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{request.error.response?.status === 403 ? 'No tienes permiso para ver esta sección.' : 'No se pudo actualizar la sección. Lo que ves puede no estar al día.'} <button onClick={request.retry} className="font-semibold underline">Reintentar</button></p>
   if (!data) return error || <p role="status" className="rounded-xl bg-slate-100 p-6 text-sm text-slate-500">Cargando…</p>
   const sinLegajo = !data.legajo && 'La persona no tiene un legajo abierto.'
+  // Rol de vacaciones: solo documento. Se abre su carga (mecanismo común) y se lleva la vista hasta ella.
+  const tipoRol = data.tipos.find(tipo => tipo.codigo === 'S05_D_ROL_VACACIONES')
+  const abrirRol = puedeSubir && tipoRol && !sinLegajo ? () => {
+    setSubiendo(tipoRol.id)
+    requestAnimationFrame(() => document.getElementById(`tipo-${tipoRol.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  } : null
 
   return <section aria-label={titulo}>
     {error}
@@ -180,7 +192,7 @@ export default function Seccion05Panel({ usuario, categoria }) {
     <p className="mb-5 mt-2 text-xs text-slate-500">Sección 05 · Movimientos del personal{literales ? ` · Anexo 01, literales ${literales}` : ' · otros documentos requeridos por la universidad'}. Un trabajador puede tener varios movimientos y documentos; ninguno se elimina.</p>
     {sinLegajo && <Aviso accion={<AbrirLegajo usuario={usuario} />}>{sinLegajo} Los registros y la carga de documentos de la sección 05 están deshabilitados hasta abrirlo.</Aviso>}
     {bloque === 'licencias' && <Licencias usuario={usuario} data={data} sinLegajo={sinLegajo} />}
-    {bloque === 'vacaciones' && <Vacaciones usuario={usuario} data={data} sinLegajo={sinLegajo} />}
-    <Documentos usuario={usuario} data={data} tipos={data.tipos.filter(tipo => tipo.bloque === bloque)} sinLegajo={sinLegajo} />
+    {bloque === 'vacaciones' && <Vacaciones usuario={usuario} data={data} sinLegajo={sinLegajo} onRol={abrirRol} />}
+    <Documentos usuario={usuario} data={data} tipos={data.tipos.filter(tipo => tipo.bloque === bloque)} sinLegajo={sinLegajo} subiendo={subiendo} setSubiendo={setSubiendo} />
   </section>
 }

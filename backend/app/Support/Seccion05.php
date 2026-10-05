@@ -21,6 +21,9 @@ final class Seccion05
     /** licencias_permisos.tipo: permisos, suspensión y descanso médico (párrafo general) y licencias (literal e). */
     public const TIPOS_LICENCIA = ['permiso', 'suspension', 'descanso_medico', ...self::LICENCIAS_OTORGADAS];
 
+    /** licencias_permisos.forma_permiso: solo para permisos ("papeletas, memorándum u otros"). */
+    public const FORMAS_PERMISO = ['papeleta', 'memorandum', 'otro'];
+
     /** goces_vacacionales.tipo: goce (literal b), adelanto o postergación (literal c). */
     public const TIPOS_GOCE = ['goce', 'adelanto', 'postergacion'];
 
