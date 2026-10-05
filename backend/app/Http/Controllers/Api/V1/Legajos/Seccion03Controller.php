@@ -7,7 +7,6 @@ use App\Models\Capacitacion;
 use App\Models\Colegiatura;
 use App\Models\DocumentoUsuario;
 use App\Models\FormacionAcademica;
-use App\Models\HistorialEstadoDocumento;
 use App\Models\Legajo;
 use App\Models\ObservacionDocumento;
 use App\Models\TipoDocumento;
@@ -16,12 +15,12 @@ use App\Support\Documentos\ArchivoPdf;
 use App\Support\Documentos\AuditoriaDocumento;
 use App\Support\Documentos\CargaDocumento;
 use App\Support\Documentos\Folios;
+use App\Support\Documentos\RevisionDocumento;
 use App\Support\Parametros;
 use App\Support\PerfilDocumental;
 use App\Support\ResumenSeccion03;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -133,70 +132,7 @@ class Seccion03Controller extends Controller
 
     public function cambiarEstado(Request $request, string $usuario, string $documento): JsonResponse
     {
-        $reglas = [
-            'estado' => 'required|in:aceptado,observado', 'estado_anterior' => 'required|string|max:20',
-            'descripcion' => 'required_if:estado,observado|nullable|string|max:3000',
-            'plazo_subsanacion' => 'required_if:estado,observado|nullable|date_format:Y-m-d|after_or_equal:today',
-            'recepcion_confirmada' => 'required_if:estado,aceptado|boolean',
-            'fedateado' => 'sometimes|boolean',
-        ];
-        $this->rechazarDesconocidos($request, $reglas);
-        $datos = $request->validate($reglas);
-        $registro = DB::transaction(function () use ($request, $usuario, $documento, $datos): DocumentoUsuario {
-            $legajo = Legajo::query()->where('usuario_id', $usuario)->where('estado_legajo', 'activo')->lockForUpdate()->first();
-            abort_unless($legajo, 409, 'El legajo está cerrado y no admite revisiones.');
-            $doc = DocumentoUsuario::query()->where('usuario_id', $usuario)->where('legajo_id', $legajo->id)->where('seccion_legajo_id', 3)->with(['tipoDocumento', 'archivo'])
-                ->lockForUpdate()->findOrFail($documento);
-            $this->exigirSensibles($request, $doc->tipoDocumento);
-            abort_unless($doc->legajo->estado_legajo === 'activo', 409, 'El legajo está cerrado y no admite revisiones.');
-            abort_if($doc->created_by === $request->user()->getAuthIdentifier(), 403, 'La revisión debe hacerla otra persona de RR. HH. No puedes revisar tu propia carga.');
-            abort_if($doc->documentosUsuarioPorSubsanaADocumento()->exists() || $doc->estado === 'anulado', 409, 'El documento fue subsanado o anulado. Revisa el documento vigente.');
-            abort_if($doc->estado !== $datos['estado_anterior'] || $doc->estado === $datos['estado'], 409, 'El documento cambió desde que lo abriste. Actualiza la lista antes de revisarlo.');
-            $antes = $doc->getAttributes();
-            $cambios = ['estado' => $datos['estado']];
-            $observacion = null;
-            if ($datos['estado'] === 'aceptado') {
-                if (! ($datos['recepcion_confirmada'] ?? false)) {
-                    throw ValidationException::withMessages(['recepcion_confirmada' => 'Confirma que verificaste la recepción, el sello y los folios.']);
-                }
-                if (! $doc->archivo || $doc->archivo->estado_antivirus === 'infectado') {
-                    throw ValidationException::withMessages(['estado' => 'El documento no tiene un archivo disponible o el archivo está bloqueado. Registra una subsanación.']);
-                }
-                if ($doc->tipoDocumento->requiere_fedateo && ! $doc->fedateado && ! ($datos['fedateado'] ?? false)) {
-                    throw ValidationException::withMessages(['fedateado' => 'Este título requiere fedateo. Confirma el fedateo antes de aceptarlo.']);
-                }
-                if (! $doc->fecha_recepcion) {
-                    $cambios += ['fecha_recepcion' => today(), 'recepcionado_por' => $request->user()->getAuthIdentifier()];
-                }
-                if (($datos['fedateado'] ?? false) && ! $doc->fedateado) {
-                    $cambios += ['fedateado' => true, 'fecha_fedateo' => today(), 'fedatario_id' => $request->user()->getAuthIdentifier()];
-                }
-                abort_if($doc->observacionesDocumentoPorDocumento()->where('estado', 'abierta')->exists(), 409, 'Tiene una observación abierta. Registra un documento nuevo que la subsane antes de aceptarlo.');
-            } else {
-                $observacion = ObservacionDocumento::query()->create([
-                    'documento_id' => $doc->id, 'tipo_observacion' => 'otro', 'descripcion' => trim($datos['descripcion']),
-                    'plazo_subsanacion' => $datos['plazo_subsanacion'], 'registrada_por' => $request->user()->getAuthIdentifier(), 'fecha_registro' => now(),
-                ]);
-            }
-            $doc->update($cambios);
-            if ($doc->estado === 'aceptado' && $doc->subsana_a_documento_id) {
-                ObservacionDocumento::query()->where('documento_id', $doc->subsana_a_documento_id)->where('estado', 'abierta')->update([
-                    'estado' => 'subsanada', 'documento_subsanacion_id' => $doc->id,
-                    'fecha_subsanacion' => now(), 'verificada_por' => $request->user()->getAuthIdentifier(),
-                    'comentario_cierre' => 'Subsanación aceptada por RR. HH.',
-                ]);
-            }
-            HistorialEstadoDocumento::query()->create([
-                'documento_usuario_id' => $doc->id, 'estado_anterior' => $antes['estado'], 'estado_nuevo' => $doc->estado,
-                'cambiado_por' => $request->user()->getAuthIdentifier(), 'fecha_cambio' => now(), 'ip_origen' => $request->ip(),
-                'observacion_id' => $observacion?->id, 'motivo' => $observacion?->descripcion ?? 'Revisión y recepción conforme de RR. HH.; fiscalización posterior independiente.',
-            ]);
-            AuditoriaDocumento::registrar($doc, $request, 'formacion.documento.'.$doc->estado, $antes);
-
-            return $doc;
-        });
-
-        return response()->json(['data' => $registro->only(['id', 'estado', 'fedateado', 'fiscalizado'])]);
+        return RevisionDocumento::cambiarEstado($request, $usuario, $documento, 3, 'formacion.documento');
     }
 
     private function registrarDatos(DocumentoUsuario $doc, array $datos, string $letra): void

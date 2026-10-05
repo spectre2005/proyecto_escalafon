@@ -117,7 +117,7 @@ export default function PdfPreviewField({ name, id, label, help, maxMB = 2, curr
     {message && <p role="alert" className="text-xs text-rose-700">{[].concat(message).join(' ')}</p>}
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
       <div className="flex min-w-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3">
-        <div className="min-w-0 flex-1 break-words text-xs text-slate-600">{active ? <><p>{file ? (currentUrl ? 'Archivo nuevo, reemplazará al actual' : 'Archivo nuevo') : 'Archivo actual'}</p><p>{file?.name || currentName || 'Documento PDF'} · {((file?.size || currentSize) / 1024 / 1024).toFixed(2)} MB</p></> : 'Vista previa del PDF'}</div>
+        <div className="min-w-0 basis-full break-words text-xs text-slate-600">{active ? <><p>{file ? (currentUrl ? 'Archivo nuevo, reemplazará al actual' : 'Archivo nuevo') : 'Archivo actual'}</p><p>{file?.name || currentName || 'Documento PDF'} · {((file?.size || currentSize) / 1024 / 1024).toFixed(2)} MB</p></> : 'Vista previa del PDF'}</div>
         <button type="button" className={button} disabled={!pdf || page <= 1} onClick={() => setPage(value => value - 1)} aria-label="Página anterior">Anterior</button>
         <span aria-live="polite" className="text-xs text-slate-600">{pdf ? `${page} de ${pdf.numPages}` : '0 de 0'}</span>
         <button type="button" className={button} disabled={!pdf || page >= pdf.numPages} onClick={() => setPage(value => value + 1)} aria-label="Página siguiente">Siguiente</button>

@@ -3,6 +3,10 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Models\DocumentoUsuario;
+use App\Models\TipoDocumento;
+use App\Support\ResumenSeccion04;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class DocumentoUsuarioController extends ResourceController
 {
@@ -38,4 +42,14 @@ class DocumentoUsuarioController extends ResourceController
         'subsana_a_documento_id' => 'nullable|uuid|exists:documentos_usuario,id',
         'created_by' => 'required|uuid|exists:usuarios,id',
     ];
+
+    public function store(Request $request): JsonResponse
+    {
+        $datos = $request->validate(['tipo_documento_id' => 'required|uuid|exists:tipos_documento,id']);
+        $tipo = TipoDocumento::query()->findOrFail($datos['tipo_documento_id']);
+        abort_if($tipo->seccion_legajo_id === 4 && isset(ResumenSeccion04::ITEMS[$tipo->codigo]), 409,
+            'Registra esta evidencia mediante Agregar documento en la Sección 04.');
+
+        return parent::store($request);
+    }
 }

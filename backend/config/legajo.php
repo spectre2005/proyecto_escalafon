@@ -8,6 +8,9 @@
 */
 
 return [
+    'exp_dias_por_mes' => 30,
+    'exp_dias_por_anio' => 360,
+    'exp_hueco_largo_dias' => 90,
 
     // TODO pendiente de confirmar con el cliente: días de anticipación para avisar que un vínculo
     // laboral (o su última adenda) está por vencer. Días calendario, no hábiles.

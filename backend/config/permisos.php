@@ -22,7 +22,7 @@ return [
         'legajo.abrir' => 'Abrir el legajo de una persona que no tiene uno activo.',
         'documento.subir' => 'Subir documentos al legajo.',
         'documento.recepcionar' => 'Registrar la recepción de un documento.',
-        'documento.revisar' => 'Aceptar u observar documentos de formación académica (RR. HH.).',
+        'documento.revisar' => 'Aceptar u observar documentos de formación académica y experiencia laboral (RR. HH.).',
         'seccion07.ver' => 'Ver la sección 07: evaluación, progresión y desplazamiento.',
         'seccion07.ver_calificacion' => 'Ver calificaciones y puntajes de evaluación de desempeño.',
         'datos_sensibles.ver' => 'Ver datos sensibles y de salud (secciones 01, 09 y 10).',

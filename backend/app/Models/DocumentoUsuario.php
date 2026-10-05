@@ -20,6 +20,7 @@ class DocumentoUsuario extends Model
 
     protected $fillable = [
         'nombre',
+        'funcion_asignada',
         'usuario_id',
         'legajo_id',
         'tipo_documento_id',
