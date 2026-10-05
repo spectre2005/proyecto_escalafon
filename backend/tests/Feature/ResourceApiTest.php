@@ -5,10 +5,16 @@ namespace Tests\Feature;
 use App\Models\ArchivoDocumento;
 use App\Models\DocumentoUsuario;
 use App\Models\Familiar;
+use App\Models\Induccion;
 use App\Models\Legajo;
 use App\Models\LegajoSeccion;
+use App\Models\PerfilAdministrativo;
+use App\Models\PerfilDocente;
+use App\Models\PeriodoPrueba;
 use App\Models\Rol;
 use App\Models\Usuario;
+use App\Models\VinculoAdenda;
+use App\Models\VinculoLaboral;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -22,6 +28,9 @@ class ResourceApiTest extends TestCase
         parent::setUp();
         $this->actuarComo();
     }
+
+    /** Sección 02: el CRUD genérico solo lista, lee y crea; no edita ni elimina. */
+    private const SECCION_02 = [VinculoLaboral::class, VinculoAdenda::class, Induccion::class, PeriodoPrueba::class, PerfilDocente::class, PerfilAdministrativo::class];
 
     public static function resources(): array
     {
@@ -83,15 +92,22 @@ class ResourceApiTest extends TestCase
             unset($payload['registrado_por']);
         }
         $uri = '/api/v1/'.str_replace('_', '-', $model->getTable());
-        $response = $this->postJson($uri, $payload)->assertCreated();
-        $id = $response->json('data.id');
+        $soloLectura = $model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento;
+        if ($soloLectura) {
+            // Documentos y archivos: solo de lectura. Se crean únicamente por la carga del legajo (folios, hash y bitácora).
+            $this->postJson($uri, $payload)->assertStatus(405);
+            $model->save();
+        }
+        $id = $soloLectura ? $model->getKey() : $this->postJson($uri, $payload)->assertCreated()->json('data.id');
         $this->assertDatabaseHas($model->getTable(), ['id' => $id]);
         $this->getJson($uri.'/'.$id)->assertOk()->assertJsonPath('data.id', $id);
         $this->getJson($uri)->assertOk()->assertJsonStructure(['data', 'links', 'meta']);
         unset($payload['id']);
-        if ($model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento) {
-            // Documentos y archivos: no se editan ni se eliminan (Directiva, arts. 2.3 y 5.3).
+        if ($soloLectura || in_array($class, self::SECCION_02, true)) {
+            // No se editan ni se eliminan por el CRUD genérico (Directiva, arts. 2.3 y 5.3). Los de la sección 02 se
+            // corrigen y se anulan solo desde Seccion02Controller.
             $this->patchJson($uri.'/'.$id, $payload)->assertStatus(405);
+            $this->putJson($uri.'/'.$id, $payload)->assertStatus(405);
             $this->deleteJson($uri.'/'.$id)->assertStatus(405);
             $this->assertDatabaseHas($model->getTable(), ['id' => $id]);
 
