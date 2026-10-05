@@ -9,16 +9,17 @@ use App\Models\ObservacionDocumento;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 final class RevisionDocumento
 {
     public static function cambiarEstado(Request $request, string $usuario, string $documento, int $seccion, string $accion): JsonResponse
     {
-        $hoy = $seccion === 4 ? now('America/Lima')->startOfDay() : today();
+        $hoy = in_array($seccion, [4, 6], true) ? now('America/Lima')->startOfDay() : today();
         $reglas = [
-            'estado' => $seccion === 4 ? 'required|in:aceptado,observado,anulado' : 'required|in:aceptado,observado', 'estado_anterior' => 'required|string|max:20',
-            'descripcion' => $seccion === 4 ? 'required_if:estado,observado,anulado|nullable|string|max:3000' : 'required_if:estado,observado|nullable|string|max:3000',
+            'estado' => in_array($seccion, [4, 6], true) ? 'required|in:aceptado,observado,anulado' : 'required|in:aceptado,observado', 'estado_anterior' => 'required|string|max:20',
+            'descripcion' => in_array($seccion, [4, 6], true) ? 'required_if:estado,observado,anulado|nullable|string|max:3000' : 'required_if:estado,observado|nullable|string|max:3000',
             'plazo_subsanacion' => 'required_if:estado,observado|nullable|date_format:Y-m-d|after_or_equal:'.$hoy->toDateString(),
             'recepcion_confirmada' => 'required_if:estado,aceptado|boolean',
             'fedateado' => 'sometimes|boolean',
@@ -31,7 +32,7 @@ final class RevisionDocumento
         if ($datos['estado'] === 'anulado') {
             abort_unless($request->user()->can('sistema.administrar'), 403, 'Solo administración puede anular documentos.');
         }
-        if ($seccion === 4 && isset($datos['descripcion']) && trim($datos['descripcion']) === '') {
+        if (in_array($seccion, [4, 6], true) && isset($datos['descripcion']) && trim($datos['descripcion']) === '') {
             throw ValidationException::withMessages(['descripcion' => 'Explica el motivo antes de guardar.']);
         }
         $registro = DB::transaction(function () use ($request, $usuario, $documento, $datos, $seccion, $accion, $hoy): DocumentoUsuario {
@@ -58,11 +59,18 @@ final class RevisionDocumento
                         throw ValidationException::withMessages(['estado' => 'El certificado tiene datos de experiencia incompletos o inválidos. Registra una subsanación con el periodo y su clasificación.']);
                     }
                 }
+                if ($seccion === 6) {
+                    self::validarDatosCompensaciones($doc, $hoy->toDateString());
+                }
                 if (! ($datos['recepcion_confirmada'] ?? false)) {
                     throw ValidationException::withMessages(['recepcion_confirmada' => 'Confirma que verificaste la recepción, el sello y los folios.']);
                 }
                 if (! $doc->archivo || $doc->archivo->estado_antivirus === 'infectado') {
                     throw ValidationException::withMessages(['estado' => 'El documento no tiene un archivo disponible o el archivo está bloqueado. Registra una subsanación.']);
+                }
+                if ($seccion === 6 && ($doc->archivo->almacenamiento !== config('legajo.disco_documentos')
+                    || ! Storage::disk(config('legajo.disco_documentos'))->exists($doc->archivo->storage_path))) {
+                    throw ValidationException::withMessages(['estado' => 'El archivo PDF no está disponible. Registra una subsanación.']);
                 }
                 if ($doc->tipoDocumento->requiere_fedateo && ! $doc->fedateado && ! ($datos['fedateado'] ?? false)) {
                     throw ValidationException::withMessages(['fedateado' => 'Este documento requiere fedateo. Confirma el fedateo antes de aceptarlo.']);
@@ -99,5 +107,24 @@ final class RevisionDocumento
         });
 
         return response()->json(['data' => $registro->only(['id', 'estado', 'fedateado', 'fiscalizado'])]);
+    }
+
+    private static function validarDatosCompensaciones(DocumentoUsuario $doc, string $hoy): void
+    {
+        if ($doc->tipoDocumento->codigo === 'COMP_RECONOCIMIENTO_TIEMPO') {
+            $filas = $doc->tiempoServiciosReconocidos()->get();
+            $valido = $filas->count() === 1 && ! $filas->contains(fn ($p): bool => $p->usuario_id !== $doc->usuario_id || $p->anulado
+                || $p->anios < 0 || $p->meses < 0 || $p->dias < 0 || $p->numero_resolucion !== $doc->num_resolucion
+                || $p->fecha_resolucion->format('Y-m-d') !== $doc->fecha_emision?->format('Y-m-d') || $p->fecha_resolucion->format('Y-m-d') > $hoy);
+        } elseif ($doc->tipoDocumento->codigo === 'COMP_PAGO_COMPENSACION') {
+            $filas = $doc->compensacionesBeneficios()->get();
+            $valido = $filas->count() === 1 && ! $filas->contains(fn ($p): bool => $p->usuario_id !== $doc->usuario_id || $p->anulado
+                || ! in_array($p->tipo, ['economica', 'no_economica'], true) || trim($p->concepto) === '' || $p->fecha->format('Y-m-d') > $hoy);
+        } else {
+            return;
+        }
+        if (! $valido) {
+            throw ValidationException::withMessages(['estado' => 'Los datos estructurados no corresponden al documento o están incompletos. Registra una subsanación.']);
+        }
     }
 }

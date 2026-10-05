@@ -3,9 +3,9 @@ export const legajoSections = [
   // Subsecciones 2.1 a 2.4 de la directiva; cada una muestra sus datos y sus documentos (sin entrada aparte).
   { number: '02', title: 'Incorporación', categories: ['s02-seleccion', 's02-vinculo', 's02-induccion', 's02-prueba'], sinDocumentos: true },
   { number: '03', title: 'Formación académica y capacitación', categories: ['seccion-03', 'formacion-academica', 'capacitaciones', 'colegiaturas'] },
-  { number: '04', title: 'Experiencia laboral', categories: ['seccion-04', 'experiencia-laboral', 'tiempo-servicios-reconocidos'] },
+  { number: '04', title: 'Experiencia laboral', categories: ['seccion-04', 'experiencia-laboral'] },
   { number: '05', title: 'Movimientos del Personal', categories: ['licencias-permisos', 'periodos-vacacionales', 'goces-vacacionales'] },
-  { number: '06', title: 'Compensaciones', categories: ['compensaciones-beneficios'] },
+  { number: '06', title: 'Compensaciones', categories: ['seccion-06', 'compensaciones-beneficios'] },
   { number: '07', title: 'Evaluación de desempeño, progresión en la carrera y desplazamiento', categories: ['evaluaciones-desempeno', 'progresiones-carrera', 'desplazamientos', 'ratificaciones-docentes'] },
   { number: '08', title: 'Reconocimientos y sanciones disciplinarias', categories: ['reconocimientos', 'sanciones'] },
   { number: '09', title: 'Relaciones laborales individuales y colectivas', categories: ['afiliaciones', 'controversias'] },
