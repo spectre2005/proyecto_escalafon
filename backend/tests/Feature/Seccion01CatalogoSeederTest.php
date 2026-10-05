@@ -3,10 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\DocumentoUsuario;
+use App\Models\Familiar;
 use App\Models\Legajo;
 use App\Models\SubseccionLegajo;
 use App\Models\TipoDocumento;
 use Database\Seeders\Seccion01CatalogoSeeder;
+use Database\Seeders\Seccion01DemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -54,6 +56,9 @@ class Seccion01CatalogoSeederTest extends TestCase
         $this->assertFalse($tipos->firstWhere('codigo', 'S01_X_ANTECEDENTES_JUDICIALES')->obligatorio);
         $this->assertFalse($tipos->firstWhere('codigo', 'S01_X_DJ_INTERESES')->obligatorio);
         $this->assertSame('Ficha de datos de el/la servidor/a civil', $tipos->first()->nombre);
+        // g, i y j son obligatorios: su exigencia se calcula por familiar registrado.
+        $this->assertSame(['S01_F_DJ_NO_IMPEDIMENTOS_31419', 'S01_L_OTRAS_DJ', 'S01_OTROS_UNIVERSIDAD', 'S01_X_ANTECEDENTES_JUDICIALES', 'S01_X_DJ_INTERESES'],
+            $tipos->where('obligatorio', false)->pluck('codigo')->values()->all());
     }
 
     public function test_it_does_not_alter_types_with_documents(): void
@@ -94,5 +99,16 @@ class Seccion01CatalogoSeederTest extends TestCase
         $this->assertFalse($extra->refresh()->activo);
         $this->assertModelExists($extra);
         $this->assertSame(15, TipoDocumento::query()->where('seccion_legajo_id', 1)->where('activo', true)->count());
+    }
+
+    public function test_demo_seeder_is_repeatable(): void
+    {
+        $this->seed(Seccion01DemoSeeder::class);
+        $this->seed(Seccion01DemoSeeder::class);
+
+        $this->assertSame(1, Legajo::query()->where('numero_legajo', 'DEMO-S01-001')->count());
+        $this->assertSame(4, Familiar::query()->count());
+        $this->assertDatabaseCount('declaraciones_verificaciones', 1);
+        $this->assertSame(0, DocumentoUsuario::query()->count());
     }
 }

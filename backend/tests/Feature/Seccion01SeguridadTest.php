@@ -10,8 +10,9 @@ use App\Models\Familiar;
 use App\Models\Legajo;
 use App\Models\SeccionLegajo;
 use App\Models\Usuario;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -22,6 +23,13 @@ class Seccion01SeguridadTest extends TestCase
     use RefreshDatabase;
 
     private const PDF = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF";
+
+    private function pdfAnterior(Model $registro): void
+    {
+        $path = $registro->getTable().'/'.$registro->usuario_id.'/registro.pdf';
+        Storage::disk('local')->put($path, self::PDF);
+        DB::table($registro->getTable())->where('id', $registro->id)->update(['pdf_path' => $path, 'pdf_nombre' => 'registro.pdf']);
+    }
 
     /** Administra el sistema y ve legajos, pero su rol no tiene ve_datos_sensibles. */
     private function actuarSinSensibles(): Usuario
@@ -71,16 +79,16 @@ class Seccion01SeguridadTest extends TestCase
         Legajo::factory()->create(['usuario_id' => $persona->id, 'estado_legajo' => 'pasivo', 'fecha_apertura' => now()->subYears(3)]);
         $activo = Legajo::factory()->create(['usuario_id' => $persona->id, 'estado_legajo' => 'activo', 'fecha_apertura' => now()->subYear()]);
 
+        // PDF guardados antes del sistema de folios (pdf_path): solo descarga.
         foreach ([
-            'declaraciones-verificaciones' => ['tipo' => 'antecedente_penal', 'fecha' => '2025-01-10', 'resultado' => 'sin_registros'],
-            'certificados-discapacidad' => ['persona' => 'servidor', 'numero_conadis' => 'C-123'],
-        ] as $tipo => $data) {
+            'declaraciones-verificaciones' => DeclaracionVerificacion::factory()->create(['usuario_id' => $persona->id, 'tipo' => 'antecedente_penal']),
+            'certificados-discapacidad' => CertificadoDiscapacidad::factory()->create(['usuario_id' => $persona->id]),
+        ] as $tipo => $registro) {
             $url = '/api/v1/expedientes/'.$persona->id.'/'.$tipo;
-            $id = $this->post($url, $data + ['pdf' => UploadedFile::fake()->createWithContent('registro.pdf', self::PDF)], ['Accept' => 'application/json'])
-                ->assertCreated()->json('data.id');
+            $this->pdfAnterior($registro);
             $this->assertSame(0, BitacoraAccesoLegajo::query()->count());
 
-            $this->withHeader('User-Agent', 'Navegador de prueba')->get($url.'/'.$id.'/pdf')->assertOk()->assertDownload('registro.pdf');
+            $this->withHeader('User-Agent', 'Navegador de prueba')->get($url.'/'.$registro->id.'/pdf')->assertOk()->assertDownload('registro.pdf');
 
             $this->assertDatabaseHas('bitacora_accesos_legajo', [
                 'legajo_id' => $activo->id, 'documento_id' => null, 'usuario_id' => $admin->id,
@@ -97,8 +105,9 @@ class Seccion01SeguridadTest extends TestCase
         $this->actuarComo();
         $persona = Usuario::factory()->create();
         $url = '/api/v1/expedientes/'.$persona->id.'/certificados-discapacidad';
-        $id = $this->post($url, ['persona' => 'servidor', 'numero_conadis' => 'C-1', 'pdf' => UploadedFile::fake()->createWithContent('c.pdf', self::PDF)], ['Accept' => 'application/json'])
-            ->assertCreated()->json('data.id');
+        $registro = CertificadoDiscapacidad::factory()->create(['usuario_id' => $persona->id]);
+        $this->pdfAnterior($registro);
+        $id = $registro->id;
 
         $this->getJson($url.'/'.$id.'/pdf')->assertConflict();
         $this->assertSame(0, BitacoraAccesoLegajo::query()->count());

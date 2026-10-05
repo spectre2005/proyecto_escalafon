@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Api\V1\Legajos;
 
 use App\Http\Controllers\Api\V1\ResourceController;
+use App\Models\DocumentoUsuario;
 use App\Models\Familiar;
 use App\Models\Usuario;
 use App\Support\Catalogos;
+use App\Support\Documentos\FormulariosDatos;
+use App\Support\Seccion01;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -13,7 +16,8 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Familiares desde la ficha (sección 01). Se registran y se corrigen; no se eliminan:
- * se anulan con motivo desde Seccion01Controller.
+ * se anulan con motivo desde Seccion01Controller. Al registrarlo se puede enlazar al documento recién subido
+ * que lo acredita (i: DNI del cónyuge o concubino/a; j: DNI del hijo/a); el enlace no cambia después.
  */
 class FamiliarPersonalController extends ResourceController
 {
@@ -26,6 +30,7 @@ class FamiliarPersonalController extends ResourceController
         'numero_doc_identidad' => 'nullable|string|max:20|required_with:tipo_doc_identidad',
         'fecha_nacimiento' => 'nullable|date|before_or_equal:today',
         'es_derechohabiente' => 'required|boolean',
+        'documento_id' => 'nullable|uuid',
     ];
 
     public function __construct()
@@ -38,9 +43,9 @@ class FamiliarPersonalController extends ResourceController
     {
         Usuario::query()->findOrFail($usuario);
         $data = $this->validatedData($request);
-        $record = Familiar::query()->create([...$data, 'usuario_id' => $usuario, 'registrado_por' => $request->user()->getAuthIdentifier()]);
+        $record = new Familiar([...collect($data)->except('documento_id')->all(), 'usuario_id' => $usuario, 'registrado_por' => $request->user()->getAuthIdentifier()]);
 
-        return (new JsonResource($record))->response()->setStatusCode(201);
+        return (new JsonResource(FormulariosDatos::crearEnlazado('familiares', $usuario, $data['documento_id'] ?? null, $record)))->response()->setStatusCode(201);
     }
 
     public function updateForPerson(Request $request, string $usuario, string $familiar): JsonResource|JsonResponse
@@ -48,6 +53,16 @@ class FamiliarPersonalController extends ResourceController
         $record = Familiar::query()->where('usuario_id', $usuario)->findOrFail($familiar);
         if ($record->anulado) {
             return response()->json(['message' => 'Un familiar anulado no se puede editar.'], 409);
+        }
+        if ($request->has('documento_id')) {
+            throw ValidationException::withMessages(['documento_id' => 'El documento se enlaza al registrar el familiar o al subirlo; no se cambia después.']);
+        }
+        // Enlazado a un documento (i o j): el parentesco debe seguir correspondiendo al tipo de ese documento.
+        if ($record->documento_id && $request->has('parentesco')) {
+            $tipo = DocumentoUsuario::query()->with('tipoDocumento')->findOrFail($record->documento_id)->tipoDocumento;
+            if (! Seccion01::compatible($tipo, new Familiar(['parentesco' => $request->input('parentesco')]))) {
+                throw ValidationException::withMessages(['parentesco' => 'El familiar está enlazado a un documento de otro parentesco: no se puede cambiar a este.']);
+            }
         }
 
         return parent::update($request, $familiar);

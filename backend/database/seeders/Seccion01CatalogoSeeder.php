@@ -30,8 +30,9 @@ class Seccion01CatalogoSeeder extends Seeder
      * - El Anexo 01 no distingue regímenes: aplica_* = true en todos.
      * - f) no se ata a ninguna bandera: el esquema no tiene una que identifique los cargos de libre designación
      *   y remoción (Ley N° 31419). Hasta confirmarlo es opcional (se incorpora si existe).
-     * - g), i) y j) no se atan a tiene_derechohabientes ni al estado civil: la directiva no lo dice. Hasta
-     *   confirmarlo son opcionales, porque solo existen si hay cónyuge, concubino/a o hijos/as menores de edad.
+     * - g), i) y j) no se atan a tiene_derechohabientes ni al estado civil: la directiva no lo dice. Son obligatorios,
+     *   pero su exigencia se calcula por familiar registrado (App\Support\ExigenciasSeccion01): g e i si hay
+     *   cónyuge o concubino/a; j por cada hijo/a menor de edad.
      * - Si c), d) y e) admiten varias presentaciones (renovaciones) no lo dice la directiva: un documento por tipo;
      *   la corrección entra como documento que subsana al anterior.
      */
@@ -44,11 +45,11 @@ class Seccion01CatalogoSeeder extends Seeder
             ['requiere_djbr' => true, 'tiene_banderas' => true, 'es_dato_sensible' => true, 'formulario_datos' => 'declaraciones_verificaciones']],
         ['S01_F_DJ_NO_IMPEDIMENTOS_31419', 'Declaración Jurada de no tener impedimentos para ser designado funcionario público o directivo público de libre designación y remoción, en el marco de la Ley N° 31419', null,
             ['obligatorio' => false, 'formulario_datos' => 'declaraciones_verificaciones']],
-        ['S01_G_PARTIDA_MATRIMONIO_CONCUBINATO', 'Copia de partida de matrimonio o constancia de concubinato (unión de hecho)', null, ['obligatorio' => false]],
+        ['S01_G_PARTIDA_MATRIMONIO_CONCUBINATO', 'Copia de partida de matrimonio o constancia de concubinato (unión de hecho)', null, []],
         ['S01_H_IMPEDIMENTOS_INHABILITACIONES', 'Información de impedimentos e inhabilitaciones (RNSSC, REDJUM, entre otros)', null,
             ['permite_multiples' => true, 'formulario_datos' => 'declaraciones_verificaciones']],
-        ['S01_I_DNI_CONYUGE_CONCUBINO', 'Copia del DNI de el/la cónyuge o concubino/a', null, ['obligatorio' => false, 'formulario_datos' => 'familiares']],
-        ['S01_J_DNI_HIJOS_MENORES', 'Copia de DNI de los/las hijos/as menores de edad', null, ['obligatorio' => false, 'permite_multiples' => true, 'formulario_datos' => 'familiares']],
+        ['S01_I_DNI_CONYUGE_CONCUBINO', 'Copia del DNI de el/la cónyuge o concubino/a', null, ['permite_multiples' => true, 'formulario_datos' => 'familiares']],
+        ['S01_J_DNI_HIJOS_MENORES', 'Copia de DNI de los/las hijos/as menores de edad', null, ['permite_multiples' => true, 'formulario_datos' => 'familiares']],
         ['S01_K_CERTIFICADO_DISCAPACIDAD', 'Certificado de discapacidad de el/la servidor/a o de sus hijos/as emitido por el CONADIS, en caso corresponda', null,
             ['requiere_discapacidad' => true, 'tiene_banderas' => true, 'es_dato_salud' => true, 'permite_multiples' => true, 'formulario_datos' => 'certificados_discapacidad']],
         ['S01_L_OTRAS_DJ', 'Otras declaraciones juradas que correspondan', null, ['obligatorio' => false, 'permite_multiples' => true, 'formulario_datos' => 'declaraciones_verificaciones']],
