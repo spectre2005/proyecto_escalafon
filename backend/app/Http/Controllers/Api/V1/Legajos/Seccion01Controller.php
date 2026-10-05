@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api\V1\Legajos;
 
 use App\Http\Controllers\Api\V1\Concerns\AnulaConMotivo;
 use App\Http\Controllers\Controller;
+use App\Models\BitacoraAccesoLegajo;
 use App\Models\CertificadoDiscapacidad;
 use App\Models\DeclaracionVerificacion;
 use App\Models\Familiar;
+use App\Models\Legajo;
 use App\Models\Usuario;
 use App\Support\Catalogos;
 use Illuminate\Database\Eloquent\Model;
@@ -16,6 +18,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
@@ -23,7 +26,8 @@ use Throwable;
  * Sección 01 desde la ficha: registro de declaraciones juradas y verificaciones
  * (Anexo 01, literales c, d, e, f, h y l) y certificados de discapacidad (literal k),
  * y anulación con motivo de esos registros y de los familiares.
- * Las declaraciones y certificados permiten corregir sus datos y reemplazar su PDF.
+ * Las declaraciones y certificados permiten corregir sus datos y adjuntar un PDF si aún no lo tienen.
+ * Un PDF registrado no se reemplaza ni se borra (Directiva, arts. 2.3 y 5.3).
  */
 class Seccion01Controller extends Controller
 {
@@ -47,9 +51,9 @@ class Seccion01Controller extends Controller
         return $this->guardarConPdf($request, $usuario, 'declaraciones-verificaciones', $declaracion);
     }
 
-    public function descargarDeclaracion(string $usuario, string $declaracion): StreamedResponse
+    public function descargarDeclaracion(Request $request, string $usuario, string $declaracion): StreamedResponse
     {
-        return $this->descargarPdf(DeclaracionVerificacion::query()->where('usuario_id', $usuario)->findOrFail($declaracion));
+        return $this->descargarPdf($request, $usuario, DeclaracionVerificacion::query()->where('usuario_id', $usuario)->findOrFail($declaracion));
     }
 
     /** @return array<string, mixed> */
@@ -82,15 +86,28 @@ class Seccion01Controller extends Controller
         return $this->guardarConPdf($request, $usuario, 'certificados-discapacidad', $certificado);
     }
 
-    public function descargarCertificado(string $usuario, string $certificado): StreamedResponse
+    public function descargarCertificado(Request $request, string $usuario, string $certificado): StreamedResponse
     {
-        return $this->descargarPdf(CertificadoDiscapacidad::query()->where('usuario_id', $usuario)->findOrFail($certificado));
+        return $this->descargarPdf($request, $usuario, CertificadoDiscapacidad::query()->where('usuario_id', $usuario)->findOrFail($certificado));
     }
 
-    private function descargarPdf(Model $record): StreamedResponse
+    /**
+     * Entrega el PDF y deja registro en bitacora_accesos_legajo, como el visor de documentos del legajo.
+     * Estos PDF no están en documentos_usuario (documento_id queda vacío) y la bitácora exige un legajo:
+     * se usa el legajo activo más reciente de la persona o, si no tiene, el más reciente. Sin legajo no se
+     * puede registrar el acceso y no se entrega el archivo.
+     */
+    private function descargarPdf(Request $request, string $usuario, Model $record): StreamedResponse
     {
         $disk = Storage::disk('local');
         abort_unless($record->pdf_path && $disk->exists($record->pdf_path), 404, 'Este registro no tiene un PDF disponible.');
+        $legajo = Legajo::query()->where('usuario_id', $usuario)
+            ->orderByRaw("CASE WHEN estado_legajo = 'activo' THEN 0 ELSE 1 END")->orderByDesc('fecha_apertura')->value('id');
+        abort_unless($legajo, 409, 'La persona no tiene legajo: no se puede registrar el acceso al PDF en la bitácora.');
+        BitacoraAccesoLegajo::query()->create([
+            'legajo_id' => $legajo, 'documento_id' => null, 'usuario_id' => $request->user()->getAuthIdentifier(),
+            'accion' => 'descargar', 'ip_origen' => $request->ip(), 'user_agent' => mb_substr((string) $request->userAgent(), 0, 300), 'fecha_acceso' => now(),
+        ]);
 
         return $disk->download($record->pdf_path, $record->pdf_nombre, [
             'Content-Type' => 'application/pdf',
@@ -103,9 +120,8 @@ class Seccion01Controller extends Controller
     {
         $disk = Storage::disk('local');
         $path = null;
-        $previousPath = null;
         try {
-            $record = DB::transaction(function () use ($request, $usuario, $tipo, $registro, &$path, &$previousPath): Model {
+            $record = DB::transaction(function () use ($request, $usuario, $tipo, $registro, &$path): Model {
                 $modelo = self::MODELOS[$tipo];
                 $record = $registro
                     ? $modelo::query()->where('usuario_id', $usuario)->lockForUpdate()->findOrFail($registro)
@@ -117,10 +133,12 @@ class Seccion01Controller extends Controller
                 unset($data['pdf']);
                 $record->fill($data);
                 if ($request->hasFile('pdf')) {
+                    if ($record->pdf_path) {
+                        throw ValidationException::withMessages(['pdf' => 'Este registro ya tiene un PDF y no se puede reemplazar. Para corregirlo, anula el registro y registra uno nuevo.']);
+                    }
                     $file = $request->file('pdf');
                     $path = $file->store($tipo.'/'.$usuario, 'local');
                     abort_unless($path, 500, 'No se pudo guardar el PDF.');
-                    $previousPath = $record->pdf_path;
                     $record->pdf_path = $path;
                     $record->pdf_nombre = $file->getClientOriginalName();
                 }
@@ -133,9 +151,6 @@ class Seccion01Controller extends Controller
                 $disk->delete($path);
             }
             throw $exception;
-        }
-        if ($previousPath && $previousPath !== $path) {
-            $disk->delete($previousPath);
         }
 
         return (new JsonResource($record))->response()->setStatusCode($registro ? 200 : 201);

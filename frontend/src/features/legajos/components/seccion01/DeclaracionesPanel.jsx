@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { saveRegistroPdf } from '../../api/seccion01Api'
 import { etiqueta, resultadosDeclaracion, tiposDeclaracion } from '../../config/seccion01'
-import Campo, { Formulario, Opciones } from './Campo'
+import Campo, { Formulario, Opciones, PdfRegistrado } from './Campo'
 import RegistrosPanel from './RegistrosPanel'
 import RegistroPdf from './RegistroPdf'
 import { hoy, useBorrador, useGuardar } from './useGuardar'
@@ -26,15 +26,16 @@ function DeclaracionForm({ usuario, record, onSaved, onCancel }) {
     setPdf(file)
   }
   return <Formulario titulo={record ? 'Editar declaración o verificación' : 'Registrar declaración o verificación'} guardar={record ? 'Guardar cambios' : 'Guardar registro'} busy={busy} error={error} onSubmit={() => { if (!pdfError) guardar(draft) }} onCancel={onCancel}
-    nota="Puedes adjuntar un PDF de hasta 2 MB. Al editar, el archivo actual se conserva si no seleccionas uno nuevo.">
+    nota="Puedes adjuntar un PDF de hasta 2 MB. Un PDF ya registrado se conserva y no se reemplaza.">
     <Campo label="Tipo" required error={errors.tipo} className="sm:col-span-2"><select required value={draft.tipo} onChange={set('tipo')}><Opciones lista={tiposDeclaracion} vacio="Selecciona" /></select></Campo>
     <Campo label="Fecha de emisión o consulta" required error={errors.fecha}><input type="date" required max={hoy()} value={draft.fecha} onChange={set('fecha')} /></Campo>
     <Campo label="Resultado" required error={errors.resultado}><select required value={draft.resultado} onChange={set('resultado')}><Opciones lista={resultadosDeclaracion} vacio="Selecciona" /></select></Campo>
     <Campo label="Año al que corresponde" error={errors.anio}><input type="number" min={1950} max={new Date().getFullYear() + 1} placeholder="Ej.: año de la declaración de bienes" value={draft.anio} onChange={set('anio')} /></Campo>
     <Campo label="Vigente hasta" error={errors.vigente_hasta}><input type="date" min={draft.fecha || undefined} value={draft.vigente_hasta} onChange={set('vigente_hasta')} /></Campo>
     <Campo label="Observación" error={errors.observacion} className="sm:col-span-2"><textarea rows={2} maxLength={300} value={draft.observacion} onChange={set('observacion')} /></Campo>
-    <Campo label={record?.values.pdf_nombre ? 'Reemplazar PDF (opcional)' : 'Adjuntar PDF (opcional)'} error={pdfError || errors.pdf} className="col-span-full"><input type="file" accept=".pdf,application/pdf" onChange={seleccionarPdf} /></Campo>
-    {record?.values.pdf_nombre && <p className="col-span-full break-words text-xs text-slate-600">PDF actual: {record.values.pdf_nombre}</p>}
+    {record?.values.pdf_nombre
+      ? <PdfRegistrado nombre={record.values.pdf_nombre} error={errors.pdf} />
+      : <Campo label={'Adjuntar PDF (opcional)'} error={pdfError || errors.pdf} className="col-span-full"><input type="file" accept=".pdf,application/pdf" onChange={seleccionarPdf} /></Campo>}
   </Formulario>
 }
 

@@ -18,8 +18,9 @@ export default function RegistroPdf({ usuario, record, tipo }) {
       link.click()
       link.remove()
       setTimeout(() => URL.revokeObjectURL(url), 1000)
-    } catch {
-      setError('No se pudo descargar el PDF. Inténtalo nuevamente.')
+    } catch (failure) {
+      // 409: sin legajo no se puede registrar el acceso en la bitácora (el backend no entrega el archivo).
+      setError(failure.response?.status === 409 ? 'La persona no tiene legajo: no se puede registrar la descarga en la bitácora.' : 'No se pudo descargar el PDF. Inténtalo nuevamente.')
     } finally {
       setBusy(false)
     }

@@ -87,11 +87,13 @@ class Seccion01ApiTest extends TestCase
         $this->postJson($this->url($persona, 'sanciones').'/'.$declaracion->id.'/anular', ['motivo_anulacion' => 'No aplica'])->assertNotFound();
     }
 
-    public function test_certificate_pdf_can_be_uploaded_downloaded_preserved_and_replaced(): void
+    public function test_certificate_pdf_can_be_uploaded_downloaded_preserved_and_not_replaced(): void
     {
         Storage::fake('local');
         $autor = $this->actuarComo();
         $persona = Usuario::factory()->create();
+        // La descarga deja registro en la bitácora, que exige un legajo.
+        Legajo::factory()->create(['usuario_id' => $persona->id]);
         $url = $this->url($persona, 'certificados-discapacidad');
         $data = ['persona' => 'servidor', 'numero_conadis' => 'C-PDF', 'fecha_emision' => '2024-01-15'];
         $contenido = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF";
@@ -109,11 +111,16 @@ class Seccion01ApiTest extends TestCase
         $this->assertSame($path, $record->refresh()->pdf_path);
         Storage::disk('local')->assertExists($path);
 
-        $this->post($url.'/'.$record->id, $data + ['_method' => 'PATCH', 'pdf' => UploadedFile::fake()->createWithContent('nuevo.pdf', $contenido)], ['Accept' => 'application/json'])
-            ->assertOk()->assertJsonPath('data.pdf_nombre', 'nuevo.pdf');
-        Storage::disk('local')->assertMissing($path);
-        Storage::disk('local')->assertExists($record->refresh()->pdf_path);
-        $this->get($url.'/'.$record->id.'/pdf')->assertOk()->assertDownload('nuevo.pdf');
+        // Directiva, arts. 2.3 y 5.3: un PDF registrado no se reemplaza ni se borra.
+        $this->post($url.'/'.$record->id, $data + ['_method' => 'PATCH', 'numero_conadis' => 'C-OTRO', 'pdf' => UploadedFile::fake()->createWithContent('nuevo.pdf', $contenido)], ['Accept' => 'application/json'])
+            ->assertUnprocessable()->assertJsonValidationErrors('pdf');
+        $record->refresh();
+        $this->assertSame($path, $record->pdf_path);
+        $this->assertSame('certificado.pdf', $record->pdf_nombre);
+        $this->assertSame('C-CORREGIDO', $record->numero_conadis);
+        Storage::disk('local')->assertExists($path);
+        $this->assertCount(1, Storage::disk('local')->allFiles());
+        $this->get($url.'/'.$record->id.'/pdf')->assertOk()->assertDownload('certificado.pdf');
         $this->assertDatabaseCount('certificados_discapacidad', 1);
     }
 
@@ -142,6 +149,8 @@ class Seccion01ApiTest extends TestCase
         Storage::fake('local');
         $this->actuarComo();
         $persona = Usuario::factory()->create();
+        // La descarga deja registro en la bitácora, que exige un legajo.
+        Legajo::factory()->create(['usuario_id' => $persona->id]);
         $otra = Usuario::factory()->create();
         $url = $this->url($persona, 'certificados-discapacidad');
         $data = ['persona' => 'servidor', 'numero_conadis' => 'C-PRIVADO'];
@@ -183,11 +192,13 @@ class Seccion01ApiTest extends TestCase
         $this->patchJson($url.'/'.$id, ['fecha_emision' => '2024-05-01', 'vigente_hasta' => '2024-01-01'] + $data)->assertUnprocessable()->assertJsonValidationErrors('vigente_hasta');
     }
 
-    public function test_declaration_can_be_edited_with_pdf_upload_preservation_and_replacement(): void
+    public function test_declaration_can_be_edited_with_pdf_upload_and_preservation_without_replacement(): void
     {
         Storage::fake('local');
         $autor = $this->actuarComo();
         $persona = Usuario::factory()->create();
+        // La descarga deja registro en la bitácora, que exige un legajo.
+        Legajo::factory()->create(['usuario_id' => $persona->id]);
         $url = $this->url($persona, 'declaraciones-verificaciones');
         $data = ['tipo' => 'djbr', 'fecha' => '2025-01-10', 'resultado' => 'presentada', 'anio' => 2025, 'observacion' => 'Original'];
         $contenido = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF";
@@ -202,10 +213,14 @@ class Seccion01ApiTest extends TestCase
         $this->post($url.'/'.$id, ['_method' => 'PATCH', 'observacion' => 'Corregida', 'registrado_por' => $persona->id] + $data, ['Accept' => 'application/json'])
             ->assertOk()->assertJsonPath('data.observacion', 'Corregida')->assertJsonPath('data.registrado_por', $autor->id);
         $this->assertSame($path, $record->refresh()->pdf_path);
+        // Directiva, arts. 2.3 y 5.3: un PDF registrado no se reemplaza ni se borra.
         $this->post($url.'/'.$id, $data + ['_method' => 'PATCH', 'pdf' => UploadedFile::fake()->createWithContent('nueva.pdf', $contenido)], ['Accept' => 'application/json'])
-            ->assertOk()->assertJsonPath('data.pdf_nombre', 'nueva.pdf');
-        Storage::disk('local')->assertMissing($path);
-        Storage::disk('local')->assertExists($record->refresh()->pdf_path);
+            ->assertUnprocessable()->assertJsonValidationErrors('pdf');
+        $this->assertSame($path, $record->refresh()->pdf_path);
+        $this->assertSame('declaracion.pdf', $record->pdf_nombre);
+        $this->assertSame('Corregida', $record->observacion);
+        Storage::disk('local')->assertExists($path);
+        $this->assertCount(1, Storage::disk('local')->allFiles());
         $this->assertDatabaseCount('declaraciones_verificaciones', 1);
 
         $sinPdf = $this->postJson($url, $data)->assertCreated()->json('data.id');

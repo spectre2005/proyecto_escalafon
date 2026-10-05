@@ -187,8 +187,12 @@ class ExpedienteController extends Controller
             'legajo' => 'nullable|in:con,sin',
             'page' => 'sometimes|integer|min:1',
         ]);
+        $veSensibles = $request->user()->can('datos_sensibles.ver');
         $query = Usuario::query()->select(['id', 'nombres', 'apellido_paterno', 'apellido_materno', 'numero_doc_identidad', 'tipo_personal', 'nombre_puesto', 'unidad_organica_id'])
-            ->with('unidadOrganica:id,nombre')->withCount(['legajos', 'documentosUsuarioPorUsuario']);
+            ->with('unidadOrganica:id,nombre')->withCount(['legajos',
+                // Sin datos_sensibles.ver no se cuentan los documentos de las secciones 01, 09 y 10.
+                'documentosUsuarioPorUsuario' => fn (Builder $query): Builder => $veSensibles ? $query : $query->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES),
+            ]);
         if (! empty($filters['q'])) {
             $search = '%'.mb_strtolower(trim($filters['q'])).'%';
             $query->where(function (Builder $query) use ($search): void {
@@ -225,7 +229,9 @@ class ExpedienteController extends Controller
             // La subsección 2.4 (período de prueba) solo se muestra si la persona lo tiene.
             'tiene_periodo_prueba' => PerfilDocumental::de($person, $person->vinculosLaborales()->get())->tienePeriodoPrueba(),
             'document_sections' => SeccionLegajo::query()->orderBy('orden')->get(['id', 'nombre']),
-            'document_states' => DocumentoUsuario::query()->where('usuario_id', $usuario)->whereHas('legajo', fn (Builder $query): Builder => $query->where('usuario_id', $usuario))->distinct()->orderBy('estado')->pluck('estado'),
+            'document_states' => DocumentoUsuario::query()->where('usuario_id', $usuario)->whereHas('legajo', fn (Builder $query): Builder => $query->where('usuario_id', $usuario))
+                ->when(! $veSensibles, fn (Builder $query): Builder => $query->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES))
+                ->distinct()->orderBy('estado')->pluck('estado'),
             'legajos' => $person->legajos()->orderByDesc('fecha_apertura')->get()->map(fn (Model $row): array => $this->present($row)),
             'sections' => collect(self::SECTIONS)->map(fn (array $section, string $key): array => [
                 'key' => $key, 'label' => $section['label'], 'group' => $section['group'],

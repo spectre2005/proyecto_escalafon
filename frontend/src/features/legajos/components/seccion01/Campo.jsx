@@ -21,6 +21,15 @@ export function Opciones({ lista, actual, vacio }) {
   </>
 }
 
+// PDF ya registrado en un formulario de edición: se conserva y no se reemplaza (Directiva, arts. 2.3 y 5.3).
+export function PdfRegistrado({ nombre, error }) {
+  return <div className="col-span-full rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+    <p className="break-words">PDF registrado: {nombre}</p>
+    <p className="mt-1">Un PDF registrado no se reemplaza ni se elimina. Si es incorrecto, el registro se anula con motivo y se registra uno nuevo.</p>
+    {error && <p role="alert" className="mt-2 text-rose-700">{[].concat(error).join(' ')}</p>}
+  </div>
+}
+
 // Contenedor común de los formularios de la sección 01.
 export function Formulario({ titulo, nota, busy, error, onSubmit, onCancel, guardar, children }) {
   return <form onSubmit={event => { event.preventDefault(); onSubmit() }} className="mb-5 rounded-2xl border border-teal-200 bg-white p-5" aria-busy={busy}>

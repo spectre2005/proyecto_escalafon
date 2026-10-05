@@ -12,7 +12,7 @@ export const tiposDeclaracion = {
   antecedente_judicial: 'Antecedentes judiciales',
   antecedente_policial: 'Antecedentes policiales',
   impedimentos_rnssc: 'Impedimentos e inhabilitaciones (RNSSC)',
-  impedimentos_redjum: 'Deudores alimentarios (REDJUM)',
+  impedimentos_redjum: 'Deudores judiciales morosos (REDJUM)',
   djbr: 'Declaración jurada de bienes y rentas',
   dj_intereses: 'Declaración jurada de intereses',
   dj_no_impedimentos: 'Declaración jurada de no tener impedimentos (Ley 31419)',
