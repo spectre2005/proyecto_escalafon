@@ -1,3 +1,5 @@
+import FormSplit from '../../../../components/pdf/FormSplit'
+import PdfPreviewField from '../../../../components/pdf/PdfPreviewField'
 import { useEffect, useRef, useState } from 'react'
 import Campo, { Formulario, Opciones } from '../seccion01/Campo'
 import { hoy, useBorrador, useGuardar } from '../seccion01/useGuardar'
@@ -22,14 +24,10 @@ export default function Documento03Form({ usuario, item, datos, onSaved, onCance
     const payload = Object.fromEntries([...comunes, ...especificos].map(key => [key, values[key]]))
     return agregarDocumento03(usuario, { ...payload, tipo_documento_id: item.id }, pdf)
   }, onSaved)
-  function seleccionar(event) {
-    const archivo = event.target.files[0] || null
-    setPdf(archivo)
-    setErrorPdf(archivo && !archivo.name.toLowerCase().endsWith('.pdf') ? 'Selecciona un archivo PDF.' : archivo && archivo.size > datos.tamano_maximo_kb * 1024 ? `El PDF no debe superar los ${datos.tamano_maximo_kb} KB.` : '')
-  }
   return <Formulario titulo="Agregar documento" guardar="Guardar documento" busy={busy} error={error} onCancel={onCancel}
     onSubmit={() => { if (pdf && !errorPdf) guardar(draft) }}
     nota="Quedará en revisión. Lo registrado no se edita ni se elimina: para corregirlo, agrega un documento nuevo que subsane al anterior.">
+    <FormSplit pdf={<PdfPreviewField label={`Archivo PDF (máximo ${datos.tamano_maximo_kb} KB)`} required maxMB={datos.tamano_maximo_kb ? datos.tamano_maximo_kb / 1024 : 2} help="Selecciona el PDF para ver su contenido antes de guardarlo." error={errorPdf || errors.pdf} onChange={(file, message) => { setPdf(file); setErrorPdf(message) }} />}>
     <Campo label="Nombre del documento" required error={errors.nombre} className="sm:col-span-2"><input ref={nombre} required maxLength={200} value={draft.nombre} onChange={set('nombre')} /></Campo>
     <Campo label="Institución emisora" required error={errors.emisor}><input required maxLength={200} value={draft.emisor} onChange={set('emisor')} /></Campo>
     <Campo label="Fecha de emisión" required error={errors.fecha_emision}><input type="date" required max={hoy()} value={draft.fecha_emision} onChange={set('fecha_emision')} /></Campo>
@@ -48,11 +46,11 @@ export default function Documento03Form({ usuario, item, datos, onSaved, onCance
     <Campo label="Folio inicial sugerido" required error={errors.folio_inicio}><input type="number" required min="1" value={draft.folio_inicio} onChange={set('folio_inicio')} /></Campo>
     <Campo label="Folio final" required error={errors.folio_fin}><input type="number" required min={draft.folio_inicio || 1} value={draft.folio_fin} onChange={set('folio_fin')} /></Campo>
     <Campo label="Modalidad de presentación" required error={errors.modalidad_presentacion}><select required value={draft.modalidad_presentacion} onChange={set('modalidad_presentacion')}><Opciones lista={modalidadesPresentacion} vacio="Selecciona" /></select></Campo>
-    <Campo label={`Archivo PDF (máximo ${datos.tamano_maximo_kb} KB)`} required error={errorPdf || errors.pdf}><input type="file" accept="application/pdf,.pdf" required onChange={seleccionar} /></Campo>
     {vigentes.length > 0 && <Campo label="Documento que subsana" required={!item.permite_multiples} error={errors.subsana_a_documento_id} className="sm:col-span-2"><select required={!item.permite_multiples} value={draft.subsana_a_documento_id} onChange={set('subsana_a_documento_id')}>
       <option value="">{item.permite_multiples ? 'Es un documento adicional' : 'Selecciona el documento que corriges'}</option>
       {vigentes.map(doc => <option key={doc.id} value={doc.id}>{doc.nombre} · folios {folios(doc.folio_inicio, doc.folio_fin)}</option>)}
     </select></Campo>}
     {errors.tipo_documento_id && <p role="alert" className="col-span-full text-sm text-rose-700">{errors.tipo_documento_id.join(' ')}</p>}
+    </FormSplit>
   </Formulario>
 }

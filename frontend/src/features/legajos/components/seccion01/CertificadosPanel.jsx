@@ -1,3 +1,5 @@
+import FormSplit from '../../../../components/pdf/FormSplit'
+import PdfPreviewField from '../../../../components/pdf/PdfPreviewField'
 import { useState } from 'react'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { saveCertificado } from '../../api/seccion01Api'
@@ -17,20 +19,9 @@ function CertificadoForm({ usuario, record, onSaved, onCancel }) {
   // Solo familiares vigentes de esta persona (el backend lo vuelve a validar).
   const familiares = useLiveQuery(`/expedientes/${usuario}/familiares?page=1`)
   const opciones = (familiares.data?.data || []).filter(record => !record.values.anulado)
-  function seleccionarPdf(event) {
-    const file = event.target.files?.[0]
-    setPdf(null)
-    setPdfError('')
-    if (!file) return
-    if (!file.name.toLowerCase().endsWith('.pdf') || file.size > 2 * 1024 * 1024) {
-      setPdfError('Selecciona un archivo PDF de hasta 2 MB.')
-      event.target.value = ''
-      return
-    }
-    setPdf(file)
-  }
   return <Formulario titulo={record ? 'Editar certificado de discapacidad' : 'Registrar certificado de discapacidad'} guardar={record ? 'Guardar cambios' : 'Guardar certificado'} busy={busy} error={error} onSubmit={() => { if (!pdfError) guardar(draft) }} onCancel={onCancel}
     nota="Puedes adjuntar un PDF de hasta 2 MB. Al editar, el archivo actual se conserva si no seleccionas uno nuevo.">
+    <FormSplit pdf={<PdfPreviewField label={record?.values.pdf_nombre ? 'Reemplazar PDF (opcional)' : 'Adjuntar certificado en PDF (opcional)'} help="Puedes adjuntar un PDF de hasta 2 MB. Al editar, el archivo actual se conserva si no seleccionas uno nuevo." currentUrl={record?.values.pdf_nombre ? `/expedientes/${usuario}/certificados-discapacidad/${record.id}/pdf` : undefined} currentName={record?.values.pdf_nombre} error={pdfError || errors.pdf} onChange={(file, message) => { setPdf(file); setPdfError(message) }} />}>
     <Campo label="¿De quién es el certificado?" required error={errors.persona}><select required value={draft.persona} onChange={set('persona')}><Opciones lista={personasCertificado} /></select></Campo>
     {draft.persona === 'familiar' && <Campo label="Familiar" required error={errors.familiar_id}><select required value={draft.familiar_id} onChange={set('familiar_id')} disabled={!familiares.data}>
       <option value="">{familiares.data ? (opciones.length ? 'Selecciona' : 'Primero registra al familiar') : 'Cargando familiares…'}</option>
@@ -40,8 +31,8 @@ function CertificadoForm({ usuario, record, onSaved, onCancel }) {
     <Campo label="N.º de certificado CONADIS" required error={errors.numero_conadis}><input required maxLength={30} value={draft.numero_conadis} onChange={set('numero_conadis')} /></Campo>
     <Campo label="Fecha de emisión" error={errors.fecha_emision}><input type="date" max={hoy()} value={draft.fecha_emision} onChange={set('fecha_emision')} /></Campo>
     <Campo label="Vigente hasta" error={errors.vigente_hasta}><input type="date" min={draft.fecha_emision || undefined} value={draft.vigente_hasta} onChange={set('vigente_hasta')} /></Campo>
-    <Campo label={record?.values.pdf_nombre ? 'Reemplazar PDF (opcional)' : 'Adjuntar certificado en PDF (opcional)'} error={pdfError || errors.pdf} className="col-span-full"><input type="file" accept=".pdf,application/pdf" onChange={seleccionarPdf} /></Campo>
     {record?.values.pdf_nombre && <p className="col-span-full break-words text-xs text-slate-600">PDF actual: {record.values.pdf_nombre}</p>}
+    </FormSplit>
   </Formulario>
 }
 

@@ -1,3 +1,5 @@
+import FormSplit from '../../../../components/pdf/FormSplit'
+import PdfPreviewField from '../../../../components/pdf/PdfPreviewField'
 import { useRef, useState } from 'react'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { subirDocumento } from '../../api/documentosApi'
@@ -30,16 +32,10 @@ export default function SubirDocumentoForm({ usuario, seccion, tipo, titular, en
     respuesta.current = (await subirDocumento(usuario, { ...data, seccion_legajo_id: seccion, tipo_documento_id: tipo.id, folio_inicio: sugerido }, pdf)).data.data
   }, () => onSaved(respuesta.current))
 
-  function elegirPdf(event) {
-    const archivo = event.target.files[0] || null
-    setErrorPdf(archivo && archivo.type !== 'application/pdf' ? 'Selecciona un archivo PDF.' : archivo && maximoKb && archivo.size > maximoKb * 1024 ? `El PDF no debe superar los ${maximoKb} KB.` : '')
-    setPdf(archivo)
-  }
-
   return <Formulario titulo={`Subir documento: ${tipo.literal ? `${tipo.literal}) ` : ''}${tipo.nombre}`} guardar="Subir documento" busy={busy} error={error}
     onSubmit={() => sugerido && pdf && !errorPdf && guardar(draft)} onCancel={onCancel}
     nota="El documento no se puede eliminar ni reemplazar después: si hay un error, se sube uno nuevo que lo subsana. Quien sube queda registrado con tu sesión.">
-    <Campo label={`Archivo PDF${maximoKb ? ` (máx. ${maximoKb} KB)` : ''}`} required error={errorPdf || errors.pdf} className="sm:col-span-2"><input type="file" required accept="application/pdf,.pdf" onChange={elegirPdf} /></Campo>
+    <FormSplit pdf={<PdfPreviewField label={`Archivo PDF${maximoKb ? ` (máx. ${maximoKb} KB)` : ''}`} required maxMB={maximoKb ? maximoKb / 1024 : 2} help="Selecciona el PDF para ver su contenido antes de guardarlo." error={errorPdf || errors.pdf} onChange={(file, message) => { setPdf(file); setErrorPdf(message) }} />}>
     <Campo label="Folio inicial (siguiente de la sección)" error={errors.folio_inicio}><input readOnly value={sugerido ?? 'Calculando…'} /></Campo>
     <Campo label="Folio final" required error={errors.folio_fin}><input type="number" required min={sugerido || 1} value={draft.folio_fin} onChange={set('folio_fin')} placeholder={sugerido ? String(sugerido) : ''} /></Campo>
     {sugerido && draft.folio_fin && <p className="text-xs text-slate-500 sm:col-span-2">Folios que ocupará: {folios(sugerido, Number(draft.folio_fin))}</p>}
@@ -62,5 +58,6 @@ export default function SubirDocumentoForm({ usuario, seccion, tipo, titular, en
         {enlaces.map(enlace => <option key={enlace.id} value={enlace.id}>{enlace.etiqueta}</option>)}
       </select></Campo>}
     <Campo label="Motivo de incorporación" error={errors.motivo_incorporacion} className="sm:col-span-2"><input maxLength={300} value={draft.motivo_incorporacion} onChange={set('motivo_incorporacion')} /></Campo>
+    </FormSplit>
   </Formulario>
 }

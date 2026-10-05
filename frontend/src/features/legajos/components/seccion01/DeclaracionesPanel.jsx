@@ -1,3 +1,5 @@
+import FormSplit from '../../../../components/pdf/FormSplit'
+import PdfPreviewField from '../../../../components/pdf/PdfPreviewField'
 import { useState } from 'react'
 import { saveRegistroPdf } from '../../api/seccion01Api'
 import { etiqueta, resultadosDeclaracion, tiposDeclaracion } from '../../config/seccion01'
@@ -13,28 +15,17 @@ function DeclaracionForm({ usuario, record, onSaved, onCancel }) {
   const [pdf, setPdf] = useState(null)
   const [pdfError, setPdfError] = useState('')
   const { busy, error, errors, guardar } = useGuardar(data => saveRegistroPdf(usuario, 'declaraciones-verificaciones', record?.id, { ...data, anio: data.anio ? Number(data.anio) : null }, pdf), onSaved)
-  function seleccionarPdf(event) {
-    const file = event.target.files?.[0]
-    setPdf(null)
-    setPdfError('')
-    if (!file) return
-    if (!file.name.toLowerCase().endsWith('.pdf') || file.size > 2 * 1024 * 1024) {
-      setPdfError('Selecciona un archivo PDF de hasta 2 MB.')
-      event.target.value = ''
-      return
-    }
-    setPdf(file)
-  }
   return <Formulario titulo={record ? 'Editar declaración o verificación' : 'Registrar declaración o verificación'} guardar={record ? 'Guardar cambios' : 'Guardar registro'} busy={busy} error={error} onSubmit={() => { if (!pdfError) guardar(draft) }} onCancel={onCancel}
     nota="Puedes adjuntar un PDF de hasta 2 MB. Al editar, el archivo actual se conserva si no seleccionas uno nuevo.">
+    <FormSplit pdf={<PdfPreviewField label={record?.values.pdf_nombre ? 'Reemplazar PDF (opcional)' : 'Adjuntar PDF (opcional)'} help="Puedes adjuntar un PDF de hasta 2 MB. Al editar, el archivo actual se conserva si no seleccionas uno nuevo." currentUrl={record?.values.pdf_nombre ? `/expedientes/${usuario}/declaraciones-verificaciones/${record.id}/pdf` : undefined} currentName={record?.values.pdf_nombre} error={pdfError || errors.pdf} onChange={(file, message) => { setPdf(file); setPdfError(message) }} />}>
     <Campo label="Tipo" required error={errors.tipo} className="sm:col-span-2"><select required value={draft.tipo} onChange={set('tipo')}><Opciones lista={tiposDeclaracion} vacio="Selecciona" /></select></Campo>
     <Campo label="Fecha de emisión o consulta" required error={errors.fecha}><input type="date" required max={hoy()} value={draft.fecha} onChange={set('fecha')} /></Campo>
     <Campo label="Resultado" required error={errors.resultado}><select required value={draft.resultado} onChange={set('resultado')}><Opciones lista={resultadosDeclaracion} vacio="Selecciona" /></select></Campo>
     <Campo label="Año al que corresponde" error={errors.anio}><input type="number" min={1950} max={new Date().getFullYear() + 1} placeholder="Ej.: año de la declaración de bienes" value={draft.anio} onChange={set('anio')} /></Campo>
     <Campo label="Vigente hasta" error={errors.vigente_hasta}><input type="date" min={draft.fecha || undefined} value={draft.vigente_hasta} onChange={set('vigente_hasta')} /></Campo>
     <Campo label="Observación" error={errors.observacion} className="sm:col-span-2"><textarea rows={2} maxLength={300} value={draft.observacion} onChange={set('observacion')} /></Campo>
-    <Campo label={record?.values.pdf_nombre ? 'Reemplazar PDF (opcional)' : 'Adjuntar PDF (opcional)'} error={pdfError || errors.pdf} className="col-span-full"><input type="file" accept=".pdf,application/pdf" onChange={seleccionarPdf} /></Campo>
     {record?.values.pdf_nombre && <p className="col-span-full break-words text-xs text-slate-600">PDF actual: {record.values.pdf_nombre}</p>}
+    </FormSplit>
   </Formulario>
 }
 
