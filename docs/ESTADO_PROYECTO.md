@@ -41,7 +41,7 @@ Rutas con `react-router-dom` 7. Tailwind. Datos con `useLiveQuery` (se refresca 
 ## Sección 02: falta
 
 - **CRUD genérico cerrado (04/10/2026):** `routes/api.php` quita `update` y `destroy` a `vinculos-laborales`, `vinculo-adendas`, `inducciones`, `periodos-prueba`, `perfil-docente` y `perfil-administrativo` (responden 405); se corrigen y se anulan solo desde `Seccion02Controller`. `documentos-usuario` y `archivos-documento` quedan solo de lectura (`index` y `show`); los documentos se crean solo por la carga del legajo. Test: `CrudGenericoSoloLecturaTest`.
-- **Queda abierto:** el CRUD genérico todavía permite *crear* registros de esos seis recursos sin pasar por las reglas de la 02 (legajo abierto, autor, vínculo abierto). Decidir si también se bloquea `store`.
+- **`store` también cerrado (04/10/2026):** esos seis recursos quedan solo de lectura en el CRUD genérico (`index` y `show`; `POST /api/v1/<recurso>` responde 405), igual que documentos y archivos. Se crean solo desde `Seccion02Controller` (`POST /api/v1/expedientes/{usuario}/<recurso>`, que valida legajo abierto, autor y vínculo abierto); los perfiles docente y administrativo, con `PUT .../vinculos-laborales/{vinculo}/datos-puesto`. Antes se comprobó que ni el frontend ni las secciones 01 y 02 usaban el `store` genérico. Para datos de prueba, usar factories o seeders, no el CRUD genérico. Tests: `ResourceApiTest` y `CrudGenericoSoloLecturaTest`.
 - **Verificación, observación, marcar como falso y fiscalización (art. 7):** los estados existen, pero no hay acciones. Fuera del alcance actual.
 - **Sin probar en el navegador:** la recepción y el visor solo tienen tests de API.
 
@@ -106,11 +106,10 @@ Sección 01:
 
 ## Siguientes pasos
 
-1. Decidir si se bloquea también `store` en el CRUD genérico de los recursos de la sección 02.
-2. Revisar y hacer commit de la sección 01 (`feature/seccion-01-alinear`) y probarla en el navegador con la persona demo 99000101.
-3. Bandeja de requerimientos y observaciones.
-4. Verificación y fiscalización de documentos (art. 7), cuando el cliente defina el flujo.
-5. Secciones 03, 04 y 10 (resto del núcleo común) con el mismo patrón: catálogo, datos y documentos juntos.
+1. Revisar y hacer commit de la sección 01 (`feature/seccion-01-alinear`) y probarla en el navegador con la persona demo 99000101.
+2. Bandeja de requerimientos y observaciones.
+3. Verificación y fiscalización de documentos (art. 7), cuando el cliente defina el flujo.
+4. Secciones 03, 04 y 10 (resto del núcleo común) con el mismo patrón: catálogo, datos y documentos juntos.
 
 ## Historial
 

@@ -18,8 +18,8 @@ use Tests\Concerns\SubeDocumentos;
 use Tests\TestCase;
 
 /**
- * CRUD genérico de la sección 02 y de los documentos: los registros de la 02 se corrigen y se anulan solo desde
- * Seccion02Controller; documentos y archivos se crean solo por la carga del legajo. Listado y lectura siguen igual.
+ * CRUD genérico de la sección 02 y de los documentos: solo de lectura. Los registros de la 02 se crean, corrigen y
+ * anulan solo desde Seccion02Controller; documentos y archivos se crean solo por la carga del legajo.
  */
 class CrudGenericoSoloLecturaTest extends TestCase
 {
@@ -45,25 +45,30 @@ class CrudGenericoSoloLecturaTest extends TestCase
         $this->actuarComo(Usuario::factory()->create(), 'asistente_legajo');
     }
 
-    public function test_section_02_records_cannot_be_updated_or_deleted_through_the_generic_crud(): void
+    public function test_section_02_records_are_read_only_in_the_generic_crud(): void
     {
         foreach (self::SECCION_02 as $recurso => $clase) {
             $registro = $clase::factory()->create();
             $antes = $registro->refresh()->getAttributes();
+            $total = $clase::query()->count();
+            $payload = array_diff_key($clase::factory()->make()->getAttributes(), ['id' => true]);
             $url = '/api/v1/'.$recurso.'/'.$registro->getKey();
 
             $this->actuarComo();
             $this->getJson('/api/v1/'.$recurso)->assertOk();
             $this->getJson($url)->assertOk()->assertJsonPath('data.id', $registro->getKey());
+            $this->postJson('/api/v1/'.$recurso, $payload)->assertStatus(405);
             $this->patchJson($url, ['anulado' => false])->assertStatus(405);
             $this->putJson($url, [])->assertStatus(405);
             $this->deleteJson($url)->assertStatus(405);
 
             $this->actuarSinPermiso();
             $this->getJson('/api/v1/'.$recurso)->assertForbidden();
+            $this->postJson('/api/v1/'.$recurso, $payload)->assertStatus(405);
             $this->patchJson($url, [])->assertStatus(405);
             $this->deleteJson($url)->assertStatus(405);
 
+            $this->assertSame($total, $clase::query()->count(), $recurso);
             $this->assertSame($antes, $registro->refresh()->getAttributes(), $recurso);
         }
     }
@@ -104,6 +109,7 @@ class CrudGenericoSoloLecturaTest extends TestCase
         $this->assertNotNull(DocumentoUsuario::query()->findOrFail($id)->fecha_recepcion);
         // Lo que el CRUD genérico ya no permite se hace desde la sección 02.
         $vinculo = VinculoLaboral::query()->where('usuario_id', $persona->id)->whereNull('fecha_cese')->firstOrFail();
+        $this->postJson($base.'/inducciones', ['vinculo_laboral_id' => $vinculo->id, 'tipo' => 'general', 'fecha' => today()->toDateString()])->assertCreated();
         $this->patchJson($base.'/vinculos-laborales/'.$vinculo->id, ['nombre_puesto' => 'Puesto corregido'])->assertOk();
         $this->postJson($base.'/seccion-02/vinculos-laborales/'.$vinculo->id.'/anular', ['motivo_anulacion' => 'Registrado por error'])->assertOk();
         $this->assertTrue($vinculo->refresh()->anulado);

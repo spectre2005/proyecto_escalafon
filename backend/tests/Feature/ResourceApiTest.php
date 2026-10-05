@@ -29,7 +29,7 @@ class ResourceApiTest extends TestCase
         $this->actuarComo();
     }
 
-    /** Sección 02: el CRUD genérico solo lista, lee y crea; no edita ni elimina. */
+    /** Sección 02: el CRUD genérico solo lista y lee; no crea, no edita ni elimina. */
     private const SECCION_02 = [VinculoLaboral::class, VinculoAdenda::class, Induccion::class, PeriodoPrueba::class, PerfilDocente::class, PerfilAdministrativo::class];
 
     public static function resources(): array
@@ -92,9 +92,10 @@ class ResourceApiTest extends TestCase
             unset($payload['registrado_por']);
         }
         $uri = '/api/v1/'.str_replace('_', '-', $model->getTable());
-        $soloLectura = $model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento;
+        $soloLectura = $model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento || in_array($class, self::SECCION_02, true);
         if ($soloLectura) {
-            // Documentos y archivos: solo de lectura. Se crean únicamente por la carga del legajo (folios, hash y bitácora).
+            // Documentos y archivos se crean únicamente por la carga del legajo (folios, hash y bitácora); los registros de
+            // la sección 02, solo desde Seccion02Controller.
             $this->postJson($uri, $payload)->assertStatus(405);
             $model->save();
         }
@@ -103,7 +104,7 @@ class ResourceApiTest extends TestCase
         $this->getJson($uri.'/'.$id)->assertOk()->assertJsonPath('data.id', $id);
         $this->getJson($uri)->assertOk()->assertJsonStructure(['data', 'links', 'meta']);
         unset($payload['id']);
-        if ($soloLectura || in_array($class, self::SECCION_02, true)) {
+        if ($soloLectura) {
             // No se editan ni se eliminan por el CRUD genérico (Directiva, arts. 2.3 y 5.3). Los de la sección 02 se
             // corrigen y se anulan solo desde Seccion02Controller.
             $this->patchJson($uri.'/'.$id, $payload)->assertStatus(405);
