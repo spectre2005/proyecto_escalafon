@@ -29,6 +29,7 @@ const flags = [
   ['con_discapacidad', 'Con discapacidad'],
   ['obligado_djbr', 'Obligado a presentar declaración jurada de bienes y rentas'],
   ['exige_colegiatura', 'Requiere colegiatura'],
+  ['exige_estudios_basicos', 'El puesto exige estudios básicos'],
   ['tiene_periodo_prueba', 'Tiene período de prueba'],
   ['tiene_derechohabientes', 'Tiene derechohabientes'],
 ]

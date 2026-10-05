@@ -141,6 +141,8 @@ class DocumentoLegajoController extends Controller
         $accion = $request->validate(['accion' => 'sometimes|in:ver,descargar'])['accion'] ?? 'ver';
         $registro = $this->documentoDe($request, $usuario, $documento);
         $archivo = $registro->archivo;
+        abort_if($registro->seccion_legajo_id === 3 && $archivo?->estado_antivirus === 'infectado', 423,
+            'El archivo está bloqueado por el antivirus. Registra un documento nuevo que lo subsane.');
         $disco = (string) config('legajo.disco_documentos');
         abort_unless($archivo && $archivo->almacenamiento === $disco && Storage::disk($disco)->exists($archivo->storage_path), 404, 'El documento no tiene un archivo disponible.');
 

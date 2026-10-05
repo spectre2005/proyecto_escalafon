@@ -19,6 +19,7 @@ class DocumentoUsuario extends Model
     protected $table = 'documentos_usuario';
 
     protected $fillable = [
+        'nombre',
         'usuario_id',
         'legajo_id',
         'tipo_documento_id',

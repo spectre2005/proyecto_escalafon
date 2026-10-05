@@ -25,7 +25,15 @@ class AdministradorSeeder extends Seeder
         }
 
         DB::transaction(function () use ($email, $password): void {
-            $admin = Usuario::query()->firstOrCreate(['email_institucional' => $email], [
+            $admin = Usuario::query()->where('email_institucional', $email)->first()
+                ?? Usuario::query()->where('numero_doc_identidad', 'ADMIN-SISTEMA')->first();
+
+            if ($admin && $admin->email_institucional !== $email) {
+                $admin->update(['email_institucional' => $email, 'password' => $password, 'activo' => true]);
+            }
+
+            $admin ??= Usuario::query()->create([
+                'email_institucional' => $email,
                 'tipo_doc_identidad' => 'sistema',
                 'numero_doc_identidad' => 'ADMIN-SISTEMA',
                 'nombres' => 'Administrador',

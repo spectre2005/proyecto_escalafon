@@ -82,7 +82,7 @@ class DocumentoLegajoApiTest extends TestCase
     public function test_rejects_type_of_another_section_and_person_without_legajo(): void
     {
         $this->actuarComo();
-        $otraSeccion = TipoDocumento::factory()->create(['seccion_legajo_id' => SeccionLegajo::factory()->create(['id' => 3])->id]);
+        $otraSeccion = TipoDocumento::factory()->create(['seccion_legajo_id' => SeccionLegajo::query()->findOrFail(3)->id]);
 
         $this->subir($this->personaDemo(), $this->metadatos($this->tipo02('a'), 1, 1, ['tipo_documento_id' => $otraSeccion->id]))
             ->assertUnprocessable()->assertJsonValidationErrors('tipo_documento_id');

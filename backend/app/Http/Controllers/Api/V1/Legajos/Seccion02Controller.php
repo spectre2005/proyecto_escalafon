@@ -53,6 +53,7 @@ class Seccion02Controller extends Controller
         'nombre_puesto' => 'required|string|max:150',
         'obligado_djbr' => 'sometimes|boolean',
         'exige_colegiatura' => 'sometimes|boolean',
+        'exige_estudios_basicos' => 'sometimes|boolean',
         'tiene_periodo_prueba' => 'sometimes|boolean',
         'proceso_seleccion' => 'nullable|string|max:100',
         'fecha_resultado_seleccion' => 'nullable|date_format:Y-m-d|before_or_equal:today',
@@ -322,7 +323,7 @@ class Seccion02Controller extends Controller
         $tiposInduccion = $inducciones->where('vinculo_laboral_id', $vinculo->id)->pluck('tipo')->all();
 
         return [
-            ...$this->fila($vinculo, ['tipo_personal', 'regimen_laboral', 'regimen_normativo_id', 'unidad_organica_id', 'nombre_puesto', 'obligado_djbr', 'exige_colegiatura', 'tiene_periodo_prueba', 'proceso_seleccion', 'fecha_resultado_seleccion', 'numero_documento_vinculo', 'fecha_inicio', 'fecha_fin_prevista', 'fecha_cese']),
+            ...$this->fila($vinculo, ['tipo_personal', 'regimen_laboral', 'regimen_normativo_id', 'unidad_organica_id', 'nombre_puesto', 'obligado_djbr', 'exige_colegiatura', 'exige_estudios_basicos', 'tiene_periodo_prueba', 'proceso_seleccion', 'fecha_resultado_seleccion', 'numero_documento_vinculo', 'fecha_inicio', 'fecha_fin_prevista', 'fecha_cese']),
             'regimen_normativo' => $vinculo->regimenNormativo?->nombre,
             'registrado_por' => $this->nombre($vinculo->registradoPor),
             'unidad_organica' => $vinculo->unidadOrganica?->nombre,

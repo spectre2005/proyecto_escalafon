@@ -20,6 +20,7 @@ class Usuario extends Authenticatable
 
     /** @use HasFactory<UsuarioFactory> */
     use HasFactory;
+
     use HasUuids;
     use Notifiable;
 
@@ -51,6 +52,7 @@ class Usuario extends Authenticatable
         'nombre_puesto',
         'obligado_djbr',
         'exige_colegiatura',
+        'exige_estudios_basicos',
         'tiene_periodo_prueba',
         'tiene_derechohabientes',
         'con_discapacidad',
@@ -66,6 +68,7 @@ class Usuario extends Authenticatable
             'password' => 'hashed',
             'obligado_djbr' => 'boolean',
             'exige_colegiatura' => 'boolean',
+            'exige_estudios_basicos' => 'boolean',
             'tiene_periodo_prueba' => 'boolean',
             'tiene_derechohabientes' => 'boolean',
             'con_discapacidad' => 'boolean',

@@ -36,7 +36,7 @@ export function VinculoForm({ usuario, record, documentoId, onSaved, onCancel })
     unidad_organica_id: v.unidad_organica_id || '', nombre_puesto: v.nombre_puesto || '', numero_documento_vinculo: v.numero_documento_vinculo || '',
     fecha_inicio: v.fecha_inicio || '', fecha_fin_prevista: v.fecha_fin_prevista || '', fecha_cese: v.fecha_cese || '',
     proceso_seleccion: v.proceso_seleccion || '', fecha_resultado_seleccion: v.fecha_resultado_seleccion || '',
-    obligado_djbr: v.obligado_djbr ?? false, exige_colegiatura: v.exige_colegiatura ?? false, tiene_periodo_prueba: v.tiene_periodo_prueba ?? false,
+    obligado_djbr: v.obligado_djbr ?? false, exige_colegiatura: v.exige_colegiatura ?? false, exige_estudios_basicos: v.exige_estudios_basicos ?? false, tiene_periodo_prueba: v.tiene_periodo_prueba ?? false,
   })
   const { busy, error, errors, guardar } = useGuardar(data => saveSeccion02(usuario, 'vinculos-laborales', record?.id, conDocumento(data, documentoId)), onSaved)
   return <Formulario titulo={record ? 'Corregir vínculo laboral' : 'Registrar vínculo laboral'} guardar="Guardar vínculo" busy={busy} error={error} onSubmit={() => guardar(draft)} onCancel={onCancel}
@@ -54,7 +54,7 @@ export function VinculoForm({ usuario, record, documentoId, onSaved, onCancel })
     <Campo label="Fecha del resultado de selección" error={errors.fecha_resultado_seleccion}><input type="date" max={hoy()} value={draft.fecha_resultado_seleccion} onChange={set('fecha_resultado_seleccion')} /></Campo>
     <Campo label="Fecha de cese (solo si el vínculo ya terminó)" error={errors.fecha_cese}><input type="date" min={draft.fecha_inicio || undefined} max={hoy()} value={draft.fecha_cese} onChange={set('fecha_cese')} /></Campo>
     <div className="col-span-full grid gap-2 text-sm text-slate-700">
-      {[['obligado_djbr', 'Obligado a presentar declaración jurada de bienes y rentas'], ['exige_colegiatura', 'El puesto exige colegiatura'], ['tiene_periodo_prueba', 'Tiene período de prueba']].map(([key, text]) => <label key={key} className="flex items-center gap-2"><input type="checkbox" className="size-4 accent-teal-700" checked={draft[key]} onChange={set(key)} />{text}</label>)}
+      {[['obligado_djbr', 'Obligado a presentar declaración jurada de bienes y rentas'], ['exige_colegiatura', 'El puesto exige colegiatura'], ['exige_estudios_basicos', 'El puesto exige estudios básicos'], ['tiene_periodo_prueba', 'Tiene período de prueba']].map(([key, text]) => <label key={key} className="flex items-center gap-2"><input type="checkbox" className="size-4 accent-teal-700" checked={draft[key]} onChange={set(key)} />{text}</label>)}
     </div>
   </Formulario>
 }

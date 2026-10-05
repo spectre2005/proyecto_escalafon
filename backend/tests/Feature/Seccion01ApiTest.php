@@ -271,7 +271,7 @@ class Seccion01ApiTest extends TestCase
         $persona = Usuario::factory()->create(['fecha_nacimiento' => '1990-05-01', 'domicilio' => 'Calle Falsa 123', 'telefono' => '999888777', 'estado_civil' => 'casado']);
         $legajo = Legajo::factory()->create(['usuario_id' => $persona->id]);
         SeccionLegajo::factory()->create(['id' => 1, 'nombre' => 'Información personal y familiar']);
-        SeccionLegajo::factory()->create(['id' => 3, 'nombre' => 'Formación académica y capacitación']);
+        SeccionLegajo::query()->findOrFail(3);
         DocumentoUsuario::factory()->create(['usuario_id' => $persona->id, 'legajo_id' => $legajo->id, 'seccion_legajo_id' => 1]);
         $visible = DocumentoUsuario::factory()->create(['usuario_id' => $persona->id, 'legajo_id' => $legajo->id, 'seccion_legajo_id' => 3]);
 

@@ -321,6 +321,10 @@ class ExpedienteController extends Controller
             abort_unless((clone $legajos)->exists(), 404);
         }
         $documents = DocumentoUsuario::query()->where('usuario_id', $usuario)->whereIn('legajo_id', (clone $legajos)->select('id'));
+        if (! $veSensibles) {
+            $documents->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES)
+                ->whereHas('tipoDocumento', fn ($tipo) => $tipo->where('es_dato_sensible', false)->where('es_dato_salud', false));
+        }
         $config = self::SECTIONS[$section];
         $query = $config['model']::query();
         $ids = match ($config['scope']) {
@@ -343,13 +347,19 @@ class ExpedienteController extends Controller
         if ($config['scope'] === 'legajo' && in_array('usuario_id', $query->getModel()->getFillable(), true) && $section !== 'bitacora-accesos-legajo') {
             $query->where('usuario_id', $usuario);
         }
+        if (! $veSensibles && in_array($section, ['formacion-academica', 'colegiaturas', 'capacitaciones'], true)) {
+            $query->where(fn ($datos) => $datos->whereNull('documento_id')->orWhereHas('documento',
+                fn ($doc) => $doc->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES)
+                    ->whereHas('tipoDocumento', fn ($tipo) => $tipo->where('es_dato_sensible', false)->where('es_dato_salud', false))));
+        }
         // Vínculos y adendas anulados no salen en los listados (se ven aparte, en la sección 02).
         if (in_array($section, ['vinculos-laborales', 'vinculo-adendas'], true)) {
             $query->where('anulado', false);
         }
         if ($section === 'documentos-usuario') {
             if (! $veSensibles) {
-                $query->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES);
+                $query->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES)
+                    ->whereHas('tipoDocumento', fn ($tipo) => $tipo->where('es_dato_sensible', false)->where('es_dato_salud', false));
             }
             if (! empty($filters['seccion_id'])) {
                 $query->where('seccion_legajo_id', $filters['seccion_id']);
