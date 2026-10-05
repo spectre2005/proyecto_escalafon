@@ -3,10 +3,13 @@
 namespace App\Support\Documentos;
 
 use App\Models\DocumentoUsuario;
+use App\Models\GoceVacacional;
 use App\Models\Induccion;
+use App\Models\LicenciaPermiso;
 use App\Models\PeriodoPrueba;
 use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
+use App\Support\Seccion05;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
 
@@ -24,6 +27,8 @@ final class FormulariosDatos
         'vinculo_adendas' => VinculoAdenda::class,
         'inducciones' => Induccion::class,
         'periodos_prueba' => PeriodoPrueba::class,
+        'licencias_permisos' => LicenciaPermiso::class,
+        'goces_vacacionales' => GoceVacacional::class,
     ];
 
     public static function soportado(?string $formulario): bool
@@ -37,6 +42,10 @@ final class FormulariosDatos
         $registro = self::registro($formulario, $documento->usuario_id, $registroId);
         if (! $registro) {
             throw ValidationException::withMessages(['enlace_id' => 'Selecciona un registro de esta persona que no esté anulado y (salvo los vínculos) que aún no tenga documento.']);
+        }
+        // Sección 05: cada tipo de documento acredita solo ciertos tipos de movimiento (p. ej. b) solo goces).
+        if (! Seccion05::admite($documento->tipoDocumento?->codigo, $registro->getAttribute('tipo'))) {
+            throw ValidationException::withMessages(['enlace_id' => 'Este tipo de documento no acredita ese tipo de movimiento.']);
         }
         if ($formulario === 'vinculos_laborales') {
             $documento->update(['vinculo_laboral_id' => $registro->getKey()]);

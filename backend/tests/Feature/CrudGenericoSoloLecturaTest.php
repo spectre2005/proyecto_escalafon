@@ -4,10 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\ArchivoDocumento;
 use App\Models\DocumentoUsuario;
+use App\Models\GoceVacacional;
 use App\Models\Induccion;
+use App\Models\LicenciaPermiso;
 use App\Models\PerfilAdministrativo;
 use App\Models\PerfilDocente;
 use App\Models\PeriodoPrueba;
+use App\Models\PeriodoVacacional;
 use App\Models\SeccionLegajo;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
@@ -29,6 +32,8 @@ class CrudGenericoSoloLecturaTest extends TestCase
     private const SECCION_02 = [
         'vinculos-laborales' => VinculoLaboral::class, 'vinculo-adendas' => VinculoAdenda::class, 'inducciones' => Induccion::class,
         'periodos-prueba' => PeriodoPrueba::class, 'perfil-docente' => PerfilDocente::class, 'perfil-administrativo' => PerfilAdministrativo::class,
+        // Sección 05: se registran y anulan solo desde Seccion05Controller.
+        'licencias-permisos' => LicenciaPermiso::class, 'periodos-vacacionales' => PeriodoVacacional::class, 'goces-vacacionales' => GoceVacacional::class,
     ];
 
     private const DOCUMENTOS = ['documentos-usuario' => DocumentoUsuario::class, 'archivos-documento' => ArchivoDocumento::class];

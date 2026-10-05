@@ -5,12 +5,15 @@ namespace Tests\Feature;
 use App\Models\ArchivoDocumento;
 use App\Models\DocumentoUsuario;
 use App\Models\Familiar;
+use App\Models\GoceVacacional;
 use App\Models\Induccion;
 use App\Models\Legajo;
 use App\Models\LegajoSeccion;
+use App\Models\LicenciaPermiso;
 use App\Models\PerfilAdministrativo;
 use App\Models\PerfilDocente;
 use App\Models\PeriodoPrueba;
+use App\Models\PeriodoVacacional;
 use App\Models\Rol;
 use App\Models\Usuario;
 use App\Models\VinculoAdenda;
@@ -31,6 +34,9 @@ class ResourceApiTest extends TestCase
 
     /** Sección 02: el CRUD genérico solo lista y lee; no crea, no edita ni elimina. */
     private const SECCION_02 = [VinculoLaboral::class, VinculoAdenda::class, Induccion::class, PeriodoPrueba::class, PerfilDocente::class, PerfilAdministrativo::class];
+
+    /** Sección 05: igual, se registran y anulan solo desde Seccion05Controller. */
+    private const SECCION_05 = [LicenciaPermiso::class, PeriodoVacacional::class, GoceVacacional::class];
 
     public static function resources(): array
     {
@@ -92,10 +98,10 @@ class ResourceApiTest extends TestCase
             unset($payload['registrado_por']);
         }
         $uri = '/api/v1/'.str_replace('_', '-', $model->getTable());
-        $soloLectura = $model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento || in_array($class, self::SECCION_02, true);
+        $soloLectura = $model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento || in_array($class, [...self::SECCION_02, ...self::SECCION_05], true);
         if ($soloLectura) {
             // Documentos y archivos se crean únicamente por la carga del legajo (folios, hash y bitácora); los registros de
-            // la sección 02, solo desde Seccion02Controller.
+            // las secciones 02 y 05, solo desde Seccion02Controller y Seccion05Controller.
             $this->postJson($uri, $payload)->assertStatus(405);
             $model->save();
         }

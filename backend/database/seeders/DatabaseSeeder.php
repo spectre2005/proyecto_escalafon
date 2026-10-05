@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
             UbigeoSeeder::class,
             SeccionesLegajoCatalogoSeeder::class,
             Seccion02CatalogoSeeder::class,
+            Seccion05CatalogoSeeder::class,
             AdministradorSeeder::class,
             UsuarioSeeder::class,
             EvaluacionDesempenoSeeder::class,

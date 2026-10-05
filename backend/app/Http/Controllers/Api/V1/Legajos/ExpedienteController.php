@@ -57,6 +57,7 @@ use App\Models\UsuarioRol;
 use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
 use App\Support\PerfilDocumental;
+use App\Support\Seccion05;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -347,9 +348,14 @@ class ExpedienteController extends Controller
         if (in_array($section, ['vinculos-laborales', 'vinculo-adendas'], true)) {
             $query->where('anulado', false);
         }
+        // Descanso médico (sección 05): dato de salud, solo con datos_sensibles.ver (Directiva, num. 6.2).
+        if ($section === 'licencias-permisos' && ! $veSensibles) {
+            $query->whereNotIn('tipo', Seccion05::DATOS_SALUD);
+        }
         if ($section === 'documentos-usuario') {
             if (! $veSensibles) {
-                $query->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES);
+                $query->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES)
+                    ->whereDoesntHave('tipoDocumento', fn (Builder $tipo) => $tipo->where('es_dato_sensible', true)->orWhere('es_dato_salud', true));
             }
             if (! empty($filters['seccion_id'])) {
                 $query->where('seccion_legajo_id', $filters['seccion_id']);

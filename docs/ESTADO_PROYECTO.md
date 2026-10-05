@@ -56,6 +56,14 @@ Rutas con `react-router-dom` 7. Tailwind. Datos con `useLiveQuery` (se refresca 
 - **Seguridad:** el CRUD genérico de familiares, declaraciones y certificados exige `datos_sensibles.ver` y no permite borrar. La descarga de los PDF antiguos se registra en la bitácora.
 - **Menú:** seis grupos y resumen (`Seccion01Panel.jsx`). Persona demo: `Seccion01DemoSeeder` (99000101).
 
+## Sección 05 (Movimientos del personal): hecho, sin commit
+
+- **Estructura (Anexo 01):** tres entradas en la ficha, sin subsecciones (la directiva no las define): «Licencias, permisos y suspensiones» (a, e, suspensión y descanso médico), «Vacaciones» (b, c, d) y «Otros documentos» (gancho de la universidad). Reemplaza el menú anterior (`licencias-permisos`, `periodos-vacacionales`, `goces-vacacionales` y «Documentos de la sección»).
+- **Catálogo:** `Seccion05CatalogoSeeder` (8 tipos, todos con varios documentos y ninguno obligatorio). El bloque de cada tipo y qué movimientos acredita están en `Support/Seccion05`.
+- **Datos:** se reutilizan `licencias_permisos`, `periodos_vacacionales` y `goces_vacacionales` sin migraciones. Se registran y se anulan desde `Seccion05Controller` (`GET/POST …/seccion-05/…`); no se corrigen. El CRUD genérico de esas tablas queda en solo lectura.
+- **Documentos:** servicio común, con folios propios de la sección 5. `FormulariosDatos` enlaza el documento con la licencia o el goce si son compatibles (por ejemplo, b) solo con goces).
+- **Descanso médico:** se trata como dato de salud (num. 6.2). Sin `datos_sensibles.ver` no se ve, no se registra ni se sube. Test: `Seccion05ApiTest`.
+
 ## Límites del asistente
 
 Límites propuestos del asistente (**pendiente de confirmar con el cliente**):
@@ -103,6 +111,13 @@ Sección 01:
 19. ¿c, d y e admiten varias presentaciones (renovaciones, DJBR anual)? ¿Qué otros registros cubre el "entre otros" de h)?
 20. ¿Los PDF anteriores al sistema de folios cuentan como cargados? ¿Se exige el DNI de todos los cónyuges registrados? ¿k aplica también a los hijos?
 21. ¿Se puede descargar un PDF de la 01 si la persona no tiene legajo? Hoy no, porque la bitácora exige un legajo.
+
+Sección 05:
+22. Rol de vacaciones: ¿solo documento (como hoy) o también datos estructurados? ¿Se exige cada año?
+23. «Suspensión»: hoy va en la 05, según el Anexo 01. ¿Las suspensiones disciplinarias van aquí o en la 08?
+24. ¿Además del descanso médico, otras licencias son datos de salud (por ejemplo, asistencia médica a un familiar)?
+25. Días de un movimiento: ¿calendario o hábiles? Hoy se registran tal como dice el documento, sin superar el rango de fechas. ¿Los permisos por horas se registran con 0 días?
+26. ¿Algún documento de la 05 debe ser obligatorio (hoy ninguno)? ¿Hace falta controlar un saldo vacacional? Hoy solo se informan los días de goce y de adelanto por período.
 
 ## Siguientes pasos
 

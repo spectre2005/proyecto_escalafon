@@ -4,7 +4,8 @@ export const legajoSections = [
   { number: '02', title: 'Incorporación', categories: ['s02-seleccion', 's02-vinculo', 's02-induccion', 's02-prueba'], sinDocumentos: true },
   { number: '03', title: 'Formación académica y capacitación', categories: ['formacion-academica', 'capacitaciones', 'colegiaturas'] },
   { number: '04', title: 'Experiencia laboral', categories: ['experiencia-laboral', 'tiempo-servicios-reconocidos'] },
-  { number: '05', title: 'Movimientos del Personal', categories: ['licencias-permisos', 'periodos-vacacionales', 'goces-vacacionales'] },
+  // Anexo 01: licencias y permisos (a, e), vacaciones (b, c, d) y otros; cada entrada muestra sus registros y sus documentos.
+  { number: '05', title: 'Movimientos del Personal', categories: ['s05-licencias', 's05-vacaciones', 's05-otros'], sinDocumentos: true },
   { number: '06', title: 'Compensaciones', categories: ['compensaciones-beneficios'] },
   { number: '07', title: 'Evaluación de desempeño, progresión en la carrera y desplazamiento', categories: ['evaluaciones-desempeno', 'progresiones-carrera', 'desplazamientos', 'ratificaciones-docentes'] },
   { number: '08', title: 'Reconocimientos y sanciones disciplinarias', categories: ['reconocimientos', 'sanciones'] },
