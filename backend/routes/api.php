@@ -40,6 +40,7 @@ use App\Http\Controllers\Api\V1\Legajos\Seccion06Controller;
 use App\Http\Controllers\Api\V1\Legajos\Seccion07Controller as Seccion07LegajoController;
 use App\Http\Controllers\Api\V1\Legajos\Seccion08Controller;
 use App\Http\Controllers\Api\V1\Legajos\Seccion09Controller;
+use App\Http\Controllers\Api\V1\Legajos\Seccion11Controller;
 use App\Http\Controllers\Api\V1\LegajoSeccionController;
 use App\Http\Controllers\Api\V1\LicenciaPermisoController;
 use App\Http\Controllers\Api\V1\MovimientoCustodiaLegajoController;
@@ -103,6 +104,9 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum'])->
         Route::get('expedientes/{usuario}/seccion-07/resumen', [Seccion07LegajoController::class, 'resumen'])->whereUuid('usuario')->middleware('can:seccion07.ver');
         // Sección 09: sensible (afiliación sindical, Directiva definición "e"), exige además datos_sensibles.ver.
         Route::get('expedientes/{usuario}/seccion-09', [Seccion09Controller::class, 'show'])->whereUuid('usuario')->middleware('can:datos_sensibles.ver');
+        // Sección 11 (desvinculación): no es sensible; la liquidación (tipo sensible) se filtra en el controlador.
+        Route::get('expedientes/{usuario}/seccion-11', [Seccion11Controller::class, 'show'])->whereUuid('usuario');
+        Route::get('expedientes/{usuario}/seccion-11/anulados', [Seccion11Controller::class, 'anulados'])->whereUuid('usuario')->middleware('can:sistema.administrar');
         Route::get('expedientes/{usuario}/{section}', [ExpedienteController::class, 'section'])->whereUuid('usuario');
     });
 
@@ -162,6 +166,14 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum'])->
     });
     Route::post('expedientes/{usuario}/seccion-09/{tipo}/{registro}/anular', [Seccion09Controller::class, 'anularRegistro'])
         ->middleware(['can:sistema.administrar', 'can:datos_sensibles.ver'])->whereUuid(['usuario', 'registro'])->whereIn('tipo', ['controversias', 'afiliaciones']);
+
+    // Sección 11 (desvinculación): registrar y corregir con legajo.editar; anular con sistema.administrar.
+    Route::middleware('can:legajo.editar')->group(function (): void {
+        Route::post('expedientes/{usuario}/seccion-11/desvinculaciones', [Seccion11Controller::class, 'store'])->whereUuid('usuario');
+        Route::patch('expedientes/{usuario}/seccion-11/desvinculaciones/{registro}', [Seccion11Controller::class, 'update'])->whereUuid(['usuario', 'registro']);
+    });
+    Route::post('expedientes/{usuario}/seccion-11/desvinculaciones/{registro}/anular', [Seccion11Controller::class, 'anularRegistro'])
+        ->middleware('can:sistema.administrar')->whereUuid(['usuario', 'registro']);
 
     Route::post('expedientes/{usuario}/legajo', [AperturaLegajoController::class, 'store'])->middleware('can:legajo.abrir')->whereUuid('usuario');
 
@@ -231,6 +243,7 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum'])->
 // registran, corrigen y anulan solo desde la sección 07 (Legajos\Seccion07Controller).
 // afiliaciones y controversias (sección 09, sensibles): solo lectura y con datos_sensibles.ver; se registran, corrigen y
 // anulan desde Legajos\Seccion09Controller.
+// desvinculaciones (sección 11): solo lectura; se registran, corrigen y anulan desde Legajos\Seccion11Controller.
 Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', 'can:sistema.administrar'])->group(function (): void {
     Route::apiResource('afiliaciones', AfiliacionController::class)->parameters(['afiliaciones' => 'record'])->whereUuid('record')->names('api.v1.afiliaciones')->only(['index', 'show'])->middleware('can:datos_sensibles.ver');
     Route::apiResource('archivos-documento', ArchivoDocumentoController::class)->parameters(['archivos-documento' => 'record'])->whereUuid('record')->names('api.v1.archivos-documento')->only(['index', 'show']);
@@ -245,7 +258,7 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', 'c
     Route::apiResource('controversias', ControversiaController::class)->parameters(['controversias' => 'record'])->whereUuid('record')->names('api.v1.controversias')->only(['index', 'show'])->middleware('can:datos_sensibles.ver');
     Route::apiResource('declaraciones-verificaciones', DeclaracionVerificacionController::class)->parameters(['declaraciones-verificaciones' => 'record'])->whereUuid('record')->names('api.v1.declaraciones-verificaciones')->middleware('can:datos_sensibles.ver');
     Route::apiResource('desplazamientos', DesplazamientoController::class)->parameters(['desplazamientos' => 'record'])->whereUuid('record')->names('api.v1.desplazamientos')->only(['index', 'show']);
-    Route::apiResource('desvinculaciones', DesvinculacionController::class)->parameters(['desvinculaciones' => 'record'])->whereUuid('record')->names('api.v1.desvinculaciones');
+    Route::apiResource('desvinculaciones', DesvinculacionController::class)->parameters(['desvinculaciones' => 'record'])->whereUuid('record')->names('api.v1.desvinculaciones')->only(['index', 'show']);
     Route::apiResource('documentos-usuario', DocumentoUsuarioController::class)->parameters(['documentos-usuario' => 'record'])->whereUuid('record')->names('api.v1.documentos-usuario')->only(['index', 'show']);
     Route::apiResource('evaluaciones-desempeno', EvaluacionDesempenoController::class)->parameters(['evaluaciones-desempeno' => 'record'])->whereUuid('record')->names('api.v1.evaluaciones-desempeno')->only(['index', 'show']);
     Route::apiResource('experiencia-laboral', ExperienciaLaboralController::class)->parameters(['experiencia-laboral' => 'record'])->whereUuid('record')->names('api.v1.experiencia-laboral');

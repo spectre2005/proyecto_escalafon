@@ -7,6 +7,7 @@ use App\Models\CertificadoDiscapacidad;
 use App\Models\Controversia;
 use App\Models\DeclaracionVerificacion;
 use App\Models\Desplazamiento;
+use App\Models\Desvinculacion;
 use App\Models\DocumentoUsuario;
 use App\Models\EvaluacionDesempeno;
 use App\Models\Familiar;
@@ -23,6 +24,7 @@ use App\Support\Seccion01;
 use App\Support\Seccion05;
 use App\Support\Seccion07;
 use App\Support\Seccion09;
+use App\Support\Seccion11;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -43,6 +45,10 @@ use Illuminate\Validation\ValidationException;
  *
  * Sección 09: a) solo acredita controversias individuales, b) solo colectivas y c) solo afiliaciones a sindicato
  * (App\Support\Seccion09); un documento acredita un solo registro vigente.
+ *
+ * Sección 11: todo documento enlazado a una desvinculación queda agrupado por su vínculo (documentos_usuario.vinculo_laboral_id,
+ * escrito una sola vez). Los del término (a, b, c, g y aceptación de renuncia) además acreditan el registro (documento_id,
+ * uno por registro) y solo si el motivo de cese corresponde (App\Support\Seccion11); los complementarios (d, e, f) solo se agrupan.
  */
 final class FormulariosDatos
 {
@@ -62,6 +68,7 @@ final class FormulariosDatos
         'desplazamientos' => Desplazamiento::class,
         'controversias' => Controversia::class,
         'afiliaciones' => Afiliacion::class,
+        'desvinculaciones' => Desvinculacion::class,
     ];
 
     /**
@@ -72,7 +79,7 @@ final class FormulariosDatos
 
     /** Formularios en los que un documento acredita un solo registro vigente. */
     private const UN_REGISTRO_POR_DOCUMENTO = ['familiares', 'declaraciones_verificaciones', 'certificados_discapacidad',
-        'evaluaciones_desempeno', 'progresiones_carrera', 'ratificaciones_docentes', 'desplazamientos', 'controversias', 'afiliaciones'];
+        'evaluaciones_desempeno', 'progresiones_carrera', 'ratificaciones_docentes', 'desplazamientos', 'controversias', 'afiliaciones', 'desvinculaciones'];
 
     public static function soportado(?string $formulario): bool
     {
@@ -82,6 +89,11 @@ final class FormulariosDatos
     /** Enlaza el documento recién subido con un registro ya existente de su formulario (de la misma persona). */
     public static function enlazarRegistro(DocumentoUsuario $documento, string $formulario, string $registroId): void
     {
+        if ($formulario === 'desvinculaciones') {
+            self::enlazarDesvinculacion($documento, $registroId);
+
+            return;
+        }
         $registro = null;
         foreach (self::familia($formulario) as $opcion) {
             $registro ??= self::registro($opcion, $documento->usuario_id, $registroId);
@@ -121,7 +133,7 @@ final class FormulariosDatos
     }
 
     /**
-     * Crea un registro de datos (secciones 01, 07 y 09) enlazado, si se indica, al documento recién subido que lo acredita.
+     * Crea un registro de datos (secciones 01, 07, 09 y 11) enlazado, si se indica, al documento recién subido que lo acredita.
      * En una transacción con el documento bloqueado: dos registros simultáneos no toman el mismo documento.
      */
     public static function crearEnlazado(string $formulario, string $usuario, ?string $documentoId, Model $registro): Model
@@ -136,9 +148,40 @@ final class FormulariosDatos
                 $registro->documento_id = $documento->id;
             }
             $registro->save();
+            if ($registro instanceof Desvinculacion && $registro->documento_id !== null) {
+                self::agruparPorVinculo($registro->documento_id, $registro->vinculo_laboral_id);
+            }
 
             return $registro->refresh();
         });
+    }
+
+    /**
+     * Sección 11: enlaza un documento recién subido con una desvinculación vigente de la persona. Los del término la
+     * acreditan (si aún no tiene documento); los complementarios solo se agrupan por el vínculo que terminó.
+     */
+    private static function enlazarDesvinculacion(DocumentoUsuario $documento, string $registroId): void
+    {
+        $registro = Desvinculacion::query()->whereKey($registroId)->where('usuario_id', $documento->usuario_id)->where('anulado', false)->with('vinculoLaboral')->first();
+        if (! $registro) {
+            throw ValidationException::withMessages(['enlace_id' => 'Selecciona una desvinculación de esta persona que no esté anulada.']);
+        }
+        $codigo = $documento->tipoDocumento?->codigo;
+        if (! Seccion11::admite($codigo, $registro->motivo_cese, $registro->vinculoLaboral?->regimen_laboral)) {
+            throw ValidationException::withMessages(['enlace_id' => 'Este tipo de documento no corresponde al motivo de cese o al régimen del vínculo de esa desvinculación.']);
+        }
+        if (Seccion11::principal($codigo)) {
+            if (Desvinculacion::query()->whereKey($registro->id)->whereNull('documento_id')->update(['documento_id' => $documento->id]) !== 1) {
+                throw ValidationException::withMessages(['enlace_id' => 'Esa desvinculación ya tiene su documento de término. Súbelo sin enlace como documento adicional.']);
+            }
+        }
+        self::agruparPorVinculo($documento->id, $registro->vinculo_laboral_id);
+    }
+
+    /** Agrupa el documento por el vínculo que terminó; se escribe una sola vez (de vacío a un valor). */
+    private static function agruparPorVinculo(string $documentoId, string $vinculoId): void
+    {
+        DocumentoUsuario::query()->whereKey($documentoId)->whereNull('vinculo_laboral_id')->update(['vinculo_laboral_id' => $vinculoId, 'updated_at' => now()]);
     }
 
     /** El formulario del tipo y los alternativos que su documento también acredita. */
@@ -147,11 +190,15 @@ final class FormulariosDatos
         return [$formulario, ...(self::ALTERNATIVOS[$formulario] ?? [])];
     }
 
-    /** ¿El registro es del tipo que acredita el documento? (secciones 01, 07 y 09; los demás no se restringen). */
+    /** ¿El registro es del tipo que acredita el documento? (secciones 01, 07, 09 y 11; los demás no se restringen). */
     private static function compatible(?TipoDocumento $tipo, Model $registro): bool
     {
         if ($registro instanceof Controversia || $registro instanceof Afiliacion) {
             return $tipo !== null && Seccion09::admite($tipo->codigo, $registro->tipo);
+        }
+        if ($registro instanceof Desvinculacion) {
+            return $tipo !== null && Seccion11::principal($tipo->codigo)
+                && Seccion11::admite($tipo->codigo, $registro->motivo_cese, VinculoLaboral::query()->whereKey($registro->vinculo_laboral_id)->value('regimen_laboral'));
         }
         if ($registro instanceof Desplazamiento) {
             return Seccion07::admiteDesplazamiento($tipo?->codigo, $registro->tipo);
