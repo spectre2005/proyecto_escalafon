@@ -15,7 +15,8 @@ export const legajoSections = [
   { number: '09', title: 'Relaciones laborales individuales y colectivas', categories: ['s09-individuales', 's09-colectivas', 's09-afiliacion', 's09-otros'], sinDocumentos: true },
   // Subsecciones 10.1 y 10.2 del Anexo 01 y otros documentos; cada entrada muestra sus registros y sus documentos.
   { number: '10', title: 'Seguridad y Salud en el Trabajo (SST) y bienestar social', categories: ['s10-sst', 's10-bienestar', 's10-otros'], sinDocumentos: true },
-  { number: '11', title: 'Desvinculación', categories: ['desvinculaciones'] },
+  // Anexo 01, literales a) a g) y aceptación de renuncia (Anexo 05): la desvinculación de cada vínculo y sus documentos.
+  { number: '11', title: 'Desvinculación', categories: ['s11-desvinculacion', 's11-documentos'], sinDocumentos: true },
 ]
 
 export function findDocumentSection(group, sections) {
