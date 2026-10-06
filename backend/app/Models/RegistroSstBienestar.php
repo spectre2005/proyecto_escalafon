@@ -27,6 +27,11 @@ class RegistroSstBienestar extends Model
         'registrado_por',
         'anulado',
         'motivo_anulacion',
+        'fecha_inicio',
+        'fecha_fin',
+        'fecha_vencimiento',
+        'entidad',
+        'numero_documento',
     ];
 
     /** @return array<string, string> */
@@ -34,6 +39,9 @@ class RegistroSstBienestar extends Model
     {
         return [
             'fecha' => 'date',
+            'fecha_inicio' => 'date',
+            'fecha_fin' => 'date',
+            'fecha_vencimiento' => 'date',
             'anulado' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',

@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\V1\Legajos\Seccion02Controller;
 use App\Http\Controllers\Api\V1\Legajos\Seccion03Controller;
 use App\Http\Controllers\Api\V1\Legajos\Seccion04Controller;
 use App\Http\Controllers\Api\V1\Legajos\Seccion06Controller;
+use App\Http\Controllers\Api\V1\Legajos\Seccion10Controller;
 use App\Http\Controllers\Api\V1\LegajoSeccionController;
 use App\Http\Controllers\Api\V1\LicenciaPermisoController;
 use App\Http\Controllers\Api\V1\MovimientoCustodiaLegajoController;
@@ -78,6 +79,18 @@ Route::prefix('v1/auth')->middleware(LocalDevelopmentOnly::class)->group(functio
 });
 
 Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum'])->group(function (): void {
+    Route::middleware('can:datos_sensibles.ver')->group(function (): void {
+        Route::get('expedientes/{usuario}/seccion-10', [Seccion10Controller::class, 'show'])->middleware('can:legajo.ver')->whereUuid('usuario');
+        Route::get('expedientes/{usuario}/seccion-10/documentos/{documento}/historial', [Seccion10Controller::class, 'historial'])
+            ->middleware('can:legajo.ver')->whereUuid(['usuario', 'documento']);
+        Route::post('expedientes/{usuario}/seccion-10/documentos', [Seccion10Controller::class, 'store'])->middleware('can:documento.subir')->whereUuid('usuario');
+        Route::patch('expedientes/{usuario}/seccion-10/documentos/{documento}', [Seccion10Controller::class, 'update'])
+            ->middleware('can:legajo.editar')->whereUuid(['usuario', 'documento']);
+        Route::post('expedientes/{usuario}/seccion-10/documentos/{documento}/estado', [Seccion10Controller::class, 'cambiarEstado'])
+            ->middleware('can:documento.revisar')->whereUuid(['usuario', 'documento']);
+        Route::post('expedientes/{usuario}/seccion-10/documentos/{documento}/anular', [Seccion10Controller::class, 'anular'])
+            ->middleware('can:sistema.administrar')->whereUuid(['usuario', 'documento']);
+    });
     Route::middleware('can:legajo.ver')->group(function (): void {
         Route::get('expedientes', [ExpedienteController::class, 'index']);
         Route::get('ubicaciones', [ExpedienteController::class, 'locations']);
@@ -220,7 +233,7 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', 'c
     Route::apiResource('reconocimientos', ReconocimientoController::class)->parameters(['reconocimientos' => 'record'])->whereUuid('record')->names('api.v1.reconocimientos');
     Route::apiResource('referencias-legajo-pasivo', ReferenciaLegajoPasivoController::class)->parameters(['referencias-legajo-pasivo' => 'record'])->whereUuid('record')->names('api.v1.referencias-legajo-pasivo');
     Route::apiResource('regimenes-normativos', RegimenNormativoController::class)->parameters(['regimenes-normativos' => 'record'])->whereUuid('record')->names('api.v1.regimenes-normativos');
-    Route::apiResource('registros-sst-bienestar', RegistroSstBienestarController::class)->parameters(['registros-sst-bienestar' => 'record'])->whereUuid('record')->names('api.v1.registros-sst-bienestar');
+    Route::apiResource('registros-sst-bienestar', RegistroSstBienestarController::class)->parameters(['registros-sst-bienestar' => 'record'])->whereUuid('record')->names('api.v1.registros-sst-bienestar')->middleware('can:datos_sensibles.ver')->only(['index', 'show']);
     Route::apiResource('requerimientos-documentos', RequerimientoDocumentoController::class)->parameters(['requerimientos-documentos' => 'record'])->whereUuid('record')->names('api.v1.requerimientos-documentos');
     Route::apiResource('roles', RolController::class)->parameters(['roles' => 'record'])->whereUuid('record')->names('api.v1.roles');
     Route::apiResource('sanciones', SancionController::class)->parameters(['sanciones' => 'record'])->whereUuid('record')->names('api.v1.sanciones');

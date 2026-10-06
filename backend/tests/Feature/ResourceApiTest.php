@@ -28,7 +28,7 @@ class ResourceApiTest extends TestCase
         $resources = [];
         foreach (glob(__DIR__.'/../../app/Models/*.php') as $path) {
             $name = pathinfo($path, PATHINFO_FILENAME);
-            if (! ctype_alnum($name) || in_array($name, ['Usuario', 'User', ...array_keys(self::anulables())], true)) {
+            if (! ctype_alnum($name) || in_array($name, ['Usuario', 'User', 'RegistroSstBienestar', ...array_keys(self::anulables())], true)) {
                 continue;
             }
             $resources[$name] = ['App\\Models\\'.$name];

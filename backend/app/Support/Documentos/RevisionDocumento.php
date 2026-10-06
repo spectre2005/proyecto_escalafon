@@ -16,10 +16,10 @@ final class RevisionDocumento
 {
     public static function cambiarEstado(Request $request, string $usuario, string $documento, int $seccion, string $accion): JsonResponse
     {
-        $hoy = in_array($seccion, [4, 6], true) ? now('America/Lima')->startOfDay() : today();
+        $hoy = in_array($seccion, [4, 6, 10], true) ? now('America/Lima')->startOfDay() : today();
         $reglas = [
-            'estado' => in_array($seccion, [4, 6], true) ? 'required|in:aceptado,observado,anulado' : 'required|in:aceptado,observado', 'estado_anterior' => 'required|string|max:20',
-            'descripcion' => in_array($seccion, [4, 6], true) ? 'required_if:estado,observado,anulado|nullable|string|max:3000' : 'required_if:estado,observado|nullable|string|max:3000',
+            'estado' => in_array($seccion, [4, 6, 10], true) ? 'required|in:aceptado,observado,anulado' : 'required|in:aceptado,observado', 'estado_anterior' => 'required|string|max:20',
+            'descripcion' => in_array($seccion, [4, 6, 10], true) ? 'required_if:estado,observado,anulado|nullable|string|max:3000' : 'required_if:estado,observado|nullable|string|max:3000',
             'plazo_subsanacion' => 'required_if:estado,observado|nullable|date_format:Y-m-d|after_or_equal:'.$hoy->toDateString(),
             'recepcion_confirmada' => 'required_if:estado,aceptado|boolean',
             'fedateado' => 'sometimes|boolean',
@@ -32,7 +32,7 @@ final class RevisionDocumento
         if ($datos['estado'] === 'anulado') {
             abort_unless($request->user()->can('sistema.administrar'), 403, 'Solo administración puede anular documentos.');
         }
-        if (in_array($seccion, [4, 6], true) && isset($datos['descripcion']) && trim($datos['descripcion']) === '') {
+        if (in_array($seccion, [4, 6, 10], true) && isset($datos['descripcion']) && trim($datos['descripcion']) === '') {
             throw ValidationException::withMessages(['descripcion' => 'Explica el motivo antes de guardar.']);
         }
         $registro = DB::transaction(function () use ($request, $usuario, $documento, $datos, $seccion, $accion, $hoy): DocumentoUsuario {
@@ -68,7 +68,7 @@ final class RevisionDocumento
                 if (! $doc->archivo || $doc->archivo->estado_antivirus === 'infectado') {
                     throw ValidationException::withMessages(['estado' => 'El documento no tiene un archivo disponible o el archivo está bloqueado. Registra una subsanación.']);
                 }
-                if ($seccion === 6 && ($doc->archivo->almacenamiento !== config('legajo.disco_documentos')
+                if (in_array($seccion, [6, 10], true) && ($doc->archivo->almacenamiento !== config('legajo.disco_documentos')
                     || ! Storage::disk(config('legajo.disco_documentos'))->exists($doc->archivo->storage_path))) {
                     throw ValidationException::withMessages(['estado' => 'El archivo PDF no está disponible. Registra una subsanación.']);
                 }

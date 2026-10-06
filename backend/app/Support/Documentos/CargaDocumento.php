@@ -85,7 +85,7 @@ final class CargaDocumento
     private static function validarSubsanacion(Legajo $legajo, TipoDocumento $tipo, ?string $subsanaA): void
     {
         $vigentes = DocumentoUsuario::query()->where('legajo_id', $legajo->id)->where('tipo_documento_id', $tipo->id)
-            ->when(in_array($tipo->seccion_legajo_id, [3, 4, 6], true), fn ($query) => $query->where('estado', '!=', 'anulado'))
+            ->when(in_array($tipo->seccion_legajo_id, [3, 4, 6, 10], true), fn ($query) => $query->where('estado', '!=', 'anulado'))
             ->whereDoesntHave('documentosUsuarioPorSubsanaADocumento')->lockForUpdate()->pluck('id');
         if ($subsanaA !== null && ! $vigentes->contains($subsanaA)) {
             throw ValidationException::withMessages(['subsana_a_documento_id' => 'El documento a subsanar debe ser de este legajo y tipo, y no estar ya subsanado.']);

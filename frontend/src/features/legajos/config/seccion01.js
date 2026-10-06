@@ -27,7 +27,7 @@ export const personasCertificado = { servidor: 'El servidor(a)', familiar: 'Un f
 export const nacionalidades = ['Peruana', 'Argentina', 'Boliviana', 'Brasileña', 'Chilena', 'Colombiana', 'Ecuatoriana', 'Española', 'Mexicana', 'Venezolana']
 
 // Categorías de las secciones 01, 09 y 10: requieren datos_sensibles.ver (el backend responde 403).
-export const categoriasSensibles = ['familiares', 'declaraciones-verificaciones', 'certificados-discapacidad', 'afiliaciones', 'controversias', 'registros-sst-bienestar']
+export const categoriasSensibles = ['familiares', 'declaraciones-verificaciones', 'certificados-discapacidad', 'afiliaciones', 'controversias', 'registros-sst-bienestar', 'seccion-10']
 
 export function etiqueta(lista, valor) {
   if (valor === null || valor === undefined || valor === '') return 'No registrado'

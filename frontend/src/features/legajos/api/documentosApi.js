@@ -2,11 +2,11 @@ import api from '../../../axios'
 
 // Documentos del legajo (PDF + metadatos), común a todas las secciones. El backend valida permisos,
 // folios correlativos, tipo real del archivo y que el tipo pertenezca a la sección.
-export function subirDocumento(usuario, data, pdf) {
+export function subirDocumento(usuario, data, pdf, ruta = `/expedientes/${usuario}/documentos`) {
   const form = new FormData()
   Object.entries(data).forEach(([key, value]) => { if (value !== null && value !== undefined && value !== '') form.append(key, value) })
   if (pdf) form.append('pdf', pdf)
-  return api.post(`/expedientes/${usuario}/documentos`, form)
+  return api.post(ruta, form)
 }
 
 // Recepción (art. 4.5): quién y cuándo, una sola vez. Permiso documento.recepcionar.

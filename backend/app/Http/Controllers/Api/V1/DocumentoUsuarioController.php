@@ -66,6 +66,8 @@ class DocumentoUsuarioController extends ResourceController
     {
         $datos = $request->validate(['tipo_documento_id' => 'required|uuid|exists:tipos_documento,id']);
         $tipo = TipoDocumento::query()->findOrFail($datos['tipo_documento_id']);
+        abort_if($tipo->seccion_legajo_id === 10 || (int) $request->input('seccion_legajo_id') === 10, 409,
+            'Registra esta evidencia desde la ficha de SST y Bienestar Social de la Sección 10.');
         abort_if($tipo->seccion_legajo_id === 6 && isset(ResumenSeccion06::ITEMS[$tipo->codigo]), 409, 'Registra esta evidencia mediante Agregar documento en la Sección 06.');
         abort_if($tipo->seccion_legajo_id === 4 && isset(ResumenSeccion04::ITEMS[$tipo->codigo]), 409,
             'Registra esta evidencia mediante Agregar documento en la Sección 04.');

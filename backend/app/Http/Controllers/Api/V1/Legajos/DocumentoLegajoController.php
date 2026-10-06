@@ -9,6 +9,7 @@ use App\Models\Legajo;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Support\Documentos\ArchivoPdf;
+use App\Support\Documentos\AuditoriaDocumento;
 use App\Support\Documentos\CargaDocumento;
 use App\Support\Documentos\EstadoDocumento;
 use App\Support\Documentos\Folios;
@@ -65,6 +66,7 @@ class DocumentoLegajoController extends Controller
         $request->validate(['tipo_documento_id' => ['required', 'uuid', Rule::exists('tipos_documento', 'id')->where('seccion_legajo_id', $seccion)->where('activo', true)]],
             ['tipo_documento_id.exists' => 'El tipo de documento no pertenece a la sección indicada (o está inactivo).']);
         $tipo = TipoDocumento::query()->findOrFail($request->input('tipo_documento_id'));
+        abort_if($seccion === 10, 422, 'Registra esta evidencia desde la ficha de SST y Bienestar Social de la Sección 10.');
         abort_if($tipo->seccion_legajo_id === 6 && isset(ResumenSeccion06::ITEMS[$tipo->codigo]), 422, 'Registra esta evidencia mediante Agregar documento en la Sección 06.');
         abort_if($seccion === 4 && isset(ResumenSeccion04::ITEMS[$tipo->codigo]), 422, 'Usa Agregar documento en la Sección 04 para registrar sus datos de experiencia.');
         $this->exigirSensibles($request, $seccion, $tipo);
@@ -145,7 +147,7 @@ class DocumentoLegajoController extends Controller
         $accion = $request->validate(['accion' => 'sometimes|in:ver,descargar'])['accion'] ?? 'ver';
         $registro = $this->documentoDe($request, $usuario, $documento);
         $archivo = $registro->archivo;
-        abort_if(in_array($registro->seccion_legajo_id, [3, 4, 6], true) && $archivo?->estado_antivirus === 'infectado', 423,
+        abort_if(in_array($registro->seccion_legajo_id, [3, 4, 6, 10], true) && $archivo?->estado_antivirus === 'infectado', 423,
             'El archivo está bloqueado por el antivirus. Registra un documento nuevo que lo subsane.');
         $disco = (string) config('legajo.disco_documentos');
         abort_unless($archivo && $archivo->almacenamiento === $disco && Storage::disk($disco)->exists($archivo->storage_path), 404, 'El documento no tiene un archivo disponible.');
@@ -154,6 +156,9 @@ class DocumentoLegajoController extends Controller
             'legajo_id' => $registro->legajo_id, 'documento_id' => $registro->id, 'usuario_id' => $request->user()->getAuthIdentifier(),
             'accion' => $accion, 'ip_origen' => $request->ip(), 'user_agent' => mb_substr((string) $request->userAgent(), 0, 300), 'fecha_acceso' => now(),
         ]);
+        if ($registro->seccion_legajo_id === 10 && $accion === 'descargar') {
+            DB::transaction(fn () => AuditoriaDocumento::registrar($registro, $request, 'DESCARGAR_DOCUMENTO'));
+        }
         $cabeceras = ['Content-Type' => 'application/pdf', 'X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, no-store'];
 
         return Storage::disk($disco)->response($archivo->storage_path, $archivo->nombre_original, $cabeceras, $accion === 'ver' ? 'inline' : 'attachment');
