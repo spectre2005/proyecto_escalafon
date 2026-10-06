@@ -4,7 +4,7 @@ import { subirDocumento } from './documentosApi'
 const ruta = usuario => `/expedientes/${usuario}/seccion-10/documentos`
 
 export function agregarDocumento10(usuario, datos, pdf) {
-  return subirDocumento(usuario, { ...datos, pendiente: datos.pendiente ? 1 : 0 }, pdf, ruta(usuario))
+  return subirDocumento(usuario, datos, pdf, ruta(usuario))
 }
 
 export function editarDocumento10(usuario, documento, datos) {

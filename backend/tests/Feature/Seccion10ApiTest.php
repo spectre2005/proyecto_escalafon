@@ -172,16 +172,38 @@ class Seccion10ApiTest extends TestCase
 
     public function test_pending_process_can_be_completed_without_overwriting_history_or_allocating_empty_folios(): void
     {
-        $id = $this->cargar(cambios: ['pendiente' => 1, 'pdf' => null, 'numero_folios' => null])->assertCreated()->json('data.id');
+        $id = $this->cargar(cambios: ['pdf' => null, 'numero_folios' => null])->assertCreated()->assertJsonPath('data.estado', 'pendiente')->json('data.id');
         $this->assertDatabaseCount('archivos_documento', 0);
         $this->assertSame('pendiente', $this->item('S10_REGLAMENTO')['estado']);
         $this->getJson($this->url())->assertJsonPath('data.folios.total', 0)->assertJsonPath('data.folio_sugerido', 1);
+        $this->patchJson($this->url('/documentos/'.$id), $this->datos(cambios: ['estado_anterior' => 'pendiente', 'nombre' => 'Constancia pendiente', 'modalidad_presentacion' => null]))
+            ->assertOk()->assertJsonPath('data.estado', 'pendiente');
+        $this->assertDatabaseCount('documentos_usuario', 1);
         $nuevo = $this->cargar(cambios: ['subsana_a_documento_id' => $id])->assertCreated()->json('data.id');
         $this->assertSame('si', $this->item('S10_REGLAMENTO')['estado']);
         $this->getJson($this->url())->assertJsonPath('data.folios.total', 2)->assertJsonPath('data.folio_sugerido', 3);
         $this->assertDatabaseHas('documentos_usuario', ['id' => $id, 'archivo_id' => null, 'estado' => 'pendiente']);
         $this->assertDatabaseHas('documentos_usuario', ['id' => $nuevo, 'subsana_a_documento_id' => $id]);
         $this->assertDatabaseHas('auditoria_eventos', ['entidad_id' => $nuevo, 'accion' => 'COMPLETAR_TRAMITE']);
+    }
+
+    public function test_missing_pdf_automatically_creates_pending_records_in_both_subsections_without_file_metadata(): void
+    {
+        foreach (['S10_REGLAMENTO', 'S10_SEGURO'] as $codigo) {
+            $id = $this->cargar($codigo, ['pdf' => null, 'numero_folios' => null, 'modalidad_presentacion' => null, 'pendiente' => 0])
+                ->assertCreated()->assertJsonPath('data.estado', 'pendiente')->assertJsonPath('data.archivo_id', null)->json('data.id');
+            $this->assertSame('pendiente', $this->item($codigo)['estado']);
+            $this->assertDatabaseHas('documentos_usuario', ['id' => $id, 'folio_inicio' => null, 'folio_fin' => null]);
+        }
+        $this->getJson($this->url())->assertOk()->assertJsonPath('data.folios.total', 0)->assertJsonPath('data.folio_sugerido', 1);
+        $this->assertDatabaseCount('archivos_documento', 0);
+        $this->assertCount(0, Storage::disk(config('legajo.disco_documentos'))->allFiles());
+    }
+
+    public function test_real_pdf_cannot_be_marked_pending_by_a_client_flag(): void
+    {
+        $this->cargar(cambios: ['pendiente' => 1])->assertCreated()->assertJsonPath('data.estado', 'cargado');
+        $this->assertSame('si', $this->item('S10_REGLAMENTO')['estado']);
     }
 
     public function test_folios_are_summed_by_subsection_excluding_annulled_and_superseded_documents(): void

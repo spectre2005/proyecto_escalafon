@@ -138,7 +138,7 @@ class Seccion10Controller extends Controller
             $reglas['estado_anterior'] = 'required|string|max:20';
         } else {
             $reglas += ['tipo_documento_id' => 'required|uuid', 'pendiente' => 'sometimes|boolean', 'subsana_a_documento_id' => 'nullable|uuid'];
-            $pendiente = $request->boolean('pendiente');
+            $pendiente = $request->file('pdf') === null && ! $request->filled('pdf');
             $reglas['pdf'] = $pendiente ? 'prohibited' : ['required', 'file', 'max:'.Parametros::entero('tamano_maximo_pdf_kb')];
             $reglas['numero_folios'] = $pendiente ? 'prohibited' : 'required|integer|between:1,2147483647';
             if (! $pendiente) {
@@ -147,6 +147,9 @@ class Seccion10Controller extends Controller
         }
         $this->rechazarDesconocidos($request, $reglas);
         $datos = $request->validate($reglas);
+        if (! $editar) {
+            $datos['pendiente'] = $pendiente;
+        }
         foreach (['nombre', 'emisor', 'numero_documento', 'descripcion', 'entidad'] as $campo) {
             if (isset($datos[$campo])) {
                 $datos[$campo] = trim($datos[$campo]);
