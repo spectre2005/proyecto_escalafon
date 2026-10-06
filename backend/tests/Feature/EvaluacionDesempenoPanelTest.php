@@ -48,7 +48,9 @@ class EvaluacionDesempenoPanelTest extends TestCase
             ->assertJsonPath('data.0.usuario.nombres', 'Persona Ficticia')
             ->assertJsonPath('data.0.evaluador.nombres', 'Evaluador Ficticio')
             ->assertJsonPath('data.0.ciclo_anio', 2025)
-            ->assertJsonPath('data.0.puntaje', '85.50')
+            // Sin seccion07.ver_calificacion (nadie lo tiene todavía, ni ADMIN) la calificación y el puntaje no salen.
+            ->assertJsonPath('data.0.puntaje', null)
+            ->assertJsonPath('data.0.calificacion', null)
             ->assertJsonPath('data.0.plan_mejora', true)
             ->assertJsonPath('filters.ciclos.0', 2025)
             ->assertJsonMissingPath('data.0.registrado_por')

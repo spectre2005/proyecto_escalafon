@@ -4,16 +4,22 @@ namespace App\Support\Documentos;
 
 use App\Models\CertificadoDiscapacidad;
 use App\Models\DeclaracionVerificacion;
+use App\Models\Desplazamiento;
 use App\Models\DocumentoUsuario;
+use App\Models\EvaluacionDesempeno;
 use App\Models\Familiar;
 use App\Models\GoceVacacional;
 use App\Models\Induccion;
 use App\Models\LicenciaPermiso;
 use App\Models\PeriodoPrueba;
+use App\Models\ProgresionCarrera;
+use App\Models\RatificacionDocente;
+use App\Models\TipoDocumento;
 use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
 use App\Support\Seccion01;
 use App\Support\Seccion05;
+use App\Support\Seccion07;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -27,6 +33,10 @@ use Illuminate\Validation\ValidationException;
  *
  * Sección 01: el registro debe ser compatible con el tipo del documento (App\Support\Seccion01) y un documento
  * acredita un solo registro vigente de familiares, declaraciones_verificaciones o certificados_discapacidad.
+ *
+ * Sección 07: un documento acredita un solo registro vigente; un documento de 7.3 solo acredita los tipos de
+ * desplazamiento de su literal (App\Support\Seccion07), y la resolución de 7.2 acredita una progresión
+ * (administrativos) o una ratificación docente (ALTERNATIVOS).
  */
 final class FormulariosDatos
 {
@@ -40,10 +50,21 @@ final class FormulariosDatos
         'certificados_discapacidad' => CertificadoDiscapacidad::class,
         'licencias_permisos' => LicenciaPermiso::class,
         'goces_vacacionales' => GoceVacacional::class,
+        'evaluaciones_desempeno' => EvaluacionDesempeno::class,
+        'progresiones_carrera' => ProgresionCarrera::class,
+        'ratificaciones_docentes' => RatificacionDocente::class,
+        'desplazamientos' => Desplazamiento::class,
     ];
 
+    /**
+     * formulario_datos del tipo => otros formularios que su documento también puede acreditar.
+     * TODO pendiente de confirmar con el cliente: la ratificación o promoción docente se acredita con el tipo de 7.2 a).
+     */
+    private const ALTERNATIVOS = ['progresiones_carrera' => ['ratificaciones_docentes']];
+
     /** Formularios en los que un documento acredita un solo registro vigente. */
-    private const UN_REGISTRO_POR_DOCUMENTO = ['familiares', 'declaraciones_verificaciones', 'certificados_discapacidad'];
+    private const UN_REGISTRO_POR_DOCUMENTO = ['familiares', 'declaraciones_verificaciones', 'certificados_discapacidad',
+        'evaluaciones_desempeno', 'progresiones_carrera', 'ratificaciones_docentes', 'desplazamientos'];
 
     public static function soportado(?string $formulario): bool
     {
@@ -53,7 +74,10 @@ final class FormulariosDatos
     /** Enlaza el documento recién subido con un registro ya existente de su formulario (de la misma persona). */
     public static function enlazarRegistro(DocumentoUsuario $documento, string $formulario, string $registroId): void
     {
-        $registro = self::registro($formulario, $documento->usuario_id, $registroId);
+        $registro = null;
+        foreach (self::familia($formulario) as $opcion) {
+            $registro ??= self::registro($opcion, $documento->usuario_id, $registroId);
+        }
         if (! $registro) {
             throw ValidationException::withMessages(['enlace_id' => 'Selecciona un registro de esta persona que no esté anulado y (salvo los vínculos) que aún no tenga documento.']);
         }
@@ -61,7 +85,7 @@ final class FormulariosDatos
         if (! Seccion05::admite($documento->tipoDocumento?->codigo, $registro->getAttribute('tipo'))) {
             throw ValidationException::withMessages(['enlace_id' => 'Este tipo de documento no acredita ese tipo de movimiento.']);
         }
-        if (! Seccion01::compatible($documento->tipoDocumento, $registro)) {
+        if (! self::compatible($documento->tipoDocumento, $registro)) {
             throw ValidationException::withMessages(['enlace_id' => 'El registro no corresponde a este tipo de documento.']);
         }
         if ($formulario === 'vinculos_laborales') {
@@ -74,10 +98,13 @@ final class FormulariosDatos
     /** Documento de la persona, del tipo que abre este formulario, al que se enlaza un registro nuevo. */
     public static function documentoPara(string $usuario, string $documentoId, string $formulario): DocumentoUsuario
     {
+        // Tipos cuyo formulario es este o lo admite como alternativo (7.2 a: progresión o ratificación docente).
+        $abren = [$formulario, ...array_keys(array_filter(self::ALTERNATIVOS, fn (array $otros): bool => in_array($formulario, $otros, true)))];
         $documento = DocumentoUsuario::query()->where('usuario_id', $usuario)->whereKey($documentoId)
-            ->whereHas('tipoDocumento', fn ($query) => $query->where('formulario_datos', $formulario))->first();
-        $enlazado = in_array($formulario, self::UN_REGISTRO_POR_DOCUMENTO, true)
-            && $documento && (self::MODELOS[$formulario])::query()->where('documento_id', $documento->id)->where('anulado', false)->exists();
+            ->whereHas('tipoDocumento', fn ($query) => $query->whereIn('formulario_datos', $abren))->first();
+        $enlazado = in_array($formulario, self::UN_REGISTRO_POR_DOCUMENTO, true) && $documento
+            && collect(self::familia($documento->tipoDocumento->formulario_datos))
+                ->contains(fn (string $opcion): bool => (self::MODELOS[$opcion])::query()->where('documento_id', $documento->id)->where('anulado', false)->exists());
         if (! $documento || ($formulario === 'vinculos_laborales' && $documento->vinculo_laboral_id !== null) || $enlazado) {
             throw ValidationException::withMessages(['documento_id' => 'El documento no es de esta persona, no corresponde a este formulario o ya está enlazado.']);
         }
@@ -86,7 +113,7 @@ final class FormulariosDatos
     }
 
     /**
-     * Crea un registro de datos (sección 01) enlazado, si se indica, al documento recién subido que lo acredita.
+     * Crea un registro de datos (secciones 01 y 07) enlazado, si se indica, al documento recién subido que lo acredita.
      * En una transacción con el documento bloqueado: dos registros simultáneos no toman el mismo documento.
      */
     public static function crearEnlazado(string $formulario, string $usuario, ?string $documentoId, Model $registro): Model
@@ -95,7 +122,7 @@ final class FormulariosDatos
             if ($documentoId !== null) {
                 DocumentoUsuario::query()->whereKey($documentoId)->lockForUpdate()->first();
                 $documento = self::documentoPara($usuario, $documentoId, $formulario);
-                if (! Seccion01::compatible($documento->tipoDocumento, $registro)) {
+                if (! self::compatible($documento->tipoDocumento, $registro)) {
                     throw ValidationException::withMessages(['documento_id' => 'El registro no corresponde al tipo del documento que acredita.']);
                 }
                 $registro->documento_id = $documento->id;
@@ -104,6 +131,22 @@ final class FormulariosDatos
 
             return $registro->refresh();
         });
+    }
+
+    /** El formulario del tipo y los alternativos que su documento también acredita. */
+    private static function familia(string $formulario): array
+    {
+        return [$formulario, ...(self::ALTERNATIVOS[$formulario] ?? [])];
+    }
+
+    /** ¿El registro es del tipo que acredita el documento? (secciones 01 y 07; los demás no se restringen). */
+    private static function compatible(?TipoDocumento $tipo, Model $registro): bool
+    {
+        if ($registro instanceof Desplazamiento) {
+            return Seccion07::admiteDesplazamiento($tipo?->codigo, $registro->tipo);
+        }
+
+        return $tipo === null || Seccion01::compatible($tipo, $registro);
     }
 
     /** Registro sin documento enlazado (los vínculos admiten varios documentos: contrato, renovaciones). */

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { categoriaPorConsulta } from '../../legajos/config/seccion07'
 
 const cell = 'px-5 py-4 align-top'
 const muted = 'text-slate-400'
@@ -11,9 +12,12 @@ function texto(value, vacio = 'No registrado') {
   return value === null || value === undefined || value === '' ? <span className={muted}>{vacio}</span> : String(value).replaceAll('_', ' ')
 }
 
-function Persona({ persona }) {
+// Ficha de la persona abierta en la subsección de la 07 que corresponde a la pestaña.
+const ficha = (persona, tipo) => `/legajos/${persona.id}?categoria=${categoriaPorConsulta[tipo.key]}`
+
+function Persona({ persona, tipo }) {
   if (!persona) return <span className={muted}>Sin persona vinculada</span>
-  return <><Link to={`/legajos/${persona.id}`} className="font-semibold text-teal-800 hover:underline">{persona.nombre}</Link><p className="mt-1 text-xs text-slate-500">DNI {persona.documento || 'no registrado'} · {persona.unidad || 'Sin unidad registrada'}</p></>
+  return <><Link to={ficha(persona, tipo)} className="font-semibold text-teal-800 hover:underline">{persona.nombre}</Link><p className="mt-1 text-xs text-slate-500">DNI {persona.documento || 'no registrado'} · {persona.unidad || 'Sin unidad registrada'}</p></>
 }
 
 function Reservado() {
@@ -61,10 +65,10 @@ export default function Seccion07Tabla({ tipo, registros }) {
   return <div className="overflow-x-auto"><table className="w-full text-left text-sm">
     <thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="px-5 py-4 font-medium">Persona</th>{cols.map(([title]) => <th key={title} className="whitespace-nowrap px-5 py-4 font-medium">{title}</th>)}<th className="px-5 py-4 font-medium">Respaldo</th><th className="px-5 py-4 font-medium"><span className="sr-only">Legajo</span></th></tr></thead>
     <tbody>{registros.map(registro => <tr key={registro.id} className="border-t border-slate-100 hover:bg-teal-50/30">
-      <td className={`${cell} min-w-56`}><Persona persona={registro.persona} /></td>
+      <td className={`${cell} min-w-56`}><Persona persona={registro.persona} tipo={tipo} /></td>
       {cols.map(([title, render]) => <td key={title} className={`${cell} text-slate-700`}>{render(registro)}</td>)}
       <td className={cell}><Documento registro={registro} /></td>
-      <td className={cell}>{registro.persona && <Link className="whitespace-nowrap text-xs font-semibold text-teal-700 hover:underline" to={`/legajos/${registro.persona.id}`}>Abrir legajo →</Link>}</td>
+      <td className={cell}>{registro.persona && <Link className="whitespace-nowrap text-xs font-semibold text-teal-700 hover:underline" to={ficha(registro.persona, tipo)}>Abrir legajo →</Link>}</td>
     </tr>)}</tbody>
   </table></div>
 }

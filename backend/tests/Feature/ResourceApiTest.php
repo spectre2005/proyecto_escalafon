@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\ArchivoDocumento;
+use App\Models\Desplazamiento;
 use App\Models\DocumentoUsuario;
+use App\Models\EvaluacionDesempeno;
 use App\Models\Familiar;
 use App\Models\GoceVacacional;
 use App\Models\Induccion;
@@ -14,6 +16,8 @@ use App\Models\PerfilAdministrativo;
 use App\Models\PerfilDocente;
 use App\Models\PeriodoPrueba;
 use App\Models\PeriodoVacacional;
+use App\Models\ProgresionCarrera;
+use App\Models\RatificacionDocente;
 use App\Models\Rol;
 use App\Models\Usuario;
 use App\Models\VinculoAdenda;
@@ -38,6 +42,9 @@ class ResourceApiTest extends TestCase
     /** Sección 05: igual, se registran y anulan solo desde Seccion05Controller. */
     private const SECCION_05 = [LicenciaPermiso::class, PeriodoVacacional::class, GoceVacacional::class];
 
+    /** Sección 07: igual, se registran, corrigen y anulan solo desde Legajos\Seccion07Controller. */
+    private const SECCION_07 = [EvaluacionDesempeno::class, ProgresionCarrera::class, RatificacionDocente::class, Desplazamiento::class];
+
     public static function resources(): array
     {
         $resources = [];
@@ -52,15 +59,15 @@ class ResourceApiTest extends TestCase
         return $resources;
     }
 
-    /** Secciones 01 y 07: registros que solo se crean y se anulan. */
+    /** Sección 01: registros que solo se crean y se anulan. Los de la 07 pasaron a solo lectura (SECCION_07). */
     public static function anulables(): array
     {
-        return collect(['EvaluacionDesempeno', 'ProgresionCarrera', 'RatificacionDocente', 'Desplazamiento', 'DeclaracionVerificacion', 'CertificadoDiscapacidad'])
+        return collect(['DeclaracionVerificacion', 'CertificadoDiscapacidad'])
             ->mapWithKeys(fn (string $name): array => [$name => ['App\\Models\\'.$name]])->all();
     }
 
     #[DataProvider('anulables')]
-    public function test_section_07_records_are_annulled_never_edited_or_deleted(string $class): void
+    public function test_annullable_records_are_annulled_never_edited_or_deleted(string $class): void
     {
         $autor = $this->actuarComo();
         $model = $class::factory()->make();
@@ -98,7 +105,7 @@ class ResourceApiTest extends TestCase
             unset($payload['registrado_por']);
         }
         $uri = '/api/v1/'.str_replace('_', '-', $model->getTable());
-        $soloLectura = $model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento || in_array($class, [...self::SECCION_02, ...self::SECCION_05], true);
+        $soloLectura = $model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento || in_array($class, [...self::SECCION_02, ...self::SECCION_05, ...self::SECCION_07], true);
         if ($soloLectura) {
             // Documentos y archivos se crean únicamente por la carga del legajo (folios, hash y bitácora); los registros de
             // las secciones 02 y 05, solo desde Seccion02Controller y Seccion05Controller.

@@ -399,6 +399,10 @@ class ExpedienteController extends Controller
         }
         $page = $query->orderBy('id')->paginate(20)->withQueryString();
         $page->setCollection($page->getCollection()->map(fn (Model $row): array => $this->present($row)));
+        // Sección 07: sin seccion07.ver_calificacion no salen la calificación ni el puntaje (pendiente de decisión del cliente).
+        if ($section === 'evaluaciones-desempeno' && ! $request->user()->can('seccion07.ver_calificacion')) {
+            $page->setCollection($page->getCollection()->map(fn (array $row): array => [...$row, 'values' => [...$row['values'], 'calificacion' => null, 'puntaje' => null]]));
+        }
 
         return response()->json($page);
     }

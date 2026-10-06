@@ -24,6 +24,7 @@ return [
         'documento.recepcionar' => 'Registrar la recepción de un documento.',
         'documento.revisar' => 'Aceptar u observar documentos de formación académica, experiencia laboral y compensaciones (RR. HH.).',
         'seccion07.ver' => 'Ver la sección 07: evaluación, progresión y desplazamiento.',
+        'seccion07.registrar' => 'Registrar, corregir y anular datos de la sección 07 desde el legajo (anular exige además sistema.administrar).',
         'seccion07.ver_calificacion' => 'Ver calificaciones y puntajes de evaluación de desempeño.',
         'datos_sensibles.ver' => 'Ver datos sensibles y de salud (secciones 01, 09 y 10).',
         'sistema.administrar' => 'Configuración, catálogos y herramientas internas de la ORH.',

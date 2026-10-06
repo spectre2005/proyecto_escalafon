@@ -8,7 +8,8 @@ export const legajoSections = [
   // Anexo 01: licencias y permisos (a, e), vacaciones (b, c, d) y otros; cada entrada muestra sus registros y sus documentos.
   { number: '05', title: 'Movimientos del Personal', categories: ['s05-licencias', 's05-vacaciones', 's05-otros'], sinDocumentos: true },
   { number: '06', title: 'Compensaciones', categories: ['seccion-06', 'compensaciones-beneficios'] },
-  { number: '07', title: 'Evaluación de desempeño, progresión en la carrera y desplazamiento', categories: ['evaluaciones-desempeno', 'progresiones-carrera', 'desplazamientos', 'ratificaciones-docentes'] },
+  // Subsecciones 7.1 a 7.3 de la directiva; cada una muestra sus datos y sus documentos (sin entrada aparte).
+  { number: '07', title: 'Evaluación de desempeño, progresión en la carrera y desplazamiento', categories: ['s07-desempeno', 's07-progresion', 's07-desplazamiento'], sinDocumentos: true },
   { number: '08', title: 'Reconocimientos y sanciones disciplinarias', categories: ['reconocimientos', 'sanciones'] },
   { number: '09', title: 'Relaciones laborales individuales y colectivas', categories: ['afiliaciones', 'controversias'] },
   { number: '10', title: 'Seguridad y Salud en el Trabajo (SST) y bienestar social', categories: ['registros-sst-bienestar'] },

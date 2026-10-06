@@ -141,11 +141,12 @@ class Seccion07ApiTest extends TestCase
         $this->seed(Seccion07DemoSeeder::class);
         $this->actuarComo();
 
-        $this->getJson('/api/v1/seccion07/evaluaciones?por_pagina=50')->assertOk()->assertJsonPath('total', 20);
-        $this->assertDatabaseCount('evaluaciones_desempeno', 21);
-        $this->getJson('/api/v1/seccion07/progresiones')->assertOk()->assertJsonPath('total', 2);
-        $this->getJson('/api/v1/seccion07/ratificaciones')->assertOk()->assertJsonPath('total', 2);
-        $this->getJson('/api/v1/seccion07/desplazamientos')->assertOk()->assertJsonPath('total', 3);
+        // Consulta (20 + 1 anulada) y las tres personas con legajo (3 evaluaciones, 1 progresión, 1 ratificación, 3 desplazamientos).
+        $this->getJson('/api/v1/seccion07/evaluaciones?por_pagina=50')->assertOk()->assertJsonPath('total', 23);
+        $this->assertDatabaseCount('evaluaciones_desempeno', 24);
+        $this->getJson('/api/v1/seccion07/progresiones')->assertOk()->assertJsonPath('total', 3);
+        $this->getJson('/api/v1/seccion07/ratificaciones')->assertOk()->assertJsonPath('total', 3);
+        $this->getJson('/api/v1/seccion07/desplazamientos')->assertOk()->assertJsonPath('total', 6);
     }
 
     public function test_rejects_unknown_types_and_invalid_filters_and_is_dev_only(): void

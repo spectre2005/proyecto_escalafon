@@ -35,8 +35,9 @@ class EvaluacionDesempenoResource extends JsonResource
             ]),
             'ciclo_anio' => $this->ciclo_anio,
             'fecha_evaluacion' => $this->fecha_evaluacion,
-            'calificacion' => $this->calificacion,
-            'puntaje' => $this->puntaje,
+            // Sin seccion07.ver_calificacion no se envían (pendiente de decisión del cliente).
+            'calificacion' => $request->user()?->can('seccion07.ver_calificacion') ? $this->calificacion : null,
+            'puntaje' => $request->user()?->can('seccion07.ver_calificacion') ? $this->puntaje : null,
             'plan_mejora' => $this->plan_mejora,
             'anulado' => $this->anulado,
         ];
