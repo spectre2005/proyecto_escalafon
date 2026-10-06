@@ -27,6 +27,8 @@ try {
     }
 
     Invoke-Docker @('compose', 'exec', '-T', 'app', 'php', 'artisan', 'migrate', '--no-interaction')
+    Invoke-Docker @('compose', 'exec', '-T', 'app', 'php', 'artisan', 'db:seed', '--class=SeccionesLegajoCatalogoSeeder', '--no-interaction')
+    Invoke-Docker @('compose', 'exec', '-T', 'app', 'php', 'artisan', 'db:seed', '--class=Seccion10CatalogoSeeder', '--no-interaction')
     Invoke-Docker @('compose', 'exec', '-T', 'app', 'php', 'artisan', 'optimize:clear', '--no-interaction')
     Invoke-Docker @('compose', 'up', '-d', '--build', '--force-recreate', 'frontend')
 
