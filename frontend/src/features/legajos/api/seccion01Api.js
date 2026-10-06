@@ -1,27 +1,19 @@
 import api from '../../../axios'
 
+// Datos de la sección 01. Al registrar se puede enlazar el documento recién subido que el registro acredita
+// (documento_id); el enlace no cambia después. Los PDF se suben como documentos del legajo (documentosApi).
 export function saveFamiliar(usuario, id, data) {
   const url = `/expedientes/${usuario}/familiares`
   return id ? api.patch(`${url}/${id}`, data) : api.post(url, data)
 }
 
-export function saveRegistro(usuario, tipo, data) {
-  return api.post(`/expedientes/${usuario}/${tipo}`, data)
-}
-
-export function saveCertificado(usuario, id, data, pdf) {
-  return saveRegistroPdf(usuario, 'certificados-discapacidad', id, data, pdf)
-}
-
-export function saveRegistroPdf(usuario, tipo, id, data, pdf) {
-  const form = new FormData()
-  Object.entries(data).forEach(([key, value]) => form.append(key, value ?? ''))
-  if (pdf) form.append('pdf', pdf)
-  if (id) form.append('_method', 'PATCH')
+// tipo: declaraciones-verificaciones o certificados-discapacidad.
+export function saveRegistro(usuario, tipo, id, data) {
   const url = `/expedientes/${usuario}/${tipo}`
-  return api.post(id ? `${url}/${id}` : url, form)
+  return id ? api.patch(`${url}/${id}`, data) : api.post(url, data)
 }
 
+// PDF guardado antes del sistema de folios (solo lectura). La descarga queda en la bitácora.
 export function descargarRegistroPdf(usuario, tipo, id) {
   return api.get(`/expedientes/${usuario}/${tipo}/${id}/pdf`, { responseType: 'blob' })
 }

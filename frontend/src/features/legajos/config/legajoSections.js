@@ -1,5 +1,6 @@
 export const legajoSections = [
-  { number: '01', title: 'Información personal y familiar', categories: ['general', 'familiares', 'declaraciones-verificaciones', 'certificados-discapacidad'] },
+  // Seis grupos (config/seccion01.js); cada uno muestra sus datos y sus documentos (sin entrada aparte).
+  { number: '01', title: 'Información personal y familiar', categories: ['general', 's01-antecedentes', 's01-declaraciones', 's01-familia', 's01-discapacidad', 's01-otros'], sinDocumentos: true },
   // Subsecciones 2.1 a 2.4 de la directiva; cada una muestra sus datos y sus documentos (sin entrada aparte).
   { number: '02', title: 'Incorporación', categories: ['s02-seleccion', 's02-vinculo', 's02-induccion', 's02-prueba'], sinDocumentos: true },
   { number: '03', title: 'Formación académica y capacitación', categories: ['seccion-03', 'formacion-academica', 'capacitaciones', 'colegiaturas'] },

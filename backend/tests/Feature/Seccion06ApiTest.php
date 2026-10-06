@@ -306,7 +306,8 @@ class Seccion06ApiTest extends TestCase
     {
         $tipo = TipoDocumento::query()->where('codigo', 'COMP_RECONOCIMIENTO_TIEMPO')->firstOrFail();
         $this->post('/api/v1/expedientes/'.$this->persona->id.'/documentos', $this->metadatos($tipo, 1, 1), ['Accept' => 'application/json'])->assertUnprocessable();
-        $this->postJson('/api/v1/documentos-usuario', ['tipo_documento_id' => $tipo->id])->assertConflict();
+        // El CRUD genérico de documentos-usuario no tiene store (sección 02): responde 405.
+        $this->postJson('/api/v1/documentos-usuario', ['tipo_documento_id' => $tipo->id])->assertStatus(405);
         $id = $this->cargar()->assertCreated()->json('data.id');
         $this->patchJson('/api/v1/documentos-usuario/'.$id, ['estado' => 'aceptado'])->assertStatus(405);
         $this->deleteJson('/api/v1/documentos-usuario/'.$id)->assertStatus(405);

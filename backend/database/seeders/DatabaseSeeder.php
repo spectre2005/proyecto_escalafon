@@ -14,6 +14,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             UbigeoSeeder::class,
             SeccionesLegajoCatalogoSeeder::class,
+            Seccion01CatalogoSeeder::class,
             Seccion02CatalogoSeeder::class,
             Seccion03CatalogoSeeder::class,
             Seccion06CatalogoSeeder::class,

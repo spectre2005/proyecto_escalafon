@@ -190,7 +190,8 @@ class Seccion04ApiTest extends TestCase
     {
         $tipo = TipoDocumento::query()->where('codigo', 'EXP_CERTIFICADO_TRABAJO')->firstOrFail();
         $this->post('/api/v1/expedientes/'.$this->persona->id.'/documentos', $this->metadatos($tipo, 1, 1), ['Accept' => 'application/json'])->assertUnprocessable();
-        $this->postJson('/api/v1/documentos-usuario', ['tipo_documento_id' => $tipo->id])->assertConflict();
+        // El CRUD genérico de documentos-usuario no tiene store (sección 02): responde 405.
+        $this->postJson('/api/v1/documentos-usuario', ['tipo_documento_id' => $tipo->id])->assertStatus(405);
         $this->assertDatabaseCount('documentos_usuario', 0);
     }
 
