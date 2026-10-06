@@ -225,6 +225,11 @@ class DocumentoUsuario extends Model
         return $this->hasMany(Reconocimiento::class, 'documento_id', 'id');
     }
 
+    public function recursosImpugnatorios(): HasMany
+    {
+        return $this->hasMany(RecursoImpugnatorio::class, 'documento_id', 'id');
+    }
+
     public function sanciones(): HasMany
     {
         return $this->hasMany(Sancion::class, 'documento_id', 'id');

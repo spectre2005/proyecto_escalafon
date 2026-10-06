@@ -13,9 +13,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('usuarios', function (Blueprint $table) {
-            $table->string('foto_path')->nullable();
-        });
+        if (! Schema::hasColumn('usuarios', 'foto_path')) {
+            Schema::table('usuarios', function (Blueprint $table) {
+                $table->string('foto_path')->nullable();
+            });
+        }
 
         $disk = Storage::disk('personal_photos');
         foreach (DB::table('usuarios')->select('id')->orderBy('id')->lazy() as $usuario) {

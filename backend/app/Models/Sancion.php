@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Sancion extends Model
 {
@@ -30,6 +31,9 @@ class Sancion extends Model
         'resultado_recurso',
         'fecha_resultado_recurso',
         'registrada_en_rnssc',
+        'fecha_registro_rnssc',
+        'referencia_rnssc',
+        'referencia_procedimiento',
         'registrado_por',
         'anulado',
         'motivo_anulacion',
@@ -45,6 +49,7 @@ class Sancion extends Model
             'dias_suspension' => 'integer',
             'fecha_resultado_recurso' => 'date',
             'registrada_en_rnssc' => 'boolean',
+            'fecha_registro_rnssc' => 'date',
             'anulado' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
@@ -64,5 +69,10 @@ class Sancion extends Model
     public function registradoPor(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'registrado_por', 'id');
+    }
+
+    public function recursosImpugnatorios(): HasMany
+    {
+        return $this->hasMany(RecursoImpugnatorio::class, 'sancion_id', 'id')->orderBy('fecha')->orderBy('id');
     }
 }

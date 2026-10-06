@@ -6,6 +6,7 @@ use App\Models\DocumentoUsuario;
 use App\Models\TipoDocumento;
 use App\Support\ResumenSeccion04;
 use App\Support\ResumenSeccion06;
+use App\Support\ResumenSeccion08;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -53,6 +54,10 @@ class DocumentoUsuarioController extends ResourceController
             $query->whereNotIn('seccion_legajo_id', [1, 9, 10])
                 ->whereHas('tipoDocumento', fn ($tipo) => $tipo->where('es_dato_sensible', false)->where('es_dato_salud', false));
         }
+        if (! request()->user()->can('seccion08.sanciones.ver') && ! request()->user()->can('seccion08.sanciones.registrar')
+            && ! request()->user()->can('seccion08.sanciones.revisar')) {
+            $query->whereDoesntHave('tipoDocumento', fn ($tipo) => $tipo->whereIn('codigo', ['SAN_RESOLUCION_SANCION', 'SAN_RESOLUCION_RECURSO']));
+        }
 
         return $query;
     }
@@ -69,6 +74,8 @@ class DocumentoUsuarioController extends ResourceController
         abort_if($tipo->seccion_legajo_id === 6 && isset(ResumenSeccion06::ITEMS[$tipo->codigo]), 409, 'Registra esta evidencia mediante Agregar documento en la Sección 06.');
         abort_if($tipo->seccion_legajo_id === 4 && isset(ResumenSeccion04::ITEMS[$tipo->codigo]), 409,
             'Registra esta evidencia mediante Agregar documento en la Sección 04.');
+        abort_if($tipo->seccion_legajo_id === 8 && isset(ResumenSeccion08::ITEMS[$tipo->codigo]), 409,
+            'Registra esta evidencia mediante Agregar documento en la Sección 08.');
 
         return parent::store($request);
     }

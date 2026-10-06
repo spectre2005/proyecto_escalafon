@@ -9,6 +9,7 @@ use App\Models\Legajo;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Support\Documentos\ArchivoPdf;
+use App\Support\Documentos\AuditoriaDocumento;
 use App\Support\Documentos\CargaDocumento;
 use App\Support\Documentos\EstadoDocumento;
 use App\Support\Documentos\Folios;
@@ -154,6 +155,9 @@ class DocumentoLegajoController extends Controller
             'legajo_id' => $registro->legajo_id, 'documento_id' => $registro->id, 'usuario_id' => $request->user()->getAuthIdentifier(),
             'accion' => $accion, 'ip_origen' => $request->ip(), 'user_agent' => mb_substr((string) $request->userAgent(), 0, 300), 'fecha_acceso' => now(),
         ]);
+        if ($registro->seccion_legajo_id === 8) {
+            AuditoriaDocumento::registrar($registro, $request, 'seccion08.documento.'.$accion);
+        }
         $cabeceras = ['Content-Type' => 'application/pdf', 'X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, no-store'];
 
         return Storage::disk($disco)->response($archivo->storage_path, $archivo->nombre_original, $cabeceras, $accion === 'ver' ? 'inline' : 'attachment');
@@ -180,6 +184,9 @@ class DocumentoLegajoController extends Controller
 
     private function exigirSensibles(Request $request, int $seccion, ?TipoDocumento $tipo = null): void
     {
+        if ($seccion === 8 && in_array($tipo?->codigo, ['SAN_RESOLUCION_SANCION', 'SAN_RESOLUCION_RECURSO'], true)) {
+            abort_unless($request->user()->can('seccion08.sanciones.ver') || $request->user()->can('seccion08.sanciones.revisar'), 403, 'Tu perfil no tiene acceso a documentos de sanciones.');
+        }
         $sensible = in_array($seccion, self::SECCIONES_SENSIBLES, true) || $tipo?->es_dato_sensible || $tipo?->es_dato_salud;
         abort_if($sensible && ! $request->user()->veDatosSensibles(), 403, 'Esta sección o tipo de documento contiene datos sensibles.');
     }

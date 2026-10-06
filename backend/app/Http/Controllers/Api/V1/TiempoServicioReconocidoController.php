@@ -66,15 +66,15 @@ class TiempoServicioReconocidoController extends ResourceController
     private function protegerRegistro(string $record): void
     {
         $registro = $this->indexQuery()->with('documento')->findOrFail($record);
-        abort_if($registro->documento?->seccion_legajo_id === 6, 409, 'Este registro está sustentado en el legajo. Corrígelo mediante un documento que subsane al anterior.');
+        abort_if(in_array($registro->documento?->seccion_legajo_id, [6, 8], true), 409, 'Este registro está sustentado en el legajo. Corrígelo mediante un documento que subsane al anterior.');
     }
 
     private function protegerDestino(Request $request): void
     {
         $datos = $request->validate(['documento_id' => 'nullable|uuid']);
         if (! empty($datos['documento_id'])) {
-            abort_if(DocumentoUsuario::query()->whereKey($datos['documento_id'])->where('seccion_legajo_id', 6)->exists(), 409,
-                'Registra los datos junto con su documento en la Sección 06.');
+            abort_if(DocumentoUsuario::query()->whereKey($datos['documento_id'])->whereIn('seccion_legajo_id', [6, 8])->exists(), 409,
+                'Registra los datos junto con su documento en la sección correspondiente del legajo.');
         }
     }
 }

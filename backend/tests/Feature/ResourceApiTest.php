@@ -20,7 +20,10 @@ use App\Models\PeriodoPrueba;
 use App\Models\PeriodoVacacional;
 use App\Models\ProgresionCarrera;
 use App\Models\RatificacionDocente;
+use App\Models\Reconocimiento;
+use App\Models\RecursoImpugnatorio;
 use App\Models\Rol;
+use App\Models\Sancion;
 use App\Models\Usuario;
 use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
@@ -47,21 +50,55 @@ class ResourceApiTest extends TestCase
     /** Sección 07: igual, se registran, corrigen y anulan solo desde Legajos\Seccion07Controller. */
     private const SECCION_07 = [EvaluacionDesempeno::class, ProgresionCarrera::class, RatificacionDocente::class, Desplazamiento::class];
 
+    /** Sección 08: igual, se registran desde Legajos\Seccion08Controller (sanciones exige además seccion08.sanciones.ver). */
+    private const SECCION_08 = [Reconocimiento::class, Sancion::class];
+
     /** Sección 09: igual, desde Legajos\Seccion09Controller (y el CRUD genérico exige además datos_sensibles.ver). */
     private const SECCION_09 = [Afiliacion::class, Controversia::class];
+
+    /**
+     * Modelos que deliberadamente NO tienen CRUD genérico (ni lectura): solo existen dentro de su sección.
+     * RecursoImpugnatorio (sección 08): se registra únicamente desde Legajos\Seccion08Controller al subir la resolución
+     * del recurso. No participan de test_resource_can_be_created_read_updated_and_deleted; en su lugar,
+     * test_models_without_generic_crud_have_no_endpoint verifica que no exista ningún endpoint genérico.
+     * Siguen cubiertos por ModelPersistenceTest.
+     */
+    private const SIN_CRUD_GENERICO = [RecursoImpugnatorio::class];
 
     public static function resources(): array
     {
         $resources = [];
         foreach (glob(__DIR__.'/../../app/Models/*.php') as $path) {
             $name = pathinfo($path, PATHINFO_FILENAME);
-            if (! ctype_alnum($name) || in_array($name, ['Usuario', 'User', ...array_keys(self::anulables())], true)) {
+            if (! ctype_alnum($name) || in_array($name, ['Usuario', 'User', ...array_keys(self::anulables())], true)
+                || in_array('App\\Models\\'.$name, self::SIN_CRUD_GENERICO, true)) {
                 continue;
             }
             $resources[$name] = ['App\\Models\\'.$name];
         }
 
         return $resources;
+    }
+
+    /** Modelos sin CRUD genérico (SIN_CRUD_GENERICO). */
+    public static function sinCrudGenerico(): array
+    {
+        return collect(self::SIN_CRUD_GENERICO)->mapWithKeys(fn (string $clase): array => [class_basename($clase) => [$clase]])->all();
+    }
+
+    #[DataProvider('sinCrudGenerico')]
+    public function test_models_without_generic_crud_have_no_endpoint(string $class): void
+    {
+        $model = $class::factory()->create();
+        $uri = '/api/v1/'.str_replace('_', '-', $model->getTable());
+
+        // Ninguna operación genérica existe: ni listar, ni leer, ni crear, ni editar, ni eliminar.
+        $this->getJson($uri)->assertNotFound();
+        $this->getJson($uri.'/'.$model->getKey())->assertNotFound();
+        $this->postJson($uri, [])->assertNotFound();
+        $this->patchJson($uri.'/'.$model->getKey(), [])->assertNotFound();
+        $this->deleteJson($uri.'/'.$model->getKey())->assertNotFound();
+        $this->assertDatabaseHas($model->getTable(), ['id' => $model->getKey()]);
     }
 
     /** Sección 01: registros que solo se crean y se anulan. Los de la 07 pasaron a solo lectura (SECCION_07). */
@@ -110,7 +147,7 @@ class ResourceApiTest extends TestCase
             unset($payload['registrado_por']);
         }
         $uri = '/api/v1/'.str_replace('_', '-', $model->getTable());
-        $soloLectura = $model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento || in_array($class, [...self::SECCION_02, ...self::SECCION_05, ...self::SECCION_07, ...self::SECCION_09], true);
+        $soloLectura = $model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento || in_array($class, [...self::SECCION_02, ...self::SECCION_05, ...self::SECCION_07, ...self::SECCION_08, ...self::SECCION_09], true);
         if ($soloLectura) {
             // Documentos y archivos se crean únicamente por la carga del legajo (folios, hash y bitácora); los registros de
             // las secciones 02 y 05, solo desde Seccion02Controller y Seccion05Controller.
