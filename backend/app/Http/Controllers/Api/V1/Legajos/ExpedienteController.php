@@ -315,6 +315,9 @@ class ExpedienteController extends Controller
     {
         Usuario::query()->findOrFail($usuario);
         abort_unless(isset(self::SECTIONS[$section]), 404);
+        abort_if($section === 'sanciones' && ! $request->user()->can('seccion08.sanciones.ver')
+            && ! $request->user()->can('seccion08.sanciones.registrar') && ! $request->user()->can('seccion08.sanciones.revisar'),
+            403, 'Tu perfil no tiene acceso a sanciones disciplinarias.');
         $veSensibles = $request->user()->can('datos_sensibles.ver');
         abort_if(in_array($section, self::SENSIBLES, true) && ! $veSensibles, 403, 'Esta sección contiene datos sensibles.');
         $filters = $request->validate([
@@ -331,6 +334,10 @@ class ExpedienteController extends Controller
         if (! $veSensibles) {
             $documents->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES)
                 ->whereHas('tipoDocumento', fn ($tipo) => $tipo->where('es_dato_sensible', false)->where('es_dato_salud', false));
+        }
+        if (! $request->user()->can('seccion08.sanciones.ver') && ! $request->user()->can('seccion08.sanciones.registrar')
+            && ! $request->user()->can('seccion08.sanciones.revisar')) {
+            $documents->whereDoesntHave('tipoDocumento', fn ($tipo) => $tipo->whereIn('codigo', ['SAN_RESOLUCION_SANCION', 'SAN_RESOLUCION_RECURSO']));
         }
         $config = self::SECTIONS[$section];
         $query = $config['model']::query();

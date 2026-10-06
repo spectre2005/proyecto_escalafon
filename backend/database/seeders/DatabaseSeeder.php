@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             Seccion02CatalogoSeeder::class,
             Seccion03CatalogoSeeder::class,
             Seccion06CatalogoSeeder::class,
+            Seccion08CatalogoSeeder::class,
             Seccion05CatalogoSeeder::class,
             Seccion07CatalogoSeeder::class,
             AdministradorSeeder::class,
