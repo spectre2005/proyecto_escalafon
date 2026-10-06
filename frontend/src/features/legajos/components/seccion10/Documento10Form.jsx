@@ -4,6 +4,7 @@ import PdfPreviewField from '../../../../components/pdf/PdfPreviewField'
 import Campo, { Formulario, Opciones } from '../seccion01/Campo'
 import { useBorrador, useGuardar } from '../seccion01/useGuardar'
 import { modalidadesPresentacion } from '../../config/documentos'
+import { emisores10 } from '../../config/seccion10'
 import { agregarDocumento10, editarDocumento10 } from '../../api/seccion10Api'
 
 export default function Documento10Form({ usuario, item, datos, documento, modo, onSaved, onCancel }) {
@@ -11,6 +12,8 @@ export default function Documento10Form({ usuario, item, datos, documento, modo,
   const tituloModulo = datos.subseccion === '10.1' ? 'SST' : 'Bienestar Social'
   const [tipoId, setTipoId] = useState(item.id)
   const tipo = datos.items.find(option => option.id === tipoId)
+  const opcionesEmisor = emisores10[tipo.codigo] || []
+  const [otroEmisor, setOtroEmisor] = useState(Boolean(documento?.emisor && !opcionesEmisor.includes(documento.emisor)))
   const [pdf, setPdf] = useState(null)
   const [errorPdf, setErrorPdf] = useState('')
   const pendiente = !editar && !pdf
@@ -22,6 +25,16 @@ export default function Documento10Form({ usuario, item, datos, documento, modo,
     fecha_inicio: documento?.fecha_inicio || '', fecha_fin: documento?.fecha_fin || '',
     fecha_vencimiento: documento?.fecha_vencimiento || '', entidad: documento?.entidad || '',
   })
+  function cambiarTipo(event) {
+    const siguiente = datos.items.find(option => option.id === event.target.value)
+    setTipoId(siguiente.id)
+    setOtroEmisor(Boolean(draft.emisor && !(emisores10[siguiente.codigo] || []).includes(draft.emisor)))
+  }
+  function cambiarEmisor(event) {
+    const otro = event.target.value === '__otro__'
+    setOtroEmisor(otro)
+    set('emisor')({ target: { value: otro ? '' : event.target.value } })
+  }
   const { busy, error, errors, guardar } = useGuardar(values => {
     const comunes = ['nombre', 'emisor', 'fecha_emision', 'numero_documento', 'descripcion', 'modalidad_presentacion']
     if (tipo.periodo) comunes.push('fecha_inicio', 'fecha_fin')
@@ -38,14 +51,21 @@ export default function Documento10Form({ usuario, item, datos, documento, modo,
   const dias = draft.fecha_inicio && draft.fecha_fin ? Math.round((Date.parse(draft.fecha_fin) - Date.parse(draft.fecha_inicio)) / 86400000) + 1 : null
   const campos = <>
     <Campo label="Tipo de documento" required error={errors.tipo_documento_id} className="sm:col-span-2">
-      <select required value={tipoId} disabled={!!documento} onChange={event => setTipoId(event.target.value)}>
-        {datos.items.filter(option => option.activo || option.id === tipoId).map(option => <option key={option.id} value={option.id}>{option.subseccion} · {option.nombre}</option>)}
+      <select required value={tipoId} disabled={!!documento} onChange={cambiarTipo}>
+        {datos.items.filter(option => option.activo || option.id === tipoId).map(option => <option key={option.id} value={option.id}>{option.nombre}</option>)}
       </select>
     </Campo>
     <Campo label="Servidor" className="sm:col-span-2"><input readOnly value={datos.persona.nombre_completo} /></Campo>
     <Campo label="Nombre del documento" required error={errors.nombre} className="sm:col-span-2"><input required maxLength={200} value={draft.nombre} onChange={set('nombre')} /></Campo>
     <Campo label="Fecha del documento / emisión" required error={errors.fecha_emision}><input type="date" required max={datos.fecha_actual} value={draft.fecha_emision} onChange={set('fecha_emision')} /></Campo>
-    <Campo label="Emisor" required error={errors.emisor}><input required maxLength={200} value={draft.emisor} onChange={set('emisor')} /></Campo>
+    <Campo label="Emisor" required error={otroEmisor ? undefined : errors.emisor}>
+      <select required value={otroEmisor ? '__otro__' : draft.emisor} onChange={cambiarEmisor}>
+        <option value="">Selecciona el emisor</option>
+        {opcionesEmisor.map(emisor => <option key={emisor} value={emisor}>{emisor}</option>)}
+        <option value="__otro__">Otro emisor</option>
+      </select>
+    </Campo>
+    {otroEmisor && <Campo label="Nombre del emisor" required error={errors.emisor}><input required maxLength={200} placeholder="Escribe el nombre del emisor" value={draft.emisor} onChange={set('emisor')} /></Campo>}
     <Campo label="Número de documento" error={errors.numero_documento}><input maxLength={60} value={draft.numero_documento} onChange={set('numero_documento')} /></Campo>
     {(!pendiente || editar) && <Campo label="Modalidad de presentación" required={!editar || !!documento?.archivo} error={errors.modalidad_presentacion}><select required={!editar || !!documento?.archivo} value={draft.modalidad_presentacion} onChange={set('modalidad_presentacion')}><Opciones lista={modalidadesPresentacion} vacio="Selecciona" /></select></Campo>}
     {tipo.entidad_eps && <Campo label="Entidad EPS" required error={errors.entidad}><input required maxLength={200} value={draft.entidad} onChange={set('entidad')} /></Campo>}

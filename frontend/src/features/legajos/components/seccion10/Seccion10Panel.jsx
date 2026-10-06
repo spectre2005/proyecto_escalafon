@@ -51,11 +51,11 @@ function Historial({ usuario, documento }) {
   </div>
 }
 
-function Documentos({ item, permisos, abrir, ver }) {
+function Documentos({ item, permisos, abrir, ver, mostrarTitulo = true }) {
   const [incluirHistorial, setIncluirHistorial] = useState(false)
   const documentos = item.documentos.filter(doc => incluirHistorial || (!doc.anulado && !doc.subsanado))
   return <section aria-label={`Documentos de ${item.nombre}`} className="rounded-2xl border border-slate-200 bg-white p-5">
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h3 className="font-semibold text-slate-800">{item.nombre}</h3><label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" className="accent-teal-700" checked={incluirHistorial} onChange={event => setIncluirHistorial(event.target.checked)} />Incluir anulados y versiones anteriores</label></div>
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">{mostrarTitulo && <h3 className="font-semibold text-slate-800">{item.nombre}</h3>}<label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" className="accent-teal-700" checked={incluirHistorial} onChange={event => setIncluirHistorial(event.target.checked)} />Incluir anulados y versiones anteriores</label></div>
     {!documentos.length && <p className="text-sm text-slate-500">No hay documentos para esta consulta.</p>}
     <div className="space-y-4">{documentos.map(doc => <article key={doc.id} className="rounded-xl border border-slate-200 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3"><h4 className="break-words font-semibold text-slate-800">{doc.nombre || doc.archivo?.nombre_original || 'Trámite sin nombre'}</h4><span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">{doc.anulado ? 'Anulado' : doc.subsanado ? 'Versión anterior' : !doc.archivo ? 'Pendiente de archivo' : doc.estado_original}</span></div>
@@ -110,6 +110,7 @@ export default function Seccion10Panel({ usuario, subseccion = '10.1' }) {
   if (!data) return consulta.error ? <p role="alert" className="rounded-xl bg-rose-50 p-5 text-sm text-rose-800">{apiErrorMessage(consulta.error)} <button className="underline" onClick={consulta.retry}>Reintentar</button></p> : <p role="status" className="p-6 text-sm text-slate-500">Cargando {titulo}…</p>
   const itemSeleccionado = data.items.find(item => item.id === seleccion)
   return <section aria-label={titulo} className="space-y-5">
+    <header aria-label="Resumen de folios" className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-2">{[[`Número de folios ${subseccion === '10.1' ? 'SST' : 'Bienestar Social'}`, subseccion === '10.1' ? data.folios.sst : data.folios.bienestar], ['Total de folios de la Sección 10', data.folios.total]].map(([etiqueta, cantidad]) => <div key={etiqueta}><p className="text-xs text-slate-500">{etiqueta}</p><p className="mt-2 text-2xl font-bold text-slate-800">{cantidad}</p></div>)}</header>
     <section aria-label={`Documentos de ${titulo}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <h2 className="border-b border-slate-100 p-5 font-semibold text-slate-800">Documentos de {titulo}</h2>
       <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr>{['Tipo de documento', 'Estado', 'Cantidad', 'Última fecha', 'Número de folios', 'Acciones'].map(tituloColumna => <th key={tituloColumna} scope="col" className="px-4 py-3 font-medium">{tituloColumna}</th>)}</tr></thead><tbody>
@@ -119,10 +120,11 @@ export default function Seccion10Panel({ usuario, subseccion = '10.1' }) {
     {!data.legajo && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p className="mb-3">Abre el legajo para registrar documentos.</p><AbrirLegajo usuario={usuario} /></div>}
     {consulta.error && <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">No se pudo actualizar la ficha. <button className="underline" onClick={consulta.retry}>Reintentar</button></p>}
     {aviso && <p role="status" className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">{aviso}</p>}
-    <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-2">{[[`Número de folios ${subseccion === '10.1' ? 'SST' : 'Bienestar Social'}`, subseccion === '10.1' ? data.folios.sst : data.folios.bienestar], ['Total de folios de la Sección 10', data.folios.total]].map(([etiqueta, cantidad]) => <div key={etiqueta}><p className="text-xs text-slate-500">{etiqueta}</p><p className="mt-2 text-2xl font-bold text-slate-800">{cantidad}</p></div>)}</div>
     {data.folios.sin_clasificar > 0 && <p className="rounded-xl bg-amber-50 p-4 text-xs text-amber-900">El total incluye {data.folios.sin_clasificar} folio(s) de documentos anteriores sin clasificación. Se conservan en el historial.</p>}
     {data.documentos_anteriores?.length > 0 && <details className="rounded-2xl border border-slate-200 bg-white p-4"><summary className="cursor-pointer text-sm font-medium text-slate-700">Documentos archivados de tipos anteriores</summary><div className="mt-4"><Documentos item={{ nombre: 'Documentos archivados', activo: false, documentos: data.documentos_anteriores }} permisos={{ anular }} abrir={abrir} ver={setVisor} /></div></details>}
-    {itemSeleccionado && <Documentos key={itemSeleccionado.id} item={itemSeleccionado} permisos={{ subir, editar, revisar, anular }} abrir={abrir} ver={setVisor} />}
+    {itemSeleccionado && <Modal titulo={`Documentos de ${itemSeleccionado.nombre}`} onClose={() => setSeleccion(null)}>
+      <Documentos key={itemSeleccionado.id} item={itemSeleccionado} permisos={{ subir, editar, revisar, anular }} abrir={abrir} ver={setVisor} mostrarTitulo={false} />
+    </Modal>}
     {visor && <Modal titulo={`Documento de ${titulo}`} onClose={() => setVisor(null)}><VisorPdf usuario={usuario} documento={visor} titulo={visor.nombre} onClose={() => setVisor(null)} /></Modal>}
     {modal && <Modal titulo={modal.modo === 'historial' ? `Historial: ${modal.documento.nombre}` : modal.item.nombre} onClose={() => setModal(null)}>
       {modal.modo === 'historial' ? <Historial usuario={usuario} documento={modal.documento} /> : ['aceptado', 'observado', 'anulado'].includes(modal.modo)
