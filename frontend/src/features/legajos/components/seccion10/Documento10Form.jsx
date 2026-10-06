@@ -8,6 +8,7 @@ import { agregarDocumento10, editarDocumento10 } from '../../api/seccion10Api'
 
 export default function Documento10Form({ usuario, item, datos, documento, modo, onSaved, onCancel }) {
   const editar = modo === 'editar'
+  const tituloModulo = datos.subseccion === '10.1' ? 'SST' : 'Bienestar Social'
   const pendiente = modo === 'pendiente'
   const [tipoId, setTipoId] = useState(item.id)
   const tipo = datos.items.find(option => option.id === tipoId)
@@ -62,7 +63,7 @@ export default function Documento10Form({ usuario, item, datos, documento, modo,
     {documento && !editar && <p className="col-span-full text-xs text-slate-600">Esta evidencia completará o subsanará «{documento.nombre}». El registro anterior se conservará en el historial.</p>}
     {errors.subsana_a_documento_id && <p role="alert" className="col-span-full text-sm text-rose-700">{errors.subsana_a_documento_id.join(' ')}</p>}
   </>
-  return <Formulario titulo={editar ? 'Editar metadatos' : pendiente ? 'Registrar trámite pendiente' : documento ? 'Adjuntar evidencia o subsanar documento' : 'Adjuntar documento SST / Bienestar Social'}
+  return <Formulario titulo={editar ? 'Editar metadatos' : pendiente ? `Registrar trámite pendiente de ${tituloModulo}` : documento ? 'Adjuntar evidencia o subsanar documento' : `Adjuntar documento de ${tituloModulo}`}
     guardar={editar ? 'Guardar cambios' : pendiente ? 'Registrar trámite' : 'Guardar documento'} busy={busy} error={error} onCancel={onCancel}
     onSubmit={() => { if (editar || pendiente || (pdf && !errorPdf)) guardar(draft) }}
     nota={editar ? 'Solo se pueden editar metadatos antes de la recepción o validación. Cada cambio queda en la auditoría.' : pendiente ? 'El trámite figurará como Pendiente y no sumará folios hasta adjuntar la evidencia.' : 'El PDF se envía al guardar. Los documentos anteriores se conservan; los folios activos se recalculan automáticamente.'}>

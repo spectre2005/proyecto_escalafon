@@ -16,7 +16,6 @@ final class ResumenSeccion10
         'S10_SUBSIDIOS' => ['10.2', 'Trámites y gestiones de subsidios', false, false, false],
         'S10_DESCANSO_MEDICO' => ['10.2', 'Descansos médicos', true, false, false],
         'S10_EPS' => ['10.2', 'Afiliaciones a Entidades Prestadoras de Salud (EPS)', true, true, true],
-        'S10_OTROS' => ['10.2', 'Otros documentos requeridos por la entidad', false, true, false],
     ];
 
     /** @param Collection<int, array<string, mixed>> $documentos */
@@ -36,12 +35,14 @@ final class ResumenSeccion10
             'numero_folios' => $vigentes->sum('numero_folios'), 'documentos' => $documentos->values()->all()];
     }
 
-    /** @param Collection<int, array<string, mixed>> $items */
-    public static function folios(Collection $items): array
+    /** @param Collection<int, array<string, mixed>> $documentos */
+    public static function folios(Collection $documentos): array
     {
-        $sst = $items->where('subseccion', '10.1')->sum('numero_folios');
-        $bienestar = $items->where('subseccion', '10.2')->sum('numero_folios');
+        $vigentes = $documentos->filter(fn (array $doc): bool => ! $doc['anulado'] && ! $doc['subsanado']);
+        $sst = $vigentes->where('subseccion', '10.1')->sum('numero_folios');
+        $bienestar = $vigentes->where('subseccion', '10.2')->sum('numero_folios');
+        $total = $vigentes->sum('numero_folios');
 
-        return ['sst' => $sst, 'bienestar' => $bienestar, 'total' => $sst + $bienestar];
+        return ['sst' => $sst, 'bienestar' => $bienestar, 'total' => $total, 'sin_clasificar' => $total - $sst - $bienestar];
     }
 }

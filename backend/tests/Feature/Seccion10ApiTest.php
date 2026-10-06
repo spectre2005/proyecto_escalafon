@@ -78,13 +78,13 @@ class Seccion10ApiTest extends TestCase
         return collect($this->getJson($this->url())->assertOk()->json('data.items'))->firstWhere('codigo', $codigo);
     }
 
-    public function test_catalogue_has_two_subsections_ten_types_and_real_empty_states(): void
+    public function test_catalogue_has_two_subsections_nine_types_and_real_empty_states(): void
     {
         $this->seed(Seccion10CatalogoSeeder::class);
         $this->assertSame(2, SubseccionLegajo::query()->where('seccion_legajo_id', 10)->count());
-        $this->assertSame(10, TipoDocumento::query()->where('seccion_legajo_id', 10)->count());
+        $this->assertSame(9, TipoDocumento::query()->where('seccion_legajo_id', 10)->count());
         $data = $this->getJson($this->url())->assertOk()->assertJsonPath('data.folios.total', 0)->json('data');
-        $this->assertCount(10, $data['items']);
+        $this->assertCount(9, $data['items']);
         $this->assertSame($this->persona->id, $data['persona']['id']);
         $this->assertSame($this->persona->numero_doc_identidad, $data['persona']['numero_doc_identidad']);
         foreach ($data['items'] as $item) {
@@ -96,6 +96,56 @@ class Seccion10ApiTest extends TestCase
     public static function conceptos(): array
     {
         return array_map(fn (string $codigo): array => [$codigo], array_keys(ResumenSeccion10::TIPOS));
+    }
+
+    public function test_subsection_queries_separate_sst_and_welfare_and_keep_section_totals(): void
+    {
+        $this->cargar('S10_CAPACITACIONES', ['numero_folios' => 3])->assertCreated();
+        $this->cargar('S10_SUBSIDIOS', ['numero_folios' => 2])->assertCreated();
+        foreach (['10.1' => 5, '10.2' => 4] as $subseccion => $cantidad) {
+            $data = $this->getJson($this->url('?subseccion='.$subseccion))->assertOk()
+                ->assertJsonPath('data.subseccion', $subseccion)->assertJsonCount($cantidad, 'data.items')
+                ->assertJsonPath('data.folios.sst', 3)->assertJsonPath('data.folios.bienestar', 2)->assertJsonPath('data.folios.total', 5)->json('data');
+            foreach ($data['items'] as $item) {
+                $this->assertSame($subseccion, $item['subseccion']);
+                $this->assertNotSame('S10_OTROS', $item['codigo']);
+            }
+        }
+        $this->getJson($this->url('?subseccion=10.3'))->assertUnprocessable();
+    }
+
+    public function test_retired_type_cannot_receive_new_uploads_and_preserves_existing_documents_and_folios(): void
+    {
+        $subseccion = SubseccionLegajo::query()->where('seccion_legajo_id', 10)->where('codigo', '10.2')->firstOrFail();
+        $tipo = TipoDocumento::factory()->create(['seccion_legajo_id' => 10, 'subseccion_legajo_id' => $subseccion->id, 'codigo' => 'S10_OTROS', 'activo' => true]);
+        $doc = DocumentoUsuario::factory()->create(['usuario_id' => $this->persona->id, 'legajo_id' => $this->legajo->id,
+            'seccion_legajo_id' => 10, 'tipo_documento_id' => $tipo->id, 'estado' => 'cargado', 'archivo_id' => null,
+            'folio_inicio' => 1, 'folio_fin' => 3, 'created_by' => $this->autor->id]);
+        RegistroSstBienestar::factory()->create(['usuario_id' => $this->persona->id, 'documento_id' => $doc->id, 'tipo' => 'S10_OTROS', 'anulado' => false]);
+        $this->seed(Seccion10CatalogoSeeder::class);
+        $this->assertFalse($tipo->fresh()->activo);
+        $this->cargar('S10_OTROS')->assertUnprocessable();
+        $this->getJson($this->url('?subseccion=10.2'))->assertOk()->assertJsonCount(4, 'data.items')
+            ->assertJsonPath('data.documentos_anteriores.0.id', $doc->id)->assertJsonPath('data.folios.bienestar', 3)->assertJsonPath('data.folios.total', 3);
+        $this->getJson($this->url('?subseccion=10.1'))->assertOk()->assertJsonCount(0, 'data.documentos_anteriores');
+        $this->getJson($this->url('/documentos/'.$doc->id.'/historial'))->assertOk()->assertJsonPath('data.documento.id', $doc->id);
+        $this->assertDatabaseHas('documentos_usuario', ['id' => $doc->id]);
+    }
+
+    public function test_opening_legajo_then_uploading_from_both_subsections_uses_complete_base_catalogue(): void
+    {
+        $this->persona = Usuario::factory()->create();
+        $this->getJson($this->url('?subseccion=10.1'))->assertOk()->assertJsonPath('data.legajo', null);
+        $legajo = $this->postJson('/api/v1/expedientes/'.$this->persona->id.'/legajo')->assertCreated()->assertJsonPath('data.secciones', 13)->json('data.id');
+        $this->legajo = Legajo::query()->findOrFail($legajo);
+        $this->cargar('S10_REGLAMENTO')->assertCreated();
+        $this->cargar('S10_SEGURO')->assertCreated();
+        foreach (['10.1', '10.2'] as $subseccion) {
+            $this->getJson($this->url('?subseccion='.$subseccion))->assertOk()->assertJsonPath('data.legajo.id', $legajo)
+                ->assertJsonPath('data.folios.sst', 2)->assertJsonPath('data.folios.bienestar', 2)->assertJsonPath('data.folios.total', 4);
+        }
+        $this->assertCount(2, Storage::disk(config('legajo.disco_documentos'))->allFiles());
+        $this->postJson('/api/v1/expedientes/'.$this->persona->id.'/legajo')->assertConflict();
     }
 
     #[DataProvider('conceptos')]

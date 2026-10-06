@@ -24,6 +24,7 @@ class Seccion10Controller extends Controller
 {
     public function show(Request $request, string $usuario): JsonResponse
     {
+        $subseccion = $request->validate(['subseccion' => 'nullable|in:10.1,10.2'])['subseccion'] ?? null;
         $persona = Usuario::query()->with(['unidadOrganica', 'vinculosLaborales.unidadOrganica'])->findOrFail($usuario);
         $legajo = $persona->legajos()->where('estado_legajo', 'activo')->orderByDesc('fecha_apertura')->orderByDesc('id')->first();
         $hoy = now('America/Lima')->toDateString();
@@ -32,10 +33,11 @@ class Seccion10Controller extends Controller
             ->with(['archivo', 'legajo', 'tipoDocumento.subseccionLegajo', 'registrosSstBienestar', 'documentosUsuarioPorSubsanaADocumento', 'createdBy'])
             ->orderByDesc('fecha_emision')->orderByDesc('id')->get()->map(fn (DocumentoUsuario $doc): array => $this->documento($doc, $request));
         $items = $tipos->map(fn (TipoDocumento $tipo): array => ResumenSeccion10::item($tipo->only(['id', 'codigo', 'nombre', 'activo', 'descripcion', 'requiere_fedateo']),
-            $docs->where('tipo_documento_id', $tipo->id), $hoy));
-        $folios = ResumenSeccion10::folios($items);
-        $folios['total'] = $docs->filter(fn (array $doc): bool => ! $doc['anulado'] && ! $doc['subsanado'])->sum('numero_folios');
-        $folios['sin_clasificar'] = $folios['total'] - $folios['sst'] - $folios['bienestar'];
+            $docs->where('tipo_documento_id', $tipo->id), $hoy))
+            ->when($subseccion, fn ($items) => $items->where('subseccion', $subseccion))->values();
+        $folios = ResumenSeccion10::folios($docs);
+        $anteriores = $docs->reject(fn (array $doc): bool => isset(ResumenSeccion10::TIPOS[$doc['codigo_tipo']]))
+            ->when($subseccion, fn ($docs) => $docs->filter(fn (array $doc): bool => ! $doc['subseccion'] || $doc['subseccion'] === $subseccion))->values();
         $vinculos = $persona->vinculosLaborales->where('anulado', false);
         $actual = $vinculos->filter(fn ($v): bool => $v->fecha_inicio->format('Y-m-d') <= $hoy
             && (! $v->fecha_cese || $v->fecha_cese->format('Y-m-d') >= $hoy))->sortByDesc('fecha_inicio')->first();
@@ -49,6 +51,7 @@ class Seccion10Controller extends Controller
                 'unidad_organica' => $actual?->unidadOrganica?->nombre ?? $persona->unidadOrganica?->nombre,
                 'fecha_ingreso' => $vinculos->sortBy('fecha_inicio')->first()?->fecha_inicio?->format('Y-m-d')],
             'legajo' => $legajo?->only(['id', 'numero_legajo']), 'items' => $items->all(), 'folios' => $folios,
+            'subseccion' => $subseccion, 'documentos_anteriores' => $anteriores->all(),
             'fecha_actual' => $hoy, 'folio_sugerido' => $legajo ? Folios::ultimo($legajo, 10) + 1 : null,
             'tamano_maximo_kb' => Parametros::entero('tamano_maximo_pdf_kb'),
         ]]);
@@ -171,7 +174,7 @@ class Seccion10Controller extends Controller
     {
         Usuario::query()->findOrFail($usuario);
 
-        return DocumentoUsuario::query()->where('usuario_id', $usuario)->where('seccion_legajo_id', 10)->with('tipoDocumento')->findOrFail($documento);
+        return DocumentoUsuario::query()->where('usuario_id', $usuario)->where('seccion_legajo_id', 10)->with('tipoDocumento.subseccionLegajo')->findOrFail($documento);
     }
 
     private function documento(DocumentoUsuario $doc, Request $request): array
@@ -193,6 +196,7 @@ class Seccion10Controller extends Controller
             : ($registro?->fecha_inicio?->format('Y-m-d') > $hoy || ! $disponible ? 'pendiente' : 'activo'));
 
         return [...$doc->only(['id', 'nombre', 'emisor', 'tipo_documento_id', 'folio_inicio', 'folio_fin', 'modalidad_presentacion', 'subsana_a_documento_id', 'fedateado', 'fiscalizado', 'created_by']),
+            'codigo_tipo' => $doc->tipoDocumento->codigo, 'subseccion' => $doc->tipoDocumento->subseccionLegajo?->codigo,
             ...($registro?->only(['descripcion', 'numero_documento', 'entidad', 'estado_tramite', 'motivo_anulacion']) ?? []),
             'estado_original' => $doc->estado, 'anulado' => $anulado, 'subsanado' => $subsanado, 'archivo_disponible' => (bool) $disponible,
             'archivo' => $doc->archivo?->only(['id', 'nombre_original', 'mime_type', 'tamano_bytes', 'num_paginas', 'estado_antivirus']),

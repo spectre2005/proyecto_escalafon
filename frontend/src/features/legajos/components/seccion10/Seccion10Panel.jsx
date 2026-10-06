@@ -89,8 +89,9 @@ function Documentos({ item, permisos, abrir, ver }) {
   </section>
 }
 
-export default function Seccion10Panel({ usuario }) {
-  const consulta = useLiveQuery(`/expedientes/${usuario}/seccion-10`)
+export default function Seccion10Panel({ usuario, subseccion = '10.1' }) {
+  const titulo = subseccion === '10.1' ? 'Seguridad y Salud en el Trabajo (SST)' : 'Bienestar Social'
+  const consulta = useLiveQuery(`/expedientes/${usuario}/seccion-10?subseccion=${subseccion}`)
   const data = consulta.data?.data
   const subir = usePuede('documento.subir')
   const editar = usePuede('legajo.editar')
@@ -106,13 +107,13 @@ export default function Seccion10Panel({ usuario }) {
     setAviso('Operación guardada. La ficha y los folios se han actualizado.')
     consulta.retry()
   }
-  if (!data) return consulta.error ? <p role="alert" className="rounded-xl bg-rose-50 p-5 text-sm text-rose-800">{apiErrorMessage(consulta.error)} <button className="underline" onClick={consulta.retry}>Reintentar</button></p> : <p role="status" className="p-6 text-sm text-slate-500">Cargando SST y Bienestar Social…</p>
+  if (!data) return consulta.error ? <p role="alert" className="rounded-xl bg-rose-50 p-5 text-sm text-rose-800">{apiErrorMessage(consulta.error)} <button className="underline" onClick={consulta.retry}>Reintentar</button></p> : <p role="status" className="p-6 text-sm text-slate-500">Cargando {titulo}…</p>
   const itemSeleccionado = data.items.find(item => item.id === seleccion)
   const primero = data.items.find(item => item.activo)
   const persona = data.persona
-  return <section aria-label="Seguridad y Salud en el Trabajo y Bienestar Social" className="space-y-5">
+  return <section aria-label={titulo} className="space-y-5">
     <header className="rounded-2xl border border-slate-200 bg-white p-5">
-      <p className="text-xs font-semibold uppercase tracking-wider text-teal-700">Sección 10</p><h2 className="mt-2 text-xl font-semibold text-slate-800">Seguridad y Salud en el Trabajo (SST) y Bienestar Social</h2>
+      <p className="text-xs font-semibold uppercase tracking-wider text-teal-700">Sección 10 · {subseccion}</p><h2 className="mt-2 text-xl font-semibold text-slate-800">{titulo}</h2>
       <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-3">{[['Servidor', persona.nombre_completo], [persona.tipo_doc_identidad?.toUpperCase() || 'DNI', persona.numero_doc_identidad], ['Cargo', persona.cargo], ['Fecha de ingreso', fecha(persona.fecha_ingreso)], ['Unidad orgánica', persona.unidad_organica], ['Régimen laboral', persona.regimen_laboral], ['Tipo de personal', persona.tipo_personal]].map(([titulo, valor]) => <div key={titulo}><dt className="text-xs text-slate-500">{titulo}</dt><dd className="mt-1 text-slate-800">{valor || 'No registrado'}</dd></div>)}</dl>
     </header>
     {!data.legajo && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p className="mb-3">Abre el legajo para registrar trámites y documentos.</p><AbrirLegajo usuario={usuario} /></div>}
@@ -120,16 +121,17 @@ export default function Seccion10Panel({ usuario }) {
     {aviso && <p role="status" className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">{aviso}</p>}
     {subir && data.legajo && primero && <div className="flex flex-wrap gap-3"><button className={boton} onClick={() => abrir('nuevo', primero)}>Adjuntar documento</button><button className={boton} onClick={() => abrir('pendiente', primero)}>Registrar trámite pendiente</button></div>}
     <p className="text-xs leading-relaxed text-slate-500">“Sí” indica evidencia disponible y vigente; la recepción y revisión se muestran en cada documento. Los trámites sin archivo figuran como “Pendiente”. Las versiones anteriores y los anulados se conservan en el historial.</p>
-    {[['10.1', 'Seguridad y Salud en el Trabajo (SST)'], ['10.2', 'Bienestar Social']].map(([codigo, titulo]) => <section key={codigo} aria-label={`${codigo} ${titulo}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-      <h3 className="border-b border-slate-100 p-5 font-semibold text-slate-800">{codigo} {titulo}</h3>
+    <section aria-label={`Documentos de ${titulo}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <h3 className="border-b border-slate-100 p-5 font-semibold text-slate-800">Documentos de {titulo}</h3>
       <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr>{['Tipo de documento', 'Estado', 'Cantidad', 'Última fecha', 'Número de folios', 'Acciones'].map(tituloColumna => <th key={tituloColumna} scope="col" className="px-4 py-3 font-medium">{tituloColumna}</th>)}</tr></thead><tbody>
-        {data.items.filter(item => item.subseccion === codigo).map(item => <tr key={item.id} className="border-t border-slate-100"><th scope="row" className="min-w-64 px-4 py-4 font-medium text-slate-800">{item.nombre}{!item.activo && <span className="ml-2 text-xs text-slate-400">Inactivo</span>}</th><td className="px-4 py-4"><span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs ${estados[item.estado][1]}`}>{estados[item.estado][0]}</span></td><td className="px-4 py-4">{item.cantidad}</td><td className="whitespace-nowrap px-4 py-4 text-slate-600">{fecha(item.ultima_fecha)}</td><td className="px-4 py-4">{item.numero_folios}</td><td className="px-4 py-4"><div className="flex min-w-36 flex-wrap gap-2"><button className={boton} onClick={() => setSeleccion(item.id)}>Ver documentos</button>{subir && data.legajo && item.activo && <button className={boton} onClick={() => abrir('nuevo', item)}>Adjuntar</button>}</div></td></tr>)}
+        {data.items.filter(item => item.subseccion === subseccion).map(item => <tr key={item.id} className="border-t border-slate-100"><th scope="row" className="min-w-64 px-4 py-4 font-medium text-slate-800">{item.nombre}{!item.activo && <span className="ml-2 text-xs text-slate-400">Inactivo</span>}</th><td className="px-4 py-4"><span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs ${estados[item.estado][1]}`}>{estados[item.estado][0]}</span></td><td className="px-4 py-4">{item.cantidad}</td><td className="whitespace-nowrap px-4 py-4 text-slate-600">{fecha(item.ultima_fecha)}</td><td className="px-4 py-4">{item.numero_folios}</td><td className="px-4 py-4"><div className="flex min-w-36 flex-wrap gap-2"><button className={boton} onClick={() => setSeleccion(item.id)}>Ver documentos</button>{subir && data.legajo && item.activo && <button className={boton} onClick={() => abrir('nuevo', item)}>Adjuntar</button>}</div></td></tr>)}
       </tbody></table></div>
-    </section>)}
-    <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-3">{[['Número de folios SST', data.folios.sst], ['Número de folios Bienestar Social', data.folios.bienestar], ['Total de folios', data.folios.total]].map(([titulo, cantidad]) => <div key={titulo}><p className="text-xs text-slate-500">{titulo}</p><p className="mt-2 text-2xl font-bold text-slate-800">{cantidad}</p></div>)}</div>
-    {data.folios.sin_clasificar > 0 && <p className="rounded-xl bg-amber-50 p-4 text-xs text-amber-900">El total incluye {data.folios.sin_clasificar} folio(s) de documentos anteriores al catálogo actual. Puedes consultarlos en “Documentos de la sección”.</p>}
+    </section>
+    <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-2">{[[`Número de folios ${subseccion === '10.1' ? 'SST' : 'Bienestar Social'}`, subseccion === '10.1' ? data.folios.sst : data.folios.bienestar], ['Total de folios de la Sección 10', data.folios.total]].map(([etiqueta, cantidad]) => <div key={etiqueta}><p className="text-xs text-slate-500">{etiqueta}</p><p className="mt-2 text-2xl font-bold text-slate-800">{cantidad}</p></div>)}</div>
+    {data.folios.sin_clasificar > 0 && <p className="rounded-xl bg-amber-50 p-4 text-xs text-amber-900">El total incluye {data.folios.sin_clasificar} folio(s) de documentos anteriores sin clasificación. Se conservan en el historial.</p>}
+    {data.documentos_anteriores?.length > 0 && <details className="rounded-2xl border border-slate-200 bg-white p-4"><summary className="cursor-pointer text-sm font-medium text-slate-700">Documentos archivados de tipos anteriores</summary><div className="mt-4"><Documentos item={{ nombre: 'Documentos archivados', activo: false, documentos: data.documentos_anteriores }} permisos={{ anular }} abrir={abrir} ver={setVisor} /></div></details>}
     {itemSeleccionado && <Documentos key={itemSeleccionado.id} item={itemSeleccionado} permisos={{ subir, editar, revisar, anular }} abrir={abrir} ver={setVisor} />}
-    {visor && <Modal titulo="Documento SST / Bienestar Social" onClose={() => setVisor(null)}><VisorPdf usuario={usuario} documento={visor} titulo={visor.nombre} onClose={() => setVisor(null)} /></Modal>}
+    {visor && <Modal titulo={`Documento de ${titulo}`} onClose={() => setVisor(null)}><VisorPdf usuario={usuario} documento={visor} titulo={visor.nombre} onClose={() => setVisor(null)} /></Modal>}
     {modal && <Modal titulo={modal.modo === 'historial' ? `Historial: ${modal.documento.nombre}` : modal.item.nombre} onClose={() => setModal(null)}>
       {modal.modo === 'historial' ? <Historial usuario={usuario} documento={modal.documento} /> : ['aceptado', 'observado', 'anulado'].includes(modal.modo)
         ? <Revision03Form usuario={usuario} documento={modal.documento} item={modal.item} estado={modal.modo} fechaActual={data.fecha_actual} revisar={modal.modo === 'anulado' ? anularDocumento10 : revisarDocumento10} onSaved={guardado} onCancel={() => setModal(null)} nota="La operación conserva el archivo y queda registrada con tu usuario, fecha y hora. La revisión requiere una persona distinta de quien realizó la carga." />

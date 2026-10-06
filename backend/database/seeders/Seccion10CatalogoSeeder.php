@@ -34,10 +34,11 @@ class Seccion10CatalogoSeeder extends Seeder
                     'id' => self::id($orden), 'subseccion_legajo_id' => $subsecciones[$subseccion]->id,
                     'nombre' => $nombre, 'orden' => $orden, 'permite_multiples' => true, 'obligatorio' => false,
                     'es_dato_sensible' => true, 'es_dato_salud' => in_array($codigo, ['S10_ACCIDENTES_INCIDENTES', 'S10_EXAMEN_OCUPACIONAL', 'S10_DESCANSO_MEDICO'], true),
-                    'es_hook_universidad' => $codigo === 'S10_OTROS', 'activo' => true,
+                    'es_hook_universidad' => false, 'activo' => true,
                     'descripcion' => $codigo === 'S10_EXAMEN_OCUPACIONAL' ? 'Solo evidencia administrativa de realización, sin diagnósticos ni resultados clínicos.' : null,
                 ]);
             }
+            TipoDocumento::query()->where('seccion_legajo_id', 10)->where('codigo', 'S10_OTROS')->update(['activo' => false]);
         });
     }
 }

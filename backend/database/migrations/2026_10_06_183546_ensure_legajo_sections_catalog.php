@@ -1,8 +1,7 @@
 <?php
 
+use Database\Seeders\SeccionesLegajoCatalogoSeeder;
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -11,7 +10,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        //
+        (new SeccionesLegajoCatalogoSeeder)->run();
     }
 
     /**
@@ -19,6 +18,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        //
+        // Las secciones fijas se conservan: pueden estar referenciadas por legajos y documentos.
     }
 };
