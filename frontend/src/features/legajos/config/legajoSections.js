@@ -13,12 +13,17 @@ export const legajoSections = [
   { number: '08', title: 'Reconocimientos y sanciones disciplinarias', categories: ['reconocimientos', 'sanciones'] },
   // Anexo 01: controversias individuales (a), colectivas (b), afiliación al sindicato (c) y otros; cada entrada muestra sus registros y sus documentos.
   { number: '09', title: 'Relaciones laborales individuales y colectivas', categories: ['s09-individuales', 's09-colectivas', 's09-afiliacion', 's09-otros'], sinDocumentos: true },
-  { number: '10', title: 'Seguridad y Salud en el Trabajo (SST) y bienestar social', categories: ['registros-sst-bienestar'] },
+  { number: '10', title: 'Seguridad y Salud en el Trabajo (SST) y bienestar social', categories: ['s10-sst', 's10-bienestar'], sinDocumentos: true },
   // Anexo 01, literales a) a g) y aceptación de renuncia (Anexo 05): la desvinculación de cada vínculo y sus documentos.
   { number: '11', title: 'Desvinculación', categories: ['s11-desvinculacion', 's11-documentos'], sinDocumentos: true },
 ]
 
+export const subseccionesSeccion10 = {
+  's10-sst': { codigo: '10.1', titulo: 'Seguridad y Salud en el Trabajo (SST)' },
+  's10-bienestar': { codigo: '10.2', titulo: 'Bienestar Social' },
+}
+
 export function findDocumentSection(group, sections) {
   const normalize = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
-  return sections.find(section => normalize(section.nombre) === normalize(group.title))
+  return sections.find(section => Number(section.id) === Number(group.number)) || sections.find(section => normalize(section.nombre) === normalize(group.title))
 }

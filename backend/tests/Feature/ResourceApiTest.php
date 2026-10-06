@@ -23,6 +23,7 @@ use App\Models\ProgresionCarrera;
 use App\Models\RatificacionDocente;
 use App\Models\Reconocimiento;
 use App\Models\RecursoImpugnatorio;
+use App\Models\RegistroSstBienestar;
 use App\Models\Rol;
 use App\Models\Sancion;
 use App\Models\Usuario;
@@ -65,6 +66,9 @@ class ResourceApiTest extends TestCase
      * Siguen cubiertos por ModelPersistenceTest.
      */
     private const SIN_CRUD_GENERICO = [RecursoImpugnatorio::class];
+
+    /** Sección 10: igual, se registran desde Legajos\Seccion10Controller (el CRUD genérico exige además datos_sensibles.ver). */
+    private const SECCION_10 = [RegistroSstBienestar::class];
 
     /** Sección 11: igual, desde Legajos\Seccion11Controller. */
     private const SECCION_11 = [Desvinculacion::class];
@@ -151,7 +155,7 @@ class ResourceApiTest extends TestCase
             unset($payload['registrado_por']);
         }
         $uri = '/api/v1/'.str_replace('_', '-', $model->getTable());
-        $soloLectura = $model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento || in_array($class, [...self::SECCION_02, ...self::SECCION_05, ...self::SECCION_07, ...self::SECCION_08, ...self::SECCION_09, ...self::SECCION_11], true);
+        $soloLectura = $model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento || in_array($class, [...self::SECCION_02, ...self::SECCION_05, ...self::SECCION_07, ...self::SECCION_08, ...self::SECCION_09, ...self::SECCION_10, ...self::SECCION_11], true);
         if ($soloLectura) {
             // Documentos y archivos se crean únicamente por la carga del legajo (folios, hash y bitácora); los registros de
             // las secciones 02 y 05, solo desde Seccion02Controller y Seccion05Controller.

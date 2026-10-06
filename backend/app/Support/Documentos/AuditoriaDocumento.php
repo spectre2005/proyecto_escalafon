@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 /** Cadena de auditoría por documento; se invoca dentro de la transacción que lo crea o revisa. */
 final class AuditoriaDocumento
 {
-    public static function registrar(DocumentoUsuario $documento, Request $request, string $accion, ?array $antes = null): void
+    public static function registrar(DocumentoUsuario $documento, Request $request, string $accion, ?array $antes = null, ?array $despues = null): void
     {
         DocumentoUsuario::query()->whereKey($documento->id)->lockForUpdate()->firstOrFail();
         $previo = AuditoriaEvento::query()->where('entidad', 'documentos_usuario')->where('entidad_id', $documento->id)
@@ -20,7 +20,7 @@ final class AuditoriaDocumento
             'usuario_titular_id' => $documento->usuario_id, 'accion' => $accion,
             'entidad' => 'documentos_usuario', 'entidad_id' => $documento->id,
             'datos_antes' => $antes === null ? null : json_encode($antes, JSON_THROW_ON_ERROR),
-            'datos_despues' => json_encode($documento->getAttributes(), JSON_THROW_ON_ERROR),
+            'datos_despues' => json_encode($despues ?? $documento->getAttributes(), JSON_THROW_ON_ERROR),
             'ip_origen' => $request->ip(), 'user_agent' => mb_substr((string) $request->userAgent(), 0, 300),
             'request_id' => (string) Str::uuid(), 'hash_previo' => $previo,
         ];

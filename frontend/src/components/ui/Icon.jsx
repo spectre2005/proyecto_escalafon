@@ -16,6 +16,7 @@ export default function Icon({ name, size = 20, ...props }) {
     close: <path d="m6 6 12 12M6 18 18 6" />,
     check: <path d="m5 12 4 4L19 6" />,
     upload: <><path d="M12 16V3m-5 5 5-5 5 5M4 16v5h16v-5" /></>,
+    eye: <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></>,
     user: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>,
     logout: <><path d="M10 4H4v16h6M15 8l4 4-4 4M19 12H9" /></>,
   }

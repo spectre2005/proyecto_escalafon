@@ -42,7 +42,7 @@ export const gruposSeccion01 = {
 export const formulariosDatos01 = { familiares: 'Familiar', declaraciones_verificaciones: 'Declaración o verificación', certificados_discapacidad: 'Certificado de discapacidad' }
 
 // Categorías de las secciones 01, 09 y 10: requieren datos_sensibles.ver (el backend responde 403).
-export const categoriasSensibles = [...Object.keys(gruposSeccion01).filter(key => key !== 'general'), 'afiliaciones', 'controversias', 'registros-sst-bienestar']
+export const categoriasSensibles = [...Object.keys(gruposSeccion01).filter(key => key !== 'general'), 'afiliaciones', 'controversias', 'registros-sst-bienestar', 'seccion-10', 's10-sst', 's10-bienestar']
 
 export function etiqueta(lista, valor) {
   if (valor === null || valor === undefined || valor === '') return 'No registrado'

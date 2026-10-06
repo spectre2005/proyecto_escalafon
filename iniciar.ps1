@@ -28,7 +28,7 @@ try {
 
     Invoke-Docker @('compose', 'exec', '-T', 'app', 'php', 'artisan', 'migrate', '--no-interaction')
     Invoke-Docker @('compose', 'exec', '-T', 'app', 'php', 'artisan', 'optimize:clear', '--no-interaction')
-    Invoke-Docker @('compose', 'up', '-d', '--build', 'frontend')
+    Invoke-Docker @('compose', 'up', '-d', '--build', '--force-recreate', 'frontend')
 
     Write-Host 'Sistema preparado. Abre http://localhost:5173'
     Write-Host 'Cada computadora que clona el proyecto tiene su propia base de datos y archivos.'

@@ -6,6 +6,7 @@ use App\Models\Legajo;
 use App\Models\LegajoSeccion;
 use App\Models\PerfilAdministrativo;
 use App\Models\PerfilDocente;
+use App\Models\SeccionLegajo;
 use App\Models\Usuario;
 use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
@@ -199,6 +200,7 @@ class Seccion02CierreTest extends TestCase
         $this->postJson($this->url($persona, 'legajo'))->assertForbidden();
 
         $this->actuarComo();
+        SeccionLegajo::query()->whereKey(12)->delete();
         $this->postJson($this->url($persona, 'legajo'))->assertConflict();
         $this->assertSame(0, Legajo::query()->where('usuario_id', $persona->id)->count());
     }
