@@ -67,6 +67,21 @@ class AuthenticationTest extends TestCase
         $this->assertDatabaseCount('usuarios', 0);
     }
 
+    public function test_admin_seeder_reuses_system_administrator_when_email_changes(): void
+    {
+        $this->seed(AdministradorSeeder::class);
+        $admin = Usuario::firstOrFail();
+        config(['auth.administrador_inicial' => ['email' => 'nuevo@example.test', 'password' => 'da123']]);
+
+        $this->seed(AdministradorSeeder::class);
+
+        $this->assertDatabaseCount('usuarios', 1);
+        $this->assertDatabaseCount('usuario_roles', 1);
+        $this->assertSame('nuevo@example.test', $admin->fresh()->email_institucional);
+        $this->assertTrue(Hash::check('da123', $admin->fresh()->password));
+        $this->login('nuevo@example.test', 'da123')->assertOk();
+    }
+
     public function test_successful_login_returns_user_permissions_and_sensitive_flag(): void
     {
         $this->seed(AdministradorSeeder::class);

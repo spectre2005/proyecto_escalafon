@@ -14,6 +14,8 @@ use App\Support\Documentos\EstadoDocumento;
 use App\Support\Documentos\Folios;
 use App\Support\Documentos\FormulariosDatos;
 use App\Support\Parametros;
+use App\Support\ResumenSeccion04;
+use App\Support\ResumenSeccion06;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -63,6 +65,8 @@ class DocumentoLegajoController extends Controller
         $request->validate(['tipo_documento_id' => ['required', 'uuid', Rule::exists('tipos_documento', 'id')->where('seccion_legajo_id', $seccion)->where('activo', true)]],
             ['tipo_documento_id.exists' => 'El tipo de documento no pertenece a la sección indicada (o está inactivo).']);
         $tipo = TipoDocumento::query()->findOrFail($request->input('tipo_documento_id'));
+        abort_if($tipo->seccion_legajo_id === 6 && isset(ResumenSeccion06::ITEMS[$tipo->codigo]), 422, 'Registra esta evidencia mediante Agregar documento en la Sección 06.');
+        abort_if($seccion === 4 && isset(ResumenSeccion04::ITEMS[$tipo->codigo]), 422, 'Usa Agregar documento en la Sección 04 para registrar sus datos de experiencia.');
         $this->exigirSensibles($request, $seccion, $tipo);
 
         $maximo = Parametros::entero('tamano_maximo_pdf_kb');
@@ -141,6 +145,8 @@ class DocumentoLegajoController extends Controller
         $accion = $request->validate(['accion' => 'sometimes|in:ver,descargar'])['accion'] ?? 'ver';
         $registro = $this->documentoDe($request, $usuario, $documento);
         $archivo = $registro->archivo;
+        abort_if(in_array($registro->seccion_legajo_id, [3, 4, 6], true) && $archivo?->estado_antivirus === 'infectado', 423,
+            'El archivo está bloqueado por el antivirus. Registra un documento nuevo que lo subsane.');
         $disco = (string) config('legajo.disco_documentos');
         abort_unless($archivo && $archivo->almacenamiento === $disco && Storage::disk($disco)->exists($archivo->storage_path), 404, 'El documento no tiene un archivo disponible.');
 

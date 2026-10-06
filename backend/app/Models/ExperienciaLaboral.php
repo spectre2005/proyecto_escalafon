@@ -23,6 +23,9 @@ class ExperienciaLaboral extends Model
         'entidad_empresa',
         'sector',
         'cargo',
+        'tipo_vinculo',
+        'es_ejercicio_profesional',
+        'es_docencia_universitaria',
         'funciones',
         'fecha_inicio',
         'fecha_fin',
@@ -38,6 +41,8 @@ class ExperienciaLaboral extends Model
             'fecha_inicio' => 'date',
             'fecha_fin' => 'date',
             'anulado' => 'boolean',
+            'es_ejercicio_profesional' => 'boolean',
+            'es_docencia_universitaria' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];

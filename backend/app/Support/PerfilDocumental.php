@@ -21,6 +21,7 @@ final class PerfilDocumental
 
     /** Columna requiere_* => [bandera del perfil, texto cuando no aplica]. */
     private const REQUIERE = [
+        'requiere_estudios_basicos' => ['exige_estudios_basicos', 'solo si el puesto exige estudios básicos'],
         'requiere_djbr' => ['obligado_djbr', 'solo para obligados a la declaración jurada de bienes y rentas'],
         'requiere_colegiatura' => ['exige_colegiatura', 'solo si el puesto exige colegiatura'],
         'requiere_derechohabientes' => ['tiene_derechohabientes', 'solo si tiene derechohabientes'],
@@ -32,8 +33,9 @@ final class PerfilDocumental
      * @param  list<string>  $regimenes
      * @param  list<string>  $tiposPersonal
      * @param  array<string, bool>  $banderas
+     * @param  list<string>  $puestos
      */
-    private function __construct(public readonly array $regimenes, public readonly array $tiposPersonal, public readonly array $banderas) {}
+    private function __construct(public readonly array $regimenes, public readonly array $tiposPersonal, public readonly array $banderas, public readonly array $puestos) {}
 
     /** @param Collection<int, VinculoLaboral> $vinculos */
     public static function de(Usuario $usuario, Collection $vinculos): self
@@ -42,7 +44,7 @@ final class PerfilDocumental
         $vigentes = $vinculos->whereNull('fecha_cese')->reject(fn (VinculoLaboral $vinculo): bool => (bool) $vinculo->anulado);
         $origen = $vigentes->isEmpty() ? collect([$usuario]) : $vigentes;
         $banderas = [];
-        foreach (['obligado_djbr', 'exige_colegiatura', 'tiene_periodo_prueba'] as $bandera) {
+        foreach (['obligado_djbr', 'exige_colegiatura', 'exige_estudios_basicos', 'tiene_periodo_prueba'] as $bandera) {
             $banderas[$bandera] = (bool) $usuario->{$bandera} || $vigentes->contains(fn (VinculoLaboral $vinculo): bool => (bool) $vinculo->{$bandera});
         }
         foreach (['tiene_derechohabientes', 'con_discapacidad'] as $bandera) {
@@ -53,6 +55,7 @@ final class PerfilDocumental
             $origen->pluck('regimen_laboral')->filter()->unique()->values()->all(),
             $origen->pluck('tipo_personal')->filter()->unique()->values()->all(),
             $banderas,
+            $origen->pluck('nombre_puesto')->filter()->unique()->values()->all(),
         );
     }
 

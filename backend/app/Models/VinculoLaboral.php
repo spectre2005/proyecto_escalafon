@@ -27,6 +27,7 @@ class VinculoLaboral extends Model
         'nombre_puesto',
         'obligado_djbr',
         'exige_colegiatura',
+        'exige_estudios_basicos',
         'tiene_periodo_prueba',
         'proceso_seleccion',
         'fecha_resultado_seleccion',
@@ -45,6 +46,7 @@ class VinculoLaboral extends Model
         return [
             'obligado_djbr' => 'boolean',
             'exige_colegiatura' => 'boolean',
+            'exige_estudios_basicos' => 'boolean',
             'tiene_periodo_prueba' => 'boolean',
             'fecha_resultado_seleccion' => 'date',
             'fecha_inicio' => 'date',

@@ -3,6 +3,13 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Models\DocumentoUsuario;
+use App\Models\TipoDocumento;
+use App\Support\ResumenSeccion04;
+use App\Support\ResumenSeccion06;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
 
 class DocumentoUsuarioController extends ResourceController
 {
@@ -38,4 +45,31 @@ class DocumentoUsuarioController extends ResourceController
         'subsana_a_documento_id' => 'nullable|uuid|exists:documentos_usuario,id',
         'created_by' => 'required|uuid|exists:usuarios,id',
     ];
+
+    protected function indexQuery(): Builder
+    {
+        $query = parent::indexQuery();
+        if (! request()->user()->veDatosSensibles()) {
+            $query->whereNotIn('seccion_legajo_id', [1, 9, 10])
+                ->whereHas('tipoDocumento', fn ($tipo) => $tipo->where('es_dato_sensible', false)->where('es_dato_salud', false));
+        }
+
+        return $query;
+    }
+
+    public function show(string $record): JsonResource
+    {
+        return new JsonResource($this->indexQuery()->findOrFail($record));
+    }
+
+    public function store(Request $request): JsonResponse
+    {
+        $datos = $request->validate(['tipo_documento_id' => 'required|uuid|exists:tipos_documento,id']);
+        $tipo = TipoDocumento::query()->findOrFail($datos['tipo_documento_id']);
+        abort_if($tipo->seccion_legajo_id === 6 && isset(ResumenSeccion06::ITEMS[$tipo->codigo]), 409, 'Registra esta evidencia mediante Agregar documento en la Sección 06.');
+        abort_if($tipo->seccion_legajo_id === 4 && isset(ResumenSeccion04::ITEMS[$tipo->codigo]), 409,
+            'Registra esta evidencia mediante Agregar documento en la Sección 04.');
+
+        return parent::store($request);
+    }
 }

@@ -33,7 +33,10 @@ use App\Http\Controllers\Api\V1\Legajos\FamiliarPersonalController;
 use App\Http\Controllers\Api\V1\Legajos\FotoPersonalController;
 use App\Http\Controllers\Api\V1\Legajos\Seccion01Controller;
 use App\Http\Controllers\Api\V1\Legajos\Seccion02Controller;
+use App\Http\Controllers\Api\V1\Legajos\Seccion03Controller;
+use App\Http\Controllers\Api\V1\Legajos\Seccion04Controller;
 use App\Http\Controllers\Api\V1\Legajos\Seccion05Controller;
+use App\Http\Controllers\Api\V1\Legajos\Seccion06Controller;
 use App\Http\Controllers\Api\V1\LegajoSeccionController;
 use App\Http\Controllers\Api\V1\LicenciaPermisoController;
 use App\Http\Controllers\Api\V1\MovimientoCustodiaLegajoController;
@@ -84,6 +87,9 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum'])->
         Route::get('expedientes/{usuario}/foto', [FotoPersonalController::class, 'show'])->whereUuid('usuario');
         // Antes de la ruta genérica {section}.
         Route::get('expedientes/{usuario}/seccion-02', [Seccion02Controller::class, 'show'])->whereUuid('usuario');
+        Route::get('expedientes/{usuario}/seccion-06', [Seccion06Controller::class, 'show'])->whereUuid('usuario');
+        Route::get('expedientes/{usuario}/seccion-04', [Seccion04Controller::class, 'show'])->whereUuid('usuario');
+        Route::get('expedientes/{usuario}/seccion-03', [Seccion03Controller::class, 'show'])->whereUuid('usuario');
         Route::get('expedientes/{usuario}/seccion-02/anulados', [Seccion02Controller::class, 'anulados'])->whereUuid('usuario')->middleware('can:sistema.administrar');
         Route::get('expedientes/{usuario}/seccion-05', [Seccion05Controller::class, 'show'])->whereUuid('usuario');
         Route::get('expedientes/{usuario}/seccion-05/anulados', [Seccion05Controller::class, 'anulados'])->whereUuid('usuario')->middleware('can:sistema.administrar');
@@ -133,9 +139,18 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum'])->
     // Documentos del legajo (PDF + metadatos), común a todas las secciones. Las secciones 01, 09 y 10
     // exigen además datos_sensibles.ver (lo valida el controlador según la sección y el tipo).
     Route::middleware('can:documento.subir')->group(function (): void {
+        Route::post('expedientes/{usuario}/seccion-06/documentos', [Seccion06Controller::class, 'store'])->whereUuid('usuario');
+        Route::post('expedientes/{usuario}/seccion-04/documentos', [Seccion04Controller::class, 'store'])->whereUuid('usuario');
+        Route::post('expedientes/{usuario}/seccion-03/documentos', [Seccion03Controller::class, 'store'])->whereUuid('usuario');
         Route::get('expedientes/{usuario}/documentos/folio-sugerido', [DocumentoLegajoController::class, 'folio'])->whereUuid('usuario');
         Route::post('expedientes/{usuario}/documentos', [DocumentoLegajoController::class, 'store'])->whereUuid('usuario');
     });
+    Route::post('expedientes/{usuario}/seccion-06/documentos/{documento}/estado', [Seccion06Controller::class, 'cambiarEstado'])
+        ->middleware('can:documento.revisar')->whereUuid(['usuario', 'documento']);
+    Route::post('expedientes/{usuario}/seccion-04/documentos/{documento}/estado', [Seccion04Controller::class, 'cambiarEstado'])
+        ->middleware('can:documento.revisar')->whereUuid(['usuario', 'documento']);
+    Route::post('expedientes/{usuario}/seccion-03/documentos/{documento}/estado', [Seccion03Controller::class, 'cambiarEstado'])
+        ->middleware('can:documento.revisar')->whereUuid(['usuario', 'documento']);
     Route::post('expedientes/{usuario}/documentos/{documento}/recepcionar', [DocumentoLegajoController::class, 'recepcionar'])
         ->middleware('can:documento.recepcionar')->whereUuid(['usuario', 'documento']);
     Route::get('expedientes/{usuario}/documentos/{documento}/archivo', [DocumentoLegajoController::class, 'archivo'])

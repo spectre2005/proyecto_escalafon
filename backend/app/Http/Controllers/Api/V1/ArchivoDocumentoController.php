@@ -3,6 +3,9 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Models\ArchivoDocumento;
+use App\Models\DocumentoUsuario;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Resources\Json\JsonResource;
 
 class ArchivoDocumentoController extends ResourceController
 {
@@ -23,4 +26,21 @@ class ArchivoDocumentoController extends ResourceController
         'subido_por' => 'required|uuid|exists:usuarios,id',
         'subido_en' => 'nullable|date',
     ];
+
+    protected function indexQuery(): Builder
+    {
+        $query = parent::indexQuery();
+        if (! request()->user()->veDatosSensibles()) {
+            $query->whereNotIn('id', DocumentoUsuario::query()->whereNotNull('archivo_id')
+                ->where(fn ($doc) => $doc->whereIn('seccion_legajo_id', [1, 9, 10])
+                    ->orWhereHas('tipoDocumento', fn ($tipo) => $tipo->where('es_dato_sensible', true)->orWhere('es_dato_salud', true)))->select('archivo_id'));
+        }
+
+        return $query;
+    }
+
+    public function show(string $record): JsonResource
+    {
+        return new JsonResource($this->indexQuery()->findOrFail($record));
+    }
 }

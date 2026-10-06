@@ -48,6 +48,7 @@ class UpdateExpedienteRequest extends FormRequest
             'con_discapacidad' => 'sometimes|required|boolean',
             'obligado_djbr' => 'sometimes|required|boolean',
             'exige_colegiatura' => 'sometimes|required|boolean',
+            'exige_estudios_basicos' => 'sometimes|required|boolean',
             'tiene_periodo_prueba' => 'sometimes|required|boolean',
             'tiene_derechohabientes' => 'sometimes|required|boolean',
             'ubicacion' => 'sometimes|nullable|array:region,provincia,distrito|min:3',

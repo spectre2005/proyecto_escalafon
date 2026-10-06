@@ -14,6 +14,7 @@ use App\Models\ObservacionDocumento;
 use App\Models\PerfilDocente;
 use App\Models\ProcesoFiscalizacion;
 use App\Models\SolicitudFiscalizacion;
+use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -48,7 +49,7 @@ class ExpedienteApiTest extends TestCase
             ->assertJsonCount(0, 'data.legajos')->assertJsonMissingPath('data.usuario.values.password');
         foreach ($response->json('data.sections') as $section) {
             $this->getJson('/api/v1/expedientes/'.$person->id.'/'.$section['key'])
-                ->assertOk()->assertJsonPath('total', 0);
+                ->assertOk()->assertJsonPath('total', $section['key'] === 'tipos-documento' ? TipoDocumento::query()->count() : 0);
         }
     }
 
