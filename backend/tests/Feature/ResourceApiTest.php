@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Afiliacion;
 use App\Models\ArchivoDocumento;
+use App\Models\Controversia;
 use App\Models\Desplazamiento;
 use App\Models\DocumentoUsuario;
 use App\Models\EvaluacionDesempeno;
@@ -44,6 +46,9 @@ class ResourceApiTest extends TestCase
 
     /** Sección 07: igual, se registran, corrigen y anulan solo desde Legajos\Seccion07Controller. */
     private const SECCION_07 = [EvaluacionDesempeno::class, ProgresionCarrera::class, RatificacionDocente::class, Desplazamiento::class];
+
+    /** Sección 09: igual, desde Legajos\Seccion09Controller (y el CRUD genérico exige además datos_sensibles.ver). */
+    private const SECCION_09 = [Afiliacion::class, Controversia::class];
 
     public static function resources(): array
     {
@@ -105,7 +110,7 @@ class ResourceApiTest extends TestCase
             unset($payload['registrado_por']);
         }
         $uri = '/api/v1/'.str_replace('_', '-', $model->getTable());
-        $soloLectura = $model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento || in_array($class, [...self::SECCION_02, ...self::SECCION_05, ...self::SECCION_07], true);
+        $soloLectura = $model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento || in_array($class, [...self::SECCION_02, ...self::SECCION_05, ...self::SECCION_07, ...self::SECCION_09], true);
         if ($soloLectura) {
             // Documentos y archivos se crean únicamente por la carga del legajo (folios, hash y bitácora); los registros de
             // las secciones 02 y 05, solo desde Seccion02Controller y Seccion05Controller.
