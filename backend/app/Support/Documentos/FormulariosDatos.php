@@ -2,7 +2,9 @@
 
 namespace App\Support\Documentos;
 
+use App\Models\Afiliacion;
 use App\Models\CertificadoDiscapacidad;
+use App\Models\Controversia;
 use App\Models\DeclaracionVerificacion;
 use App\Models\Desplazamiento;
 use App\Models\DocumentoUsuario;
@@ -20,6 +22,7 @@ use App\Models\VinculoLaboral;
 use App\Support\Seccion01;
 use App\Support\Seccion05;
 use App\Support\Seccion07;
+use App\Support\Seccion09;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -37,6 +40,9 @@ use Illuminate\Validation\ValidationException;
  * Sección 07: un documento acredita un solo registro vigente; un documento de 7.3 solo acredita los tipos de
  * desplazamiento de su literal (App\Support\Seccion07), y la resolución de 7.2 acredita una progresión
  * (administrativos) o una ratificación docente (ALTERNATIVOS).
+ *
+ * Sección 09: a) solo acredita controversias individuales, b) solo colectivas y c) solo afiliaciones a sindicato
+ * (App\Support\Seccion09); un documento acredita un solo registro vigente.
  */
 final class FormulariosDatos
 {
@@ -54,6 +60,8 @@ final class FormulariosDatos
         'progresiones_carrera' => ProgresionCarrera::class,
         'ratificaciones_docentes' => RatificacionDocente::class,
         'desplazamientos' => Desplazamiento::class,
+        'controversias' => Controversia::class,
+        'afiliaciones' => Afiliacion::class,
     ];
 
     /**
@@ -64,7 +72,7 @@ final class FormulariosDatos
 
     /** Formularios en los que un documento acredita un solo registro vigente. */
     private const UN_REGISTRO_POR_DOCUMENTO = ['familiares', 'declaraciones_verificaciones', 'certificados_discapacidad',
-        'evaluaciones_desempeno', 'progresiones_carrera', 'ratificaciones_docentes', 'desplazamientos'];
+        'evaluaciones_desempeno', 'progresiones_carrera', 'ratificaciones_docentes', 'desplazamientos', 'controversias', 'afiliaciones'];
 
     public static function soportado(?string $formulario): bool
     {
@@ -113,7 +121,7 @@ final class FormulariosDatos
     }
 
     /**
-     * Crea un registro de datos (secciones 01 y 07) enlazado, si se indica, al documento recién subido que lo acredita.
+     * Crea un registro de datos (secciones 01, 07 y 09) enlazado, si se indica, al documento recién subido que lo acredita.
      * En una transacción con el documento bloqueado: dos registros simultáneos no toman el mismo documento.
      */
     public static function crearEnlazado(string $formulario, string $usuario, ?string $documentoId, Model $registro): Model
@@ -139,9 +147,12 @@ final class FormulariosDatos
         return [$formulario, ...(self::ALTERNATIVOS[$formulario] ?? [])];
     }
 
-    /** ¿El registro es del tipo que acredita el documento? (secciones 01 y 07; los demás no se restringen). */
+    /** ¿El registro es del tipo que acredita el documento? (secciones 01, 07 y 09; los demás no se restringen). */
     private static function compatible(?TipoDocumento $tipo, Model $registro): bool
     {
+        if ($registro instanceof Controversia || $registro instanceof Afiliacion) {
+            return $tipo !== null && Seccion09::admite($tipo->codigo, $registro->tipo);
+        }
         if ($registro instanceof Desplazamiento) {
             return Seccion07::admiteDesplazamiento($tipo?->codigo, $registro->tipo);
         }

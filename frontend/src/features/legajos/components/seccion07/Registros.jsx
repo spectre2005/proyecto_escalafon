@@ -1,19 +1,23 @@
 import { useState } from 'react'
 import { apiErrorMessage } from '../../../../axios'
-import { usePuede } from '../../../auth/session'
+import { puede, useSesion } from '../../../auth/session'
 import { AnularForm } from '../seccion01/RegistrosPanel'
 import { Bloqueo } from '../seccion02/Registros'
 
 const button = 'rounded-xl bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50'
 
+// Permisos por defecto (sección 07). La sección 09 pasa los suyos (legajo.editar / sistema.administrar + datos_sensibles.ver).
+const PERMISOS_07 = { registrar: ['seccion07.registrar'], anular: ['seccion07.registrar', 'sistema.administrar'] }
+
 /**
- * Bloque de datos de una subsección de la 07: registrar y corregir (seccion07.registrar) y anular con motivo
- * (seccion07.registrar + sistema.administrar). Los registros llegan sin anulados desde el backend.
+ * Bloque de datos de una subsección o bloque de la ficha: registrar y corregir, y anular con motivo, según los permisos
+ * indicados (todos los de la lista). Los registros llegan sin anulados desde el backend; el backend valida siempre.
  * bloqueo: texto que explica por qué no se puede registrar; deshabilita el botón y se muestra.
  */
-export default function Registros({ titulo, agregar, vacio, registros, bloqueo, tituloRegistro, subtitulo, campos, renderForm, onAnular, aviso }) {
-  const puedeRegistrar = usePuede('seccion07.registrar')
-  const puedeAnular = usePuede('sistema.administrar') && puedeRegistrar
+export default function Registros({ titulo, agregar, vacio, registros, bloqueo, tituloRegistro, subtitulo, campos, renderForm, onAnular, aviso, permisos = PERMISOS_07 }) {
+  const sesion = useSesion()
+  const puedeRegistrar = permisos.registrar.every(permiso => puede(sesion, permiso))
+  const puedeAnular = permisos.anular.every(permiso => puede(sesion, permiso))
   const [editing, setEditing] = useState(null)
   const [anulando, setAnulando] = useState(null)
   const [busy, setBusy] = useState(false)

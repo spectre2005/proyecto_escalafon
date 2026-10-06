@@ -11,7 +11,8 @@ export const legajoSections = [
   // Subsecciones 7.1 a 7.3 de la directiva; cada una muestra sus datos y sus documentos (sin entrada aparte).
   { number: '07', title: 'Evaluación de desempeño, progresión en la carrera y desplazamiento', categories: ['s07-desempeno', 's07-progresion', 's07-desplazamiento'], sinDocumentos: true },
   { number: '08', title: 'Reconocimientos y sanciones disciplinarias', categories: ['reconocimientos', 'sanciones'] },
-  { number: '09', title: 'Relaciones laborales individuales y colectivas', categories: ['afiliaciones', 'controversias'] },
+  // Anexo 01: controversias individuales (a), colectivas (b), afiliación al sindicato (c) y otros; cada entrada muestra sus registros y sus documentos.
+  { number: '09', title: 'Relaciones laborales individuales y colectivas', categories: ['s09-individuales', 's09-colectivas', 's09-afiliacion', 's09-otros'], sinDocumentos: true },
   { number: '10', title: 'Seguridad y Salud en el Trabajo (SST) y bienestar social', categories: ['registros-sst-bienestar'] },
   { number: '11', title: 'Desvinculación', categories: ['desvinculaciones'] },
 ]
