@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import api, { apiErrorMessage } from '../../../axios'
-import { readInstitution } from '../../../config/institution'
+import { cacheInstitution, normalizeInstitution, readInstitution } from '../../../config/institution'
+import { fetchInstitution } from '../../settings/institutionApi'
 
 export default function DownloadPersonalReport({ usuario, blank = false, className }) {
   const [busy, setBusy] = useState(false)
@@ -11,6 +12,9 @@ export default function DownloadPersonalReport({ usuario, blank = false, classNa
     setError('')
     try {
       const { createPersonalPdf } = await import('../pdf/fichaPersonalPdf')
+      const branding = await fetchInstitution()
+      const institution = branding.configured ? normalizeInstitution(branding.data) : readInstitution()
+      if (branding.configured) cacheInstitution(institution)
       let values = {}
       const families = []
       if (!blank) {
@@ -25,7 +29,7 @@ export default function DownloadPersonalReport({ usuario, blank = false, classNa
           page++
         } while (page <= lastPage)
       }
-      createPersonalPdf({ values, families, blank, institution: readInstitution().name }).save(blank ? 'ficha_personal_vacia.pdf' : 'ficha_personal.pdf')
+      createPersonalPdf({ values, families, blank, institution }).save(blank ? 'ficha_personal_vacia.pdf' : 'ficha_personal.pdf')
     } catch (failure) {
       setError(failure.response || failure.isAxiosError ? apiErrorMessage(failure) : 'No se pudo generar el PDF. Inténtalo nuevamente.')
     } finally {

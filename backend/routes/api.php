@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\V1\FormacionAcademicaController;
 use App\Http\Controllers\Api\V1\GoceVacacionalController;
 use App\Http\Controllers\Api\V1\HistorialEstadoDocumentoController;
 use App\Http\Controllers\Api\V1\InduccionController;
+use App\Http\Controllers\Api\V1\InstitutionSettingsController;
 use App\Http\Controllers\Api\V1\LegajoController;
 use App\Http\Controllers\Api\V1\Legajos\AperturaLegajoController;
 use App\Http\Controllers\Api\V1\Legajos\DocumentoLegajoController;
@@ -84,6 +85,8 @@ Route::prefix('v1/auth')->middleware(LocalDevelopmentOnly::class)->group(functio
 });
 
 Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum'])->group(function (): void {
+    Route::get('institucion', [InstitutionSettingsController::class, 'show']);
+    Route::put('institucion', [InstitutionSettingsController::class, 'update'])->middleware('can:sistema.administrar');
     Route::middleware('can:datos_sensibles.ver')->group(function (): void {
         Route::get('expedientes/{usuario}/seccion-10', [Seccion10Controller::class, 'show'])->middleware('can:legajo.ver')->whereUuid('usuario');
         Route::get('expedientes/{usuario}/seccion-10/documentos/{documento}/historial', [Seccion10Controller::class, 'historial'])

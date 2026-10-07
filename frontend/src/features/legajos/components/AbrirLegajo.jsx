@@ -27,7 +27,7 @@ export default function AbrirLegajo({ usuario, className = '' }) {
 
   return <div className={className}>
     {confirmando ? <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
-      Se creará el legajo activo con sus 13 secciones y un número correlativo.
+      Se abrirá un legajo activo con un número correlativo y se habilitarán las 11 secciones de la ficha.
       <button type="button" disabled={busy} onClick={abrir} className="rounded-lg bg-teal-700 px-3 py-1.5 font-semibold text-white disabled:opacity-50">{busy ? 'Abriendo…' : 'Confirmar apertura'}</button>
       <button type="button" disabled={busy} onClick={() => setConfirmando(false)} className="font-semibold text-slate-600">Cancelar</button>
     </div> : <button type="button" onClick={() => { setError(''); setConfirmando(true) }} className="rounded-xl bg-teal-700 px-4 py-2 text-sm font-semibold text-white">Abrir legajo</button>}
