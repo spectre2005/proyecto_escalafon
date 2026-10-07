@@ -1,3 +1,4 @@
+import Icon from '../../../../components/ui/Icon'
 import { useState } from 'react'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../../auth/session'
@@ -120,7 +121,7 @@ function Documentos({ usuario, data, codigos }) {
             {tipo.solo_anexo_05 && <Anexo05 />}
             <Etiqueta clase={exigeClase}>{exigeTexto}</Etiqueta>
             <Etiqueta clase={coloresEstadoDocumento[tipo.estado] || 'bg-slate-100 text-slate-700'}>{etiqueta(estadosDocumento, tipo.estado)}{tipo.documentos > 1 ? ` · ${tipo.documentos} documentos` : ''}</Etiqueta>
-            {puedeSubir && <button disabled={ocupado || sinLegajo} onClick={() => { setAviso(''); setSubiendo(tipo.id) }} className={enlace}>{tipo.documento && !tipo.permite_multiples ? 'Subsanar documento' : 'Subir documento'}</button>}
+            {puedeSubir && <button disabled={ocupado || sinLegajo} onClick={() => { setAviso(''); setSubiendo(tipo.id) }} className={`${enlace} inline-flex items-center gap-2`}><Icon name="paperclip" size={18} />{tipo.documento && !tipo.permite_multiples ? 'Subsanar documento' : 'Subir documento'}</button>}
           </div>
         </div>
         {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={1} tipo={tipo} titular={data.titular} relacion={relacionPorTipo[tipo.codigo]} enlaces={enlacesDe(tipo, data)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}

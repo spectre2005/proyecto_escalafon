@@ -1,3 +1,4 @@
+import Icon from '../../../../components/ui/Icon'
 import { useState } from 'react'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../../auth/session'
@@ -84,7 +85,7 @@ function Documentos({ usuario, data, tipos, sinLegajo }) {
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <Etiqueta clase="bg-slate-100 text-slate-600">Opcional</Etiqueta>
           <Etiqueta clase={coloresEstadoDocumento[tipo.estado] || 'bg-slate-100 text-slate-700'}>{etiqueta(estadosDocumento, tipo.estado)}{tipo.documentos > 1 ? ` · ${tipo.documentos} documentos` : ''}</Etiqueta>
-          {puedeSubir && <button disabled={ocupado || !!sinLegajo} title={sinLegajo || undefined} onClick={() => { setAviso(''); setSubiendo(tipo.id) }} className={enlace}>Subir documento</button>}
+          {puedeSubir && <button disabled={ocupado || !!sinLegajo} title={sinLegajo || undefined} onClick={() => { setAviso(''); setSubiendo(tipo.id) }} className={`${enlace} inline-flex items-center gap-2`}><Icon name="paperclip" size={18} />Subir documento</button>}
         </div>
       </div>
       {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={9} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo, data)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}

@@ -79,7 +79,7 @@ function Documentos({ item, permisos, abrir, ver, mostrarTitulo = true }) {
       <div className="mt-4 flex flex-wrap gap-2">
         {doc.archivo_disponible && <button className={boton} onClick={() => ver(doc)}>Ver / Descargar</button>}
         {permisos.editar && doc.puede_editar && <button className={boton} onClick={() => abrir('editar', item, doc)}>Editar metadatos</button>}
-        {permisos.subir && item.activo && doc.puede_subsanar && <button className={boton} onClick={() => abrir('adjuntar', item, doc)}>{doc.archivo ? 'Nueva evidencia / subsanar' : 'Adjuntar evidencia'}</button>}
+        {permisos.subir && item.activo && doc.puede_subsanar && <button className={`${boton} inline-flex items-center gap-2`} onClick={() => abrir('adjuntar', item, doc)}><Icon name="paperclip" size={18} />{doc.archivo ? 'Nueva evidencia / subsanar' : 'Adjuntar evidencia'}</button>}
         {permisos.revisar && doc.puede_revisar && <>
           {!['aceptado', 'verificado'].includes(doc.estado_original) && <button className={boton} onClick={() => abrir('aceptado', item, doc)}>Aceptar</button>}
           {doc.estado_original !== 'observado' && <button className={boton} onClick={() => abrir('observado', item, doc)}>Observar</button>}
