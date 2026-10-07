@@ -1,16 +1,11 @@
 import api from '../../../axios'
+import { loadUserPages } from './userPages'
 
 export async function listUsers(signal) {
-  const users = []
-  let page = 1
-  let lastPage
-  do {
+  return loadUserPages(async page => {
     const { data } = await api.get('/usuarios', { params: { page }, signal })
-    users.push(...data.data)
-    lastPage = data.meta.last_page
-    page++
-  } while (page <= lastPage)
-  return users
+    return data
+  })
 }
 
 export async function saveUsers(usuarios) {

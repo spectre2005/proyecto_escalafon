@@ -3,32 +3,35 @@ import api from '../../axios'
 import { createQueryStore } from './queryStore'
 
 const store = createQueryStore((url, signal) => api.get(url, { signal }).then(response => response.data))
-let subscribers = 0
-let interval
+const subscriptions = new Map()
 
-function refreshVisible() {
-  if (document.visibilityState === 'visible') store.refreshVisible()
-}
-
-export function useLiveQuery(url) {
-  const subscribe = useCallback(listener => store.subscribe(url, listener), [url])
-  const snapshot = useCallback(() => store.snapshot(url), [url])
+export function useLiveQuery(url, queryStore = store) {
+  const subscribe = useCallback(listener => queryStore.subscribe(url, listener), [url, queryStore])
+  const snapshot = useCallback(() => queryStore.snapshot(url), [url, queryStore])
   const result = useSyncExternalStore(subscribe, snapshot)
   useEffect(() => {
-    if (subscribers++ === 0) {
-      interval = setInterval(refreshVisible, 5000)
+    let subscription = subscriptions.get(queryStore)
+    if (!subscription) {
+      const refreshVisible = () => {
+        if (document.visibilityState === 'visible') queryStore.refreshVisible()
+      }
+      subscription = { count: 0, refreshVisible, interval: setInterval(refreshVisible, 1000) }
+      subscriptions.set(queryStore, subscription)
       window.addEventListener('focus', refreshVisible)
       document.addEventListener('visibilitychange', refreshVisible)
-      window.addEventListener('records-updated', store.invalidate)
+      window.addEventListener('records-updated', queryStore.invalidate)
     }
+    subscription.count++
     return () => {
-      if (--subscribers === 0) {
+      if (--subscription.count === 0) {
+        const { interval, refreshVisible } = subscription
         clearInterval(interval)
         window.removeEventListener('focus', refreshVisible)
         document.removeEventListener('visibilitychange', refreshVisible)
-        window.removeEventListener('records-updated', store.invalidate)
+        window.removeEventListener('records-updated', queryStore.invalidate)
+        subscriptions.delete(queryStore)
       }
     }
-  }, [])
-  return { ...result, retry: () => store.refresh(url), setData: data => store.setData(url, data) }
+  }, [queryStore])
+  return { ...result, retry: () => queryStore.refresh(url), setData: data => queryStore.setData(url, data) }
 }

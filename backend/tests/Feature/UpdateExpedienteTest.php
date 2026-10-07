@@ -67,6 +67,14 @@ class UpdateExpedienteTest extends TestCase
         $this->getJson('/api/v1/ubicaciones?region=A&provincia=B')->assertOk()->assertExactJson(['data' => ['C']]);
     }
 
+    public function test_complete_location_catalog_includes_ids_and_parent_names(): void
+    {
+        $location = Ubigeo::factory()->create(['region' => 'A', 'provincia' => 'B', 'distrito' => 'C']);
+        $this->getJson('/api/v1/ubicaciones?completo=1')->assertOk()->assertExactJson([
+            'data' => [['id' => $location->id, 'region' => 'A', 'provincia' => 'B', 'distrito' => 'C']],
+        ]);
+    }
+
     public function test_invalid_and_privileged_fields_are_rejected_without_partial_writes(): void
     {
         $person = Usuario::factory()->create();

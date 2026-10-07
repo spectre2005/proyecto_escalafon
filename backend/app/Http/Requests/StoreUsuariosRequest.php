@@ -27,7 +27,8 @@ class StoreUsuariosRequest extends FormRequest
     {
         return [
             'usuarios' => ['required', 'array', 'list', 'min:1', 'max:1000'],
-            'usuarios.*' => ['required', 'array:numero_doc_identidad,nombres,apellido_paterno,apellido_materno,email_institucional,tipo_personal,regimen_laboral,telefono'],
+            'usuarios.*' => ['required', 'array:numero_doc_identidad,nombres,apellido_paterno,apellido_materno,email_institucional,tipo_personal,regimen_laboral,telefono,ubigeo_id'],
+            'usuarios.*.ubigeo_id' => ['nullable', 'uuid', Rule::exists('ubigeo', 'id')],
             'usuarios.*.numero_doc_identidad' => ['bail', 'required', 'string', 'regex:/^[0-9]{8}$/', 'distinct:strict', Rule::unique('usuarios', 'numero_doc_identidad')],
             'usuarios.*.nombres' => ['required', 'string', 'max:120'],
             'usuarios.*.apellido_paterno' => ['required', 'string', 'max:80'],

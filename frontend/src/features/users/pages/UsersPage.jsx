@@ -1,9 +1,10 @@
 import DownloadPersonalReport from '../../reportes/components/DownloadPersonalReport'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { apiErrorMessage } from '../../../axios'
 import { saveUsers } from '../api/usuariosApi'
 import { useUsers } from '../hooks/useUsers'
 import Icon from '../../../components/ui/Icon'
+import UbigeoFields from '../../../components/ui/UbigeoFields'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   columns,
@@ -31,8 +32,12 @@ const labels = {
 
 export default function UsersPage() {
   const { users, setUsers, loading, loadError, refreshUsers: refreshData } = useUsers()
-  const [tab, setTab] = useState('csv')
+  const [tab, setTab] = useState('manual')
+  const [registrationOpen, setRegistrationOpen] = useState(false)
+  const registrationDialog = useRef(null)
   const [draft, setDraft] = useState(emptyUser)
+  const [location, setLocation] = useState({ region: '', provincia: '', distrito: '' })
+  const [ubigeoId, setUbigeoId] = useState('')
   const [batch, setBatch] = useState([])
   const [filename, setFilename] = useState('')
   const [busy, setBusy] = useState(false)
@@ -44,11 +49,36 @@ export default function UsersPage() {
   }
   const [filter, setFilter] = useState('todos')
   const [statusFilter, setStatusFilter] = useState('todos')
+  const [pageSize, setPageSize] = useState(10)
+  function changePage(page) {
+    const next = new URLSearchParams(searchParams)
+    if (page > 1) next.set('page', String(page))
+    else next.delete('page')
+    setSearchParams(next, { replace: true })
+  }
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
   const fileInput = useRef(null)
   function refreshUsers() {
     if (!savingRef.current) refreshData()
+  }
+
+  useEffect(() => {
+    if (!registrationOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = previousOverflow }
+  }, [registrationOpen])
+
+  function openRegistration() {
+    setMessage(null)
+    setRegistrationOpen(true)
+    registrationDialog.current.showModal()
+  }
+
+  function closeRegistration() {
+    if (savingRef.current || busy) return
+    registrationDialog.current.close()
   }
 
   async function persistUsers(records) {
@@ -59,6 +89,7 @@ export default function UsersPage() {
     try {
       const saved = await saveUsers(records)
       setUsers((previous) => [...saved, ...previous.filter(user => !saved.some(record => record.id === user.id))])
+      changePage(1)
       setMessage({
         text: `${saved.length} registro(s) guardado(s) en la base de datos.`,
       })
@@ -97,6 +128,12 @@ export default function UsersPage() {
     tipoPersonal: filter,
     estado: statusFilter,
   })
+  const totalPages = Math.max(1, Math.ceil(visible.length / pageSize))
+  const requestedPage = Number(searchParams.get('page'))
+  const currentPage = Number.isInteger(requestedPage) && requestedPage > 0
+    ? Math.min(requestedPage, totalPages) : 1
+  const firstIndex = (currentPage - 1) * pageSize
+  const pageUsers = visible.slice(firstIndex, firstIndex + pageSize)
 
   async function readFile(file) {
     if (!file || busy || savingRef.current) return
@@ -126,6 +163,7 @@ export default function UsersPage() {
       Object.entries(draft).map(([key, value]) => [key, value.trim()]),
     )
     const errors = validateUser(user)
+    if (Object.values(location).some(Boolean) && !ubigeoId) errors.push('Selecciona región, provincia y distrito para completar la ubicación.')
     if (
       users.some(
         (item) =>
@@ -137,7 +175,12 @@ export default function UsersPage() {
       errors.push('Ya existe un usuario con ese DNI o correo.')
     if (errors.length)
       return setMessage({ error: true, text: errors.join(' ') })
-    if (await persistUsers([user])) setDraft(emptyUser)
+    if (await persistUsers([{ ...user, ubigeo_id: ubigeoId || null }])) {
+      setDraft(emptyUser)
+      setLocation({ region: '', provincia: '', distrito: '' })
+      setUbigeoId('')
+      registrationDialog.current.close()
+    }
   }
 
   async function importBatch() {
@@ -145,6 +188,7 @@ export default function UsersPage() {
     if (await persistUsers(batch)) {
       setBatch([])
       setFilename('')
+      registrationDialog.current.close()
     }
   }
 
@@ -155,17 +199,11 @@ export default function UsersPage() {
               <p className="mb-2.5 text-[9px] font-bold tracking-[1.8px] text-[#719087]">
                 DIRECTORIO INSTITUCIONAL
               </p>
-              <h1>Carga de usuarios</h1>
+              <h1>Personal</h1>
               <p>
                 Agrega y revisa la información del personal en un solo lugar.
               </p>
             </div>
-            <a
-              className="inline-flex items-center justify-center gap-2 rounded-lg border px-4.5 py-3 text-xs font-semibold transition-colors border-[#dbe6e1] bg-white text-[#4f6d63] hover:bg-[#edf6f2]"
-              href="#usuarios"
-            >
-              <Icon name="users" size={18} /> Ver usuarios
-            </a>
           </div>
           <div className="mb-6 rounded-lg border border-[#e4dfc7] bg-[#faf8ef] px-4 py-3 text-[11px] leading-relaxed text-[#827347]">
             <strong>Desarrollo local.</strong> Los registros se guardan en la
@@ -204,6 +242,175 @@ export default function UsersPage() {
           </section>
 
           <div
+            className="mt-5 flex flex-wrap items-center gap-3"
+            aria-live="polite"
+          >
+            <button
+              type="button"
+              onClick={refreshUsers}
+              disabled={loading || saving}
+              className="rounded-lg border border-[#dbe6e1] bg-white px-4 py-2 text-xs text-[#4f6d63]"
+            >
+              {loading ? 'Cargando usuarios…' : 'Actualizar lista'}
+            </button>
+            {loadError && (
+              <p role="alert" className="text-xs text-red-700">
+                {loadError}
+              </p>
+            )}
+          </div>
+          {message && !registrationOpen && (
+            <div
+              className={`mt-5 rounded-lg px-5 py-4 text-xs leading-relaxed ${message.error ? 'bg-[#fff0ed] text-[#ac4d3a]' : 'bg-[#e4f2e9] text-[#2c7650]'}`}
+              role={message.error ? 'alert' : 'status'}
+            >
+              {message.text}
+            </div>
+          )}
+          <section
+            className="overflow-hidden rounded-xl border border-[#e0e9e4] bg-white mt-6 scroll-mt-5"
+            id="usuarios"
+          >
+            <div className="flex flex-col items-start justify-between gap-4 px-4 py-5 md:flex-row md:items-center md:p-6 [&_h2]:wrap-anywhere [&_p]:mt-1.5 [&_p]:text-[11px] [&_p]:leading-relaxed [&_p]:text-[#889991]">
+              <div>
+                <h2>
+                  Usuarios registrados{' '}
+                  <span className="ml-1 inline-block rounded-md bg-[#edf5ef] px-2 py-1 align-middle text-[10px] text-[#60856d]">
+                    {users.length}
+                  </span>
+                </h2>
+                <p>Consulta los registros guardados en la base de datos.</p>
+              </div>
+              <div className="flex w-full flex-wrap items-center gap-2 md:w-auto">
+                <button type="button" onClick={openRegistration} aria-haspopup="dialog" className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#26776d] px-4.5 py-3 text-xs font-semibold text-white hover:bg-[#1b625a]">
+                  <Icon name="plus" size={17} /> Agregar información
+                </button>
+                <DownloadPersonalReport blank className="inline-flex items-center justify-center gap-2 rounded-lg border px-4.5 py-3 text-xs font-semibold transition-colors border-[#dbe6e1] bg-white text-[#4f6d63] hover:bg-[#edf6f2]" />
+              </div>
+            </div>
+            <div className="flex flex-col gap-3.5 px-4 pb-5 md:flex-row md:px-6 [&_select]:text-[11px] md:[&_select]:ml-auto">
+              <label className="flex flex-1 items-center gap-2.5 rounded-lg border border-[#dce7e0] px-3 text-[#8da294] md:max-w-105 [&_input]:w-full [&_input]:border-0! [&_input]:bg-transparent! [&_input]:pl-0! [&_input]:text-[11px]">
+                <Icon name="search" size={18} />
+                <input
+                  aria-label="Buscar usuarios"
+                  placeholder="Buscar por nombre, DNI o correo…"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+              </label>
+              <select
+                aria-label="Filtrar por tipo de personal"
+                value={filter}
+                onChange={(event) => { setFilter(event.target.value); changePage(1) }}
+              >
+                <option value="todos">Todo el personal</option>
+                <option value="docente">Docentes</option>
+                <option value="administrativo">Administrativos</option>
+              </select>
+              <select
+                aria-label="Filtrar por estado"
+                value={statusFilter}
+                onChange={(event) => { setStatusFilter(event.target.value); changePage(1) }}
+              >
+                <option value="todos">Todo estado</option>
+                <option value="activo">Activos</option>
+                <option value="inactivo">Inactivos</option>
+              </select>
+            </div>
+            <div className="overflow-x-auto">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Usuario</th>
+                    <th>DNI</th>
+                    <th>Correo institucional</th>
+                    <th>Tipo de personal</th>
+                    <th>Régimen laboral</th>
+                    <th>Estado</th>
+                    <th>Reportes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageUsers.map((user) => (
+                    <tr key={user.numero_doc_identidad}>
+                      <td>
+                        <Link to={`/legajos/${user.id}`} className="font-semibold text-teal-800 hover:underline">
+                          {user.nombres} {user.apellido_paterno}{' '}
+                          {user.apellido_materno}
+                        </Link>
+                      </td>
+                      <td>{user.numero_doc_identidad}</td>
+                      <td>{user.email_institucional}</td>
+                      <td>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[10px] ${user.tipo_personal === 'administrativo' ? 'bg-[#f6f0e1] text-[#9e8750]' : 'bg-[#eaf3f9] text-[#557f9b]'}`}
+                        >
+                          {user.tipo_personal === 'docente'
+                            ? 'Docente'
+                            : 'Administrativo'}
+                        </span>
+                      </td>
+                      <td>{user.regimen_laboral}</td>
+                      <td>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[10px] ${user.activo ? 'bg-[#eaf4ee] text-[#3d8060]' : 'bg-[#faf3e5] text-[#9b7a37]'}`}
+                        >
+                          {user.activo ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </td>
+                    <td><DownloadPersonalReport usuario={user.id} className="whitespace-nowrap rounded-lg border border-teal-200 px-3 py-2 text-xs font-semibold text-teal-800 hover:bg-teal-50" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {!loading && !loadError && !visible.length && (
+              <div className="px-5 py-9 text-center text-[#9ab3a3] [&>svg]:mx-auto [&_h3]:mt-3 [&_h3]:mb-2 [&_h3]:text-[13px] [&_h3]:font-medium [&_h3]:text-[#657f6e] [&_p]:text-[11px] [&_p]:text-[#96a69b]">
+                <Icon name="users" size={32} />
+                <h3>
+                  {users.length
+                    ? 'No se encontraron usuarios'
+                    : 'Tu lista de usuarios empieza aquí'}
+                </h3>
+                <p>
+                  {users.length
+                    ? 'Prueba con otro nombre o cambia el filtro.'
+                    : 'Importa un archivo CSV o agrega tu primer usuario manualmente.'}
+                </p>
+              </div>
+            )}
+            <footer className="flex flex-wrap items-center justify-between gap-4 border-t border-[#edf2ee] px-4 py-4 text-xs text-[#60796c] md:px-6">
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2">
+                  Usuarios por página
+                  <select value={pageSize} onChange={event => { setPageSize(Number(event.target.value)); changePage(1) }}>
+                    {[10, 15, 20].map(size => <option key={size} value={size}>{size}</option>)}
+                  </select>
+                </label>
+                <span aria-live="polite">
+                  {visible.length ? firstIndex + 1 : 0}–{firstIndex + pageUsers.length} de {visible.length} usuarios
+                  {visible.length !== users.length && ` (${users.length} en total)`}
+                </span>
+              </div>
+              <nav aria-label="Paginación de usuarios" className="flex items-center gap-3">
+                <button type="button" onClick={() => changePage(currentPage - 1)} disabled={currentPage === 1} className="rounded-lg border border-[#dbe6e1] bg-white px-3 py-2 text-[#4f6d63] hover:bg-[#edf6f2]">Anterior</button>
+                <span>Página {currentPage} de {totalPages}</span>
+                <button type="button" onClick={() => changePage(currentPage + 1)} disabled={currentPage === totalPages} className="rounded-lg border border-[#dbe6e1] bg-white px-3 py-2 text-[#4f6d63] hover:bg-[#edf6f2]">Siguiente</button>
+              </nav>
+            </footer>
+          </section>
+
+          <dialog
+            ref={registrationDialog}
+            aria-labelledby="registration-title"
+            aria-busy={saving || busy}
+            className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-3xl overflow-y-auto rounded-2xl border-0 bg-[#f6f8fa] p-0 text-[#243f43] shadow-2xl backdrop:bg-slate-900/50"
+            onCancel={event => { if (savingRef.current || busy) event.preventDefault() }}
+            onClose={() => setRegistrationOpen(false)}
+          >
+            {loading && <p role="status" className="px-6 pt-4 text-xs text-[#4f6d63]">Cargando usuarios para comprobar duplicados…</p>}
+            {loadError && <p role="alert" className="px-6 pt-4 text-xs text-red-700">{loadError}</p>}
+          <div
             className="grid scroll-mt-5 grid-cols-1 gap-6"
             id="carga"
           >
@@ -213,9 +420,12 @@ export default function UsersPage() {
                   01
                 </span>
                 <div>
-                  <h2>Agregar información</h2>
+                  <h2 id="registration-title">Agregar información</h2>
                   <p>Elige cómo deseas cargar los datos de los usuarios.</p>
                 </div>
+                <button type="button" onClick={closeRegistration} disabled={saving || busy} aria-label="Cerrar formulario" className="ml-auto grid size-9 shrink-0 place-items-center rounded-lg text-[#4f6d63] hover:bg-[#edf6f2]">
+                  <Icon name="close" size={20} />
+                </button>
               </div>
               <div
                 className="flex gap-6 border-b border-[#e9efec] px-6"
@@ -224,6 +434,7 @@ export default function UsersPage() {
                 <button
                   type="button"
                   aria-pressed={tab === 'csv'}
+                  disabled={saving || busy}
                   className="flex items-center gap-2 border-b-2 pb-3.5 text-xs aria-pressed:border-[#297d6a] aria-pressed:font-semibold aria-pressed:text-[#297d6a] border-transparent text-[#8a9b93]"
                   onClick={() => setTab('csv')}
                 >
@@ -232,6 +443,7 @@ export default function UsersPage() {
                 <button
                   type="button"
                   aria-pressed={tab === 'manual'}
+                  disabled={saving || busy}
                   className="flex items-center gap-2 border-b-2 pb-3.5 text-xs aria-pressed:border-[#297d6a] aria-pressed:font-semibold aria-pressed:text-[#297d6a] border-transparent text-[#8a9b93]"
                   onClick={() => setTab('manual')}
                 >
@@ -383,6 +595,7 @@ export default function UsersPage() {
                         )}
                       </select>
                     </label>
+                    <UbigeoFields value={location} onChange={(next, id) => { setLocation(next); setUbigeoId(id) }} disabled={saving} />
                     <div className="col-span-full flex items-center justify-between gap-2.5 [&_small]:text-[10px] [&_small]:text-[#8b9c91]">
                       <small>* Campos obligatorios</small>
                       <button
@@ -400,24 +613,7 @@ export default function UsersPage() {
 
           </div>
 
-          <div
-            className="mt-5 flex flex-wrap items-center gap-3"
-            aria-live="polite"
-          >
-            <button
-              type="button"
-              onClick={refreshUsers}
-              disabled={loading || saving}
-              className="rounded-lg border border-[#dbe6e1] bg-white px-4 py-2 text-xs text-[#4f6d63]"
-            >
-              {loading ? 'Cargando usuarios…' : 'Actualizar lista'}
-            </button>
-            {loadError && (
-              <p role="alert" className="text-xs text-red-700">
-                {loadError}
-              </p>
-            )}
-          </div>
+
           {message && (
             <div
               className={`mt-5 rounded-lg px-5 py-4 text-xs leading-relaxed ${message.error ? 'bg-[#fff0ed] text-[#ac4d3a]' : 'bg-[#e4f2e9] text-[#2c7650]'}`}
@@ -426,7 +622,7 @@ export default function UsersPage() {
               {message.text}
             </div>
           )}
-          {!!batch.length && (
+          {tab === 'csv' && !!batch.length && (
             <section className="overflow-hidden rounded-xl border border-[#e0e9e4] bg-white mt-6 scroll-mt-5 [&>p]:px-6">
               <div className="flex flex-col items-start justify-between gap-4 px-4 py-5 md:flex-row md:items-center md:p-6 [&_h2]:wrap-anywhere [&_p]:mt-1.5 [&_p]:text-[11px] [&_p]:leading-relaxed [&_p]:text-[#889991]">
                 <div>
@@ -513,117 +709,11 @@ export default function UsersPage() {
             </section>
           )}
 
-          <section
-            className="overflow-hidden rounded-xl border border-[#e0e9e4] bg-white mt-6 scroll-mt-5"
-            id="usuarios"
-          >
-            <div className="flex flex-col items-start justify-between gap-4 px-4 py-5 md:flex-row md:items-center md:p-6 [&_h2]:wrap-anywhere [&_p]:mt-1.5 [&_p]:text-[11px] [&_p]:leading-relaxed [&_p]:text-[#889991]">
-              <div>
-                <h2>
-                  Usuarios registrados{' '}
-                  <span className="ml-1 inline-block rounded-md bg-[#edf5ef] px-2 py-1 align-middle text-[10px] text-[#60856d]">
-                    {users.length}
-                  </span>
-                </h2>
-                <p>Consulta los registros guardados en la base de datos.</p>
-              </div>
-              <DownloadPersonalReport blank className="inline-flex items-center justify-center gap-2 rounded-lg border px-4.5 py-3 text-xs font-semibold transition-colors border-[#dbe6e1] bg-white text-[#4f6d63] hover:bg-[#edf6f2]" />
+
+            <div className="flex justify-end px-6 py-4">
+              <button type="button" onClick={closeRegistration} disabled={saving || busy} className="rounded-lg border border-[#dbe6e1] bg-white px-4 py-2.5 text-xs font-semibold text-[#4f6d63] hover:bg-[#edf6f2]">Cancelar</button>
             </div>
-            <div className="flex flex-col gap-3.5 px-4 pb-5 md:flex-row md:px-6 [&_select]:text-[11px] md:[&_select]:ml-auto">
-              <label className="flex flex-1 items-center gap-2.5 rounded-lg border border-[#dce7e0] px-3 text-[#8da294] md:max-w-105 [&_input]:w-full [&_input]:border-0! [&_input]:bg-transparent! [&_input]:pl-0! [&_input]:text-[11px]">
-                <Icon name="search" size={18} />
-                <input
-                  aria-label="Buscar usuarios"
-                  placeholder="Buscar por nombre, DNI o correo…"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                />
-              </label>
-              <select
-                aria-label="Filtrar por tipo de personal"
-                value={filter}
-                onChange={(event) => setFilter(event.target.value)}
-              >
-                <option value="todos">Todo el personal</option>
-                <option value="docente">Docentes</option>
-                <option value="administrativo">Administrativos</option>
-              </select>
-              <select
-                aria-label="Filtrar por estado"
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
-              >
-                <option value="todos">Todo estado</option>
-                <option value="activo">Activos</option>
-                <option value="inactivo">Inactivos</option>
-              </select>
-            </div>
-            <div className="overflow-x-auto">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Usuario</th>
-                    <th>DNI</th>
-                    <th>Correo institucional</th>
-                    <th>Tipo de personal</th>
-                    <th>Régimen laboral</th>
-                    <th>Estado</th>
-                    <th>Reportes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visible.map((user) => (
-                    <tr key={user.numero_doc_identidad}>
-                      <td>
-                        <Link to={`/legajos/${user.id}`} className="font-semibold text-teal-800 hover:underline">
-                          {user.nombres} {user.apellido_paterno}{' '}
-                          {user.apellido_materno}
-                        </Link>
-                      </td>
-                      <td>{user.numero_doc_identidad}</td>
-                      <td>{user.email_institucional}</td>
-                      <td>
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-[10px] ${user.tipo_personal === 'administrativo' ? 'bg-[#f6f0e1] text-[#9e8750]' : 'bg-[#eaf3f9] text-[#557f9b]'}`}
-                        >
-                          {user.tipo_personal === 'docente'
-                            ? 'Docente'
-                            : 'Administrativo'}
-                        </span>
-                      </td>
-                      <td>{user.regimen_laboral}</td>
-                      <td>
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-[10px] ${user.activo ? 'bg-[#eaf4ee] text-[#3d8060]' : 'bg-[#faf3e5] text-[#9b7a37]'}`}
-                        >
-                          {user.activo ? 'Activo' : 'Inactivo'}
-                        </span>
-                      </td>
-                    <td><DownloadPersonalReport usuario={user.id} className="whitespace-nowrap rounded-lg border border-teal-200 px-3 py-2 text-xs font-semibold text-teal-800 hover:bg-teal-50" /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {!loading && !loadError && !visible.length && (
-              <div className="px-5 py-9 text-center text-[#9ab3a3] [&>svg]:mx-auto [&_h3]:mt-3 [&_h3]:mb-2 [&_h3]:text-[13px] [&_h3]:font-medium [&_h3]:text-[#657f6e] [&_p]:text-[11px] [&_p]:text-[#96a69b]">
-                <Icon name="users" size={32} />
-                <h3>
-                  {users.length
-                    ? 'No se encontraron usuarios'
-                    : 'Tu lista de usuarios empieza aquí'}
-                </h3>
-                <p>
-                  {users.length
-                    ? 'Prueba con otro nombre o cambia el filtro.'
-                    : 'Importa un archivo CSV o agrega tu primer usuario manualmente.'}
-                </p>
-              </div>
-            )}
-            <footer className="border-t border-[#edf2ee] px-6 py-4 text-[10px] text-[#92a296]">
-              {visible.length} de {users.length} usuarios · Datos guardados
-            </footer>
-          </section>
+          </dialog>
     </div>
   )
 }

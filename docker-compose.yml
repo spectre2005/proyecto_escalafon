@@ -7,7 +7,9 @@ services:
       CACHE_STORE: file
     volumes:
       - ./backend:/var/www/html
+      - vendor:/var/www/html/vendor
       - ./docker/php/performance.ini:/usr/local/etc/php/conf.d/zz-performance.ini:ro
+    command: sh -c "if [ ! -f vendor/autoload.php ]; then composer install --no-interaction --prefer-dist || exit 1; fi; exec php-fpm"
     depends_on:
       db:
         condition: service_healthy
@@ -51,3 +53,4 @@ services:
 
 volumes:
   dbdata:
+  vendor:

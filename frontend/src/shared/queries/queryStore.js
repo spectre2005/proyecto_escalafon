@@ -42,7 +42,7 @@ export function createQueryStore(load, { maxEntries = 40, now = Date.now } = {})
     subscribe(url, listener) {
       const item = entry(url)
       item.listeners.add(listener)
-      void refresh(url)
+      if (!item.checkedAt || now() - item.checkedAt >= 1000) void refresh(url)
       return () => {
         item.listeners.delete(listener)
         queueMicrotask(() => {
@@ -53,9 +53,10 @@ export function createQueryStore(load, { maxEntries = 40, now = Date.now } = {})
     refresh,
     setData(url, data) {
       const item = entry(url)
+      const value = typeof data === 'function' ? data(item.snapshot.data) : data
       cancel(item)
       item.checkedAt = now()
-      publish(item, { data, error: null, loading: false })
+      publish(item, { data: value, error: null, loading: false })
     },
     invalidate() {
       for (const [url, item] of entries) {

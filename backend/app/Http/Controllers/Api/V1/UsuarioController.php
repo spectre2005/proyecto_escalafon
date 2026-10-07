@@ -109,6 +109,7 @@ class UsuarioController extends Controller
             'email_institucional' => strtolower($row['email_institucional']),
             'apellido_materno' => $row['apellido_materno'] ?? null,
             'telefono' => $row['telefono'] ?? null,
+            'ubigeo_id' => $row['ubigeo_id'] ?? null,
             'password' => $unissuedPassword,
             'activo' => false,
             'created_at' => $now,

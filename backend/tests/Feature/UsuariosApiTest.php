@@ -3,11 +3,13 @@
 namespace Tests\Feature;
 
 use App\Models\Legajo;
+use App\Models\Ubigeo;
 use App\Models\Usuario;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class UsuariosApiTest extends TestCase
@@ -33,6 +35,25 @@ class UsuariosApiTest extends TestCase
             'numero_doc_identidad', 'nombres', 'apellido_paterno', 'email_institucional',
             'tipo_personal', 'regimen_laboral',
         ]), ...$overrides];
+    }
+
+    public function test_registration_saves_a_selected_location_and_allows_rows_without_location(): void
+    {
+        $location = Ubigeo::factory()->create();
+        $this->postJson('/api/v1/usuarios', ['usuarios' => [
+            $this->payload(['numero_doc_identidad' => '00123456', 'ubigeo_id' => $location->id]),
+            $this->payload(['numero_doc_identidad' => '00123457']),
+        ]])->assertCreated();
+        $this->assertDatabaseHas('usuarios', ['numero_doc_identidad' => '00123456', 'ubigeo_id' => $location->id]);
+        $this->assertDatabaseHas('usuarios', ['numero_doc_identidad' => '00123457', 'ubigeo_id' => null]);
+    }
+
+    public function test_registration_rejects_a_location_outside_the_catalog(): void
+    {
+        $this->postJson('/api/v1/usuarios', ['usuarios' => [
+            $this->payload(['ubigeo_id' => (string) Str::uuid()]),
+        ]])->assertUnprocessable()->assertJsonValidationErrors('usuarios.0.ubigeo_id');
+        $this->assertUsuariosCreados(0);
     }
 
     public function test_manual_record_persists_and_is_returned_by_a_later_request(): void

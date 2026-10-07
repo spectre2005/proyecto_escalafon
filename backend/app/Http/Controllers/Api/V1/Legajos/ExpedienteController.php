@@ -298,13 +298,16 @@ class ExpedienteController extends Controller
 
     public function locations(Request $request): JsonResponse
     {
-        $filters = $request->validate(['region' => 'nullable|string|max:100|required_with:provincia', 'provincia' => 'nullable|string|max:100']);
+        $filters = $request->validate(['region' => 'nullable|string|max:100|required_with:provincia', 'provincia' => 'nullable|string|max:100', 'completo' => 'sometimes|boolean']);
         $query = Ubigeo::query();
         if (! empty($filters['region'])) {
             $query->where('region', $filters['region']);
         }
         if (! empty($filters['provincia'])) {
             $query->where('provincia', $filters['provincia']);
+        }
+        if ($request->boolean('completo')) {
+            return response()->json(['data' => $query->orderBy('region')->orderBy('provincia')->orderBy('distrito')->get(['id', 'region', 'provincia', 'distrito'])]);
         }
         $column = ! empty($filters['region']) ? (! empty($filters['provincia']) ? 'distrito' : 'provincia') : 'region';
 
