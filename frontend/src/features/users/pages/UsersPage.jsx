@@ -1,6 +1,8 @@
 import DownloadPersonalReport from '../../reportes/components/DownloadPersonalReport'
+import { advanceOnEnter } from '../../../shared/forms/advanceOnEnter'
 import { useEffect, useRef, useState } from 'react'
-import { apiErrorMessage } from '../../../axios'
+import api, { apiErrorMessage } from '../../../axios'
+import { downloadUsersTemplate, parseUsersFile, resolveUsersLocations } from '../utils/usuariosExcel'
 import { saveUsers } from '../api/usuariosApi'
 import { useUsers } from '../hooks/useUsers'
 import Icon from '../../../components/ui/Icon'
@@ -8,8 +10,6 @@ import UbigeoFields from '../../../components/ui/UbigeoFields'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   columns,
-  downloadCsv,
-  parseUsersCsv,
   validateUser,
 } from '../utils/usuariosCsv'
 import { filterUsers } from '../utils/usuariosFiltering'
@@ -31,7 +31,7 @@ const labels = {
 }
 
 export default function UsersPage() {
-  const { users, setUsers, loading, loadError, refreshUsers: refreshData } = useUsers()
+  const { users, setUsers, loading, loadError } = useUsers()
   const [tab, setTab] = useState('manual')
   const [registrationOpen, setRegistrationOpen] = useState(false)
   const registrationDialog = useRef(null)
@@ -44,11 +44,17 @@ export default function UsersPage() {
   const [message, setMessage] = useState(null)
   const [searchParams, setSearchParams] = useSearchParams()
   const query = searchParams.get('q') || ''
-  function setQuery(value) {
-    setSearchParams(value ? { q: value } : {}, { replace: true })
+  function updateFilter(key, value) {
+    const next = new URLSearchParams(searchParams)
+    if (value && value !== 'todos') next.set(key, value)
+    else next.delete(key)
+    next.delete('page')
+    setSearchParams(next, { replace: true })
   }
-  const [filter, setFilter] = useState('todos')
-  const [statusFilter, setStatusFilter] = useState('todos')
+  function setQuery(value) { updateFilter('q', value) }
+  const filter = ['docente', 'administrativo'].includes(searchParams.get('tipo')) ? searchParams.get('tipo') : 'todos'
+  const statusFilter = ['activo', 'inactivo'].includes(searchParams.get('estado')) ? searchParams.get('estado') : 'todos'
+  const contactFilter = ['con', 'sin'].includes(searchParams.get('correo')) ? searchParams.get('correo') : 'todos'
   const [pageSize, setPageSize] = useState(10)
   function changePage(page) {
     const next = new URLSearchParams(searchParams)
@@ -59,9 +65,6 @@ export default function UsersPage() {
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
   const fileInput = useRef(null)
-  function refreshUsers() {
-    if (!savingRef.current) refreshData()
-  }
 
   useEffect(() => {
     if (!registrationOpen) return
@@ -127,6 +130,7 @@ export default function UsersPage() {
     query,
     tipoPersonal: filter,
     estado: statusFilter,
+    correo: contactFilter,
   })
   const totalPages = Math.max(1, Math.ceil(visible.length / pageSize))
   const requestedPage = Number(searchParams.get('page'))
@@ -142,11 +146,12 @@ export default function UsersPage() {
     setFilename('')
     setBusy(true)
     try {
-      if (!/\.csv$/i.test(file.name))
-        throw new Error('Selecciona un archivo CSV.')
-      if (file.size > 2 * 1024 * 1024)
-        throw new Error('El archivo supera el límite de 2 MB.')
-      const parsed = parseUsersCsv(await file.text())
+      if (!/\.(xlsx|csv)$/i.test(file.name)) throw new Error('Selecciona un archivo Excel (.xlsx) o CSV (.csv).')
+      if (file.size > 2 * 1024 * 1024) throw new Error('El archivo supera el límite de 2 MB.')
+      const records = await parseUsersFile(file)
+      const needsLocations = records.some(record => record.region || record.provincia || record.distrito)
+      const locations = needsLocations ? (await api.get('/ubicaciones?completo=1')).data.data : []
+      const parsed = resolveUsersLocations(records, locations)
       setBatch(parsed)
       setFilename(file.name)
     } catch (error) {
@@ -205,12 +210,6 @@ export default function UsersPage() {
               </p>
             </div>
           </div>
-          <div className="mb-6 rounded-lg border border-[#e4dfc7] bg-[#faf8ef] px-4 py-3 text-[11px] leading-relaxed text-[#827347]">
-            <strong>Desarrollo local.</strong> Los registros se guardan en la
-            base de datos. El acceso requiere una cuenta administradora.
-            Los nuevos usuarios quedan inactivos hasta implementar su
-            activación.
-          </div>
           <section
             className="mb-7 grid grid-cols-3 gap-2 md:gap-4.5 [&_article]:rounded-xl [&_article]:border [&_article]:border-[#e4ebe8] [&_article]:bg-white [&_article]:p-3 md:[&_article]:flex md:[&_article]:items-center md:[&_article]:gap-4 md:[&_article]:p-5 [&_p]:mb-1.5 [&_p]:min-h-7 [&_p]:text-[10px] [&_p]:text-[#7f928b] md:[&_p]:min-h-0 md:[&_p]:text-[11px] [&_strong]:font-['Manrope',sans-serif] [&_strong]:text-2xl md:[&_strong]:text-[26px] [&_article:nth-child(2)>span]:bg-[#eff3fa] [&_article:nth-child(2)>span]:text-[#6384ad] [&_article:nth-child(3)>span]:bg-[#faf5e8] [&_article:nth-child(3)>span]:text-[#b3995e]"
             aria-label="Resumen de usuarios"
@@ -245,14 +244,6 @@ export default function UsersPage() {
             className="mt-5 flex flex-wrap items-center gap-3"
             aria-live="polite"
           >
-            <button
-              type="button"
-              onClick={refreshUsers}
-              disabled={loading || saving}
-              className="rounded-lg border border-[#dbe6e1] bg-white px-4 py-2 text-xs text-[#4f6d63]"
-            >
-              {loading ? 'Cargando usuarios…' : 'Actualizar lista'}
-            </button>
             {loadError && (
               <p role="alert" className="text-xs text-red-700">
                 {loadError}
@@ -301,7 +292,7 @@ export default function UsersPage() {
               <select
                 aria-label="Filtrar por tipo de personal"
                 value={filter}
-                onChange={(event) => { setFilter(event.target.value); changePage(1) }}
+                onChange={(event) => { updateFilter('tipo', event.target.value) }}
               >
                 <option value="todos">Todo el personal</option>
                 <option value="docente">Docentes</option>
@@ -310,11 +301,16 @@ export default function UsersPage() {
               <select
                 aria-label="Filtrar por estado"
                 value={statusFilter}
-                onChange={(event) => { setStatusFilter(event.target.value); changePage(1) }}
+                onChange={(event) => { updateFilter('estado', event.target.value) }}
               >
                 <option value="todos">Todo estado</option>
                 <option value="activo">Activos</option>
                 <option value="inactivo">Inactivos</option>
+              </select>
+              <select aria-label="Filtrar por correo" value={contactFilter} onChange={event => updateFilter('correo', event.target.value)}>
+                <option value="todos">Todo contacto</option>
+                <option value="con">Con correo</option>
+                <option value="sin">Sin correo</option>
               </select>
             </div>
             <div className="overflow-x-auto">
@@ -375,7 +371,7 @@ export default function UsersPage() {
                 <p>
                   {users.length
                     ? 'Prueba con otro nombre o cambia el filtro.'
-                    : 'Importa un archivo CSV o agrega tu primer usuario manualmente.'}
+                    : 'Importa un archivo Excel o CSV o agrega tu primer usuario manualmente.'}
                 </p>
               </div>
             )}
@@ -438,7 +434,7 @@ export default function UsersPage() {
                   className="flex items-center gap-2 border-b-2 pb-3.5 text-xs aria-pressed:border-[#297d6a] aria-pressed:font-semibold aria-pressed:text-[#297d6a] border-transparent text-[#8a9b93]"
                   onClick={() => setTab('csv')}
                 >
-                  <Icon name="upload" size={17} /> Importar CSV
+                  <Icon name="upload" size={17} /> Importar Excel / CSV
                 </button>
                 <button
                   type="button"
@@ -476,12 +472,12 @@ export default function UsersPage() {
                       Seleccionar archivo
                     </button>
                     <small>
-                      CSV en UTF-8 · Hasta 2 MB · Máximo 1,000 usuarios
+                      Excel (.xlsx) o CSV en UTF-8 · Hasta 2 MB · Máximo 1,000 usuarios
                     </small>
                     <input
                       ref={fileInput}
                       type="file"
-                      accept=".csv,text/csv"
+                      accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
                       hidden
                       onChange={(event) => readFile(event.target.files[0])}
                     />
@@ -492,22 +488,34 @@ export default function UsersPage() {
                       <span>
                         <strong>Empieza con nuestra plantilla</strong>
                         <small>
-                          Incluye las columnas necesarias para la carga.
+                          Campos obligatorios, listas de opciones e instrucciones en Excel.
                         </small>
                       </span>
                     </span>
                     <button
                       type="button"
-                      onClick={() => downloadCsv([], 'plantilla_usuarios.csv')}
+                      disabled={busy || saving}
+                      onClick={async () => {
+                        setBusy(true)
+                        try { await downloadUsersTemplate() }
+                        catch { setMessage({ error: true, text: 'No se pudo descargar la plantilla. Intenta nuevamente.' }) }
+                        finally { setBusy(false) }
+                      }}
                     >
-                      Descargar CSV ↓
+                      Descargar Excel ↓
                     </button>
                   </div>
+                  <p className="mt-4 text-xs leading-relaxed text-[#648776]">
+                    Completa la hoja Personal desde la fila 2. Los campos con * son obligatorios.
+                    DNI y teléfono deben conservar sus ceros iniciales. La ubicación es opcional;
+                    si la incluyes, completa región, provincia y distrito. Revisa los datos antes de guardar.
+                  </p>
                 </div>
               ) : (
                 <form
                   className="grid grid-cols-1 gap-4 px-4 py-5 md:grid-cols-2 md:p-6 [&_label]:flex [&_label]:flex-col [&_label]:gap-2 [&_label]:text-[11px] [&_label]:text-[#557566]"
                   onSubmit={addManual}
+                  onKeyDown={advanceOnEnter}
                   aria-busy={saving}
                 >
                   <fieldset
@@ -652,6 +660,10 @@ export default function UsersPage() {
                       <th>Registro</th>
                       <th>DNI</th>
                       <th>Usuario</th>
+                      <th>Correo institucional</th>
+                      <th>Tipo de personal</th>
+                      <th>Régimen laboral</th>
+                      <th>Teléfono</th>
                       <th>Validación</th>
                     </tr>
                   </thead>
@@ -662,7 +674,12 @@ export default function UsersPage() {
                         <td>{user.numero_doc_identidad}</td>
                         <td>
                           {user.nombres} {user.apellido_paterno}
+                          {' '}{user.apellido_materno}
                         </td>
+                        <td>{user.email_institucional}</td>
+                        <td>{user.tipo_personal}</td>
+                        <td>{user.regimen_laboral}</td>
+                        <td>{user.telefono || '—'}</td>
                         <td
                           className={
                             errors.length

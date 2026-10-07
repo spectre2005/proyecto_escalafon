@@ -1,4 +1,4 @@
-import { regimenesPorTipo } from './regimenesLaborales'
+import { regimenesPorTipo } from './regimenesLaborales.js'
 
 export const columns = ['numero_doc_identidad', 'nombres', 'apellido_paterno', 'apellido_materno', 'email_institucional', 'tipo_personal', 'regimen_laboral', 'telefono']
 

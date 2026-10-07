@@ -20,3 +20,10 @@ test('combines status, personnel type, and search filters', () => {
   )
   assert.deepEqual(filterUsers(users, { estado: 'activo', tipoPersonal: 'administrativo' }), [])
 })
+
+ test('filters contact coverage and combines it with status', () => {
+  const records = [...users, { ...users[0], numero_doc_identidad: '99000003', email_institucional: '  ', activo: false }]
+  assert.equal(filterUsers(records, { correo: 'con' }).length, 2)
+  assert.deepEqual(filterUsers(records, { correo: 'sin', estado: 'inactivo' }).map(user => user.numero_doc_identidad), ['99000003'])
+  assert.equal(filterUsers(records, { correo: 'sin', estado: 'activo' }).length, 0)
+})

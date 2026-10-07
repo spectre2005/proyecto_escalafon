@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import Icon from '../../../components/ui/Icon'
+import { advanceOnEnter } from '../../../shared/forms/advanceOnEnter'
 import api, { apiErrorMessage } from '../../../axios'
 import { useLiveQuery } from '../../../shared/queries/useLiveQuery'
 import { estadosCiviles, tiposDocIdentidad } from '../config/seccion01'
@@ -36,7 +38,7 @@ const flags = [
   ['tiene_derechohabientes', 'Tiene derechohabientes'],
 ]
 
-export default function GeneralDataEditor({ usuario, data, onSaved, onCancel }) {
+export default function GeneralDataEditor({ usuario, data, onSaved, onCancel, onUploadDni, onUploadFicha }) {
   const [original] = useState(() => ({ ...data.usuario.values, ...data.edit_values }))
   const [version] = useState(data.version)
   const [draft, setDraft] = useState(() => ({
@@ -79,8 +81,8 @@ export default function GeneralDataEditor({ usuario, data, onSaved, onCancel }) 
       setSaving(false)
     }
   }
-  return <form onSubmit={save} aria-busy={saving}>
-    <div className="mb-6 flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold text-slate-800">Editar información personal</h2><p className="mt-2 text-xs text-slate-500">Los cambios se mostrarán al guardar.</p></div><button type="button" disabled={saving} onClick={onCancel} className="text-sm text-slate-500 hover:text-slate-800">Cancelar</button></div>
+  return <form onSubmit={save} onKeyDown={advanceOnEnter} aria-busy={saving}>
+    <div className="mb-6 flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-lg font-semibold text-slate-800">Editar información personal</h2><p className="mt-2 text-xs text-slate-500">Los cambios se mostrarán al guardar.</p></div><div className="flex flex-wrap items-center gap-3">{onUploadFicha && <button type="button" disabled={saving} onClick={onUploadFicha} className="inline-flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-100"><Icon name="upload" size={17} />Subir ficha personal</button>}<button type="button" disabled={saving} onClick={onCancel} className="text-sm text-slate-500 hover:text-slate-800">Cancelar</button></div></div>
     {error && <p role="alert" className="mb-5 rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{error}</p>}
     <fieldset disabled={saving} className="grid gap-5 sm:grid-cols-2">
       {fields.map(([key, title, type, maxLength, required]) => {
@@ -88,9 +90,17 @@ export default function GeneralDataEditor({ usuario, data, onSaved, onCancel }) 
         const digits = isDni ? 8 : key === 'telefono' ? 9 : null
         const props = { name: key, className: inputClass, required, value: draft[key], inputMode: digits ? 'numeric' : undefined, pattern: digits ? `[0-9]{${digits}}` : undefined, title: digits ? `Debe contener ${digits} dígitos.` : undefined, onChange: event => setDraft(previous => ({ ...previous, [key]: digits ? event.target.value.replace(/\D/g, '').slice(0, digits) : event.target.value })), 'aria-invalid': !!fieldErrors[key] }
         const lista = key === 'regimen_laboral' ? Object.fromEntries((regimenesPorTipo[draft.tipo_personal] || []).map(option => [option.value, option.label])) : listas[key]
-        return <label key={key} className="flex flex-col gap-2 text-xs font-medium text-slate-600">{title}{required ? ' *' : ''}
-          {lista ? <select {...props}>{key === 'regimen_laboral' && <option value="" disabled>Selecciona un régimen</option>}<Opciones lista={lista} actual={draft[key]} vacio={required ? undefined : 'No registrado'} /></select> : <input {...props} type={type} maxLength={digits || maxLength} readOnly={key === 'nacionalidad'} aria-readonly={key === 'nacionalidad' ? true : undefined} />}
-          {fieldErrors[key] && <span className="text-rose-700">{fieldErrors[key].join(' ')}</span>}</label>
+        return <div key={key} className="flex flex-col gap-2 text-xs font-medium text-slate-600">
+          <label htmlFor={`personal-${key}`}>{isDni ? 'DNI' : title}{required ? ' *' : ''}</label>
+          <div className="flex items-center gap-2">
+            {lista ? <select {...props} id={`personal-${key}`}>{key === 'regimen_laboral' && <option value="" disabled>Selecciona un régimen</option>}<Opciones lista={lista} actual={draft[key]} vacio={required ? undefined : 'No registrado'} /></select> : <input {...props} id={`personal-${key}`} type={type} maxLength={digits || maxLength} readOnly={key === 'nacionalidad'} aria-readonly={key === 'nacionalidad' ? true : undefined} />}
+            {key === 'numero_doc_identidad' && onUploadDni && <span className="group relative shrink-0">
+              <button type="button" onClick={onUploadDni} aria-label={isDni ? 'Subir copia de DNI' : 'Subir copia de documento de identidad'} aria-describedby="identity-upload-tooltip" className="grid size-11 place-items-center rounded-xl border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100 focus-visible:outline-2 focus-visible:outline-teal-600"><Icon name="upload" size={19} /></button>
+              <span id="identity-upload-tooltip" role="tooltip" className="pointer-events-none absolute right-0 bottom-full z-10 mb-2 hidden whitespace-nowrap rounded-lg bg-slate-800 px-3 py-2 text-[11px] text-white group-hover:block group-focus-within:block">{isDni ? 'Subir copia de DNI' : 'Subir archivo de identidad'}</span>
+            </span>}
+          </div>
+          {fieldErrors[key] && <span className="text-rose-700">{fieldErrors[key].join(' ')}</span>}
+        </div>
       })}
       <label className="flex flex-col gap-2 text-xs font-medium text-slate-600">Tipo de personal *<select name="tipo_personal" className={inputClass} value={draft.tipo_personal} onChange={event => setDraft(previous => ({ ...previous, tipo_personal: event.target.value, regimen_laboral: regimenInicial(event.target.value) }))}><option value="docente">Docente</option><option value="administrativo">Administrativo</option></select></label>
       {[['unidad_organica_id', 'Unidad orgánica', 'unidades'], ['regimen_normativo_id', 'Régimen normativo', 'regimenes']].map(([key, title, catalog]) => <label key={key} className="flex flex-col gap-2 text-xs font-medium text-slate-600">{title}<select name={key} className={inputClass} value={draft[key]} disabled={!options.data} onChange={event => setDraft(previous => ({ ...previous, [key]: event.target.value }))}><option value="">Sin asignar</option>{!options.data && draft[key] && <option value={draft[key]}>{data.usuario.values[key]}</option>}{options.data?.data[catalog].map(item => <option key={item.id} value={item.id}>{item.nombre}{item.activo ? '' : ' (inactivo)'}</option>)}</select>{fieldErrors[key] && <span className="text-rose-700">{fieldErrors[key].join(' ')}</span>}</label>)}
