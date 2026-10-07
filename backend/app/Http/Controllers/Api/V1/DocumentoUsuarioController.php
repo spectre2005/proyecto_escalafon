@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Models\DocumentoUsuario;
 use App\Models\TipoDocumento;
+use App\Support\RelacionTitular;
 use App\Support\ResumenSeccion04;
 use App\Support\ResumenSeccion06;
 use App\Support\ResumenSeccion08;
@@ -34,7 +35,6 @@ class DocumentoUsuarioController extends ResourceController
         'fecha_emision' => 'nullable|date',
         'titular_nombre' => 'nullable|string|max:200',
         'titular_documento' => 'nullable|string|max:20',
-        'relacion_titular' => 'sometimes|string|max:20',
         'num_resolucion' => 'nullable|string|max:60',
         'estado' => 'sometimes|string|max:20',
         'fedateado' => 'sometimes|boolean',
@@ -46,6 +46,12 @@ class DocumentoUsuarioController extends ResourceController
         'subsana_a_documento_id' => 'nullable|uuid|exists:documentos_usuario,id',
         'created_by' => 'required|uuid|exists:usuarios,id',
     ];
+
+    public function __construct()
+    {
+        $this->rules['relacion_titular'] = 'sometimes|in:'.implode(',', RelacionTitular::OPCIONES);
+        $this->rules['relacion_titular_otro'] = implode('|', RelacionTitular::reglasOtro());
+    }
 
     protected function indexQuery(): Builder
     {

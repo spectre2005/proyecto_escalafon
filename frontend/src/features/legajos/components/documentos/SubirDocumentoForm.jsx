@@ -26,11 +26,11 @@ export default function SubirDocumentoForm({ usuario, seccion, tipo, titular, en
   const respuesta = useRef(null)
   const [draft, set] = useBorrador({
     folio_fin: '', fecha_incorporacion: hoy(), emisor: '', fecha_emision: '', num_resolucion: '',
-    titular_nombre: titular?.nombre || '', titular_documento: titular?.documento || '', relacion_titular: relacion,
+    titular_nombre: titular?.nombre || '', titular_documento: titular?.documento || '', relacion_titular: relacion, relacion_titular_otro: '',
     modalidad_presentacion: '', motivo_incorporacion: '', subsana_a_documento_id: debeSubsanar && vigentes.length === 1 ? vigentes[0].id : '', enlace_id: '',
   })
   const { busy, error, errors, guardar } = useGuardar(async data => {
-    respuesta.current = (await subirDocumento(usuario, { ...data, seccion_legajo_id: seccion, tipo_documento_id: tipo.id, folio_inicio: sugerido }, pdf)).data.data
+    respuesta.current = (await subirDocumento(usuario, { ...data, relacion_titular_otro: data.relacion_titular === 'otro' ? data.relacion_titular_otro : null, seccion_legajo_id: seccion, tipo_documento_id: tipo.id, folio_inicio: sugerido }, pdf)).data.data
   }, () => onSaved(respuesta.current))
 
   return <Formulario titulo={`Subir documento: ${tipo.literal ? `${tipo.literal}) ` : ''}${tipo.nombre}`} guardar="Subir documento" busy={busy} error={error}
@@ -46,7 +46,8 @@ export default function SubirDocumentoForm({ usuario, seccion, tipo, titular, en
     <Campo label="N.º de resolución" required={tipo.requiere_num_resolucion} error={errors.num_resolucion}><input required={tipo.requiere_num_resolucion} maxLength={60} value={draft.num_resolucion} onChange={set('num_resolucion')} /></Campo>
     <Campo label="Titular (nombre)" required error={errors.titular_nombre}><input required maxLength={200} value={draft.titular_nombre} onChange={set('titular_nombre')} /></Campo>
     <Campo label="Titular (DNI u otro documento)" required error={errors.titular_documento}><input required maxLength={20} value={draft.titular_documento} onChange={set('titular_documento')} /></Campo>
-    <Campo label="Relación con el titular" required error={errors.relacion_titular}><select required value={draft.relacion_titular} onChange={set('relacion_titular')}><Opciones lista={relacionesTitular} /></select></Campo>
+    <Campo label="Relación con el titular" required error={errors.relacion_titular}><select required value={draft.relacion_titular} onChange={set('relacion_titular')}><Opciones lista={relacionesTitular} vacio="Selecciona" /></select></Campo>
+    {draft.relacion_titular === 'otro' && <Campo label="Especifique la relación" required error={errors.relacion_titular_otro}><input required maxLength={150} value={draft.relacion_titular_otro} onChange={set('relacion_titular_otro')} /></Campo>}
     <Campo label="Modalidad de presentación" required error={errors.modalidad_presentacion}><select required value={draft.modalidad_presentacion} onChange={set('modalidad_presentacion')}><Opciones lista={modalidadesPresentacion} vacio="Selecciona" /></select></Campo>
     {vigentes.length > 0 && <Campo label={debeSubsanar ? 'Documento que subsana (este tipo admite uno solo)' : 'Subsana a otro documento'} required={debeSubsanar} error={errors.subsana_a_documento_id} className="sm:col-span-2">
       <select required={debeSubsanar} value={draft.subsana_a_documento_id} onChange={set('subsana_a_documento_id')}>

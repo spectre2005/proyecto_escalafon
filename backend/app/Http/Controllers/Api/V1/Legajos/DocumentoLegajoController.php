@@ -15,6 +15,7 @@ use App\Support\Documentos\EstadoDocumento;
 use App\Support\Documentos\Folios;
 use App\Support\Documentos\FormulariosDatos;
 use App\Support\Parametros;
+use App\Support\RelacionTitular;
 use App\Support\ResumenSeccion04;
 use App\Support\ResumenSeccion06;
 use Illuminate\Http\JsonResponse;
@@ -37,10 +38,10 @@ class DocumentoLegajoController extends Controller
 
     public const MODALIDADES = ['original', 'copia_simple', 'copia_fedateada', 'digital_firmado'];
 
-    public const RELACIONES_TITULAR = ['servidor', 'conyuge_concubino', 'hijo', 'otro'];
+    public const RELACIONES_TITULAR = RelacionTitular::OPCIONES;
 
     private const CAMPOS = ['seccion_legajo_id', 'tipo_documento_id', 'pdf', 'folio_inicio', 'folio_fin', 'fecha_incorporacion', 'emisor', 'fecha_emision',
-        'titular_nombre', 'titular_documento', 'num_resolucion', 'modalidad_presentacion', 'relacion_titular', 'motivo_incorporacion',
+        'titular_nombre', 'titular_documento', 'num_resolucion', 'modalidad_presentacion', 'relacion_titular', 'relacion_titular_otro', 'motivo_incorporacion',
         'subsana_a_documento_id', 'enlace_id'];
 
     /** Folio sugerido para la próxima carga en una sección: ultimo_folio + 1. */
@@ -84,6 +85,7 @@ class DocumentoLegajoController extends Controller
             'num_resolucion' => [$tipo->requiere_num_resolucion ? 'required' : 'nullable', 'string', 'max:60'],
             'modalidad_presentacion' => ['required', Rule::in(self::MODALIDADES)],
             'relacion_titular' => ['required', Rule::in(self::RELACIONES_TITULAR)],
+            'relacion_titular_otro' => RelacionTitular::reglasOtro(),
             'motivo_incorporacion' => 'nullable|string|max:300',
             'subsana_a_documento_id' => 'nullable|uuid',
             'enlace_id' => 'nullable|uuid',

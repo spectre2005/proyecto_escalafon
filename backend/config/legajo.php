@@ -26,6 +26,9 @@ return [
     'numero_legajo' => ['prefijo' => 'LEG-{anio}-', 'digitos' => 6],
 
     // Disco privado donde se guardan los PDF del legajo (config/filesystems.php). Nunca un disco público.
+    // Pantallas disponibles para el recorrido aprobado (el orden se obtiene del catálogo).
+    'secciones_registro_guiado' => [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+
     'disco_documentos' => env('LEGAJO_DISCO_DOCUMENTOS', 'documentos'),
 
 ];

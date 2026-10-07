@@ -105,7 +105,7 @@ export default function Seccion08Panel({ usuario, categoria }) {
               {visor?.id === doc.id && <VisorPdf usuario={usuario} documento={doc} titulo={doc.nombre} onClose={() => setVisor(null)} />}
             </article>)}
             {item.aplica && data.legajo && (grupoActual === 'sanciones' ? puedeRegistrarSanciones : puedeSubir) && <>
-              {formulario?.item === item.codigo && !formulario.documento ? <Documento08Form usuario={usuario} item={item} datos={data} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado. Queda en revisión de RR. HH.')} /> : <button id={`agregar-${item.codigo}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.codigo, origen: `agregar-${item.codigo}` }) }}>{item.cantidad ? 'Agregar otro documento' : 'Agregar documento'}</button>}
+              {formulario?.item === item.codigo && !formulario.documento ? <Documento08Form usuario={usuario} item={item} datos={data} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado. Queda en revisión de RR. HH.')} /> : <button data-recorrido-tipo={item.id} id={`agregar-${item.codigo}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.codigo, origen: `agregar-${item.codigo}` }) }}>{item.cantidad ? 'Agregar otro documento' : 'Agregar documento'}</button>}
             </>}
           </div>
         </details>)}

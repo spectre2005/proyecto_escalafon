@@ -81,7 +81,7 @@ class Seccion01DocumentosTest extends TestCase
         $this->assertSame($k, $certificado->refresh()->documento_id);
         $conyuge = $this->familiar(['parentesco' => 'conyuge']);
         $hijo = $this->familiar(['parentesco' => 'hijo', 'fecha_nacimiento' => today()->subYears(8)]);
-        $i = $this->subir01('S01_I_DNI_CONYUGE_CONCUBINO', ['enlace_id' => $conyuge->id, 'relacion_titular' => 'conyuge_concubino'])->assertCreated()->json('data.id');
+        $i = $this->subir01('S01_I_DNI_CONYUGE_CONCUBINO', ['enlace_id' => $conyuge->id, 'relacion_titular' => 'conyuge'])->assertCreated()->json('data.id');
         $j = $this->subir01('S01_J_DNI_HIJOS_MENORES', ['enlace_id' => $hijo->id, 'relacion_titular' => 'hijo'])->assertCreated()->json('data.id');
         $this->assertSame([$i, $j], [$conyuge->refresh()->documento_id, $hijo->refresh()->documento_id]);
 
@@ -123,11 +123,11 @@ class Seccion01DocumentosTest extends TestCase
         $conyuge = $this->familiar(['parentesco' => 'conyuge']);
         $this->subir01('S01_G_PARTIDA_MATRIMONIO_CONCUBINATO', ['enlace_id' => $conyuge->id])->assertUnprocessable()->assertJsonValidationErrors('enlace_id');
         $this->folio--;
-        $g = $this->subir01('S01_G_PARTIDA_MATRIMONIO_CONCUBINATO', ['titular_nombre' => 'Servidor y cónyuge', 'relacion_titular' => 'conyuge_concubino'])
+        $g = $this->subir01('S01_G_PARTIDA_MATRIMONIO_CONCUBINATO', ['titular_nombre' => 'Servidor y cónyuge', 'relacion_titular' => 'conyuge'])
             ->assertCreated()->assertJsonPath('data.formulario_datos', null)->assertJsonPath('data.enlazado', false)->json('data.id');
         $this->assertNull($conyuge->refresh()->documento_id);
         $documento = DocumentoUsuario::query()->findOrFail($g);
-        $this->assertSame(['Servidor y cónyuge', 'conyuge_concubino', 1, 1], [$documento->titular_nombre, $documento->relacion_titular, $documento->folio_inicio, $documento->folio_fin]);
+        $this->assertSame(['Servidor y cónyuge', 'conyuge', 1, 1], [$documento->titular_nombre, $documento->relacion_titular, $documento->folio_inicio, $documento->folio_fin]);
 
         foreach (['S01_A_FICHA_DATOS', 'S01_B_DOCUMENTO_IDENTIDAD', 'S01_OTROS_UNIVERSIDAD'] as $codigo) {
             $id = $this->subir01($codigo)->assertCreated()->assertJsonPath('data.formulario_datos', null)->json('data.id');

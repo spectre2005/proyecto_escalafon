@@ -39,6 +39,7 @@ class DocumentoUsuario extends Model
         'titular_nombre',
         'titular_documento',
         'relacion_titular',
+        'relacion_titular_otro',
         'num_resolucion',
         'estado',
         'fedateado',

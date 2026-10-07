@@ -85,7 +85,7 @@ export default function Seccion06Panel({ usuario }) {
             {visor?.id === doc.id && <VisorPdf usuario={usuario} documento={doc} titulo={doc.nombre} onClose={() => setVisor(null)} />}
           </li>)}</ul>
           {puedeAgregar && data.legajo && item.aplica && <>
-            {formulario?.item === item.id && !formulario.documento ? <Documento06Form usuario={usuario} item={item} datos={data} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado. Queda en revisión de RR. HH.')} /> : <button id={`agregar-${item.id}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.id, origen: `agregar-${item.id}` }) }}>{item.cantidad ? (item.permite_multiples ? 'Agregar otro documento' : 'Agregar documento que subsane al anterior') : 'Agregar documento'}</button>}
+            {formulario?.item === item.id && !formulario.documento ? <Documento06Form usuario={usuario} item={item} datos={data} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado. Queda en revisión de RR. HH.')} /> : <button data-recorrido-tipo={item.id} id={`agregar-${item.id}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.id, origen: `agregar-${item.id}` }) }}>{item.cantidad ? (item.permite_multiples ? 'Agregar otro documento' : 'Agregar documento que subsane al anterior') : 'Agregar documento'}</button>}
           </>}
         </div>
       </details>)}

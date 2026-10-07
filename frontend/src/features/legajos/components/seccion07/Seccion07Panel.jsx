@@ -148,7 +148,7 @@ function Documentos({ usuario, data, subseccion, sinLegajo, aplica }) {
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             <Etiqueta clase={exigeClase}>{exigeTexto}</Etiqueta>
             <Etiqueta clase={coloresEstadoDocumento[tipo.estado] || 'bg-slate-100 text-slate-700'}>{etiqueta(estadosDocumento, tipo.estado)}{tipo.documentos > 1 ? ` · ${tipo.documentos} documentos` : ''}</Etiqueta>
-            {puedeSubir && <button disabled={ocupado || !!sinLegajo || !aplica} title={!aplica ? 'No aplica a esta persona.' : sinLegajo || undefined} onClick={() => { setAviso(''); setSubiendo(tipo.id) }} className={`${enlace} inline-flex items-center gap-2`}><Icon name="paperclip" size={18} />Subir documento</button>}
+            {puedeSubir && <button data-recorrido-tipo={tipo.id} disabled={ocupado || !!sinLegajo || !aplica} title={!aplica ? 'No aplica a esta persona.' : sinLegajo || undefined} onClick={() => { setAviso(''); setSubiendo(tipo.id) }} className={`${enlace} inline-flex items-center gap-2`}><Icon name="paperclip" size={18} />Subir documento</button>}
           </div>
         </div>
         {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={7} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo, data)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}

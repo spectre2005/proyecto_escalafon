@@ -172,7 +172,7 @@ class Seccion09Controller extends Controller
             'estado' => $ultimo ? EstadoDocumento::visible($ultimo) : 'pendiente',
             'documentos' => $documentos->count(),
             'lista' => $documentos->map(fn (DocumentoUsuario $documento): array => [
-                ...$this->fila($documento, ['estado', 'folio_inicio', 'folio_fin', 'fecha_incorporacion', 'emisor', 'fecha_emision', 'titular_nombre', 'titular_documento', 'num_resolucion', 'modalidad_presentacion', 'relacion_titular', 'subsana_a_documento_id', 'fecha_recepcion', 'created_at']),
+                ...$this->fila($documento, ['estado', 'folio_inicio', 'folio_fin', 'fecha_incorporacion', 'emisor', 'fecha_emision', 'titular_nombre', 'titular_documento', 'num_resolucion', 'modalidad_presentacion', 'relacion_titular', 'relacion_titular_otro', 'subsana_a_documento_id', 'fecha_recepcion', 'created_at']),
                 'subsanado' => $documentos->contains('subsana_a_documento_id', $documento->id),
                 'estado_visible' => EstadoDocumento::visible($documento),
                 'aprobado' => EstadoDocumento::aprobado($documento, $tipo),

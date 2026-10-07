@@ -15,6 +15,7 @@ use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
 use App\Support\Documentos\EstadoDocumento;
 use App\Support\Documentos\FormulariosDatos;
+use App\Support\ExigenciasDocumentales;
 use App\Support\Parametros;
 use App\Support\PerfilDocumental;
 use App\Support\ResumenSeccion02;
@@ -120,7 +121,7 @@ class Seccion02Controller extends Controller
             ->with(['tiposDocumento' => fn ($query) => $query->where('activo', true)->orderBy('orden')])->get()
             ->map(function (SubseccionLegajo $subseccion) use ($perfil, $documentos, $datos): array {
                 // 2.4 existe siempre; solo aplica (y exige) si la persona tiene período de prueba.
-                $aplica = $subseccion->codigo !== '2.4' || $perfil->tienePeriodoPrueba();
+                $aplica = ExigenciasDocumentales::subseccionAplica($subseccion->codigo, $perfil);
                 $tipos = $subseccion->tiposDocumento->map(fn (TipoDocumento $tipo): array => $this->tipo($tipo, $perfil, $documentos->get($tipo->id, new EloquentCollection)))->values()->all();
 
                 return ['codigo' => $subseccion->codigo, 'nombre' => $subseccion->nombre, 'aplica' => $aplica, 'datos' => $datos[$subseccion->codigo] ?? 'ninguno',
@@ -360,7 +361,7 @@ class Seccion02Controller extends Controller
             'documento' => $ultimo ? $this->fila($ultimo, ['estado', 'fecha_incorporacion', 'folio_inicio', 'folio_fin', 'emisor', 'fecha_emision', 'titular_nombre', 'titular_documento', 'num_resolucion', 'fecha_recepcion'])['values'] : null,
             // Todos los documentos del tipo; "subsanado" = otro documento lo corrige (no se elimina ni se reemplaza).
             'lista' => $documentos->map(fn (DocumentoUsuario $documento): array => [
-                ...$this->fila($documento, ['estado', 'folio_inicio', 'folio_fin', 'fecha_incorporacion', 'emisor', 'fecha_emision', 'titular_nombre', 'titular_documento', 'num_resolucion', 'modalidad_presentacion', 'relacion_titular', 'subsana_a_documento_id', 'vinculo_laboral_id', 'fecha_recepcion', 'created_at']),
+                ...$this->fila($documento, ['estado', 'folio_inicio', 'folio_fin', 'fecha_incorporacion', 'emisor', 'fecha_emision', 'titular_nombre', 'titular_documento', 'num_resolucion', 'modalidad_presentacion', 'relacion_titular', 'relacion_titular_otro', 'subsana_a_documento_id', 'vinculo_laboral_id', 'fecha_recepcion', 'created_at']),
                 'subsanado' => $documentos->contains('subsana_a_documento_id', $documento->id),
                 'estado_visible' => EstadoDocumento::visible($documento),
                 'aprobado' => EstadoDocumento::aprobado($documento, $tipo),

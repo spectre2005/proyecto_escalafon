@@ -32,6 +32,7 @@ use App\Http\Controllers\Api\V1\Legajos\DocumentoLegajoController;
 use App\Http\Controllers\Api\V1\Legajos\ExpedienteController;
 use App\Http\Controllers\Api\V1\Legajos\FamiliarPersonalController;
 use App\Http\Controllers\Api\V1\Legajos\FotoPersonalController;
+use App\Http\Controllers\Api\V1\Legajos\RecorridoLegajoController;
 use App\Http\Controllers\Api\V1\Legajos\Seccion01Controller;
 use App\Http\Controllers\Api\V1\Legajos\Seccion02Controller;
 use App\Http\Controllers\Api\V1\Legajos\Seccion03Controller;
@@ -103,6 +104,8 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum'])->
         Route::get('expedientes', [ExpedienteController::class, 'index']);
         Route::get('ubicaciones', [ExpedienteController::class, 'locations']);
         Route::get('expediente-opciones', [ExpedienteController::class, 'editOptions']);
+        Route::get('expedientes/{usuario}/recorrido', [RecorridoLegajoController::class, 'show'])->whereUuid('usuario')->middleware('can:documento.subir');
+        Route::post('expedientes/{usuario}/recorrido', [RecorridoLegajoController::class, 'actuar'])->whereUuid('usuario')->middleware('can:documento.subir');
         Route::get('expedientes/{usuario}', [ExpedienteController::class, 'show'])->whereUuid('usuario');
         Route::get('expedientes/{usuario}/foto', [FotoPersonalController::class, 'show'])->whereUuid('usuario');
         // Antes de la ruta genérica {section}. La sección 01 exige además datos_sensibles.ver.

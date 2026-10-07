@@ -16,6 +16,7 @@ use App\Support\Documentos\AuditoriaDocumento;
 use App\Support\Documentos\CargaDocumento;
 use App\Support\Documentos\Folios;
 use App\Support\Documentos\RevisionDocumento;
+use App\Support\ExigenciasDocumentales;
 use App\Support\Parametros;
 use App\Support\PerfilDocumental;
 use App\Support\ResumenSeccion03;
@@ -48,7 +49,7 @@ class Seccion08Controller extends Controller
                 'observacionesDocumentoPorDocumento', 'documentosUsuarioPorSubsanaADocumento'])->orderBy('fecha_emision')->orderBy('id')->get() : collect();
         $items = $tipos->map(function (TipoDocumento $tipo) use ($perfil, $documentos, $request): array {
             $codigo = $tipo->codigo;
-            $noAplica = $tipo->requiere_docente && ! in_array('docente', $perfil->tiposPersonal, true);
+            $noAplica = ! ExigenciasDocumentales::reconocimientoAplica($tipo, $perfil);
             $filas = $documentos->where('tipo_documento_id', $tipo->id)->map(fn (DocumentoUsuario $doc): array => $this->fila($doc, $request))->values();
             [$letra, $grupo] = ResumenSeccion08::ITEMS[$codigo];
 

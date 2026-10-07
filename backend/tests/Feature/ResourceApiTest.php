@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Models\Afiliacion;
 use App\Models\ArchivoDocumento;
 use App\Models\Controversia;
-use App\Models\Desvinculacion;
 use App\Models\Desplazamiento;
+use App\Models\Desvinculacion;
 use App\Models\DocumentoUsuario;
 use App\Models\EvaluacionDesempeno;
 use App\Models\Familiar;
@@ -22,6 +22,7 @@ use App\Models\PeriodoVacacional;
 use App\Models\ProgresionCarrera;
 use App\Models\RatificacionDocente;
 use App\Models\Reconocimiento;
+use App\Models\RecorridoLegajo;
 use App\Models\RecursoImpugnatorio;
 use App\Models\RegistroSstBienestar;
 use App\Models\Rol;
@@ -65,7 +66,7 @@ class ResourceApiTest extends TestCase
      * test_models_without_generic_crud_have_no_endpoint verifica que no exista ningún endpoint genérico.
      * Siguen cubiertos por ModelPersistenceTest.
      */
-    private const SIN_CRUD_GENERICO = [RecursoImpugnatorio::class];
+    private const SIN_CRUD_GENERICO = [RecursoImpugnatorio::class, RecorridoLegajo::class];
 
     /** Sección 10: igual, se registran desde Legajos\Seccion10Controller (el CRUD genérico exige además datos_sensibles.ver). */
     private const SECCION_10 = [RegistroSstBienestar::class];

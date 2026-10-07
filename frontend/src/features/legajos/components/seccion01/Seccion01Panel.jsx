@@ -18,7 +18,7 @@ const fecha = value => value ? value.split('-').reverse().join('/') : 'No regist
 const enlace = 'text-sm font-semibold text-teal-700 disabled:opacity-50'
 // TODO pendiente de decidir si manda el Anexo 01 o el 05: estos tipos de declaración solo figuran en el Anexo 05.
 const declaracionesAnexo05 = ['antecedente_judicial', 'dj_intereses']
-const relacionPorTipo = { S01_I_DNI_CONYUGE_CONCUBINO: 'conyuge_concubino', S01_J_DNI_HIJOS_MENORES: 'hijo' }
+const relacionPorTipo = { S01_I_DNI_CONYUGE_CONCUBINO: '', S01_J_DNI_HIJOS_MENORES: 'hijo' }
 
 const exigencia = {
   true: ['Se exige', 'bg-teal-50 text-teal-800'],
@@ -121,7 +121,7 @@ function Documentos({ usuario, data, codigos }) {
             {tipo.solo_anexo_05 && <Anexo05 />}
             <Etiqueta clase={exigeClase}>{exigeTexto}</Etiqueta>
             <Etiqueta clase={coloresEstadoDocumento[tipo.estado] || 'bg-slate-100 text-slate-700'}>{etiqueta(estadosDocumento, tipo.estado)}{tipo.documentos > 1 ? ` · ${tipo.documentos} documentos` : ''}</Etiqueta>
-            {puedeSubir && <button disabled={ocupado || sinLegajo} onClick={() => { setAviso(''); setSubiendo(tipo.id) }} className={`${enlace} inline-flex items-center gap-2`}><Icon name="paperclip" size={18} />{tipo.documento && !tipo.permite_multiples ? 'Subsanar documento' : 'Subir documento'}</button>}
+            {puedeSubir && <button data-recorrido-tipo={tipo.id} disabled={ocupado || sinLegajo} onClick={() => { setAviso(''); setSubiendo(tipo.id) }} className={`${enlace} inline-flex items-center gap-2`}><Icon name="paperclip" size={18} />{tipo.documento && !tipo.permite_multiples ? 'Subsanar documento' : 'Subir documento'}</button>}
           </div>
         </div>
         {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={1} tipo={tipo} titular={data.titular} relacion={relacionPorTipo[tipo.codigo]} enlaces={enlacesDe(tipo, data)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}

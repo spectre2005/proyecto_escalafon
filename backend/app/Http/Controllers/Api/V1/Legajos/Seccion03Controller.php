@@ -16,6 +16,7 @@ use App\Support\Documentos\AuditoriaDocumento;
 use App\Support\Documentos\CargaDocumento;
 use App\Support\Documentos\Folios;
 use App\Support\Documentos\RevisionDocumento;
+use App\Support\ExigenciasDocumentales;
 use App\Support\Parametros;
 use App\Support\PerfilDocumental;
 use App\Support\ResumenSeccion03;
@@ -51,7 +52,7 @@ class Seccion03Controller extends Controller
             $lista = $documentos->where('tipo_documento_id', $tipo->id)->map(fn (DocumentoUsuario $doc): array => $this->documento($doc, $request))->values();
             [$letra, $grupo] = ResumenSeccion03::ITEMS[$tipo->codigo];
             $opcional = ! $tipo->obligatorio || ($tipo->requiere_docente && $exigencia['exigido'] === false);
-            $aplica = ! (($tipo->requiere_estudios_basicos || $tipo->requiere_colegiatura) && $exigencia['exigido'] === false);
+            $aplica = ExigenciasDocumentales::formacionAplica($tipo, $exigencia);
 
             return [...$tipo->only(['id', 'codigo', 'nombre', 'permite_multiples', 'requiere_fedateo']),
                 'letra' => $letra, 'grupo' => $grupo, ...$exigencia,

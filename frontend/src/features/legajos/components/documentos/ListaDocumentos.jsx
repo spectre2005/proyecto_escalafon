@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { apiErrorMessage } from '../../../../axios'
 import { usePuede } from '../../../auth/session'
 import { recepcionarDocumento } from '../../api/documentosApi'
-import { folios, modalidadesPresentacion, relacionesTitular } from '../../config/documentos'
+import { folios, modalidadesPresentacion, relacionTitularTexto } from '../../config/documentos'
 import { etiqueta } from '../../config/seccion01'
 import { coloresEstadoDocumento, estadosDocumento } from '../../config/seccion02'
 import VisorPdf from './VisorPdf'
@@ -59,7 +59,7 @@ export default function ListaDocumentos({ usuario, tipo, enlazado }) {
         <dl className="mt-2 grid gap-x-4 gap-y-1 text-[11px] text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
           {[['Emisor', v.emisor || 'No registrado'], ['Emitido', fecha(v.fecha_emision)], ['Incorporado', fecha(v.fecha_incorporacion)],
             ...(tipo.requiere_num_resolucion || v.num_resolucion ? [['N.º resolución', v.num_resolucion || 'No registrado']] : []),
-            ['Titular', `${v.titular_nombre || 'No registrado'} ${v.titular_documento || ''} (${etiqueta(relacionesTitular, v.relacion_titular).toLowerCase()})`],
+            ['Titular', `${v.titular_nombre || 'No registrado'} ${v.titular_documento || ''} (${relacionTitularTexto(v)})`],
             ['Modalidad', v.modalidad_presentacion ? etiqueta(modalidadesPresentacion, v.modalidad_presentacion) : 'No registrada'],
             ['Subido por', `${documento.subido_por || 'No registrado'} · ${v.created_at || ''}`],
             ['Recepción', v.fecha_recepcion ? `${fecha(v.fecha_recepcion)} · ${documento.recepcionado_por || ''}` : 'Sin recepción registrada'],

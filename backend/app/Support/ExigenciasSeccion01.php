@@ -96,15 +96,23 @@ final class ExigenciasSeccion01
      */
     public static function estadoEnlazado(?string $documentoId, Collection $documentos): array
     {
+        $cadena = self::cadena($documentoId, $documentos);
+        $cargados = $cadena->filter(fn (DocumentoUsuario $documento): bool => in_array($documento->estado, ResumenSeccion02::ESTADOS_CARGADO, true));
+
+        return ['cargado' => $cargados->isNotEmpty(), 'recepcionado' => $cargados->contains(fn (DocumentoUsuario $documento): bool => $documento->fecha_recepcion !== null && $documento->recepcionado_por !== null)];
+    }
+
+    /** Documentos de una evidencia y sus subsanaciones; también se usa para verificar el registro. */
+    public static function cadena(?string $documentoId, Collection $documentos): Collection
+    {
         $cadena = collect();
         $siguiente = $documentoId ? $documentos->firstWhere('id', $documentoId) : null;
         while ($siguiente && ! $cadena->contains('id', $siguiente->id)) {
             $cadena->push($siguiente);
             $siguiente = $documentos->firstWhere('subsana_a_documento_id', $siguiente->id);
         }
-        $cargados = $cadena->filter(fn (DocumentoUsuario $documento): bool => in_array($documento->estado, ResumenSeccion02::ESTADOS_CARGADO, true));
 
-        return ['cargado' => $cargados->isNotEmpty(), 'recepcionado' => $cargados->contains(fn (DocumentoUsuario $documento): bool => $documento->fecha_recepcion !== null && $documento->recepcionado_por !== null)];
+        return $cadena;
     }
 
     /**

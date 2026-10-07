@@ -18,6 +18,7 @@ use App\Models\Usuario;
 use App\Models\VinculoLaboral;
 use App\Support\Documentos\EstadoDocumento;
 use App\Support\Documentos\FormulariosDatos;
+use App\Support\ExigenciasDocumentales;
 use App\Support\PerfilDocumental;
 use App\Support\ResumenSeccion02;
 use App\Support\Seccion07;
@@ -200,9 +201,9 @@ class Seccion07Controller extends Controller
         ];
         $subsecciones = SubseccionLegajo::query()->where('seccion_legajo_id', Seccion07::SECCION)->orderBy('orden')
             ->with(['tiposDocumento' => fn ($query) => $query->where('activo', true)->orderBy('orden')])->get()
-            ->map(function (SubseccionLegajo $subseccion) use ($perfil, $documentos, $niveles, $carrera): array {
+            ->map(function (SubseccionLegajo $subseccion) use ($perfil, $documentos, $niveles): array {
                 // 7.2 existe siempre; solo aplica a servidores de carrera (directiva: "servidor/a civil de carrera").
-                $aplica = $subseccion->codigo !== '7.2' || $carrera;
+                $aplica = ExigenciasDocumentales::subseccionAplica($subseccion->codigo, $perfil);
                 $tipos = $subseccion->tiposDocumento->map(fn (TipoDocumento $tipo): array => $this->tipo($tipo, $perfil, $documentos->get($tipo->id, new EloquentCollection)))->values()->all();
                 $datos = $niveles[$subseccion->codigo] ?? 'ninguno';
 
@@ -302,7 +303,7 @@ class Seccion07Controller extends Controller
             'documentos' => $documentos->count(),
             'documento' => $ultimo ? $this->fila($ultimo, ['estado', 'fecha_incorporacion', 'folio_inicio', 'folio_fin', 'emisor', 'fecha_emision', 'titular_nombre', 'titular_documento', 'num_resolucion', 'fecha_recepcion'])['values'] : null,
             'lista' => $documentos->map(fn (DocumentoUsuario $documento): array => [
-                ...$this->fila($documento, ['estado', 'folio_inicio', 'folio_fin', 'fecha_incorporacion', 'emisor', 'fecha_emision', 'titular_nombre', 'titular_documento', 'num_resolucion', 'modalidad_presentacion', 'relacion_titular', 'subsana_a_documento_id', 'fecha_recepcion', 'created_at']),
+                ...$this->fila($documento, ['estado', 'folio_inicio', 'folio_fin', 'fecha_incorporacion', 'emisor', 'fecha_emision', 'titular_nombre', 'titular_documento', 'num_resolucion', 'modalidad_presentacion', 'relacion_titular', 'relacion_titular_otro', 'subsana_a_documento_id', 'fecha_recepcion', 'created_at']),
                 'subsanado' => $documentos->contains('subsana_a_documento_id', $documento->id),
                 'estado_visible' => EstadoDocumento::visible($documento),
                 'aprobado' => EstadoDocumento::aprobado($documento, $tipo),

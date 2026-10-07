@@ -1,0 +1,36 @@
+/* Presentación móvil del recorrido; las tablas y los formularios conservan su estructura. */
+@media (max-width: 520px) {
+  .registro-guiado-contenido table,
+  .registro-guiado-contenido tbody,
+  .registro-guiado-contenido tr,
+  .registro-guiado-contenido th,
+  .registro-guiado-contenido td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .registro-guiado-contenido thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .registro-guiado-contenido tbody tr { padding: 0.75rem; }
+  .registro-guiado-contenido tbody th,
+  .registro-guiado-contenido tbody td { padding: 0.4rem 0; }
+  .registro-guiado-contenido td[data-recorrido-label]::before {
+    content: attr(data-recorrido-label) ': ';
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #475569;
+  }
+
+  .registro-guiado-contenido td > div { flex-wrap: wrap; }
+}
