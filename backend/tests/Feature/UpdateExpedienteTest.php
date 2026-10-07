@@ -67,6 +67,22 @@ class UpdateExpedienteTest extends TestCase
         $this->getJson('/api/v1/ubicaciones?region=A&provincia=B')->assertOk()->assertExactJson(['data' => ['C']]);
     }
 
+    public function test_edit_requires_eight_digit_dni_and_nine_digit_phone(): void
+    {
+        $person = Usuario::factory()->create(['tipo_doc_identidad' => 'dni', 'numero_doc_identidad' => '12345678']);
+        $uri = '/api/v1/expedientes/'.$person->id;
+        foreach (['1234567', '123456789', '1234567a'] as $dni) {
+            $this->patchJson($uri, ['numero_doc_identidad' => $dni])->assertUnprocessable()->assertJsonValidationErrors('numero_doc_identidad');
+        }
+        foreach (['12345678', '1234567890', '91234567a', '+51912345678'] as $phone) {
+            $this->patchJson($uri, ['telefono' => $phone])->assertUnprocessable()->assertJsonValidationErrors('telefono');
+        }
+        $this->patchJson($uri, ['numero_doc_identidad' => '87654321', 'telefono' => '912345678'])->assertOk();
+        $this->assertDatabaseHas('usuarios', ['id' => $person->id, 'numero_doc_identidad' => '87654321', 'telefono' => '912345678']);
+        $this->patchJson($uri, ['telefono' => null])->assertOk();
+        $this->assertNull($person->refresh()->telefono);
+    }
+
     public function test_complete_location_catalog_includes_ids_and_parent_names(): void
     {
         $location = Ubigeo::factory()->create(['region' => 'A', 'provincia' => 'B', 'distrito' => 'C']);

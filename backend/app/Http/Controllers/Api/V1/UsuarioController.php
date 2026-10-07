@@ -106,6 +106,7 @@ class UsuarioController extends Controller
             ...$row,
             'id' => (string) Str::uuid(),
             'tipo_doc_identidad' => 'dni',
+            'nacionalidad' => 'Peruano',
             'email_institucional' => strtolower($row['email_institucional']),
             'apellido_materno' => $row['apellido_materno'] ?? null,
             'telefono' => $row['telefono'] ?? null,

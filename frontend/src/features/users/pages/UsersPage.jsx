@@ -283,7 +283,7 @@ export default function UsersPage() {
               </div>
               <div className="flex w-full flex-wrap items-center gap-2 md:w-auto">
                 <button type="button" onClick={openRegistration} aria-haspopup="dialog" className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#26776d] px-4.5 py-3 text-xs font-semibold text-white hover:bg-[#1b625a]">
-                  <Icon name="plus" size={17} /> Agregar información
+                  <Icon name="plus" size={17} /> Agregar personal
                 </button>
                 <DownloadPersonalReport blank className="inline-flex items-center justify-center gap-2 rounded-lg border px-4.5 py-3 text-xs font-semibold transition-colors border-[#dbe6e1] bg-white text-[#4f6d63] hover:bg-[#edf6f2]" />
               </div>
@@ -420,7 +420,7 @@ export default function UsersPage() {
                   01
                 </span>
                 <div>
-                  <h2 id="registration-title">Agregar información</h2>
+                  <h2 id="registration-title">Agregar personal</h2>
                   <p>Elige cómo deseas cargar los datos de los usuarios.</p>
                 </div>
                 <button type="button" onClick={closeRegistration} disabled={saving || busy} aria-label="Cerrar formulario" className="ml-auto grid size-9 shrink-0 place-items-center rounded-lg text-[#4f6d63] hover:bg-[#edf6f2]">
@@ -527,7 +527,7 @@ export default function UsersPage() {
                             key === 'email_institucional' ? 'email' : 'text'
                           }
                           inputMode={
-                            key === 'numero_doc_identidad'
+                            ['numero_doc_identidad', 'telefono'].includes(key)
                               ? 'numeric'
                               : undefined
                           }
@@ -535,7 +535,7 @@ export default function UsersPage() {
                             key === 'numero_doc_identidad'
                               ? 8
                               : key === 'telefono'
-                                ? 20
+                                ? 9
                                 : key === 'nombres'
                                   ? 120
                                   : key === 'email_institucional'
@@ -545,8 +545,10 @@ export default function UsersPage() {
                           required={
                             !['apellido_materno', 'telefono'].includes(key)
                           }
+                          pattern={key === 'numero_doc_identidad' ? '[0-9]{8}' : key === 'telefono' ? '[0-9]{9}' : undefined}
+                          title={key === 'numero_doc_identidad' ? 'El DNI debe contener 8 dígitos.' : key === 'telefono' ? 'El teléfono debe contener 9 dígitos.' : undefined}
                           onChange={(event) =>
-                            setDraft(updateUserDraft(draft, key, event.target.value))
+                            setDraft(updateUserDraft(draft, key, ['numero_doc_identidad', 'telefono'].includes(key) ? event.target.value.replace(/\D/g, '').slice(0, key === 'telefono' ? 9 : 8) : event.target.value))
                           }
                         />
                         {key === 'email_institucional' && (

@@ -37,7 +37,7 @@ class UpdateExpedienteRequest extends FormRequest
             'nacionalidad' => 'sometimes|nullable|string|max:60',
             'estado_civil' => ['sometimes', 'nullable', Rule::in(Catalogos::ESTADOS_CIVILES)],
             'domicilio' => 'sometimes|nullable|string|max:250',
-            'telefono' => ['sometimes', 'nullable', 'string', 'regex:/^[+0-9()\s-]{6,20}$/'],
+            'telefono' => ['sometimes', 'nullable', 'string', 'regex:/^[0-9]{9}$/'],
             'email_institucional' => 'sometimes|required|string|email:rfc|max:255',
             'tipo_personal' => 'sometimes|required|in:docente,administrativo',
             'regimen_laboral' => 'sometimes|required|string|max:20',
@@ -56,6 +56,11 @@ class UpdateExpedienteRequest extends FormRequest
             'ubicacion.provincia' => 'required_with:ubicacion|string|max:100',
             'ubicacion.distrito' => 'required_with:ubicacion|string|max:100',
         ];
+    }
+
+    public function messages(): array
+    {
+        return ['telefono.regex' => 'El teléfono debe contener 9 dígitos.'];
     }
 
     public function withValidator(Validator $validator): void

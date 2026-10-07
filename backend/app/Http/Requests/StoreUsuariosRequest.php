@@ -36,7 +36,7 @@ class StoreUsuariosRequest extends FormRequest
             'usuarios.*.email_institucional' => ['bail', 'required', 'string', 'email:rfc', 'max:255', 'distinct:ignore_case'],
             'usuarios.*.tipo_personal' => ['required', Rule::in(['docente', 'administrativo'])],
             'usuarios.*.regimen_laboral' => ['bail', 'required', 'string', 'max:20', $this->regimenDelTipo(...)],
-            'usuarios.*.telefono' => ['nullable', 'string', 'regex:/^[+0-9()\s-]{6,20}$/'],
+            'usuarios.*.telefono' => ['nullable', 'string', 'regex:/^[0-9]{9}$/'],
         ];
     }
 
@@ -54,6 +54,7 @@ class StoreUsuariosRequest extends FormRequest
     {
         return [
             'required' => 'El campo :attribute es obligatorio.',
+            'usuarios.*.telefono.regex' => 'El teléfono debe contener 9 dígitos.',
             'string' => 'El campo :attribute debe ser texto.',
             'max' => 'El campo :attribute supera el máximo permitido (:max).',
             'min' => 'Debe enviar al menos :min registro.',

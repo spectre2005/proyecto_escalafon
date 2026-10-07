@@ -24,7 +24,7 @@ export const resultadosDeclaracion = { presentada: 'Presentada', sin_registros: 
 export const personasCertificado = { servidor: 'El servidor(a)', familiar: 'Un familiar' }
 
 // Sugerencias, no lista cerrada: la nacionalidad admite cualquier texto.
-export const nacionalidades = ['Peruana', 'Argentina', 'Boliviana', 'Brasileña', 'Chilena', 'Colombiana', 'Ecuatoriana', 'Española', 'Mexicana', 'Venezolana']
+export const nacionalidades = ['Peruano', 'Argentina', 'Boliviana', 'Brasileña', 'Chilena', 'Colombiana', 'Ecuatoriana', 'Española', 'Mexicana', 'Venezolana']
 
 // Grupos del menú de la sección 01 (solo frontend: la directiva no define subsecciones y subseccion_legajo_id es nulo).
 // Cada grupo muestra sus datos y sus documentos (códigos de Seccion01CatalogoSeeder). "general" son los datos

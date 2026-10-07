@@ -12,7 +12,7 @@ export function validateUser(user) {
   if (!['docente', 'administrativo'].includes(user.tipo_personal)) errors.push('El tipo debe ser docente o administrativo.')
   const regimenes = (regimenesPorTipo[user.tipo_personal] || []).map(regimen => regimen.value)
   if (regimenes.length && !regimenes.includes(user.regimen_laboral)) errors.push(`El régimen laboral debe ser uno de: ${regimenes.join(', ')}.`)
-  if (user.telefono && !/^[+\d()\s-]{6,20}$/.test(user.telefono)) errors.push('El teléfono no es válido.')
+  if (user.telefono && !/^[0-9]{9}$/.test(user.telefono)) errors.push('El teléfono debe contener 9 dígitos.')
   return errors
 }
 

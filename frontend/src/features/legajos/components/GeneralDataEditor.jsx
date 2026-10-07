@@ -16,7 +16,7 @@ const fields = [
   ['nacionalidad', 'Nacionalidad', 'text', 60],
   ['estado_civil', 'Estado civil', 'text', 15],
   ['domicilio', 'Domicilio', 'text', 250],
-  ['telefono', 'Teléfono', 'tel', 20],
+  ['telefono', 'Teléfono', 'tel', 9],
   ['email_institucional', 'Correo institucional', 'email', 255, true],
   ['nombre_puesto', 'Puesto', 'text', 150],
   ['regimen_laboral', 'Régimen laboral', 'text', 20, true],
@@ -44,6 +44,7 @@ export default function GeneralDataEditor({ usuario, data, onSaved, onCancel }) 
     tipo_personal: original.tipo_personal,
     unidad_organica_id: original.unidad_organica_id ?? '',
     regimen_normativo_id: original.regimen_normativo_id ?? '',
+    nacionalidad: !original.nacionalidad || original.nacionalidad === 'Peruana' ? 'Peruano' : original.nacionalidad,
   }))
   const options = useLiveQuery('/expediente-opciones')
   const [location, setLocation] = useState(() => Object.fromEntries(['region', 'provincia', 'distrito'].map(key => [key, data.usuario.values[key] ?? ''])))
@@ -81,10 +82,12 @@ export default function GeneralDataEditor({ usuario, data, onSaved, onCancel }) 
     {error && <p role="alert" className="mb-5 rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{error}</p>}
     <fieldset disabled={saving} className="grid gap-5 sm:grid-cols-2">
       {fields.map(([key, title, type, maxLength, required]) => {
-        const props = { name: key, className: inputClass, required, value: draft[key], onChange: event => setDraft(previous => ({ ...previous, [key]: event.target.value })), 'aria-invalid': !!fieldErrors[key] }
+        const isDni = key === 'numero_doc_identidad' && draft.tipo_doc_identidad === 'dni'
+        const digits = isDni ? 8 : key === 'telefono' ? 9 : null
+        const props = { name: key, className: inputClass, required, value: draft[key], inputMode: digits ? 'numeric' : undefined, pattern: digits ? `[0-9]{${digits}}` : undefined, title: digits ? `Debe contener ${digits} dígitos.` : undefined, onChange: event => setDraft(previous => ({ ...previous, [key]: digits ? event.target.value.replace(/\D/g, '').slice(0, digits) : event.target.value })), 'aria-invalid': !!fieldErrors[key] }
         const lista = listas[key]
         return <label key={key} className="flex flex-col gap-2 text-xs font-medium text-slate-600">{title}{required ? ' *' : ''}
-          {lista ? <select {...props}><Opciones lista={lista} actual={draft[key]} vacio={required ? undefined : 'No registrado'} /></select> : <input {...props} type={type} maxLength={maxLength} list={key === 'nacionalidad' ? 'nacionalidades' : undefined} />}
+          {lista ? <select {...props}><Opciones lista={lista} actual={draft[key]} vacio={required ? undefined : 'No registrado'} /></select> : <input {...props} type={type} maxLength={digits || maxLength} list={key === 'nacionalidad' ? 'nacionalidades' : undefined} />}
           {fieldErrors[key] && <span className="text-rose-700">{fieldErrors[key].join(' ')}</span>}</label>
       })}
       <datalist id="nacionalidades">{nacionalidades.map(value => <option key={value} value={value} />)}</datalist>

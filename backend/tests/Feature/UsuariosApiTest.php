@@ -78,6 +78,17 @@ class UsuariosApiTest extends TestCase
         $this->assertUsuariosCreados(2);
     }
 
+    public function test_phone_requires_nine_digits_and_new_person_defaults_to_peruano(): void
+    {
+        foreach (['12345678', '1234567890', '91234567a', '+51912345678'] as $phone) {
+            $this->postJson('/api/v1/usuarios', ['usuarios' => [$this->payload(['telefono' => $phone])]])
+                ->assertUnprocessable()->assertJsonValidationErrors('usuarios.0.telefono');
+        }
+        $response = $this->postJson('/api/v1/usuarios', ['usuarios' => [$this->payload(['telefono' => '912345678'])]])
+            ->assertCreated();
+        $this->assertDatabaseHas('usuarios', ['id' => $response->json('data.0.id'), 'telefono' => '912345678', 'nacionalidad' => 'Peruano']);
+    }
+
     public function test_invalid_row_prevents_the_whole_batch_from_being_saved(): void
     {
         $this->postJson('/api/v1/usuarios', ['usuarios' => [
