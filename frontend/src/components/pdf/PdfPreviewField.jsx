@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import api from '../../axios'
+import Icon from '../ui/Icon'
 import { validatePdf } from './pdfValidation'
 
 const button = 'rounded-lg border border-slate-200 px-3 py-2 text-xs text-teal-800 focus-visible:outline-2 focus-visible:outline-teal-600 disabled:opacity-40'
@@ -110,7 +111,7 @@ export default function PdfPreviewField({ name, id, label, help, maxMB = 2, curr
   const message = validation || error
   return <section className="flex h-full min-w-0 flex-col gap-3">
     <label className="grid min-w-0 gap-2 text-xs font-medium text-slate-600" htmlFor={id}>
-      {label}{required ? ' *' : ''}
+      <span className="flex items-center gap-2"><Icon name="paperclip" size={18} />{label}{required ? ' *' : ''}</span>
       <input ref={input} name={name} id={id} type="file" accept="application/pdf,.pdf" required={required && !currentUrl} onChange={select} aria-describedby={helpId} aria-invalid={Boolean(message)} className="min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus-visible:outline-2 focus-visible:outline-teal-600" />
     </label>
     <p id={helpId} className="text-xs text-slate-500">{help}</p>

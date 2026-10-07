@@ -36,7 +36,7 @@ class FotoPersonalController extends Controller
         }
 
         $disk = Storage::disk('personal_photos');
-        $path = $person->id.'/'.Str::uuid().'.jpg';
+        $path = $person->id.'/'.Str::uuid().'/img_'.Str::slug((string) $person->numero_doc_identidad, '_').'.jpg';
         $portrait = imagecreatetruecolor(600, 800);
         try {
             imagefill($portrait, 0, 0, imagecolorallocate($portrait, 255, 255, 255));

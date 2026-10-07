@@ -48,15 +48,20 @@ class FotoPersonalTest extends TestCase
     public function test_photo_is_persisted_replaced_and_isolated_by_person(): void
     {
         Storage::fake('personal_photos');
-        $person = Usuario::factory()->create();
+        $person = Usuario::factory()->create(['numero_doc_identidad' => '00123456']);
         $other = Usuario::factory()->create();
         $url = '/api/v1/expedientes/'.$person->id.'/foto';
         $this->get($url)->assertNoContent();
         $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=');
         for ($i = 0; $i < 2; $i++) {
+            $previousPath = $person->foto_path;
             $file = UploadedFile::fake()->image('foto.png', $i === 0 ? 1200 : 300, $i === 0 ? 400 : 1200);
             $this->post($url, ['foto' => $file], ['Accept' => 'application/json'])->assertOk();
             $person->refresh();
+            $this->assertSame('img_00123456.jpg', basename($person->foto_path));
+            if ($previousPath) {
+                Storage::disk('personal_photos')->assertMissing($previousPath);
+            }
             Storage::disk('personal_photos')->assertExists($person->foto_path);
             $this->assertDatabaseHas('usuarios', ['id' => $person->id, 'foto_path' => $person->foto_path]);
             $this->get($url)->assertOk()->assertHeader('Content-Type', 'image/jpeg');

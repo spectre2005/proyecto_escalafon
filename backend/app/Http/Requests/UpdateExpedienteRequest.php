@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Models\Ubigeo;
 use App\Models\Usuario;
 use App\Support\Catalogos;
+use App\Support\RegimenesLaborales;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -34,7 +35,6 @@ class UpdateExpedienteRequest extends FormRequest
             'apellido_paterno' => 'sometimes|required|string|max:80',
             'apellido_materno' => 'sometimes|nullable|string|max:80',
             'fecha_nacimiento' => 'sometimes|nullable|date_format:Y-m-d|before_or_equal:today',
-            'nacionalidad' => 'sometimes|nullable|string|max:60',
             'estado_civil' => ['sometimes', 'nullable', Rule::in(Catalogos::ESTADOS_CIVILES)],
             'domicilio' => 'sometimes|nullable|string|max:250',
             'telefono' => ['sometimes', 'nullable', 'string', 'regex:/^[0-9]{9}$/'],
@@ -68,6 +68,15 @@ class UpdateExpedienteRequest extends FormRequest
         $validator->after(function (Validator $validator): void {
             foreach (array_diff(array_keys($this->all()), array_keys($this->rules())) as $field) {
                 $validator->errors()->add($field, 'Campo no editable desde la ficha general.');
+            }
+            if ($this->hasAny(['tipo_personal', 'regimen_laboral'])) {
+                $person = Usuario::query()->findOrFail($this->route('usuario'));
+                $type = $this->input('tipo_personal', $person->tipo_personal);
+                $regime = $this->input('regimen_laboral', $person->regimen_laboral);
+                $codes = RegimenesLaborales::codigos($type);
+                if ($codes !== [] && ! in_array($regime, $codes, true)) {
+                    $validator->errors()->add('regimen_laboral', 'Selecciona un régimen laboral válido para el tipo de personal.');
+                }
             }
             if ($this->hasAny(['tipo_doc_identidad', 'numero_doc_identidad'])) {
                 $person = Usuario::query()->findOrFail($this->route('usuario'));

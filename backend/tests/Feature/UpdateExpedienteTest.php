@@ -67,6 +67,21 @@ class UpdateExpedienteTest extends TestCase
         $this->getJson('/api/v1/ubicaciones?region=A&provincia=B')->assertOk()->assertExactJson(['data' => ['C']]);
     }
 
+    public function test_nationality_is_not_editable_and_labor_regime_must_match_staff_type(): void
+    {
+        $person = Usuario::factory()->create(['tipo_personal' => 'docente', 'regimen_laboral' => '30220', 'nacionalidad' => 'Peruano']);
+        $uri = '/api/v1/expedientes/'.$person->id;
+        $this->patchJson($uri, ['nacionalidad' => 'Otra'])->assertUnprocessable()->assertJsonValidationErrors('nacionalidad');
+        $this->assertSame('Peruano', $person->refresh()->nacionalidad);
+        $this->patchJson($uri, ['regimen_laboral' => 'CAS'])->assertUnprocessable()->assertJsonValidationErrors('regimen_laboral');
+        $this->patchJson($uri, ['tipo_personal' => 'administrativo'])->assertUnprocessable()->assertJsonValidationErrors('regimen_laboral');
+        foreach (['CAS', '276', '728', '30057'] as $code) {
+            $this->patchJson($uri, ['tipo_personal' => 'administrativo', 'regimen_laboral' => $code])->assertOk();
+        }
+        $this->patchJson($uri, ['tipo_personal' => 'docente', 'regimen_laboral' => '30220'])->assertOk();
+        $this->assertSame('30220', $person->refresh()->regimen_laboral);
+    }
+
     public function test_edit_requires_eight_digit_dni_and_nine_digit_phone(): void
     {
         $person = Usuario::factory()->create(['tipo_doc_identidad' => 'dni', 'numero_doc_identidad' => '12345678']);
@@ -132,7 +147,7 @@ class UpdateExpedienteTest extends TestCase
         $uri = '/api/v1/expedientes/'.$person->id;
         $this->patchJson($uri, [
             'nombre_puesto' => 'Puesto de prueba', 'unidad_organica_id' => $unit->id,
-            'regimen_normativo_id' => $regime->id, 'regimen_laboral' => 'Prueba',
+            'regimen_normativo_id' => $regime->id, 'regimen_laboral' => 'CAS',
             'tipo_personal' => 'administrativo', 'con_discapacidad' => true,
             'activo' => false, 'obligado_djbr' => true, 'exige_colegiatura' => true,
             'tiene_periodo_prueba' => true, 'tiene_derechohabientes' => true,
