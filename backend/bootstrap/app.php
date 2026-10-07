@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Middleware\LegajoSoloLectura;
 use App\Http\Middleware\RequireAdministrator;
+use Illuminate\Auth\Middleware\Authorize;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -15,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+        $middleware->appendToPriorityList(Authorize::class, LegajoSoloLectura::class);
         // Alias temporal: las rutas ya usan can:<permiso>.
         $middleware->alias(['administrador' => RequireAdministrator::class]);
     })

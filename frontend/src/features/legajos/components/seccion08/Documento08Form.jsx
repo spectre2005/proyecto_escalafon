@@ -27,7 +27,7 @@ export default function Documento08Form({ usuario, item, datos, onSaved, onCance
   const vigentes = item.documentos.filter(doc => !doc.subsanado && doc.estado !== 'anulado')
   const sanciones = (datos.grupos.sanciones || []).find(group => group.codigo === 'SAN_RESOLUCION_SANCION')?.documentos || []
   const esReconocimiento = item.codigo.startsWith('REC_')
-  return <Formulario titulo="Agregar documento" guardar="Guardar registro" busy={busy} error={error} onCancel={onCancel}
+  return <Formulario modal titulo="Agregar documento" guardar="Guardar registro" busy={busy} error={error} onCancel={onCancel}
     onSubmit={() => { if (pdf && !errorPdf) guardar(draft) }} nota="Los documentos no se editan ni se borran. Si hay un error, agrega un documento nuevo que lo subsane. Quedará en revisión de RR. HH.">
     <FormSplit pdf={<PdfPreviewField label={`Adjuntar PDF (máximo ${datos.tamano_maximo_kb} KB)`} required maxMB={datos.tamano_maximo_kb / 1024} help="La vista previa se genera en tu navegador. El PDF se envía al guardar." error={errorPdf || errors.pdf} onChange={(file, message) => { setPdf(file); setErrorPdf(message) }} />}>
       <Campo label="Nombre del documento" required error={errors.nombre} className="sm:col-span-2"><input ref={primero} required maxLength={200} value={draft.nombre} onChange={set('nombre')} /></Campo>

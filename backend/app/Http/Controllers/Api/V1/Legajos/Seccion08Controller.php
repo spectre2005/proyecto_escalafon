@@ -35,7 +35,7 @@ class Seccion08Controller extends Controller
     public function show(Request $request, string $usuario): JsonResponse
     {
         $persona = Usuario::query()->with('vinculosLaborales')->findOrFail($usuario);
-        $legajo = Legajo::query()->where('usuario_id', $usuario)->where('estado_legajo', 'activo')->orderByDesc('fecha_apertura')->first();
+        $legajo = Legajo::paraConsulta($usuario);
         $perfil = PerfilDocumental::de($persona, $persona->vinculosLaborales);
         $tiempoExperiencia = TiempoExperiencia::paraPersona($usuario, permitirSensibles: $request->user()->veDatosSensibles());
         $puedeVerSanciones = $request->user()->can('seccion08.sanciones.ver')
@@ -74,7 +74,7 @@ class Seccion08Controller extends Controller
         return response()->json(['data' => [
             'persona' => $persona->only(['id', 'tipo_personal', 'nombre_puesto']),
             'perfil' => ['tipos_personal' => $perfil->tiposPersonal, 'puestos' => $perfil->puestos],
-            'legajo' => $legajo?->only(['id', 'numero_legajo']),
+            'legajo' => $legajo?->only(['id', 'numero_legajo', 'estado_legajo']),
             'grupos' => ['reconocimientos' => $items->get('reconocimientos', collect())->values(), 'sanciones' => $puedeVerSanciones ? $items->get('sanciones', collect())->values() : null],
             'puede_ver_sanciones' => $puedeVerSanciones,
             'resumen' => ResumenSeccion08::resumen($todosLosItems, $puedeVerSanciones),

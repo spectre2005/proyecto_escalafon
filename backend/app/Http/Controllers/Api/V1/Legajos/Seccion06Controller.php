@@ -28,7 +28,7 @@ class Seccion06Controller extends Controller
     public function show(Request $request, string $usuario): JsonResponse
     {
         $persona = Usuario::query()->with('vinculosLaborales')->findOrFail($usuario);
-        $legajo = $this->legajo($persona);
+        $legajo = Legajo::paraConsulta($usuario);
         $perfil = PerfilDocumental::de($persona, $persona->vinculosLaborales);
         $tipos = TipoDocumento::query()->where('seccion_legajo_id', 6)->where('activo', true)->whereIn('codigo', array_keys(ResumenSeccion06::ITEMS));
         if (! $request->user()->veDatosSensibles()) {
@@ -50,7 +50,7 @@ class Seccion06Controller extends Controller
         return response()->json(['data' => [
             'persona' => $persona->only(['id', 'nombres', 'apellido_paterno', 'apellido_materno', 'tipo_personal', 'nombre_puesto', 'numero_doc_identidad']),
             'perfil' => ['tipos_personal' => $perfil->tiposPersonal, 'puestos' => $perfil->puestos],
-            'legajo' => $legajo?->only(['id', 'numero_legajo']), 'items' => $items->all(), 'resumen' => ResumenSeccion06::total($items),
+            'legajo' => $legajo?->only(['id', 'numero_legajo', 'estado_legajo']), 'items' => $items->all(), 'resumen' => ResumenSeccion06::total($items),
             'numero_folios' => $legajo ? Folios::ultimo($legajo, 6) : 0, 'folio_sugerido' => $legajo ? Folios::ultimo($legajo, 6) + 1 : null,
             'fecha_actual' => now('America/Lima')->toDateString(), 'tamano_maximo_kb' => Parametros::entero('tamano_maximo_pdf_kb'),
         ]]);

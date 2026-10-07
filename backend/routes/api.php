@@ -75,6 +75,7 @@ use App\Http\Controllers\Api\V1\UsuarioController;
 use App\Http\Controllers\Api\V1\UsuarioRolController;
 use App\Http\Controllers\Api\V1\VinculoAdendaController;
 use App\Http\Controllers\Api\V1\VinculoLaboralController;
+use App\Http\Middleware\LegajoSoloLectura;
 use App\Http\Middleware\LocalDevelopmentOnly;
 use Illuminate\Support\Facades\Route;
 
@@ -84,7 +85,7 @@ Route::prefix('v1/auth')->middleware(LocalDevelopmentOnly::class)->group(functio
     Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 });
 
-Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum'])->group(function (): void {
+Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', LegajoSoloLectura::class])->group(function (): void {
     Route::get('institucion', [InstitutionSettingsController::class, 'show']);
     Route::put('institucion', [InstitutionSettingsController::class, 'update'])->middleware('can:sistema.administrar');
     Route::middleware('can:datos_sensibles.ver')->group(function (): void {
@@ -192,6 +193,10 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum'])->
         ->middleware('can:sistema.administrar')->whereUuid(['usuario', 'registro']);
 
     Route::post('expedientes/{usuario}/legajo', [AperturaLegajoController::class, 'store'])->middleware('can:legajo.abrir')->whereUuid('usuario');
+    Route::post('expedientes/{usuario}/legajos/{legajo}/cerrar', [AperturaLegajoController::class, 'cerrar'])
+        ->middleware('can:legajo.editar')->whereUuid(['usuario', 'legajo']);
+    Route::post('expedientes/{usuario}/legajos/{legajo}/reabrir', [AperturaLegajoController::class, 'reabrir'])
+        ->middleware('can:legajo.abrir')->whereUuid(['usuario', 'legajo']);
 
     // Documentos del legajo (PDF + metadatos), común a todas las secciones. Las secciones 01, 09 y 10
     // exigen además datos_sensibles.ver (lo valida el controlador según la sección y el tipo).

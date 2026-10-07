@@ -44,7 +44,7 @@ class UpdateExpedienteRequest extends FormRequest
             'nombre_puesto' => 'sometimes|nullable|string|max:150',
             'unidad_organica_id' => 'sometimes|nullable|uuid|exists:unidades_organicas,id',
             'regimen_normativo_id' => 'sometimes|nullable|uuid|exists:regimenes_normativos,id',
-            'activo' => 'sometimes|required|boolean',
+            'activo' => 'prohibited',
             'con_discapacidad' => 'sometimes|required|boolean',
             'obligado_djbr' => 'sometimes|required|boolean',
             'exige_colegiatura' => 'sometimes|required|boolean',

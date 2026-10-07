@@ -24,6 +24,13 @@ services:
     depends_on:
       - app
 
+  frontend_dependencies:
+    build: ./docker/node
+    user: "0:0"
+    volumes:
+      - frontend_node_modules:/app/node_modules
+    command: chown -R ${DOCKER_UID:-1000}:${DOCKER_GID:-1000} /app/node_modules
+
   frontend:
     build: ./docker/node
     user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
@@ -31,8 +38,12 @@ services:
       HOME: /tmp
     volumes:
       - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
     ports:
       - "5173:5173"
+    depends_on:
+      frontend_dependencies:
+        condition: service_completed_successfully
     command: sh -c "pnpm install && pnpm dev --host"
 
   db:
@@ -54,3 +65,4 @@ services:
 volumes:
   dbdata:
   vendor:
+  frontend_node_modules:

@@ -84,6 +84,7 @@ export default function Documento03Form({
 
   return (
     <Formulario
+      modal
       titulo="Agregar documento"
       guardar="Guardar documento"
       busy={busy}

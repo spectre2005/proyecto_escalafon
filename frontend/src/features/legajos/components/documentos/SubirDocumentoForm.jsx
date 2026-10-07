@@ -15,7 +15,8 @@ import { hoy, useBorrador, useGuardar } from '../seccion01/useGuardar'
  * relacion: relación con el titular que se propone (por defecto, el propio servidor).
  * onSaved(documento): recibe la respuesta del backend (formulario_datos, enlazado) para abrir el formulario de datos.
  */
-export default function SubirDocumentoForm({ usuario, seccion, tipo, titular, enlaces, relacion = 'servidor', onSaved, onCancel }) {
+export default function SubirDocumentoForm({ usuario, seccion, tipo, titular, enlaces, relacion = 'servidor', onSaved, onCancel, modal = Number(seccion) !== 10 }) {
+  const identidadBloqueada = tipo.codigo === 'S01_B_DOCUMENTO_IDENTIDAD'
   const folio = useLiveQuery(`/expedientes/${usuario}/documentos/folio-sugerido?seccion=${seccion}`)
   const sugerido = folio.data?.data.folio_sugerido
   const maximoKb = folio.data?.data.tamano_maximo_kb
@@ -25,15 +26,30 @@ export default function SubirDocumentoForm({ usuario, seccion, tipo, titular, en
   const [errorPdf, setErrorPdf] = useState('')
   const respuesta = useRef(null)
   const [draft, set] = useBorrador({
-    folio_fin: '', fecha_incorporacion: hoy(), emisor: '', fecha_emision: '', num_resolucion: '',
+    folio_fin: '', fecha_incorporacion: hoy(), emisor: '', fecha_emision: '', fecha_caducidad: '', num_resolucion: '',
     titular_nombre: titular?.nombre || '', titular_documento: titular?.documento || '', relacion_titular: relacion,
     modalidad_presentacion: '', motivo_incorporacion: '', subsana_a_documento_id: debeSubsanar && vigentes.length === 1 ? vigentes[0].id : '', enlace_id: '',
   })
   const { busy, error, errors, guardar } = useGuardar(async data => {
-    respuesta.current = (await subirDocumento(usuario, { ...data, seccion_legajo_id: seccion, tipo_documento_id: tipo.id, folio_inicio: sugerido }, pdf)).data.data
+    const payload = identidadBloqueada
+      ? { fecha_incorporacion: data.fecha_incorporacion, fecha_emision: data.fecha_emision, fecha_caducidad: data.fecha_caducidad }
+      : { ...data, folio_inicio: sugerido }
+    respuesta.current = (await subirDocumento(usuario, { ...payload, seccion_legajo_id: seccion, tipo_documento_id: tipo.id }, pdf)).data.data
   }, () => onSaved(respuesta.current))
 
-  return <Formulario titulo={`Subir documento: ${tipo.literal ? `${tipo.literal}) ` : ''}${tipo.nombre}`} guardar="Subir documento" busy={busy} error={error}
+  if (identidadBloqueada) return <Formulario modal={modal} titulo="Subir copia de DNI" guardar="Guardar DNI" busy={busy} error={error}
+    onSubmit={() => pdf && !errorPdf && guardar(draft)} onCancel={onCancel}
+    nota="Al actualizar el DNI, el nuevo PDF queda vigente y la copia anterior se conserva en el historial.">
+    <FormSplit pdf={<PdfPreviewField label={`Archivo PDF${maximoKb ? ` (máx. ${maximoKb} KB)` : ''}`} required maxMB={maximoKb ? maximoKb / 1024 : 2} help="Selecciona la copia del DNI para revisarla antes de guardar." error={errorPdf || errors.pdf} onChange={(file, message) => { setPdf(file); setErrorPdf(message) }} />}>
+      <Campo label="Nombre" error={errors.titular_nombre}><input readOnly value={draft.titular_nombre} /></Campo>
+      <Campo label="DNI" error={errors.titular_documento}><input readOnly value={draft.titular_documento} /></Campo>
+      <Campo label="Fecha de incorporación" required error={errors.fecha_incorporacion}><input type="date" required max={hoy()} value={draft.fecha_incorporacion} onChange={set('fecha_incorporacion')} /></Campo>
+      <Campo label="Fecha de emisión" required error={errors.fecha_emision}><input type="date" required max={hoy()} value={draft.fecha_emision} onChange={set('fecha_emision')} /></Campo>
+      <Campo label="Fecha de caducidad" required error={errors.fecha_caducidad}><input type="date" required min={draft.fecha_emision || undefined} value={draft.fecha_caducidad} onChange={set('fecha_caducidad')} /></Campo>
+    </FormSplit>
+  </Formulario>
+
+  return <Formulario modal={modal} titulo={`Subir documento: ${tipo.literal ? `${tipo.literal}) ` : ''}${tipo.nombre}`} guardar="Subir documento" busy={busy} error={error}
     onSubmit={() => sugerido && pdf && !errorPdf && guardar(draft)} onCancel={onCancel}
     nota="El documento no se puede eliminar ni reemplazar después: si hay un error, se sube uno nuevo que lo subsana. Quien sube queda registrado con tu sesión.">
     <FormSplit pdf={<PdfPreviewField label={`Archivo PDF${maximoKb ? ` (máx. ${maximoKb} KB)` : ''}`} required maxMB={maximoKb ? maximoKb / 1024 : 2} help="Selecciona el PDF para ver su contenido antes de guardarlo." error={errorPdf || errors.pdf} onChange={(file, message) => { setPdf(file); setErrorPdf(message) }} />}>
@@ -44,8 +60,8 @@ export default function SubirDocumentoForm({ usuario, seccion, tipo, titular, en
     <Campo label="Fecha de emisión" required error={errors.fecha_emision}><input type="date" required max={hoy()} value={draft.fecha_emision} onChange={set('fecha_emision')} /></Campo>
     <Campo label="Emisor" required error={errors.emisor}><input required maxLength={200} value={draft.emisor} onChange={set('emisor')} placeholder="Entidad u oficina que emite" /></Campo>
     <Campo label="N.º de resolución" required={tipo.requiere_num_resolucion} error={errors.num_resolucion}><input required={tipo.requiere_num_resolucion} maxLength={60} value={draft.num_resolucion} onChange={set('num_resolucion')} /></Campo>
-    <Campo label="Titular (nombre)" required error={errors.titular_nombre}><input required maxLength={200} value={draft.titular_nombre} onChange={set('titular_nombre')} /></Campo>
-    <Campo label="Titular (DNI u otro documento)" required error={errors.titular_documento}><input required maxLength={20} value={draft.titular_documento} onChange={set('titular_documento')} /></Campo>
+    <Campo label="Titular (nombre)" required error={errors.titular_nombre}><input required readOnly={identidadBloqueada} maxLength={200} value={draft.titular_nombre} onChange={set('titular_nombre')} className={identidadBloqueada ? 'bg-slate-50 text-slate-500' : ''} /></Campo>
+    <Campo label="Titular (DNI u otro documento)" required error={errors.titular_documento}><input required readOnly={identidadBloqueada} maxLength={20} value={draft.titular_documento} onChange={set('titular_documento')} className={identidadBloqueada ? 'bg-slate-50 text-slate-500' : ''} /></Campo>
     <Campo label="Relación con el titular" required error={errors.relacion_titular}><select required value={draft.relacion_titular} onChange={set('relacion_titular')}><Opciones lista={relacionesTitular} /></select></Campo>
     <Campo label="Modalidad de presentación" required error={errors.modalidad_presentacion}><select required value={draft.modalidad_presentacion} onChange={set('modalidad_presentacion')}><Opciones lista={modalidadesPresentacion} vacio="Selecciona" /></select></Campo>
     {vigentes.length > 0 && <Campo label={debeSubsanar ? 'Documento que subsana (este tipo admite uno solo)' : 'Subsana a otro documento'} required={debeSubsanar} error={errors.subsana_a_documento_id} className="sm:col-span-2">

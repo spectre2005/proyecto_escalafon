@@ -29,7 +29,7 @@ final class CargaDocumento
     /**
      * @param  array<string, mixed>  $metadatos  ya validados (folios, fechas, emisor, titular, etc.)
      */
-    public static function registrar(Legajo $legajo, TipoDocumento $tipo, UploadedFile $pdf, array $metadatos, string $autor, ?string $ip, ?string $subsanaA = null, ?string $enlaceId = null, string $estadoInicial = self::ESTADO_INICIAL, ?Closure $completar = null): DocumentoUsuario
+    public static function registrar(Legajo $legajo, TipoDocumento $tipo, UploadedFile $pdf, array $metadatos, string $autor, ?string $ip, ?string $subsanaA = null, ?string $enlaceId = null, string $estadoInicial = self::ESTADO_INICIAL, ?Closure $completar = null, bool $foliosAutomaticos = false): DocumentoUsuario
     {
         $disco = (string) config('legajo.disco_documentos');
         $ruta = sprintf('legajos/%s/seccion-%02d/%s.pdf', $legajo->id, $tipo->seccion_legajo_id, Str::uuid());
@@ -43,12 +43,24 @@ final class CargaDocumento
             'estado_antivirus' => 'pendiente',
             'subido_por' => $autor,
         ];
+        if ($foliosAutomaticos && (! $archivo['num_paginas'] || $archivo['num_paginas'] < 1)) {
+            throw ValidationException::withMessages(['pdf' => 'No se pudo contar las páginas del PDF para asignar sus folios. Guarda una copia del PDF e intenta nuevamente.']);
+        }
         if (! Storage::disk($disco)->putFileAs(dirname($ruta), $pdf, basename($ruta))) {
             throw new RuntimeException('No se pudo almacenar el PDF. Intenta nuevamente.');
         }
 
         try {
-            return DB::transaction(function () use ($legajo, $tipo, $metadatos, $autor, $ip, $subsanaA, $enlaceId, $archivo, $estadoInicial, $completar): DocumentoUsuario {
+            return DB::transaction(function () use ($legajo, $tipo, $metadatos, $autor, $ip, $subsanaA, $enlaceId, $archivo, $estadoInicial, $completar, $foliosAutomaticos): DocumentoUsuario {
+                $actual = Legajo::query()->whereKey($legajo->id)->lockForUpdate()->firstOrFail();
+                abort_unless($actual->estado_legajo === 'activo', 409, 'El legajo está cerrado. Solo se permite visualizar y descargar.');
+                if ($foliosAutomaticos) {
+                    Legajo::query()->whereKey($legajo->id)->lockForUpdate()->first();
+                    $metadatos['folio_inicio'] = Folios::ultimo($legajo, $tipo->seccion_legajo_id) + 1;
+                    $metadatos['folio_fin'] = $metadatos['folio_inicio'] + $archivo['num_paginas'] - 1;
+                    $subsanaA = DocumentoUsuario::query()->where('legajo_id', $legajo->id)->where('tipo_documento_id', $tipo->id)
+                        ->whereDoesntHave('documentosUsuarioPorSubsanaADocumento')->orderByDesc('folio_fin')->value('id');
+                }
                 Folios::reservar($legajo, $tipo->seccion_legajo_id, $metadatos['folio_inicio'], $metadatos['folio_fin']);
                 self::validarSubsanacion($legajo, $tipo, $subsanaA);
                 $registroArchivo = ArchivoDocumento::query()->create([...$archivo, 'subido_en' => now()]);

@@ -150,7 +150,7 @@ class Seccion03ApiTest extends TestCase
         $this->cargar('FORM_COLEGIATURA')->assertUnprocessable();
         $this->legajo->update(['estado_legajo' => 'pasivo']);
         $this->cargar()->assertConflict();
-        $this->getJson($this->url())->assertOk()->assertJsonPath('data.legajo', null);
+        $this->getJson($this->url())->assertOk()->assertJsonPath('data.legajo.id', $this->legajo->id)->assertJsonPath('data.legajo.estado_legajo', 'pasivo');
     }
 
     public function test_structured_data_is_linked_for_college_postgraduate_and_training(): void

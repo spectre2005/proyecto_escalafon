@@ -57,7 +57,7 @@ class Seccion01Controller extends Controller
         $persona = Usuario::query()->findOrFail($usuario);
         $hoy = today();
         $perfil = PerfilDocumental::de($persona, VinculoLaboral::query()->where('usuario_id', $usuario)->where('anulado', false)->get());
-        $legajo = Legajo::query()->where('usuario_id', $usuario)->where('estado_legajo', 'activo')->orderByDesc('fecha_apertura')->first();
+        $legajo = Legajo::paraConsulta($usuario);
         $documentos = DocumentoUsuario::query()->where('usuario_id', $usuario)->where('seccion_legajo_id', Seccion01CatalogoSeeder::SECCION)
             ->whereIn('legajo_id', Legajo::query()->where('usuario_id', $usuario)->select('id'))
             ->with(['archivo', 'recepcionadoPor', 'createdBy', 'tipoDocumento:id,codigo'])->orderByDesc('created_at')->orderByDesc('id')->get();
@@ -299,7 +299,7 @@ class Seccion01Controller extends Controller
             'documentos' => $documentos->count(),
             'documento' => $ultimo ? $this->fila($ultimo, ['estado', 'folio_inicio', 'folio_fin', 'fecha_recepcion'])['values'] : null,
             'lista' => $documentos->map(fn (DocumentoUsuario $documento): array => [
-                ...$this->fila($documento, ['estado', 'folio_inicio', 'folio_fin', 'fecha_incorporacion', 'emisor', 'fecha_emision', 'titular_nombre', 'titular_documento', 'num_resolucion', 'modalidad_presentacion', 'relacion_titular', 'subsana_a_documento_id', 'fecha_recepcion', 'created_at']),
+                ...$this->fila($documento, ['estado', 'folio_inicio', 'folio_fin', 'fecha_incorporacion', 'emisor', 'fecha_emision', 'fecha_caducidad', 'titular_nombre', 'titular_documento', 'num_resolucion', 'modalidad_presentacion', 'relacion_titular', 'subsana_a_documento_id', 'fecha_recepcion', 'created_at']),
                 'subsanado' => $documentos->contains('subsana_a_documento_id', $documento->id),
                 'estado_visible' => EstadoDocumento::visible($documento),
                 'aprobado' => EstadoDocumento::aprobado($documento, $tipo),

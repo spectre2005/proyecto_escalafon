@@ -53,7 +53,7 @@ class Seccion11Controller extends Controller
             ->map(fn (TipoDocumento $tipo): array => $this->tipo($tipo, $porTipo->get($tipo->id, collect()), $sensibles))->values();
 
         return response()->json(['data' => [
-            'legajo' => $this->legajoAbierto($usuario)?->only(['id', 'numero_legajo', 'estado_legajo']),
+            'legajo' => Legajo::paraConsulta($usuario)?->only(['id', 'numero_legajo', 'estado_legajo']),
             'titular' => ['nombre' => trim($persona->nombres.' '.$persona->apellido_paterno.' '.$persona->apellido_materno), 'documento' => $persona->numero_doc_identidad],
             'motivos_cese' => Seccion11::MOTIVOS_CESE,
             'vinculos' => $vinculos->map(fn (VinculoLaboral $v): array => [

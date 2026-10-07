@@ -46,6 +46,13 @@ class Legajo extends Model
         return $this->belongsTo(Usuario::class, 'usuario_id', 'id');
     }
 
+    public static function paraConsulta(string $usuario): ?self
+    {
+        return self::query()->where('usuario_id', $usuario)
+            ->orderByRaw("CASE WHEN estado_legajo = 'activo' THEN 0 ELSE 1 END")
+            ->orderByDesc('fecha_apertura')->orderByDesc('created_at')->orderByDesc('id')->first();
+    }
+
     public function legajoSecciones(): HasMany
     {
         return $this->hasMany(LegajoSeccion::class, 'legajo_id', 'id');

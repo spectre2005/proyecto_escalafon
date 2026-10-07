@@ -210,36 +210,6 @@ export default function UsersPage() {
               </p>
             </div>
           </div>
-          <section
-            className="mb-7 grid grid-cols-3 gap-2 md:gap-4.5 [&_article]:rounded-xl [&_article]:border [&_article]:border-[#e4ebe8] [&_article]:bg-white [&_article]:p-3 md:[&_article]:flex md:[&_article]:items-center md:[&_article]:gap-4 md:[&_article]:p-5 [&_p]:mb-1.5 [&_p]:min-h-7 [&_p]:text-[10px] [&_p]:text-[#7f928b] md:[&_p]:min-h-0 md:[&_p]:text-[11px] [&_strong]:font-['Manrope',sans-serif] [&_strong]:text-2xl md:[&_strong]:text-[26px] [&_article:nth-child(2)>span]:bg-[#eff3fa] [&_article:nth-child(2)>span]:text-[#6384ad] [&_article:nth-child(3)>span]:bg-[#faf5e8] [&_article:nth-child(3)>span]:text-[#b3995e]"
-            aria-label="Resumen de usuarios"
-          >
-            {[
-              ['Usuarios registrados', users.length, 'users'],
-              [
-                'Personal docente',
-                users.filter((user) => user.tipo_personal === 'docente').length,
-                'file',
-              ],
-              [
-                'Personal administrativo',
-                users.filter((user) => user.tipo_personal === 'administrativo')
-                  .length,
-                'check',
-              ],
-            ].map(([label, count, icon]) => (
-              <article key={label}>
-                <span className="mb-3 grid size-8 shrink-0 place-items-center rounded-xl bg-[#edf6f1] text-[#3c8d7b] md:mb-0 md:size-11.5">
-                  <Icon name={icon} />
-                </span>
-                <div>
-                  <p>{label}</p>
-                  <strong>{count.toString().padStart(2, '0')}</strong>
-                </div>
-              </article>
-            ))}
-          </section>
-
           <div
             className="mt-5 flex flex-wrap items-center gap-3"
             aria-live="polite"

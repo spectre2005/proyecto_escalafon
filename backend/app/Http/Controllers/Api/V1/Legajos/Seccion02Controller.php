@@ -92,7 +92,7 @@ class Seccion02Controller extends Controller
     public function show(Request $request, string $usuario): JsonResponse
     {
         $persona = Usuario::query()->findOrFail($usuario);
-        $legajo = $this->legajoAbierto($usuario);
+        $legajo = Legajo::paraConsulta($usuario);
         $vinculos = VinculoLaboral::query()->where('usuario_id', $usuario)->where('anulado', false)
             ->with(['regimenNormativo:id,nombre', 'unidadOrganica:id,nombre', 'perfilDocente', 'perfilAdministrativo', 'registradoPor',
                 'vinculoAdendas' => fn ($query) => $query->where('anulado', false)->with('registradoPor')->orderBy('fecha_inicio')->orderBy('created_at')->orderBy('id')])

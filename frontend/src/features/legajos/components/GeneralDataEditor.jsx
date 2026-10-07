@@ -29,7 +29,6 @@ const fields = [
 const listas = { tipo_doc_identidad: tiposDocIdentidad, estado_civil: estadosCiviles }
 
 const flags = [
-  ['activo', 'Activo'],
   ['con_discapacidad', 'Con discapacidad'],
   ['obligado_djbr', 'Obligado a presentar declaración jurada de bienes y rentas'],
   ['exige_colegiatura', 'Requiere colegiatura'],

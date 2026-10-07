@@ -29,7 +29,7 @@ class Seccion03Controller extends Controller
     public function show(Request $request, string $usuario): JsonResponse
     {
         $persona = Usuario::query()->with('vinculosLaborales')->findOrFail($usuario);
-        $legajo = $this->legajo($persona);
+        $legajo = Legajo::paraConsulta($usuario);
         $perfil = PerfilDocumental::de($persona, $persona->vinculosLaborales);
         $tipos = TipoDocumento::query()->where('seccion_legajo_id', 3)->where('activo', true)
             ->whereIn('codigo', array_keys(ResumenSeccion03::ITEMS));
@@ -64,7 +64,7 @@ class Seccion03Controller extends Controller
         return response()->json(['data' => [
             'persona' => $persona->only(['id', 'nombres', 'apellido_paterno', 'apellido_materno', 'tipo_personal', 'nombre_puesto']),
             'perfil' => ['tipos_personal' => $perfil->tiposPersonal, 'puestos' => $perfil->puestos],
-            'legajo' => $legajo?->only(['id', 'numero_legajo']), 'items' => $items->all(), 'resumen' => ResumenSeccion03::total($items),
+            'legajo' => $legajo?->only(['id', 'numero_legajo', 'estado_legajo']), 'items' => $items->all(), 'resumen' => ResumenSeccion03::total($items),
             'folio_sugerido' => $legajo ? Folios::ultimo($legajo, 3) + 1 : null,
             'tamano_maximo_kb' => Parametros::entero('tamano_maximo_pdf_kb'),
         ]]);

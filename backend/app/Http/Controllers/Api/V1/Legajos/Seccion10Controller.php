@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditoriaEvento;
 use App\Models\BitacoraAccesoLegajo;
 use App\Models\DocumentoUsuario;
+use App\Models\Legajo;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Support\Documentos\ArchivoPdf;
@@ -26,7 +27,7 @@ class Seccion10Controller extends Controller
     {
         $subseccion = $request->validate(['subseccion' => 'nullable|in:10.1,10.2'])['subseccion'] ?? null;
         $persona = Usuario::query()->with(['unidadOrganica', 'vinculosLaborales.unidadOrganica'])->findOrFail($usuario);
-        $legajo = $persona->legajos()->where('estado_legajo', 'activo')->orderByDesc('fecha_apertura')->orderByDesc('id')->first();
+        $legajo = Legajo::paraConsulta($usuario);
         $hoy = now('America/Lima')->toDateString();
         $tipos = TipoDocumento::query()->where('seccion_legajo_id', 10)->whereIn('codigo', array_keys(ResumenSeccion10::TIPOS))->orderBy('orden')->get();
         $docs = DocumentoUsuario::query()->where('usuario_id', $usuario)->where('seccion_legajo_id', 10)
@@ -50,7 +51,7 @@ class Seccion10Controller extends Controller
                 'cargo' => $actual?->nombre_puesto ?? $persona->nombre_puesto,
                 'unidad_organica' => $actual?->unidadOrganica?->nombre ?? $persona->unidadOrganica?->nombre,
                 'fecha_ingreso' => $vinculos->sortBy('fecha_inicio')->first()?->fecha_inicio?->format('Y-m-d')],
-            'legajo' => $legajo?->only(['id', 'numero_legajo']), 'items' => $items->all(), 'folios' => $folios,
+            'legajo' => $legajo?->only(['id', 'numero_legajo', 'estado_legajo']), 'items' => $items->all(), 'folios' => $folios,
             'subseccion' => $subseccion, 'documentos_anteriores' => $anteriores->all(),
             'fecha_actual' => $hoy, 'folio_sugerido' => $legajo ? Folios::ultimo($legajo, 10) + 1 : null,
             'tamano_maximo_kb' => Parametros::entero('tamano_maximo_pdf_kb'),

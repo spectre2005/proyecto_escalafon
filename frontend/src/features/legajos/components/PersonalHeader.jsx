@@ -1,4 +1,6 @@
 import AbrirLegajo from './AbrirLegajo'
+import CerrarLegajo from './CerrarLegajo'
+import ReabrirLegajo from './ReabrirLegajo'
 import PersonalPhoto from './PersonalPhoto'
 
 function SummaryField({ title, value }) {
@@ -31,9 +33,13 @@ export default function PersonalHeader({ data, usuario }) {
         <section aria-label="Legajos registrados" className="mt-6 border-t border-slate-100 pt-5">
           <h2 className="text-xs font-semibold text-slate-600">Legajos registrados</h2>
           {data.legajos.length ? <ul className="mt-3 flex flex-wrap gap-2">
-            {data.legajos.map(legajo => <li key={legajo.id} className="rounded-lg border border-teal-100 bg-teal-50 px-3 py-2 text-xs text-teal-900">
+            {data.legajos.map(legajo => <li key={legajo.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-teal-100 bg-teal-50 px-3 py-2 text-xs text-teal-900">
+              <div>
               <span className="font-semibold">N.º de legajo: {legajo.values.numero_legajo || 'No registrado'}</span>
-              <span className="mt-1 block text-teal-700">Estado: {legajo.values.estado_legajo ? legajo.values.estado_legajo.replaceAll('_', ' ') : 'No registrado'}</span>
+              <span className="mt-1 block text-teal-700">Estado: {legajo.values.estado_legajo === 'pasivo' ? 'Cerrado' : legajo.values.estado_legajo ? legajo.values.estado_legajo.replaceAll('_', ' ') : 'No registrado'}</span>
+              </div>
+              {legajo.values.estado_legajo === 'activo' && <CerrarLegajo usuario={usuario} legajo={legajo.id} />}
+              {['pasivo', 'cerrado'].includes(legajo.values.estado_legajo) && !data.legajos.some(item => item.values.estado_legajo === 'activo') && <ReabrirLegajo usuario={usuario} legajo={legajo.id} />}
             </li>)}
           </ul> : <p className="mt-2 text-sm text-slate-500">No hay legajos registrados para esta persona.</p>}
           {!data.legajos.some(legajo => legajo.values.estado_legajo === 'activo') && <AbrirLegajo usuario={usuario} className="mt-3" />}

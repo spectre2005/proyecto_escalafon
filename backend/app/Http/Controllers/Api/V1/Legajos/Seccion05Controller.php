@@ -51,7 +51,7 @@ class Seccion05Controller extends Controller
     {
         $persona = Usuario::query()->findOrFail($usuario);
         $salud = $request->user()->veDatosSensibles();
-        $legajo = $this->legajoAbierto($usuario);
+        $legajo = Legajo::paraConsulta($usuario);
         $licencias = $this->licencias($usuario, $salud)->where('anulado', false)->with('registradoPor')
             ->orderByDesc('fecha_inicio')->orderBy('id')->get();
         $periodos = PeriodoVacacional::query()->where('usuario_id', $usuario)->where('anulado', false)->with('registradoPor')

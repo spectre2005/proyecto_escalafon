@@ -46,7 +46,7 @@ export default function PersonalDocuments({ usuario, uploadCode, onClose }) {
       <h2 id="personal-document-title" className="mb-4 text-lg font-semibold">{title}</h2>
       {request.error && <p role="alert" className="mb-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">No se pudieron consultar los documentos. <button type="button" onClick={request.retry} className="font-semibold underline">Reintentar</button></p>}
       {uploadCode && (!data ? <p role="status" className="mb-4 text-sm text-slate-500">Consultando documentos…</p> : !data.legajo ? <p role="alert" className="mb-4 text-sm text-amber-800">Abre un legajo para esta persona antes de subir el archivo.</p> : !type ? <p role="alert" className="mb-4 text-sm text-amber-800">El tipo de documento no está disponible en el catálogo.</p> :
-        <SubirDocumentoForm key={`${uploadCode}:${type.id}`} usuario={usuario} seccion={1} tipo={type} titular={data.titular}
+        <SubirDocumentoForm modal={false} key={`${uploadCode}:${type.id}`} usuario={usuario} seccion={1} tipo={type} titular={data.titular}
           onCancel={onClose} onSaved={() => { setMessage(uploadCode === 'S01_A_FICHA_DATOS' ? 'Ficha personal subida correctamente.' : 'Copia de identidad subida correctamente.'); request.retry(); onClose() }} />)}
       {(!data || !data.legajo || !type) && <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm">Cerrar</button>}
     </dialog>

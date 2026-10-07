@@ -211,7 +211,7 @@ class Seccion07Controller extends Controller
             })->values()->all();
 
         return [
-            'legajo' => $this->legajoAbierto($usuario),
+            'legajo' => Legajo::paraConsulta($usuario),
             'perfil' => ['regimenes' => $perfil->regimenes, 'tipos_personal' => $perfil->tiposPersonal, 'es_carrera' => $carrera,
                 'administrativo_carrera' => $vinculosCarrera->isNotEmpty(), 'docente' => $perfilesDocentes->isNotEmpty()],
             'subsecciones' => $subsecciones,

@@ -53,7 +53,7 @@ class Seccion09Controller extends Controller
             ->map(fn (TipoDocumento $tipo): array => $this->tipo($tipo, $documentos->get($tipo->id, collect())))->values();
 
         return response()->json(['data' => [
-            'legajo' => $this->legajoAbierto($usuario)?->only(['id', 'numero_legajo', 'estado_legajo']),
+            'legajo' => Legajo::paraConsulta($usuario)?->only(['id', 'numero_legajo', 'estado_legajo']),
             'titular' => ['nombre' => trim($persona->nombres.' '.$persona->apellido_paterno.' '.$persona->apellido_materno), 'documento' => $persona->numero_doc_identidad],
             'tipos' => $tipos,
             'controversias' => $this->filas($controversias, self::CAMPOS_CONTROVERSIA),

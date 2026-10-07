@@ -12,6 +12,7 @@ use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use Database\Seeders\Seccion01CatalogoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
@@ -49,7 +50,69 @@ class Seccion01DocumentosTest extends TestCase
     {
         $this->folio++;
 
-        return $this->subir($this->persona, $this->metadatos($this->tipo01($codigo), $this->folio, $this->folio, $cambios));
+        if ($codigo === 'S01_B_DOCUMENTO_IDENTIDAD') {
+            $cambios = ['fecha_caducidad' => today()->addYears(8)->toDateString(), ...$cambios];
+        }
+        $respuesta = $this->subir($this->persona, $this->metadatos($this->tipo01($codigo), $this->folio, $this->folio, $cambios));
+        if ($respuesta->status() === 201) {
+            $this->folio = $respuesta->json('data.folio_fin');
+        }
+
+        return $respuesta;
+    }
+
+    public function test_dni_upload_uses_person_identity_and_automatic_folios_and_keeps_previous_pdf(): void
+    {
+        $this->actuarComo();
+        $this->subir01('S01_A_FICHA_DATOS')->assertCreated();
+        $datos = [
+            'seccion_legajo_id' => 1, 'tipo_documento_id' => $this->tipo01('S01_B_DOCUMENTO_IDENTIDAD')->id,
+            'pdf' => $this->pdf(), 'fecha_incorporacion' => today()->toDateString(),
+            'fecha_emision' => today()->subYear()->toDateString(), 'fecha_caducidad' => today()->addYears(7)->toDateString(),
+            'titular_nombre' => 'Otro nombre', 'titular_documento' => '99999999', 'folio_inicio' => 500, 'folio_fin' => 999,
+        ];
+        $id = $this->subir($this->persona, $datos)->assertCreated()
+            ->assertJsonPath('data.folio_inicio', 2)->assertJsonPath('data.folio_fin', 3)->json('data.id');
+        $documento = DocumentoUsuario::query()->findOrFail($id);
+        $this->assertSame($this->persona->numero_doc_identidad, $documento->titular_documento);
+        $this->assertSame(trim($this->persona->nombres.' '.$this->persona->apellido_paterno.' '.$this->persona->apellido_materno), $documento->titular_nombre);
+        $this->assertSame($datos['fecha_caducidad'], $documento->fecha_caducidad->toDateString());
+        $this->assertNull($documento->emisor);
+        $this->assertNull($documento->modalidad_presentacion);
+        $this->assertSame('servidor', $documento->relacion_titular);
+
+        $nuevo = $this->subir($this->persona, [...$datos, 'pdf' => $this->pdf('dni-renovado.pdf')])->assertCreated()
+            ->assertJsonPath('data.folio_inicio', 4)->assertJsonPath('data.folio_fin', 5)
+            ->assertJsonPath('data.subsana_a_documento_id', $id)->json('data.id');
+        $this->assertNotSame($id, $nuevo);
+        Storage::disk(config('legajo.disco_documentos'))->assertExists($documento->archivo->storage_path);
+        $lista = collect($this->seccion()['tipos'])->firstWhere('codigo', 'S01_B_DOCUMENTO_IDENTIDAD')['lista'];
+        $this->assertCount(2, $lista);
+        $this->assertSame($datos['fecha_caducidad'], collect($lista)->firstWhere('id', $nuevo)['values']['fecha_caducidad']);
+    }
+
+    public function test_dni_requires_valid_expiry_date_but_accepts_an_expired_document(): void
+    {
+        $this->actuarComo();
+        $datos = [
+            'seccion_legajo_id' => 1, 'tipo_documento_id' => $this->tipo01('S01_B_DOCUMENTO_IDENTIDAD')->id,
+            'pdf' => $this->pdf(), 'fecha_incorporacion' => today()->toDateString(),
+            'fecha_emision' => today()->subYears(9)->toDateString(),
+        ];
+        $this->subir($this->persona, $datos)->assertUnprocessable()->assertJsonValidationErrors('fecha_caducidad');
+        $this->subir($this->persona, [...$datos, 'fecha_caducidad' => today()->subYears(10)->toDateString()])
+            ->assertUnprocessable()->assertJsonValidationErrors('fecha_caducidad');
+        $this->subir($this->persona, [...$datos, 'fecha_caducidad' => today()->subYear()->toDateString()])->assertCreated();
+    }
+
+    public function test_dni_pdf_without_readable_page_count_does_not_reserve_folios_or_store_a_file(): void
+    {
+        $this->actuarComo();
+        $this->subir01('S01_B_DOCUMENTO_IDENTIDAD', [
+            'pdf' => UploadedFile::fake()->createWithContent('sin-paginas.pdf', "%PDF-1.4\n%%EOF\n"),
+        ])->assertUnprocessable()->assertJsonValidationErrors('pdf');
+        $this->assertDatabaseCount('documentos_usuario', 0);
+        $this->assertSame([], Storage::disk(config('legajo.disco_documentos'))->allFiles());
     }
 
     private function seccion(): array
@@ -131,7 +194,7 @@ class Seccion01DocumentosTest extends TestCase
 
         foreach (['S01_A_FICHA_DATOS', 'S01_B_DOCUMENTO_IDENTIDAD', 'S01_OTROS_UNIVERSIDAD'] as $codigo) {
             $id = $this->subir01($codigo)->assertCreated()->assertJsonPath('data.formulario_datos', null)->json('data.id');
-            $this->assertSame('Oficina de Recursos Humanos', DocumentoUsuario::query()->findOrFail($id)->emisor);
+            $this->assertSame($codigo === 'S01_B_DOCUMENTO_IDENTIDAD' ? null : 'Oficina de Recursos Humanos', DocumentoUsuario::query()->findOrFail($id)->emisor);
         }
         $this->assertSame(0, Familiar::query()->whereNotNull('documento_id')->count() + DeclaracionVerificacion::query()->whereNotNull('documento_id')->count());
     }

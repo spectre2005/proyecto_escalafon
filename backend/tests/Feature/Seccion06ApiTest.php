@@ -166,7 +166,7 @@ class Seccion06ApiTest extends TestCase
         $tipo = TipoDocumento::factory()->create(['seccion_legajo_id' => 6, 'activo' => true]);
         $this->cargar(cambios: ['tipo_documento_id' => $tipo->id])->assertUnprocessable();
         $this->legajo->update(['estado_legajo' => 'cerrado']);
-        $this->getJson($this->url())->assertOk()->assertJsonPath('data.legajo', null);
+        $this->getJson($this->url())->assertOk()->assertJsonPath('data.legajo.id', $this->legajo->id)->assertJsonPath('data.legajo.estado_legajo', 'cerrado');
         $this->cargar()->assertConflict();
     }
 

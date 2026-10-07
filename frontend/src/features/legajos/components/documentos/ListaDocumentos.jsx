@@ -50,14 +50,17 @@ export default function ListaDocumentos({ usuario, tipo, enlazado }) {
       const subsana = v.subsana_a_documento_id && lista.find(d => d.id === v.subsana_a_documento_id)
       return <article key={documento.id} className={`rounded-xl border p-3 ${subsanado ? 'border-slate-100 bg-slate-50 opacity-70' : 'border-slate-200 bg-white'}`}>
         <div className="flex flex-wrap items-start justify-between gap-2">
-          <p className="text-xs font-semibold text-slate-700">Folios {folios(v.folio_inicio, v.folio_fin)}{documento.archivo?.num_paginas ? ` · ${documento.archivo.num_paginas} página(s)` : ''}{documento.archivo ? ` · ${kb(documento.archivo.tamano_bytes)}` : ''}</p>
+          <p className="text-xs font-semibold text-slate-700">{tipo.codigo === 'S01_B_DOCUMENTO_IDENTIDAD' ? 'Copia de DNI' : `Folios ${folios(v.folio_inicio, v.folio_fin)}`}{documento.archivo?.num_paginas ? ` · ${documento.archivo.num_paginas} página(s)` : ''}{documento.archivo ? ` · ${kb(documento.archivo.tamano_bytes)}` : ''}</p>
           <div className="flex flex-wrap items-center gap-2">
             {subsanado && <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-medium text-slate-600">Subsanado</span>}
             <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${coloresEstadoDocumento[documento.estado_visible] || 'bg-slate-100 text-slate-700'}`}>{etiqueta(estadosDocumento, documento.estado_visible)}</span>
           </div>
         </div>
         <dl className="mt-2 grid gap-x-4 gap-y-1 text-[11px] text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
-          {[['Emisor', v.emisor || 'No registrado'], ['Emitido', fecha(v.fecha_emision)], ['Incorporado', fecha(v.fecha_incorporacion)],
+          {(tipo.codigo === 'S01_B_DOCUMENTO_IDENTIDAD' ? [
+            ['Nombre', v.titular_nombre || 'No registrado'], ['DNI', v.titular_documento || 'No registrado'],
+            ['Incorporado', fecha(v.fecha_incorporacion)], ['Emitido', fecha(v.fecha_emision)], ['Caducidad', fecha(v.fecha_caducidad)],
+          ] : [['Emisor', v.emisor || 'No registrado'], ['Emitido', fecha(v.fecha_emision)], ['Incorporado', fecha(v.fecha_incorporacion)],
             ...(tipo.requiere_num_resolucion || v.num_resolucion ? [['N.º resolución', v.num_resolucion || 'No registrado']] : []),
             ['Titular', `${v.titular_nombre || 'No registrado'} ${v.titular_documento || ''} (${etiqueta(relacionesTitular, v.relacion_titular).toLowerCase()})`],
             ['Modalidad', v.modalidad_presentacion ? etiqueta(modalidadesPresentacion, v.modalidad_presentacion) : 'No registrada'],
@@ -65,7 +68,7 @@ export default function ListaDocumentos({ usuario, tipo, enlazado }) {
             ['Recepción', v.fecha_recepcion ? `${fecha(v.fecha_recepcion)} · ${documento.recepcionado_por || ''}` : 'Sin recepción registrada'],
             ...(subsana ? [['Subsana a', `documento de folios ${folios(subsana.values.folio_inicio, subsana.values.folio_fin)}`]] : []),
             ...(datos ? [['Acredita', datos]] : []),
-          ].map(([label, valor]) => <div key={label} className="min-w-0"><dt className="inline text-slate-400">{label}: </dt><dd className="inline break-words">{valor}</dd></div>)}
+          ]).map(([label, valor]) => <div key={label} className="min-w-0"><dt className="inline text-slate-400">{label}: </dt><dd className="inline break-words">{valor}</dd></div>)}
         </dl>
         <div className="mt-2 flex flex-wrap items-center gap-4">
           {puedeVer && documento.archivo && <button type="button" onClick={() => setVisor(visor === documento.id ? null : documento.id)} className="text-xs font-semibold text-teal-700">{visor === documento.id ? 'Ocultar PDF' : 'Ver PDF'}</button>}

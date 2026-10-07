@@ -23,3 +23,11 @@ export function archivoDocumento(usuario, id, accion = 'ver') {
 export function abrirLegajo(usuario) {
   return api.post(`/expedientes/${usuario}/legajo`)
 }
+
+export function cerrarLegajo(usuario, legajo) {
+  return api.post(`/expedientes/${usuario}/legajos/${legajo}/cerrar`)
+}
+
+export function reabrirLegajo(usuario, legajo) {
+  return api.post(`/expedientes/${usuario}/legajos/${legajo}/reabrir`)
+}

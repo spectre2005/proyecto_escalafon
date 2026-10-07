@@ -41,7 +41,7 @@ class DocumentoLegajoController extends Controller
 
     private const CAMPOS = ['seccion_legajo_id', 'tipo_documento_id', 'pdf', 'folio_inicio', 'folio_fin', 'fecha_incorporacion', 'emisor', 'fecha_emision',
         'titular_nombre', 'titular_documento', 'num_resolucion', 'modalidad_presentacion', 'relacion_titular', 'motivo_incorporacion',
-        'subsana_a_documento_id', 'enlace_id'];
+        'subsana_a_documento_id', 'enlace_id', 'fecha_caducidad'];
 
     /** Folio sugerido para la próxima carga en una sección: ultimo_folio + 1. */
     public function folio(Request $request, string $usuario): JsonResponse
@@ -71,18 +71,31 @@ class DocumentoLegajoController extends Controller
         abort_if($seccion === 4 && isset(ResumenSeccion04::ITEMS[$tipo->codigo]), 422, 'Usa Agregar documento en la Sección 04 para registrar sus datos de experiencia.');
         $this->exigirSensibles($request, $seccion, $tipo);
 
+        $esDni = $tipo->codigo === 'S01_B_DOCUMENTO_IDENTIDAD';
+        if ($esDni) {
+            $persona = Usuario::query()->findOrFail($usuario);
+            $request->merge([
+                'titular_nombre' => trim($persona->nombres.' '.$persona->apellido_paterno.' '.$persona->apellido_materno),
+                'titular_documento' => $persona->numero_doc_identidad,
+                'relacion_titular' => 'servidor',
+                'emisor' => null, 'modalidad_presentacion' => null, 'num_resolucion' => null,
+                'motivo_incorporacion' => null, 'enlace_id' => null, 'subsana_a_documento_id' => null,
+            ]);
+        }
+
         $maximo = Parametros::entero('tamano_maximo_pdf_kb');
         $data = $request->validate([
             'pdf' => ['required', 'file', 'max:'.$maximo],
-            'folio_inicio' => 'required|integer|min:1',
-            'folio_fin' => 'required|integer|gte:folio_inicio',
+            'folio_inicio' => $esDni ? 'exclude' : 'required|integer|min:1',
+            'folio_fin' => $esDni ? 'exclude' : 'required|integer|gte:folio_inicio',
             'fecha_incorporacion' => 'required|date_format:Y-m-d|before_or_equal:today',
-            'emisor' => 'required|string|max:200',
+            'emisor' => ($esDni ? 'nullable' : 'required').'|string|max:200',
             'fecha_emision' => 'required|date_format:Y-m-d|before_or_equal:today',
+            'fecha_caducidad' => $esDni ? 'required|date_format:Y-m-d|after_or_equal:fecha_emision' : 'exclude',
             'titular_nombre' => 'required|string|max:200',
             'titular_documento' => 'required|string|max:20',
             'num_resolucion' => [$tipo->requiere_num_resolucion ? 'required' : 'nullable', 'string', 'max:60'],
-            'modalidad_presentacion' => ['required', Rule::in(self::MODALIDADES)],
+            'modalidad_presentacion' => [$esDni ? 'nullable' : 'required', Rule::in(self::MODALIDADES)],
             'relacion_titular' => ['required', Rule::in(self::RELACIONES_TITULAR)],
             'motivo_incorporacion' => 'nullable|string|max:300',
             'subsana_a_documento_id' => 'nullable|uuid',
@@ -101,7 +114,7 @@ class DocumentoLegajoController extends Controller
 
         $metadatos = collect($data)->except(['pdf', 'subsana_a_documento_id', 'enlace_id'])->map(fn ($valor) => is_string($valor) ? trim($valor) : $valor)->all();
         $documento = CargaDocumento::registrar($legajo, $tipo, $request->file('pdf'), $metadatos, $request->user()->getAuthIdentifier(), $request->ip(),
-            $data['subsana_a_documento_id'] ?? null, $data['enlace_id'] ?? null);
+            $data['subsana_a_documento_id'] ?? null, $data['enlace_id'] ?? null, foliosAutomaticos: $esDni);
 
         return response()->json(['data' => [
             ...$documento->only(['id', 'tipo_documento_id', 'seccion_legajo_id', 'estado', 'folio_inicio', 'folio_fin', 'num_resolucion', 'subsana_a_documento_id', 'vinculo_laboral_id', 'archivo_id']),

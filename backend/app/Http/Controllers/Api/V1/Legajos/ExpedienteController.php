@@ -217,6 +217,7 @@ class ExpedienteController extends Controller
         $person = Usuario::query()->with(['unidadOrganica', 'regimenNormativo', 'ubigeo'])->findOrFail($usuario);
         $veSensibles = $request->user()->can('datos_sensibles.ver');
         $presented = $this->present($person);
+        $presented['values']['activo'] = $person->legajos()->where('estado_legajo', 'activo')->exists();
         if (! $veSensibles) {
             $presented['values'] = array_diff_key($presented['values'], array_flip(self::DATOS_PERSONALES_SENSIBLES));
         }

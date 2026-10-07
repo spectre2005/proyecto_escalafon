@@ -149,7 +149,7 @@ class UpdateExpedienteTest extends TestCase
             'nombre_puesto' => 'Puesto de prueba', 'unidad_organica_id' => $unit->id,
             'regimen_normativo_id' => $regime->id, 'regimen_laboral' => 'CAS',
             'tipo_personal' => 'administrativo', 'con_discapacidad' => true,
-            'activo' => false, 'obligado_djbr' => true, 'exige_colegiatura' => true,
+            'obligado_djbr' => true, 'exige_colegiatura' => true,
             'tiene_periodo_prueba' => true, 'tiene_derechohabientes' => true,
         ])->assertOk()->assertJsonPath('data.usuario.values.unidad_organica_id', $unit->nombre)
             ->assertJsonPath('data.edit_values.unidad_organica_id', $unit->id)
@@ -157,9 +157,9 @@ class UpdateExpedienteTest extends TestCase
             ->assertJsonPath('data.usuario.values.con_discapacidad', true)
             ->assertJsonPath('data.usuario.values.activo', false);
         $this->assertDatabaseHas('usuarios', ['id' => $person->id, 'unidad_organica_id' => $unit->id, 'regimen_normativo_id' => $regime->id]);
-        $this->patchJson($uri, ['unidad_organica_id' => null, 'regimen_normativo_id' => null, 'con_discapacidad' => false, 'activo' => true])
+        $this->patchJson($uri, ['unidad_organica_id' => null, 'regimen_normativo_id' => null, 'con_discapacidad' => false])
             ->assertOk()->assertJsonPath('data.edit_values.unidad_organica_id', null)
-            ->assertJsonPath('data.usuario.values.con_discapacidad', false)->assertJsonPath('data.usuario.values.activo', true);
+            ->assertJsonPath('data.usuario.values.con_discapacidad', false)->assertJsonPath('data.usuario.values.activo', false);
         $this->patchJson($uri, ['unidad_organica_id' => '00000000-0000-4000-8000-000000000000'])
             ->assertUnprocessable()->assertJsonValidationErrors('unidad_organica_id');
         $this->getJson('/api/v1/expediente-opciones')->assertOk()
