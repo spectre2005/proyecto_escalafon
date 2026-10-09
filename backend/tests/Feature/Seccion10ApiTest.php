@@ -98,6 +98,61 @@ class Seccion10ApiTest extends TestCase
         return array_map(fn (string $codigo): array => [$codigo], array_keys(ResumenSeccion10::TIPOS));
     }
 
+    public function test_repair_migration_restores_missing_catalogue_and_enables_document_upload(): void
+    {
+        TipoDocumento::query()->where('seccion_legajo_id', 10)->delete();
+        $personas = Usuario::query()->count();
+        $this->getJson($this->url('?subseccion=10.1'))->assertOk()->assertJsonCount(0, 'data.items');
+        $migration = require database_path('migrations/2026_10_06_195640_repair_seccion10_catalogue.php');
+        $migration->up();
+        $migration->up();
+        $this->getJson($this->url('?subseccion=10.1'))->assertOk()->assertJsonCount(5, 'data.items')->assertJsonPath('data.folios.total', 0);
+        $this->getJson($this->url('?subseccion=10.2'))->assertOk()->assertJsonCount(4, 'data.items');
+        $this->assertSame($personas, Usuario::query()->count());
+        $this->assertSame(9, TipoDocumento::query()->where('seccion_legajo_id', 10)->count());
+        $this->cargar()->assertCreated();
+        $this->getJson($this->url('?subseccion=10.1'))->assertOk()->assertJsonPath('data.folios.sst', 2);
+    }
+
+    public function test_repair_preserves_legacy_identifiers_and_documents_when_catalogue_ids_are_already_used(): void
+    {
+        TipoDocumento::query()->where('seccion_legajo_id', 10)->delete();
+        SubseccionLegajo::query()->where('seccion_legajo_id', 10)->delete();
+        $subseccion = SubseccionLegajo::factory()->create(['id' => '00000010-0000-4000-9000-000000000001',
+            'seccion_legajo_id' => 10, 'codigo' => 'LEGACY', 'nombre' => 'Subsección anterior']);
+        $tipo = TipoDocumento::factory()->create(['id' => Seccion10CatalogoSeeder::id(1), 'seccion_legajo_id' => 10,
+            'subseccion_legajo_id' => $subseccion->id, 'codigo' => 'SST_ANTERIOR', 'nombre' => 'Documento anterior']);
+        $doc = DocumentoUsuario::factory()->create(['usuario_id' => $this->persona->id, 'legajo_id' => $this->legajo->id,
+            'tipo_documento_id' => $tipo->id, 'seccion_legajo_id' => 10, 'estado' => 'cargado', 'archivo_id' => null,
+            'folio_inicio' => 1, 'folio_fin' => 3, 'created_by' => $this->autor->id]);
+        $migration = require database_path('migrations/2026_10_06_195640_repair_seccion10_catalogue.php');
+        $migration->up();
+        $migration->up();
+        $nuevo = TipoDocumento::query()->where('seccion_legajo_id', 10)->where('codigo', 'S10_REGLAMENTO')->firstOrFail();
+        $this->assertNotSame($tipo->id, $nuevo->id);
+        $this->assertNotSame($subseccion->id, $nuevo->subseccion_legajo_id);
+        $this->assertDatabaseHas('tipos_documento', ['id' => $tipo->id, 'codigo' => 'SST_ANTERIOR', 'nombre' => 'Documento anterior']);
+        $this->assertDatabaseHas('documentos_usuario', ['id' => $doc->id, 'tipo_documento_id' => $tipo->id, 'folio_fin' => 3]);
+        $this->getJson($this->url('?subseccion=10.1'))->assertOk()->assertJsonCount(5, 'data.items')
+            ->assertJsonPath('data.documentos_anteriores.0.id', $doc->id)->assertJsonPath('data.folios.total', 3);
+        $this->getJson($this->url('/documentos/'.$doc->id.'/historial'))->assertOk();
+        $this->assertSame(10, TipoDocumento::query()->where('seccion_legajo_id', 10)->count());
+    }
+
+    public function test_repair_links_existing_types_to_the_correct_subsection_preserving_custom_names_and_inactive_state(): void
+    {
+        $tipo = TipoDocumento::query()->where('codigo', 'S10_DESCANSO_MEDICO')->firstOrFail();
+        $tipo->update(['subseccion_legajo_id' => null, 'nombre' => 'Constancia personalizada', 'activo' => false]);
+        DocumentoUsuario::factory()->create(['usuario_id' => $this->persona->id, 'legajo_id' => $this->legajo->id,
+            'tipo_documento_id' => $tipo->id, 'seccion_legajo_id' => 10, 'estado' => 'cargado', 'archivo_id' => null,
+            'folio_inicio' => 1, 'folio_fin' => 4, 'created_by' => $this->autor->id]);
+        $migration = require database_path('migrations/2026_10_06_195640_repair_seccion10_catalogue.php');
+        $migration->up();
+        $subseccion = SubseccionLegajo::query()->where('seccion_legajo_id', 10)->where('codigo', '10.2')->firstOrFail();
+        $this->assertDatabaseHas('tipos_documento', ['id' => $tipo->id, 'nombre' => 'Constancia personalizada', 'activo' => false, 'subseccion_legajo_id' => $subseccion->id]);
+        $this->getJson($this->url('?subseccion=10.2'))->assertOk()->assertJsonPath('data.folios.bienestar', 4)->assertJsonPath('data.folios.total', 4);
+    }
+
     public function test_subsection_queries_separate_sst_and_welfare_and_keep_section_totals(): void
     {
         $this->cargar('S10_CAPACITACIONES', ['numero_folios' => 3])->assertCreated();
