@@ -38,7 +38,7 @@ class Seccion10Controller extends Controller
             ->when($subseccion, fn ($items) => $items->where('subseccion', $subseccion))->values();
         $folios = ResumenSeccion10::folios($docs);
         $anteriores = $docs->reject(fn (array $doc): bool => isset(ResumenSeccion10::TIPOS[$doc['codigo_tipo']]))
-            ->when($subseccion, fn ($docs) => $docs->filter(fn (array $doc): bool => ! $doc['subseccion'] || $doc['subseccion'] === $subseccion))->values();
+            ->when($subseccion, fn ($docs) => $docs->filter(fn (array $doc): bool => ! in_array($doc['subseccion'], ['10.1', '10.2'], true) || $doc['subseccion'] === $subseccion))->values();
         $vinculos = $persona->vinculosLaborales->where('anulado', false);
         $actual = $vinculos->filter(fn ($v): bool => $v->fecha_inicio->format('Y-m-d') <= $hoy
             && (! $v->fecha_cese || $v->fecha_cese->format('Y-m-d') >= $hoy))->sortByDesc('fecha_inicio')->first();
