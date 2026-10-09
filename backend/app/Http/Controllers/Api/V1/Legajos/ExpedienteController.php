@@ -56,6 +56,7 @@ use App\Models\Usuario;
 use App\Models\UsuarioRol;
 use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
+use App\Support\AccesoLegajo;
 use App\Support\PerfilDocumental;
 use App\Support\Seccion05;
 use Illuminate\Database\Eloquent\Builder;
@@ -229,12 +230,13 @@ class ExpedienteController extends Controller
             'nombre' => trim($person->nombres.' '.$person->apellido_paterno.' '.$person->apellido_materno),
             // La subsección 2.4 (período de prueba) solo se muestra si la persona lo tiene.
             'tiene_periodo_prueba' => PerfilDocumental::de($person, $person->vinculosLaborales()->get())->tienePeriodoPrueba(),
-            'document_sections' => SeccionLegajo::query()->orderBy('orden')->get(['id', 'nombre']),
+            'acceso_secciones' => AccesoLegajo::secciones(),
+            'document_sections' => SeccionLegajo::query()->where('activa', true)->orderBy('orden')->get(['id', 'nombre']),
             'document_states' => DocumentoUsuario::query()->where('usuario_id', $usuario)->whereHas('legajo', fn (Builder $query): Builder => $query->where('usuario_id', $usuario))
                 ->when(! $veSensibles, fn (Builder $query): Builder => $query->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES))
                 ->distinct()->orderBy('estado')->pluck('estado'),
             'legajos' => $person->legajos()->orderByDesc('fecha_apertura')->get()->map(fn (Model $row): array => $this->present($row)),
-            'sections' => collect(self::SECTIONS)->map(fn (array $section, string $key): array => [
+            'sections' => collect(self::SECTIONS)->reject(fn (array $section, string $key): bool => $key === 'controversias')->map(fn (array $section, string $key): array => [
                 'key' => $key, 'label' => $section['label'], 'group' => $section['group'],
                 'scope' => in_array($section['scope'], ['persona', 'vinculo'], true) ? 'persona' : ($section['scope'] === 'catalogo' ? 'catalogo' : 'legajo'),
             ])->values(),

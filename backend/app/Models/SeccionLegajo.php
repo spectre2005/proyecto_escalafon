@@ -24,6 +24,8 @@ class SeccionLegajo extends Model
         'descripcion',
         'es_nucleo_comun',
         'orden',
+        'activa',
+        'disponibilidad',
     ];
 
     /** @return array<string, string> */
@@ -33,6 +35,7 @@ class SeccionLegajo extends Model
             'id' => 'integer',
             'es_nucleo_comun' => 'boolean',
             'orden' => 'integer',
+            'activa' => 'boolean',
         ];
     }
 

@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Models\Afiliacion;
 use App\Models\ArchivoDocumento;
 use App\Models\Controversia;
-use App\Models\Desvinculacion;
 use App\Models\Desplazamiento;
+use App\Models\Desvinculacion;
 use App\Models\DocumentoUsuario;
 use App\Models\EvaluacionDesempeno;
 use App\Models\Familiar;
@@ -78,7 +78,7 @@ class ResourceApiTest extends TestCase
         $resources = [];
         foreach (glob(__DIR__.'/../../app/Models/*.php') as $path) {
             $name = pathinfo($path, PATHINFO_FILENAME);
-            if (! ctype_alnum($name) || in_array($name, ['Usuario', 'User', ...array_keys(self::anulables())], true)
+            if (! ctype_alnum($name) || in_array($name, ['Usuario', 'User', 'Incorporacion', ...array_keys(self::anulables())], true)
                 || in_array('App\\Models\\'.$name, self::SIN_CRUD_GENERICO, true)) {
                 continue;
             }
@@ -121,6 +121,9 @@ class ResourceApiTest extends TestCase
     {
         $autor = $this->actuarComo();
         $model = $class::factory()->make();
+        if ($model instanceof Afiliacion) {
+            $model->tipo = 'sindicato';
+        }
         $payload = array_diff_key($model->getAttributes(), array_flip(['id', 'registrado_por', 'anulado', 'motivo_anulacion']));
         $uri = '/api/v1/'.str_replace('_', '-', $model->getTable());
 
@@ -149,6 +152,9 @@ class ResourceApiTest extends TestCase
     public function test_resource_can_be_created_read_updated_and_deleted(string $class): void
     {
         $model = $class::factory()->make();
+        if ($model instanceof Afiliacion) {
+            $model->tipo = 'sindicato';
+        }
         $payload = $model->getAttributes();
         if ($model instanceof Familiar) {
             $this->actuarComo(Usuario::findOrFail($payload['registrado_por']));
@@ -164,6 +170,13 @@ class ResourceApiTest extends TestCase
         }
         $id = $soloLectura ? $model->getKey() : $this->postJson($uri, $payload)->assertCreated()->json('data.id');
         $this->assertDatabaseHas($model->getTable(), ['id' => $id]);
+        if ($model instanceof Controversia) {
+            $this->getJson($uri.'/'.$id)->assertForbidden();
+            $this->getJson($uri)->assertForbidden();
+            $this->assertDatabaseHas($model->getTable(), ['id' => $id]);
+
+            return;
+        }
         $this->getJson($uri.'/'.$id)->assertOk()->assertJsonPath('data.id', $id);
         $this->getJson($uri)->assertOk()->assertJsonStructure(['data', 'links', 'meta']);
         unset($payload['id']);

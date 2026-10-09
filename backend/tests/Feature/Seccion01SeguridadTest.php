@@ -9,6 +9,7 @@ use App\Models\DocumentoUsuario;
 use App\Models\Familiar;
 use App\Models\Legajo;
 use App\Models\SeccionLegajo;
+use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -122,7 +123,7 @@ class Seccion01SeguridadTest extends TestCase
             SeccionLegajo::query()->find($id) ?? SeccionLegajo::factory()->create(['id' => $id, 'nombre' => $nombre]);
         }
         foreach ([1 => 'observado', 9 => 'verificado', 10 => 'falso', 3 => 'cargado'] as $seccion => $estado) {
-            DocumentoUsuario::factory()->create(['usuario_id' => $persona->id, 'legajo_id' => $legajo->id, 'seccion_legajo_id' => $seccion, 'estado' => $estado]);
+            DocumentoUsuario::factory()->create(['usuario_id' => $persona->id, 'legajo_id' => $legajo->id, 'seccion_legajo_id' => $seccion, 'estado' => $estado, ...($seccion === 9 ? ['tipo_documento_id' => TipoDocumento::factory()->create(['seccion_legajo_id' => 9, 'codigo' => 'S09_C_AFILIACION_SINDICATO'])->id] : [])]);
         }
         $conteo = fn (): ?int => collect($this->getJson('/api/v1/expedientes?q=Contada')->assertOk()->json('data'))
             ->firstWhere('id', $persona->id)['documentos_usuario_por_usuario_count'] ?? null;

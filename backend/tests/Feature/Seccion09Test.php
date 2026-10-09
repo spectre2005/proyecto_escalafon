@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Afiliacion;
 use App\Models\Controversia;
-use App\Models\DocumentoUsuario;
 use App\Models\Legajo;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
@@ -96,22 +95,11 @@ class Seccion09Test extends TestCase
     public function test_registers_lists_and_corrects_controversies_and_union_membership(): void
     {
         $admin = $this->actuarComo();
-        $individual = $this->postJson($this->url('/controversias'), $this->controversia())->assertCreated()
-            ->assertJsonPath('data.values.estado', 'en_tramite')->json('data.id');
-        $this->postJson($this->url('/controversias'), $this->controversia(['tipo' => 'colectiva', 'instancia' => 'tribunal_servicio_civil']))->assertCreated();
+        $this->postJson($this->url('/controversias'), $this->controversia())->assertForbidden();
+        $this->postJson($this->url('/controversias'), $this->controversia(['tipo' => 'colectiva']))->assertForbidden();
         $afiliacion = $this->postJson($this->url('/afiliaciones'), $this->afiliacion())->assertCreated()->json('data.id');
-
-        $this->assertDatabaseHas('controversias', ['id' => $individual, 'registrado_por' => $admin->id, 'usuario_id' => $this->persona->id]);
-        $this->assertDatabaseHas('afiliaciones', ['id' => $afiliacion, 'tipo' => 'sindicato', 'registrado_por' => $admin->id]);
-
-        $this->patchJson($this->url('/controversias/'.$individual), ['estado' => 'resuelta', 'fecha_resolucion' => '2025-08-01', 'resultado' => 'Fundado'])->assertOk()
-            ->assertJsonPath('data.values.estado', 'resuelta');
         $this->patchJson($this->url('/afiliaciones/'.$afiliacion), ['fecha_fin' => '2025-12-31'])->assertOk()->assertJsonPath('data.values.fecha_fin', '2025-12-31');
-
-        $this->getJson($this->url())->assertOk()
-            ->assertJsonCount(2, 'data.controversias')
-            ->assertJsonCount(1, 'data.afiliaciones')
-            ->assertJsonCount(4, 'data.tipos')
+        $this->getJson($this->url())->assertOk()->assertJsonCount(0, 'data.controversias')->assertJsonCount(1, 'data.afiliaciones')->assertJsonCount(1, 'data.tipos')
             ->assertJsonPath('data.afiliaciones.0.values.registrado_por', trim($admin->nombres.' '.$admin->apellido_paterno.' '.$admin->apellido_materno));
     }
 
@@ -132,45 +120,16 @@ class Seccion09Test extends TestCase
     public function test_upload_links_each_type_only_to_its_matching_record(): void
     {
         $this->actuarComo();
-
-        // a) individual: crea la controversia enlazada; no acepta una colectiva.
-        $doc = $this->subirTipo('S09_A_CONTROVERSIAS_INDIVIDUALES')->assertCreated()->assertJsonPath('data.formulario_datos', 'controversias')->json('data');
-        $this->postJson($this->url('/controversias'), $this->controversia(['tipo' => 'colectiva', 'documento_id' => $doc['id']]))->assertUnprocessable()->assertJsonValidationErrors('documento_id');
-        $id = $this->postJson($this->url('/controversias'), $this->controversia(['documento_id' => $doc['id']]))->assertCreated()->json('data.id');
-        $this->assertSame($doc['id'], Controversia::query()->find($id)->documento_id);
-        // Un documento acredita un solo registro.
-        $this->postJson($this->url('/controversias'), $this->controversia(['documento_id' => $doc['id']]))->assertUnprocessable()->assertJsonValidationErrors('documento_id');
-        // Con documento a) enlazado, la controversia no puede pasar a colectiva.
-        $this->patchJson($this->url('/controversias/'.$id), ['tipo' => 'colectiva'])->assertUnprocessable()->assertJsonValidationErrors('tipo');
-
-        // b) colectiva: al subir se enlaza a una existente; una individual se rechaza.
-        $colectiva = Controversia::factory()->create(['usuario_id' => $this->persona->id, 'tipo' => 'colectiva', 'instancia' => 'poder_judicial', 'documento_id' => null]);
-        $individual = Controversia::factory()->create(['usuario_id' => $this->persona->id, 'tipo' => 'individual', 'instancia' => 'entidad', 'documento_id' => null]);
-        $this->subirTipo('S09_B_CONTROVERSIAS_COLECTIVAS', ['enlace_id' => $individual->id])->assertUnprocessable()->assertJsonValidationErrors('enlace_id');
-        $doc = $this->subirTipo('S09_B_CONTROVERSIAS_COLECTIVAS', ['enlace_id' => $colectiva->id])->assertCreated()->assertJsonPath('data.enlazado', true)->json('data');
-        $this->assertSame($doc['id'], $colectiva->refresh()->documento_id);
-        $this->assertNull($individual->refresh()->documento_id);
-
-        // c) afiliación: solo a sindicato; ni controversias ni afiliaciones de otro tipo.
+        foreach (['S09_A_CONTROVERSIAS_INDIVIDUALES', 'S09_B_CONTROVERSIAS_COLECTIVAS', 'S09_OTROS_UNIVERSIDAD'] as $codigo) {
+            $this->subirTipo($codigo)->assertForbidden();
+        }
         $eps = Afiliacion::factory()->create(['usuario_id' => $this->persona->id, 'tipo' => 'eps', 'documento_id' => null]);
         $this->subirTipo('S09_C_AFILIACION_SINDICATO', ['enlace_id' => $eps->id])->assertUnprocessable()->assertJsonValidationErrors('enlace_id');
-        $this->subirTipo('S09_C_AFILIACION_SINDICATO', ['enlace_id' => $individual->id])->assertUnprocessable()->assertJsonValidationErrors('enlace_id');
         $doc = $this->subirTipo('S09_C_AFILIACION_SINDICATO')->assertCreated()->assertJsonPath('data.formulario_datos', 'afiliaciones')->json('data');
-        $this->postJson($this->url('/controversias'), $this->controversia(['documento_id' => $doc['id']]))->assertUnprocessable()->assertJsonValidationErrors('documento_id');
         $id = $this->postJson($this->url('/afiliaciones'), $this->afiliacion(['documento_id' => $doc['id']]))->assertCreated()->json('data.id');
         $this->assertSame([$doc['id'], 'sindicato'], array_values(Afiliacion::query()->find($id)->only(['documento_id', 'tipo'])));
-
-        // Otros: solo metadatos, sin formulario ni enlace.
-        $doc = $this->subirTipo('S09_OTROS_UNIVERSIDAD')->assertCreated()->assertJsonPath('data.formulario_datos', null)->json('data');
-        $this->subirTipo('S09_OTROS_UNIVERSIDAD', ['enlace_id' => $individual->id])->assertUnprocessable()->assertJsonValidationErrors('enlace_id');
-        $this->postJson($this->url('/afiliaciones'), $this->afiliacion(['documento_id' => $doc['id']]))->assertUnprocessable()->assertJsonValidationErrors('documento_id');
-
-        // Relación trabajador → legajo → sección 09 → tipo; folios correlativos de la sección.
-        $documentos = DocumentoUsuario::query()->where('usuario_id', $this->persona->id)->get();
-        $this->assertCount(4, $documentos);
-        $this->assertTrue($documentos->every(fn (DocumentoUsuario $d): bool => $d->seccion_legajo_id === 9 && $d->legajo_id === Legajo::query()->value('id') && $d->estado === 'cargado'));
-        $this->assertSame([1, 2, 3, 4], $documentos->pluck('folio_inicio')->sort()->values()->all());
-        $this->getJson($this->url())->assertOk()->assertJsonPath('data.tipos.0.documentos', 1)->assertJsonPath('data.tipos.1.documentos', 1);
+        $this->postJson($this->url('/afiliaciones'), $this->afiliacion(['documento_id' => $doc['id']]))->assertUnprocessable();
+        $this->getJson($this->url())->assertOk()->assertJsonPath('data.tipos.0.documentos', 1);
     }
 
     public function test_documents_can_be_received_and_viewed_with_access_log(): void
@@ -182,7 +141,7 @@ class Seccion09Test extends TestCase
         $this->postJson($base.'/recepcionar')->assertOk()->assertJsonPath('data.estado_visible', 'recepcionado');
         $this->get($base.'/archivo')->assertOk()->assertHeader('Content-Type', 'application/pdf');
         $this->assertDatabaseHas('bitacora_accesos_legajo', ['documento_id' => $doc['id'], 'accion' => 'ver']);
-        $this->getJson($this->url())->assertOk()->assertJsonPath('data.tipos.2.estado', 'recepcionado');
+        $this->getJson($this->url())->assertOk()->assertJsonPath('data.tipos.0.estado', 'recepcionado');
     }
 
     public function test_sensitive_access_is_required_for_every_action(): void
@@ -208,8 +167,8 @@ class Seccion09Test extends TestCase
 
         // Registra y corrige, pero anular es solo de administración.
         $this->actuarConPermisos(['legajo.ver', 'legajo.editar'], true);
-        $this->postJson($this->url('/controversias'), $this->controversia())->assertCreated();
-        $this->patchJson($this->url('/controversias/'.$controversia->id), ['materia' => 'Materia corregida'])->assertOk();
+        $this->postJson($this->url('/controversias'), $this->controversia())->assertForbidden();
+        $this->patchJson($this->url('/controversias/'.$controversia->id), ['materia' => 'Materia corregida'])->assertForbidden();
         $this->postJson($this->url('/controversias/'.$controversia->id.'/anular'), ['motivo_anulacion' => 'Sin permiso'])->assertForbidden();
         $this->assertFalse($controversia->refresh()->anulado);
 
@@ -234,38 +193,30 @@ class Seccion09Test extends TestCase
 
         // Un registro de otra persona no se anula por la ruta de esta.
         $otra = Controversia::factory()->create(['tipo' => 'individual', 'instancia' => 'entidad']);
-        $this->postJson($this->url('/controversias/'.$otra->id.'/anular'), ['motivo_anulacion' => 'Intento ajeno'])->assertNotFound();
+        $this->postJson($this->url('/controversias/'.$otra->id.'/anular'), ['motivo_anulacion' => 'Intento ajeno'])->assertForbidden();
     }
 
     public function test_validates_schema_fields_dates_and_rejects_author_or_annulment_fields(): void
     {
         $this->actuarComo();
-        $this->postJson($this->url('/controversias'), $this->controversia(['tipo' => 'grupal']))->assertUnprocessable()->assertJsonValidationErrors('tipo');
-        $this->postJson($this->url('/controversias'), $this->controversia(['instancia' => 'fiscalia']))->assertUnprocessable()->assertJsonValidationErrors('instancia');
-        $this->postJson($this->url('/controversias'), $this->controversia(['estado' => 'apelada']))->assertUnprocessable()->assertJsonValidationErrors('estado');
-        $this->postJson($this->url('/controversias'), $this->controversia(['materia' => null]))->assertUnprocessable()->assertJsonValidationErrors('materia');
-        $this->postJson($this->url('/controversias'), $this->controversia(['fecha_resolucion' => '2025-01-01']))->assertUnprocessable()->assertJsonValidationErrors('fecha_resolucion');
-        $this->postJson($this->url('/controversias'), $this->controversia(['registrado_por' => $this->persona->id]))->assertUnprocessable()->assertJsonValidationErrors('registrado_por');
-        $this->postJson($this->url('/controversias'), $this->controversia(['anulado' => true]))->assertUnprocessable()->assertJsonValidationErrors('anulado');
         $this->postJson($this->url('/afiliaciones'), $this->afiliacion(['entidad' => '']))->assertUnprocessable()->assertJsonValidationErrors('entidad');
         $this->postJson($this->url('/afiliaciones'), $this->afiliacion(['fecha_fin' => '2023-12-31']))->assertUnprocessable()->assertJsonValidationErrors('fecha_fin');
-
-        $id = $this->postJson($this->url('/controversias'), $this->controversia())->assertCreated()->json('data.id');
-        $this->patchJson($this->url('/controversias/'.$id), ['fecha_resolucion' => '2025-02-01'])->assertUnprocessable()->assertJsonValidationErrors('fecha_resolucion');
-
-        // Sin legajo abierto no se registra.
+        $this->postJson($this->url('/afiliaciones'), $this->afiliacion(['registrado_por' => $this->persona->id]))->assertUnprocessable()->assertJsonValidationErrors('registrado_por');
+        $this->postJson($this->url('/afiliaciones'), $this->afiliacion(['anulado' => true]))->assertUnprocessable()->assertJsonValidationErrors('anulado');
+        $id = $this->postJson($this->url('/afiliaciones'), $this->afiliacion())->assertCreated()->json('data.id');
+        $this->patchJson($this->url('/afiliaciones/'.$id), ['fecha_fin' => '2023-12-31'])->assertUnprocessable();
         $sinLegajo = Usuario::factory()->create();
-        $this->postJson($this->url('/controversias', $sinLegajo), $this->controversia())->assertConflict();
+        $this->postJson($this->url('/afiliaciones', $sinLegajo), $this->afiliacion())->assertConflict();
         $this->getJson($this->url('', $sinLegajo))->assertOk()->assertJsonPath('data.legajo', null);
     }
 
     public function test_generic_crud_is_read_only_and_never_deletes(): void
     {
         $this->actuarComo();
-        foreach (['controversias' => Controversia::factory()->create(), 'afiliaciones' => Afiliacion::factory()->create()] as $recurso => $registro) {
+        foreach (['controversias' => Controversia::factory()->create(), 'afiliaciones' => Afiliacion::factory()->create(['tipo' => 'sindicato'])] as $recurso => $registro) {
             $antes = $registro->refresh()->getAttributes();
-            $this->getJson('/api/v1/'.$recurso)->assertOk();
-            $this->getJson('/api/v1/'.$recurso.'/'.$registro->id)->assertOk();
+            $this->getJson('/api/v1/'.$recurso)->assertStatus($recurso === 'controversias' ? 403 : 200);
+            $this->getJson('/api/v1/'.$recurso.'/'.$registro->id)->assertStatus($recurso === 'controversias' ? 403 : 200);
             $this->postJson('/api/v1/'.$recurso, [])->assertStatus(405);
             $this->patchJson('/api/v1/'.$recurso.'/'.$registro->id, ['anulado' => true, 'registrado_por' => $this->persona->id])->assertStatus(405);
             $this->putJson('/api/v1/'.$recurso.'/'.$registro->id, [])->assertStatus(405);

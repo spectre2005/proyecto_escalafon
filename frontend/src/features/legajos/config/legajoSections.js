@@ -12,10 +12,12 @@ export const legajoSections = [
   { number: '07', title: 'Evaluación de desempeño, progresión en la carrera y desplazamiento', categories: ['s07-desempeno', 's07-progresion', 's07-desplazamiento'], sinDocumentos: true },
   { number: '08', title: 'Reconocimientos y sanciones disciplinarias', categories: ['reconocimientos', 'sanciones'] },
   // Anexo 01: controversias individuales (a), colectivas (b), afiliación al sindicato (c) y otros; cada entrada muestra sus registros y sus documentos.
-  { number: '09', title: 'Relaciones laborales individuales y colectivas', categories: ['s09-individuales', 's09-colectivas', 's09-afiliacion', 's09-otros'], sinDocumentos: true },
+  { number: '09', title: 'Relaciones laborales individuales y colectivas', categories: ['s09-afiliacion'], sinDocumentos: true },
   { number: '10', title: 'Seguridad y Salud en el Trabajo (SST) y bienestar social', categories: ['s10-sst', 's10-bienestar'], sinDocumentos: true },
   // Anexo 01, literales a) a g) y aceptación de renuncia (Anexo 05): la desvinculación de cada vínculo y sus documentos.
   { number: '11', title: 'Desvinculación', categories: ['s11-desvinculacion', 's11-documentos'], sinDocumentos: true },
+  { number: '12', title: 'Otros documentos', categories: [] },
+  { number: '13', title: 'Legajo pasivo', categories: ['referencias-legajo-pasivo'] },
 ]
 
 export const subseccionesSeccion10 = {

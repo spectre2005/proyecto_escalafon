@@ -23,6 +23,8 @@ class AuthenticationTest extends TestCase
     {
         parent::setUp();
         config([
+            'cache.default' => 'array',
+            'session.driver' => 'array',
             'auth.administrador_inicial' => ['email' => self::EMAIL, 'password' => self::CLAVE],
             'sanctum.stateful' => ['localhost:5173'],
         ]);
@@ -49,7 +51,7 @@ class AuthenticationTest extends TestCase
         $admin->update(['password' => 'changed-password']);
         $this->seed(AdministradorSeeder::class);
         $this->assertDatabaseCount('usuarios', 1);
-        $this->assertDatabaseCount('roles', 1);
+        $this->assertSame(1, Rol::where('codigo', 'ADMIN')->count());
         $this->assertDatabaseCount('usuario_roles', 1);
         $this->assertTrue(Hash::check('changed-password', $admin->fresh()->password));
     }

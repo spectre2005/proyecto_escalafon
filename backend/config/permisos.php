@@ -15,6 +15,7 @@ return [
 
     // Catálogo cerrado: un permiso que no esté aquí no existe.
     'catalogo' => [
+        'legajo.propio' => 'Consultar únicamente el legajo propio.',
         'personal.ver' => 'Ver la lista del personal.',
         'usuarios.gestionar' => 'Crear, editar y desactivar personal y cuentas.',
         'legajo.ver' => 'Ver el legajo de una persona.',
@@ -47,6 +48,7 @@ return [
     // los derivados y los pendientes.
     'roles' => [
         'ADMIN' => '*',
+        'personal' => ['legajo.propio'],
 
         // Pendiente de confirmar con el cliente: el rol no existe en la base
         // ni en los seeders. Basado en la tabla "Límites del asistente".
