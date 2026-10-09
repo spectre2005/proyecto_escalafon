@@ -181,7 +181,7 @@ class AuthenticationTest extends TestCase
     {
         $asistente = $this->actuarComo(Usuario::factory()->create(), 'asistente_legajo');
         $this->assertSame(
-            ['personal.ver', 'legajo.ver', 'legajo.editar', 'documento.subir', 'documento.recepcionar', 'seccion07.ver'],
+            ['personal.ver', 'legajo.ver', 'legajo.editar', 'documento.subir', 'documento.recepcionar', 'seccion07.ver', 'vencimientos.ver', 'renovaciones.gestionar'],
             $asistente->permisos(),
         );
         $this->getJson('/api/v1/expedientes')->assertOk();
@@ -189,6 +189,8 @@ class AuthenticationTest extends TestCase
         $this->postJson('/api/v1/usuarios', ['usuarios' => []])->assertForbidden();
         $this->deleteJson('/api/v1/usuarios/'.$asistente->id)->assertForbidden();
         $this->getJson('/api/v1/evaluaciones-desempeno')->assertForbidden();
+        $this->getJson('/api/v1/vencimientos')->assertOk();
+        $this->postJson('/api/v1/vencimientos/politicas', [])->assertForbidden();
         $this->assertDatabaseHas('usuarios', ['id' => $asistente->id]);
     }
 

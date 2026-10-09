@@ -75,9 +75,11 @@ use App\Http\Controllers\Api\V1\UbigeoController;
 use App\Http\Controllers\Api\V1\UnidadOrganicaController;
 use App\Http\Controllers\Api\V1\UsuarioController;
 use App\Http\Controllers\Api\V1\UsuarioRolController;
+use App\Http\Controllers\Api\V1\VencimientoLegajoController;
 use App\Http\Controllers\Api\V1\VinculoAdendaController;
 use App\Http\Controllers\Api\V1\VinculoLaboralController;
 use App\Http\Middleware\AccesoSecciones;
+use App\Http\Middleware\ExigirVigenciaLegajo;
 use App\Http\Middleware\LocalDevelopmentOnly;
 use Illuminate\Support\Facades\Route;
 
@@ -87,7 +89,24 @@ Route::prefix('v1/auth')->middleware(LocalDevelopmentOnly::class)->group(functio
     Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 });
 
-Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', AccesoSecciones::class])->group(function (): void {
+Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', AccesoSecciones::class, ExigirVigenciaLegajo::class])->group(function (): void {
+    Route::prefix('vencimientos')->controller(VencimientoLegajoController::class)->group(function (): void {
+        Route::get('/', 'index');
+        Route::get('/opciones', 'opciones');
+        Route::post('/politicas', 'politica');
+        Route::post('/procesar', 'procesar');
+        Route::get('/legajos/{legajo}', 'show')->whereUuid('legajo');
+        Route::post('/legajos/{legajo}/inicializar', 'inicializar')->whereUuid('legajo');
+        Route::get('/legajos/{legajo}/constancia', 'constancia')->whereUuid('legajo');
+        Route::post('/ciclos/{ciclo}/preparar', 'preparar')->whereUuid('ciclo');
+        Route::post('/ciclos/{ciclo}/presentar', 'presentar')->whereUuid('ciclo');
+        Route::post('/ciclos/{ciclo}/revisar', 'revisar')->whereUuid('ciclo');
+        Route::post('/ciclos/{ciclo}/notificar', 'notificar')->whereUuid('ciclo');
+        Route::post('/ciclos/{ciclo}/requisitos/{requisito}/pdf', 'subir')->whereUuid(['ciclo', 'requisito']);
+        Route::post('/ciclos/{ciclo}/requisitos/{requisito}/vincular', 'vincular')->whereUuid(['ciclo', 'requisito']);
+        Route::post('/ciclos/{ciclo}/requisitos/{requisito}/fiscalizar', 'fiscalizar')->whereUuid(['ciclo', 'requisito']);
+        Route::get('/ciclos/{ciclo}/presentaciones/{presentacion}', 'archivo')->whereUuid(['ciclo', 'presentacion']);
+    });
     Route::get('acceso-secciones', [AccesoSeccionesController::class, 'show']);
     Route::put('acceso-secciones', [AccesoSeccionesController::class, 'update'])->middleware('can:sistema.administrar');
     Route::prefix('incorporaciones')->middleware('can:legajo.editar')->controller(IncorporacionController::class)->group(function (): void {

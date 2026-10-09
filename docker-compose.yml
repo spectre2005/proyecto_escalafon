@@ -24,6 +24,22 @@ services:
     depends_on:
       - app
 
+  scheduler:
+    build: ./docker/php
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+    environment:
+      CACHE_STORE: file
+    volumes:
+      - ./backend:/var/www/html
+      - vendor:/var/www/html/vendor
+    command: php artisan schedule:work
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      app:
+        condition: service_started
+
   frontend:
     build: ./docker/node
     user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"

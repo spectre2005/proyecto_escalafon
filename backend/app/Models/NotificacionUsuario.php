@@ -29,6 +29,7 @@ class NotificacionUsuario extends Model
         'requerimiento_id',
         'leida',
         'fecha_lectura',
+        'aviso_vencimiento_id',
     ];
 
     /** @return array<string, string> */

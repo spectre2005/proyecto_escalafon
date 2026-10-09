@@ -9,6 +9,7 @@ export const navigation = [
   { label: 'Reportes', icon: 'chart', group: 'Principal' },
   // Requerimientos lee hoy del CRUD genérico (sistema.administrar).
   { label: 'Requerimientos', to: '/requerimientos', icon: 'clock', group: 'Principal', permiso: 'sistema.administrar' },
+  { label: 'Vencimientos', to: '/vencimientos', icon: 'clock', group: 'Principal', permisos: ['vencimientos.ver', 'renovacion.propia'] },
   { label: 'Fiscalización', icon: 'search', group: 'Administración', permiso: 'sistema.administrar' },
   { label: 'Acceso y autorización', to: '/accesos', icon: 'shield', group: 'Administración', permiso: 'sistema.administrar' },
   { label: 'Configuración', to: '/configuracion', icon: 'settings', group: 'Administración', permiso: 'sistema.administrar' },

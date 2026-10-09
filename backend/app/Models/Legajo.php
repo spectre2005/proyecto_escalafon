@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Legajo extends Model
 {
@@ -44,6 +45,11 @@ class Legajo extends Model
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'usuario_id', 'id');
+    }
+
+    public function cicloActual(): HasOne
+    {
+        return $this->hasOne(CicloVigencia::class, 'legajo_id')->where('actual', true);
     }
 
     public function legajoSecciones(): HasMany

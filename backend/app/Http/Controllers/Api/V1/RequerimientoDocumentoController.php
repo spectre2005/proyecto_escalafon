@@ -4,12 +4,28 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Models\RequerimientoDocumento;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class RequerimientoDocumentoController extends ResourceController
 {
     protected string $model = RequerimientoDocumento::class;
+
+    public function update(Request $request, string $record): JsonResource|JsonResponse
+    {
+        abort_if(RequerimientoDocumento::query()->findOrFail($record)->ciclo_id !== null, 409, 'Este requerimiento se gestiona desde el módulo de vencimientos.');
+
+        return parent::update($request, $record);
+    }
+
+    public function destroy(string $record): JsonResponse
+    {
+        abort_if(RequerimientoDocumento::query()->findOrFail($record)->ciclo_id !== null, 409, 'Los requisitos de renovación se conservan con el historial del ciclo.');
+
+        return parent::destroy($record);
+    }
 
     public function index(): AnonymousResourceCollection
     {

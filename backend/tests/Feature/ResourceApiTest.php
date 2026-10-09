@@ -4,10 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\Afiliacion;
 use App\Models\ArchivoDocumento;
+use App\Models\AvisoVencimiento;
+use App\Models\CicloVigencia;
 use App\Models\Controversia;
 use App\Models\Desplazamiento;
 use App\Models\Desvinculacion;
 use App\Models\DocumentoUsuario;
+use App\Models\EnvioVencimiento;
 use App\Models\EvaluacionDesempeno;
 use App\Models\Familiar;
 use App\Models\GoceVacacional;
@@ -19,11 +22,13 @@ use App\Models\PerfilAdministrativo;
 use App\Models\PerfilDocente;
 use App\Models\PeriodoPrueba;
 use App\Models\PeriodoVacacional;
+use App\Models\PresentacionRenovacion;
 use App\Models\ProgresionCarrera;
 use App\Models\RatificacionDocente;
 use App\Models\Reconocimiento;
 use App\Models\RecursoImpugnatorio;
 use App\Models\RegistroSstBienestar;
+use App\Models\RenovacionLegajo;
 use App\Models\Rol;
 use App\Models\Sancion;
 use App\Models\Usuario;
@@ -65,7 +70,14 @@ class ResourceApiTest extends TestCase
      * test_models_without_generic_crud_have_no_endpoint verifica que no exista ningún endpoint genérico.
      * Siguen cubiertos por ModelPersistenceTest.
      */
-    private const SIN_CRUD_GENERICO = [RecursoImpugnatorio::class];
+    private const SIN_CRUD_GENERICO = [
+        RecursoImpugnatorio::class,
+        CicloVigencia::class,
+        RenovacionLegajo::class,
+        PresentacionRenovacion::class,
+        AvisoVencimiento::class,
+        EnvioVencimiento::class,
+    ];
 
     /** Sección 10: igual, se registran desde Legajos\Seccion10Controller (el CRUD genérico exige además datos_sensibles.ver). */
     private const SECCION_10 = [RegistroSstBienestar::class];

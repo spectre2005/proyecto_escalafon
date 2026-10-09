@@ -16,6 +16,13 @@ return [
     // Catálogo cerrado: un permiso que no esté aquí no existe.
     'catalogo' => [
         'legajo.propio' => 'Consultar únicamente el legajo propio.',
+        'vencimientos.ver' => 'Consultar el control de vencimiento del legajo docente.',
+        'vencimientos.gestionar' => 'Configurar políticas, requisitos y fechas acreditadas de vigencia.',
+        'vencimientos.notificar' => 'Solicitar y reintentar avisos de vencimiento.',
+        'renovaciones.gestionar' => 'Presentar y vincular documentos de renovación del personal.',
+        'renovaciones.aprobar' => 'Observar o aprobar una renovación completa.',
+        'documento.fiscalizar' => 'Registrar fiscalización conforme respaldada por un informe documental.',
+        'renovacion.propia' => 'Presentar documentación para renovar el legajo propio.',
         'personal.ver' => 'Ver la lista del personal.',
         'usuarios.gestionar' => 'Crear, editar y desactivar personal y cuentas.',
         'legajo.ver' => 'Ver el legajo de una persona.',
@@ -48,7 +55,7 @@ return [
     // los derivados y los pendientes.
     'roles' => [
         'ADMIN' => '*',
-        'personal' => ['legajo.propio'],
+        'personal' => ['legajo.propio', 'renovacion.propia'],
 
         // Pendiente de confirmar con el cliente: el rol no existe en la base
         // ni en los seeders. Basado en la tabla "Límites del asistente".
@@ -59,6 +66,8 @@ return [
             'documento.subir',
             'documento.recepcionar',
             'seccion07.ver',
+            'vencimientos.ver',
+            'renovaciones.gestionar',
         ],
     ],
 
