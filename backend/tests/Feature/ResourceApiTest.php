@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Afiliacion;
 use App\Models\ArchivoDocumento;
+use App\Models\ConfiguracionFuncionalidad;
 use App\Models\Controversia;
 use App\Models\Desvinculacion;
 use App\Models\Desplazamiento;
@@ -61,11 +62,12 @@ class ResourceApiTest extends TestCase
     /**
      * Modelos que deliberadamente NO tienen CRUD genérico (ni lectura): solo existen dentro de su sección.
      * RecursoImpugnatorio (sección 08): se registra únicamente desde Legajos\Seccion08Controller al subir la resolución
-     * del recurso. No participan de test_resource_can_be_created_read_updated_and_deleted; en su lugar,
-     * test_models_without_generic_crud_have_no_endpoint verifica que no exista ningún endpoint genérico.
+     * del recurso. ConfiguracionFuncionalidad: solo cambia por App\Support\ConfiguracionFuncionalidades, que exige
+     * motivo, comprueba las restricciones y audita. No participan de test_resource_can_be_created_read_updated_and_deleted;
+     * en su lugar, test_models_without_generic_crud_have_no_endpoint verifica que no exista ningún endpoint genérico.
      * Siguen cubiertos por ModelPersistenceTest.
      */
-    private const SIN_CRUD_GENERICO = [RecursoImpugnatorio::class];
+    private const SIN_CRUD_GENERICO = [RecursoImpugnatorio::class, ConfiguracionFuncionalidad::class];
 
     /** Sección 10: igual, se registran desde Legajos\Seccion10Controller (el CRUD genérico exige además datos_sensibles.ver). */
     private const SECCION_10 = [RegistroSstBienestar::class];
