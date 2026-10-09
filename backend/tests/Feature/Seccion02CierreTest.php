@@ -170,17 +170,19 @@ class Seccion02CierreTest extends TestCase
         $this->getJson($url)->assertJsonPath('data.subsecciones.1.tipos.0.lista.0.values.vinculo_laboral_id', $vinculo->id);
     }
 
-    public function test_open_legajo_creates_thirteen_sections_and_only_one_active(): void
+    public function test_open_legajo_creates_twelve_normative_sections_and_only_one_active(): void
     {
         $this->seed(SeccionesLegajoCatalogoSeeder::class);
+        $this->assertTrue(SeccionLegajo::query()->whereKey(13)->exists());
         $this->actuarComo();
         $persona = Usuario::factory()->create();
         $otra = Usuario::factory()->create();
         $anio = today()->format('Y');
 
+        // La sección adicional 13 está en el catálogo, pero la apertura no la inicializa.
         $id = $this->postJson($this->url($persona, 'legajo'))->assertCreated()->assertJsonPath('data.estado_legajo', 'activo')
-            ->assertJsonPath('data.numero_legajo', "LEG-{$anio}-000001")->assertJsonPath('data.secciones', 13)->json('data.id');
-        $this->assertSame(range(1, 13), LegajoSeccion::query()->where('legajo_id', $id)->orderBy('seccion_legajo_id')->pluck('seccion_legajo_id')->all());
+            ->assertJsonPath('data.numero_legajo', "LEG-{$anio}-000001")->assertJsonPath('data.secciones', 12)->json('data.id');
+        $this->assertSame(range(1, 12), LegajoSeccion::query()->where('legajo_id', $id)->orderBy('seccion_legajo_id')->pluck('seccion_legajo_id')->all());
         $this->assertSame(0, (int) LegajoSeccion::query()->where('legajo_id', $id)->sum('ultimo_folio'));
         $this->postJson($this->url($persona, 'legajo'))->assertConflict();
         $this->assertSame(1, Legajo::query()->where('usuario_id', $persona->id)->count());
@@ -191,6 +193,47 @@ class Seccion02CierreTest extends TestCase
         $this->getJson($this->url($persona, 'documentos/folio-sugerido?seccion=2'))->assertJsonPath('data.folio_sugerido', 1);
         $this->subir($persona, $this->metadatos($this->tipo02('a'), 1, 1))->assertCreated();
         $this->assertSame(1, LegajoSeccion::query()->where('legajo_id', $id)->where('seccion_legajo_id', 2)->value('ultimo_folio'));
+    }
+
+    public function test_open_legajo_does_not_require_additional_passive_section_and_keeps_twelve_normative_sections(): void
+    {
+        $this->seed(SeccionesLegajoCatalogoSeeder::class);
+        $this->actuarComo();
+        $persona = Usuario::factory()->create();
+        SeccionLegajo::query()->whereKey(13)->delete();
+
+        $id = $this->postJson($this->url($persona, 'legajo'))->assertCreated()->assertJsonPath('data.estado_legajo', 'activo')
+            ->assertJsonPath('data.secciones', 12)->json('data.id');
+        $this->assertSame(range(1, 12), LegajoSeccion::query()->where('legajo_id', $id)->orderBy('seccion_legajo_id')->pluck('seccion_legajo_id')->all());
+        $this->assertSame(0, (int) LegajoSeccion::query()->where('legajo_id', $id)->sum('ultimo_folio'));
+
+        // Sin la fila 13, la carga en las secciones normativas funciona con folios desde 1.
+        $this->subir($persona, $this->metadatos($this->tipo02('a'), 1, 1))->assertCreated();
+        $this->assertSame(1, LegajoSeccion::query()->where('legajo_id', $id)->where('seccion_legajo_id', 2)->value('ultimo_folio'));
+    }
+
+    public function test_opening_does_not_touch_existing_legajos_and_passive_references_do_not_need_section_13_row(): void
+    {
+        $this->seed(SeccionesLegajoCatalogoSeeder::class);
+        $admin = $this->actuarComo();
+        // Legajo anterior con su fila 13 y folios: la apertura de otro legajo no lo toca.
+        $anterior = Legajo::factory()->create(['estado_legajo' => 'pasivo']);
+        foreach (range(1, 13) as $seccion) {
+            LegajoSeccion::factory()->create(['legajo_id' => $anterior->id, 'seccion_legajo_id' => $seccion, 'ultimo_folio' => $seccion === 13 ? 5 : 0]);
+        }
+        $filasAnteriores = LegajoSeccion::query()->where('legajo_id', $anterior->id)->orderBy('seccion_legajo_id')->get(['id', 'seccion_legajo_id', 'ultimo_folio'])->toArray();
+
+        $persona = Usuario::factory()->create();
+        $id = $this->postJson($this->url($persona, 'legajo'))->assertCreated()->assertJsonPath('data.secciones', 12)->json('data.id');
+        $this->assertSame($filasAnteriores, LegajoSeccion::query()->where('legajo_id', $anterior->id)->orderBy('seccion_legajo_id')->get(['id', 'seccion_legajo_id', 'ultimo_folio'])->toArray());
+
+        // Una referencia a un legajo pasivo se registra sin que exista la fila 13 del legajo nuevo, y no la crea.
+        $vinculo = VinculoLaboral::factory()->create(['usuario_id' => $persona->id]);
+        $this->postJson('/api/v1/referencias-legajo-pasivo', ['legajo_id' => $id, 'vinculo_laboral_id' => $vinculo->id,
+            'tipo_documento_id' => $this->tipo02('a')->id, 'folio_inicio_pasivo' => 1, 'folio_fin_pasivo' => 3,
+            'responsable_legajo_id' => $admin->id])->assertCreated();
+        $this->assertFalse(LegajoSeccion::query()->where('legajo_id', $id)->where('seccion_legajo_id', 13)->exists());
+        $this->assertSame(range(1, 12), LegajoSeccion::query()->where('legajo_id', $id)->orderBy('seccion_legajo_id')->pluck('seccion_legajo_id')->all());
     }
 
     public function test_open_legajo_requires_permission_and_complete_catalog(): void

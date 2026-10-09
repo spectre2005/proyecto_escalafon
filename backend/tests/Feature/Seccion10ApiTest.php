@@ -191,7 +191,7 @@ class Seccion10ApiTest extends TestCase
     {
         $this->persona = Usuario::factory()->create();
         $this->getJson($this->url('?subseccion=10.1'))->assertOk()->assertJsonPath('data.legajo', null);
-        $legajo = $this->postJson('/api/v1/expedientes/'.$this->persona->id.'/legajo')->assertCreated()->assertJsonPath('data.secciones', 13)->json('data.id');
+        $legajo = $this->postJson('/api/v1/expedientes/'.$this->persona->id.'/legajo')->assertCreated()->assertJsonPath('data.secciones', 12)->json('data.id');
         $this->legajo = Legajo::query()->findOrFail($legajo);
         $this->cargar('S10_REGLAMENTO')->assertCreated();
         $this->cargar('S10_SEGURO')->assertCreated();
