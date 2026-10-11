@@ -16,6 +16,7 @@ use App\Models\TipoDocumento;
 use App\Models\UnidadOrganica;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
+use App\Support\ConfiguracionFuncionalidades;
 use App\Support\Documentos\EstadoDocumento;
 use App\Support\Documentos\FormulariosDatos;
 use App\Support\PerfilDocumental;
@@ -42,6 +43,9 @@ use Illuminate\Validation\ValidationException;
 class Seccion07Controller extends Controller
 {
     use AnulaConMotivo;
+
+    /** Opción configurable de la puntuación numérica (config/funcionalidades.php). */
+    private const PUNTAJE = 's07.evaluaciones.puntaje';
 
     /** Segmento de la ruta => [modelo, formulario_datos]. */
     private const TIPOS = [
@@ -82,6 +86,7 @@ class Seccion07Controller extends Controller
             'titular' => ['nombre' => trim($persona->nombres.' '.$persona->apellido_paterno.' '.$persona->apellido_materno), 'documento' => $persona->numero_doc_identidad],
             'hoy' => $hoy->format('Y-m-d'),
             've_calificacion' => $veCalificacion,
+            'puntaje_activo' => $this->puntajeActivo(),
             'perfil' => $datos['perfil'],
             'resumen' => ResumenSeccion02::total($datos['subsecciones']),
             'subsecciones' => $datos['subsecciones'],
@@ -121,7 +126,7 @@ class Seccion07Controller extends Controller
     {
         [$modelo, $formulario] = self::TIPOS[$tipo] ?? abort(404);
         $persona = $this->exigirLegajo($usuario);
-        $data = $this->validar($request, [...$this->reglas($tipo, $usuario), 'documento_id' => 'nullable|uuid']);
+        $data = $this->sinPuntajeDesactivado($tipo, $this->validar($request, [...$this->reglas($tipo, $usuario), 'documento_id' => 'nullable|uuid']));
         $this->exigirPerfil($tipo, $persona, $data);
         $documentoId = $data['documento_id'] ?? null;
         $registro = new $modelo([...collect($data)->except('documento_id')->all(), 'usuario_id' => $usuario, 'registrado_por' => $request->user()->getAuthIdentifier()]);
@@ -142,7 +147,7 @@ class Seccion07Controller extends Controller
         if ($actual->anulado) {
             return response()->json(['message' => 'El registro está anulado: no se corrige. Registra uno nuevo.'], 409);
         }
-        $data = $this->validarCambios($request, $actual, $this->reglas($tipo, $usuario));
+        $data = $this->sinPuntajeDesactivado($tipo, $this->validarCambios($request, $actual, $this->reglas($tipo, $usuario)));
         $this->exigirPerfil($tipo, $persona, [...$actual->only(['vinculo_laboral_id', 'perfil_docente_id']), ...$data]);
         if ($actual instanceof Desplazamiento && isset($data['tipo']) && $actual->documento
             && ! Seccion07::admiteDesplazamiento($actual->documento->tipoDocumento?->codigo, $data['tipo'])) {
@@ -231,7 +236,8 @@ class Seccion07Controller extends Controller
                 'ciclo_anio' => 'required|integer|between:1900,'.(today()->year + 1),
                 'fecha_evaluacion' => "nullable|{$fecha}|before_or_equal:today",
                 'calificacion' => 'required|string|max:40',
-                'puntaje' => 'nullable|numeric|between:0,999.99',
+                // Con la puntuación numérica desactivada no se admite un valor nuevo (vacío sí: se descarta al guardar).
+                'puntaje' => $this->puntajeActivo() ? 'nullable|numeric|between:0,999.99' : 'prohibited',
                 'plan_mejora' => 'sometimes|boolean',
                 'evaluador_id' => 'nullable|uuid|exists:usuarios,id',
             ],
@@ -384,7 +390,26 @@ class Seccion07Controller extends Controller
             'fecha_fin.after_or_equal' => 'La fecha de fin no puede ser anterior a la fecha de inicio.',
             'fecha_vencimiento_periodo.after_or_equal' => 'El vencimiento del período no puede ser anterior a su inicio.',
             'vinculo_laboral_id.exists' => 'Selecciona un vínculo laboral vigente (no anulado) de esta persona.',
+            'puntaje.prohibited' => 'La puntuación numérica de las evaluaciones está desactivada en la configuración.',
         ];
+    }
+
+    private function puntajeActivo(): bool
+    {
+        return ConfiguracionFuncionalidades::activa(self::PUNTAJE);
+    }
+
+    /**
+     * Con la puntuación desactivada, el puntaje no se guarda ni se modifica: así un formulario que lo envíe vacío no
+     * borra el puntaje histórico de una evaluación.
+     */
+    private function sinPuntajeDesactivado(string $tipo, array $data): array
+    {
+        if ($tipo === 'evaluaciones-desempeno' && ! $this->puntajeActivo()) {
+            unset($data['puntaje']);
+        }
+
+        return $data;
     }
 
     /** @return array{id: string, values: array<string, mixed>} */

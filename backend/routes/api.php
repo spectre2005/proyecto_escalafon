@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\ColegiaturaController;
 use App\Http\Controllers\Api\V1\CompensacionBeneficioController;
 use App\Http\Controllers\Api\V1\CompromisoDocumentoController;
 use App\Http\Controllers\Api\V1\CompromisoEntregaOriginalController;
+use App\Http\Controllers\Api\V1\ConfiguracionFuncionalidadController;
 use App\Http\Controllers\Api\V1\ControversiaController;
 use App\Http\Controllers\Api\V1\DeclaracionVerificacionController;
 use App\Http\Controllers\Api\V1\DesplazamientoController;
@@ -75,6 +76,7 @@ use App\Http\Controllers\Api\V1\UsuarioController;
 use App\Http\Controllers\Api\V1\UsuarioRolController;
 use App\Http\Controllers\Api\V1\VinculoAdendaController;
 use App\Http\Controllers\Api\V1\VinculoLaboralController;
+use App\Http\Middleware\FuncionalidadActiva;
 use App\Http\Middleware\LegajoSoloLectura;
 use App\Http\Middleware\LocalDevelopmentOnly;
 use Illuminate\Support\Facades\Route;
@@ -85,9 +87,17 @@ Route::prefix('v1/auth')->middleware(LocalDevelopmentOnly::class)->group(functio
     Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 });
 
-Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', LegajoSoloLectura::class])->group(function (): void {
+// FuncionalidadActiva: con una funcionalidad desactivada, sus rutas de creación y modificación responden 409.
+Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', FuncionalidadActiva::class, LegajoSoloLectura::class])->group(function (): void {
     Route::get('institucion', [InstitutionSettingsController::class, 'show']);
+    // Qué ocultar en la navegación (cualquier sesión). Cambiar la configuración exige configuracion.modulos.
+    Route::get('funcionalidades', [ConfiguracionFuncionalidadController::class, 'publico']);
     Route::put('institucion', [InstitutionSettingsController::class, 'update'])->middleware('can:sistema.administrar');
+    // Configuración de funcionalidades: solo configuracion.modulos (asignación explícita, fuera de '*').
+    Route::middleware('can:configuracion.modulos')->group(function (): void {
+        Route::get('configuracion/funcionalidades', [ConfiguracionFuncionalidadController::class, 'index']);
+        Route::patch('configuracion/funcionalidades/{codigo}', [ConfiguracionFuncionalidadController::class, 'update'])->where('codigo', '[a-z0-9_.]+');
+    });
     Route::middleware('can:datos_sensibles.ver')->group(function (): void {
         Route::get('expedientes/{usuario}/seccion-10', [Seccion10Controller::class, 'show'])->middleware('can:legajo.ver')->whereUuid('usuario');
         Route::get('expedientes/{usuario}/seccion-10/documentos/{documento}/historial', [Seccion10Controller::class, 'historial'])
@@ -265,7 +275,7 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', Le
 // afiliaciones y controversias (sección 09, sensibles): solo lectura y con datos_sensibles.ver; se registran, corrigen y
 // anulan desde Legajos\Seccion09Controller.
 // desvinculaciones (sección 11): solo lectura; se registran, corrigen y anulan desde Legajos\Seccion11Controller.
-Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', 'can:sistema.administrar'])->group(function (): void {
+Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', 'can:sistema.administrar', FuncionalidadActiva::class])->group(function (): void {
     Route::apiResource('afiliaciones', AfiliacionController::class)->parameters(['afiliaciones' => 'record'])->whereUuid('record')->names('api.v1.afiliaciones')->only(['index', 'show'])->middleware('can:datos_sensibles.ver');
     Route::apiResource('archivos-documento', ArchivoDocumentoController::class)->parameters(['archivos-documento' => 'record'])->whereUuid('record')->names('api.v1.archivos-documento')->only(['index', 'show']);
     Route::apiResource('auditoria-eventos', AuditoriaEventoController::class)->parameters(['auditoria-eventos' => 'record'])->whereUuid('record')->names('api.v1.auditoria-eventos');

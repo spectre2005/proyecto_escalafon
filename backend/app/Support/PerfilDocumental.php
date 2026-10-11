@@ -77,6 +77,10 @@ final class PerfilDocumental
      */
     public function exigencia(TipoDocumento $tipo): array
     {
+        // Lo que la institución desactivó no se exige (config/funcionalidades.php); lo ya registrado no se toca.
+        if (! ConfiguracionFuncionalidades::tipoActivo((string) $tipo->codigo, (int) $tipo->seccion_legajo_id)) {
+            return ['exigido' => false, 'motivo' => 'No se exige: desactivado en la configuración de la institución.'];
+        }
         if (! $tipo->obligatorio) {
             return ['exigido' => false, 'motivo' => 'Opcional: se incorpora solo si existe.'];
         }

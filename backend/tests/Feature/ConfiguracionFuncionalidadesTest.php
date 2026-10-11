@@ -12,7 +12,7 @@ use App\Models\ReferenciaLegajoPasivo;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Support\ConfiguracionFuncionalidades;
-use Database\Seeders\Seccion07CatalogoSeeder;
+use App\Support\PerfilDocumental;
 use Database\Seeders\SeccionesLegajoCatalogoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
@@ -25,16 +25,27 @@ class ConfiguracionFuncionalidadesTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** Catálogo de prueba para ejercitar el mecanismo: el real no deja desactivar nada todavía. */
+    /** Tipos «Otros documentos» de secciones con varias funcionalidades: no pertenecen a ninguna. */
+    private const SIN_FUNCIONALIDAD = ['S01_OTROS_UNIVERSIDAD', 'S05_OTROS_UNIVERSIDAD', 'S09_OTROS_UNIVERSIDAD'];
+
+    /** Catálogo de prueba para ejercitar el mecanismo con dependencias controladas. */
     private function catalogoDePrueba(array $base = []): void
     {
         $definicion = fn (string $nombre, array $extra = []): array => $extra + ['nombre' => $nombre, 'seccion' => 5, 'implementada' => true,
-            'esencial' => null, 'depende_de' => [], 'bloqueo' => null, 'rutas_escritura' => []];
+            'esencial' => null, 'depende_de' => [], 'bloqueo' => null, 'menu' => [], 'documentos' => [], 'rutas_escritura' => [], 'tablas' => []];
         config()->set('funcionalidades.funcionalidades', [
             'prueba.base' => $definicion('Base', $base),
             'prueba.uso' => $definicion('Uso de la base', ['depende_de' => ['prueba.base']]),
             'prueba.libre' => $definicion('Libre'),
         ]);
+    }
+
+    /** Desactiva directamente (sin el servicio), para preparar escenarios. */
+    private function inactiva(string ...$codigos): void
+    {
+        foreach ($codigos as $codigo) {
+            ConfiguracionFuncionalidad::factory()->create(['codigo' => $codigo, 'activa' => false]);
+        }
     }
 
     /** @return array<string, mixed> Mensajes de la validación que lanza el cambio. */
@@ -52,7 +63,6 @@ class ConfiguracionFuncionalidadesTest extends TestCase
     {
         $secciones = ConfiguracionFuncionalidades::secciones();
         $catalogo = ConfiguracionFuncionalidades::catalogo();
-        $this->assertSame(range(1, 13), array_keys($secciones));
         $this->assertSame(array_keys(SeccionesLegajoCatalogoSeeder::SECCIONES), array_keys($secciones));
         foreach (range(1, 12) as $seccion) {
             $this->assertSame('normativa', $secciones[$seccion]['caracter']);
@@ -62,49 +72,60 @@ class ConfiguracionFuncionalidadesTest extends TestCase
 
         // Toda sección implementada tiene al menos una funcionalidad; la 12 no tiene ninguna.
         $porSeccion = array_count_values(array_column($catalogo, 'seccion'));
-        $this->assertArrayNotHasKey(12, $porSeccion);
         foreach ($secciones as $id => $seccion) {
             $this->assertSame($seccion['implementada'], isset($porSeccion[$id]), "Sección {$id}");
         }
 
-        // Cada ruta declarada existe y cada dependencia es una funcionalidad del catálogo.
         $rutas = collect(Route::getRoutes()->getRoutes())->flatMap(fn ($ruta) => array_map(fn (string $metodo): string => $metodo.' '.$ruta->uri(),
             array_diff($ruta->methods(), ['HEAD'])))->all();
+        $menus = [];
         foreach ($catalogo as $codigo => $definicion) {
-            $this->assertSame(['nombre', 'seccion', 'implementada', 'esencial', 'depende_de', 'bloqueo', 'rutas_escritura'],
+            $this->assertSame(['nombre', 'seccion', 'implementada', 'esencial', 'depende_de', 'bloqueo', 'menu', 'documentos', 'rutas_escritura', 'tablas'],
                 array_keys(array_diff_key($definicion, ['campos' => true])), $codigo);
-            $this->assertTrue($definicion['implementada'], $codigo);
-            foreach ($definicion['rutas_escritura'] as $ruta) {
+            foreach ($definicion['rutas_escritura'] as $entrada) {
+                [$ruta, $restricciones] = is_array($entrada) ? $entrada : [$entrada, []];
                 $this->assertContains($ruta, $rutas, "{$codigo}: {$ruta}");
-            }
-            // Una opción sobre campos no tiene rutas propias, depende de otra funcionalidad y sus columnas existen.
-            if (isset($definicion['campos'])) {
-                $this->assertSame([], $definicion['rutas_escritura'], $codigo);
-                $this->assertNotSame([], $definicion['depende_de'], $codigo);
-                foreach ($definicion['campos'] as $campo) {
-                    [$tabla, $columna] = explode('.', $campo);
-                    $this->assertTrue(Schema::hasColumn($tabla, $columna), "{$codigo}: {$campo}");
+                $this->assertDoesNotMatchRegularExpression('/^(GET|HEAD) /', $ruta, $codigo);
+                foreach (array_keys($restricciones) as $parametro) {
+                    $this->assertStringContainsString('{'.$parametro.'}', $ruta, $codigo);
                 }
             }
             foreach ($definicion['depende_de'] as $dependencia) {
                 $this->assertArrayHasKey($dependencia, $catalogo, $codigo);
             }
-            if ($definicion['bloqueo']) {
-                $this->assertContains($definicion['bloqueo']['tipo'], ['sin_alternativa', 'pendiente_universidad', 'pendiente_equipo'], $codigo);
+            foreach ($definicion['tablas'] as $tabla) {
+                $this->assertTrue(Schema::hasTable($tabla), "{$codigo}: {$tabla}");
             }
+            foreach ($definicion['campos'] ?? [] as $campo) {
+                [$tabla, $columna] = explode('.', $campo);
+                $this->assertTrue(Schema::hasColumn($tabla, $columna), "{$codigo}: {$campo}");
+                $this->assertSame([[], [], []], [$definicion['rutas_escritura'], $definicion['menu'], $definicion['documentos']], $codigo);
+            }
+            // Cada código de tipo declarado existe y está activo en su sección.
+            foreach (array_diff($definicion['documentos'], ['*']) as $tipo) {
+                $this->assertTrue(TipoDocumento::query()->where('seccion_legajo_id', $definicion['seccion'])->where('codigo', $tipo)->where('activo', true)->exists(), "{$codigo}: {$tipo}");
+            }
+            $menus = [...$menus, ...$definicion['menu']];
+        }
+        // Una entrada de menú pertenece a una sola funcionalidad.
+        $this->assertSame(array_unique($menus), $menus);
+
+        // Todo tipo activo de las secciones implementadas pertenece a una funcionalidad, salvo «Otros documentos».
+        foreach (TipoDocumento::query()->where('activo', true)->whereIn('seccion_legajo_id', range(1, 11))->get() as $tipo) {
+            $de = ConfiguracionFuncionalidades::deTipo($tipo->codigo, $tipo->seccion_legajo_id);
+            $this->assertSame(in_array($tipo->codigo, self::SIN_FUNCIONALIDAD, true), $de === [], $tipo->codigo);
+            $this->assertLessThanOrEqual(1, count($de), $tipo->codigo);
         }
 
-        // Esenciales (PROVISIONAL) y funcionalidades sin alternativa (la subida común rechaza sus documentos).
-        $this->assertSame(['s01.identidad', 's02.vinculos'], array_keys(array_filter($catalogo, fn (array $d): bool => $d['esencial'] !== null)));
-        $this->assertSame(['s04.experiencia', 's06.compensaciones', 's10.sst_bienestar'],
-            array_keys(array_filter($catalogo, fn (array $d): bool => ($d['bloqueo']['tipo'] ?? null) === 'sin_alternativa')));
-
-        // Solo la puntuación numérica de las evaluaciones se puede desactivar; el resto sigue bloqueado.
-        $this->assertSame(['s07.evaluaciones.puntaje'], array_keys(array_filter($catalogo, fn (array $d): bool => isset($d['campos']))));
+        // Núcleo fijo: identidad, 2.1 (S02_A se conserva) y vínculos. Bloqueada: la sección adicional (folios pendientes).
+        // El resto, configurable.
+        $this->assertSame(['s01.identidad', 's02.seleccion', 's02.vinculos'], array_values(array_filter(array_keys($catalogo), ConfiguracionFuncionalidades::nucleo(...))));
+        $this->assertSame(['adicional.referencias_pasivas'], array_keys(array_filter($catalogo, fn (array $d): bool => $d['bloqueo'] !== null)));
         foreach (array_keys($catalogo) as $codigo) {
-            $desactivable = $codigo === 's07.evaluaciones.puntaje';
-            $this->assertSame($desactivable, ConfiguracionFuncionalidades::configurable($codigo), $codigo);
-            $this->assertSame($desactivable, ConfiguracionFuncionalidades::bloqueosParaDesactivar($codigo) === [], $codigo);
+            $esperado = ! in_array($codigo, ['s01.identidad', 's02.seleccion', 's02.vinculos', 'adicional.referencias_pasivas'], true);
+            $this->assertSame($esperado, ConfiguracionFuncionalidades::configurable($codigo), $codigo);
+            $this->assertSame($codigo === 'adicional.referencias_pasivas' ? null : config('funcionalidades.advertencia_normativa'),
+                ConfiguracionFuncionalidades::advertencia($codigo), $codigo);
         }
         $this->expectException(InvalidArgumentException::class);
         ConfiguracionFuncionalidades::activa('s12.inventada');
@@ -118,10 +139,13 @@ class ConfiguracionFuncionalidadesTest extends TestCase
             $this->assertTrue($estado['disponible'], $codigo);
             $this->assertNull($estado['guardada'], $codigo);
         }
-        // Una fila guardada no desactiva lo que el catálogo no permite desactivar.
-        ConfiguracionFuncionalidad::query()->create(['codigo' => 's04.experiencia', 'activa' => false, 'motivo' => 'Fila antigua',
-            'updated_by' => Usuario::factory()->create()->id]);
-        $this->assertTrue(ConfiguracionFuncionalidades::activa('s04.experiencia'));
+        $this->assertSame([], ConfiguracionFuncionalidades::estadoPublico()['menu_oculto']);
+        $this->assertSame([], ConfiguracionFuncionalidades::estadoPublico()['secciones_ocultas']);
+        $this->assertSame([], ConfiguracionFuncionalidades::estadoPublico()['tipos_inactivos']);
+        // Una fila guardada no desactiva el núcleo.
+        $this->inactiva('s01.identidad');
+        $this->assertTrue(ConfiguracionFuncionalidades::activa('s01.identidad'));
+        $this->assertFalse(ConfiguracionFuncionalidades::guardada('s01.identidad'));
     }
 
     public function test_saved_states_can_be_queried_and_every_change_is_audited(): void
@@ -167,16 +191,18 @@ class ConfiguracionFuncionalidadesTest extends TestCase
         $this->assertSame(0, AuditoriaEvento::query()->count());
     }
 
-    public function test_essential_blocked_and_depended_on_features_cannot_be_deactivated(): void
+    public function test_core_blocked_and_depended_on_features_cannot_be_deactivated(): void
     {
         $actor = $this->actuarComo();
-        // Catálogo real: esenciales con dependencias permanentes, sin alternativa y pendientes.
-        foreach (['s01.identidad', 's02.vinculos', 's04.experiencia', 's10.sst_bienestar', 's01.familiares', 's03.formacion', 'adicional.referencias_pasivas'] as $codigo) {
-            $errores = $this->rechazo(fn () => ConfiguracionFuncionalidades::cambiar($codigo, false, 'Intento', $actor));
-            $this->assertNotEmpty($errores['activa'], $codigo);
+        // Núcleo y sección adicional (bloqueada): nunca.
+        foreach (['s01.identidad', 's02.seleccion', 's02.vinculos', 'adicional.referencias_pasivas'] as $codigo) {
+            $this->assertNotEmpty($this->rechazo(fn () => ConfiguracionFuncionalidades::cambiar($codigo, false, 'Intento', $actor))['activa'], $codigo);
             $this->assertTrue(ConfiguracionFuncionalidades::activa($codigo), $codigo);
         }
         $this->assertStringContainsString('Es esencial', ConfiguracionFuncionalidades::bloqueosParaDesactivar('s02.vinculos')[0]);
+        // Dependencia real: 7.1 no se desactiva mientras la puntuación (que depende de ella) esté activa.
+        $this->assertSame(['La usa «Puntuación numérica de las evaluaciones», que está activa.'],
+            $this->rechazo(fn () => ConfiguracionFuncionalidades::cambiar('s07.evaluaciones', false, 'Intento', $actor))['activa']);
         $this->assertSame(0, ConfiguracionFuncionalidad::query()->count());
         $this->assertSame(0, AuditoriaEvento::query()->count());
 
@@ -203,58 +229,88 @@ class ConfiguracionFuncionalidadesTest extends TestCase
         $this->assertSame(4, AuditoriaEvento::query()->where('entidad', 'configuracion_funcionalidades')->count());
     }
 
+    public function test_sections_hide_only_when_no_active_feature_with_menu_remains(): void
+    {
+        $actor = $this->actuarComo();
+        // 06: una sola funcionalidad; al desactivarla se oculta la sección entera.
+        $this->assertTrue(ConfiguracionFuncionalidades::estados()['s06.compensaciones']['oculta_seccion']);
+        ConfiguracionFuncionalidades::cambiar('s06.compensaciones', false, 'La universidad no la usa', $actor);
+        $this->assertTrue(ConfiguracionFuncionalidades::seccionOculta(6));
+
+        // 09: sin controversias queda la afiliación (y «Otros documentos»).
+        $this->assertFalse(ConfiguracionFuncionalidades::estados()['s09.controversias']['oculta_seccion']);
+        ConfiguracionFuncionalidades::cambiar('s09.controversias', false, 'Solo afiliación sindical', $actor);
+        $this->assertFalse(ConfiguracionFuncionalidades::seccionOculta(9));
+
+        // 07: sin 7.2 ni puntuación, la sección sigue con 7.1 y 7.3.
+        ConfiguracionFuncionalidades::cambiar('s07.progresion', false, 'No se usa', $actor);
+        ConfiguracionFuncionalidades::cambiar('s07.evaluaciones.puntaje', false, 'Sin puntuación numérica', $actor);
+        $this->assertFalse(ConfiguracionFuncionalidades::seccionOculta(7));
+
+        $publico = ConfiguracionFuncionalidades::estadoPublico();
+        $this->assertSame([6], $publico['secciones_ocultas']);
+        $this->assertEqualsCanonicalizing(['seccion-06', 'compensaciones-beneficios', 'documentos-06', 's09-individuales', 's09-colectivas', 's07-progresion'],
+            $publico['menu_oculto']);
+        $tipos06 = TipoDocumento::query()->where('seccion_legajo_id', 6)->where('activo', true)->pluck('codigo')->all();
+        $this->assertEqualsCanonicalizing([...$tipos06, 'S09_A_CONTROVERSIAS_INDIVIDUALES', 'S09_B_CONTROVERSIAS_COLECTIVAS', 'S07_72A_RESOLUCION_PROGRESION'],
+            $publico['tipos_inactivos']);
+        $this->assertFalse($publico['activas']['s07.evaluaciones.puntaje']);
+        $this->assertTrue($publico['activas']['s09.afiliaciones']);
+        // «Otros documentos» de la 09 sigue activo.
+        $this->assertTrue(ConfiguracionFuncionalidades::tipoActivo('S09_OTROS_UNIVERSIDAD', 9));
+    }
+
+    public function test_inactive_document_types_are_not_required(): void
+    {
+        $actor = $this->actuarComo();
+        $tipo = TipoDocumento::query()->where('codigo', 'S02_H_REGISTRO_INDUCCION')->where('activo', true)->firstOrFail();
+        $this->assertTrue($tipo->obligatorio);
+        $perfil = PerfilDocumental::de(Usuario::factory()->create(), collect());
+        $this->assertNotSame('No se exige: desactivado en la configuración de la institución.', $perfil->exigencia($tipo)['motivo']);
+
+        ConfiguracionFuncionalidades::cambiar('s02.inducciones', false, 'La institución no registra inducciones', $actor);
+        $this->assertSame(['exigido' => false, 'motivo' => 'No se exige: desactivado en la configuración de la institución.'], $perfil->exigencia($tipo));
+        // Otros tipos de la misma sección se siguen exigiendo con sus reglas.
+        $seleccion = TipoDocumento::query()->where('codigo', 'S02_A_RESULTADO_SELECCION')->where('activo', true)->firstOrFail();
+        $this->assertNotSame('No se exige: desactivado en la configuración de la institución.', $perfil->exigencia($seleccion)['motivo']);
+    }
+
     public function test_score_option_can_be_turned_off_without_touching_evaluations_or_stored_scores(): void
     {
-        $this->seed(Seccion07CatalogoSeeder::class);
         $actor = $this->actuarComo();
         $evaluacion = EvaluacionDesempeno::factory()->create(['calificacion' => 'Buen rendimiento', 'puntaje' => 15.5]);
         $filaEvaluacion = fn (): array => EvaluacionDesempeno::query()->findOrFail($evaluacion->id)->toArray();
         $tipos71 = fn (): array => TipoDocumento::query()->whereIn('codigo', ['S07_71A_GESTION_RENDIMIENTO', 'S07_71B_ACTA_RETROALIMENTACION'])
-            ->orderBy('codigo')->get(['codigo', 'obligatorio', 'activo'])->toArray();
+            ->where('activo', true)->orderBy('codigo')->get(['codigo', 'obligatorio', 'activo'])->toArray();
         $antes = [$filaEvaluacion(), $tipos71()];
         $this->assertSame([true, true], array_column($antes[1], 'obligatorio'));
-        $resto07 = ['s07.evaluaciones', 's07.progresiones', 's07.ratificaciones', 's07.desplazamientos'];
 
-        // Por defecto activa; las evaluaciones no se pueden desactivar mientras la usen.
         $this->assertTrue(ConfiguracionFuncionalidades::activa('s07.evaluaciones.puntaje'));
-        $this->assertContains('La usa «Puntuación numérica de las evaluaciones», que está activa.',
-            ConfiguracionFuncionalidades::bloqueosParaDesactivar('s07.evaluaciones'));
-
         ConfiguracionFuncionalidades::cambiar('s07.evaluaciones.puntaje', false, 'La universidad no usa puntuación numérica', $actor);
         $this->assertFalse(ConfiguracionFuncionalidades::activa('s07.evaluaciones.puntaje'));
-        foreach ($resto07 as $codigo) {
+        foreach (['s07.evaluaciones', 's07.progresion', 's07.desplazamientos'] as $codigo) {
             $this->assertTrue(ConfiguracionFuncionalidades::activa($codigo), $codigo);
         }
-        // Las evaluaciones siguen sin poder desactivarse por su propio bloqueo, ya no por la puntuación.
-        $this->assertNotContains('La usa «Puntuación numérica de las evaluaciones», que está activa.',
-            ConfiguracionFuncionalidades::bloqueosParaDesactivar('s07.evaluaciones'));
-        $this->assertNotEmpty($this->rechazo(fn () => ConfiguracionFuncionalidades::cambiar('s07.evaluaciones', false, 'Intento', $actor))['activa']);
-        // Puntajes, calificación y obligatoriedad de 7.1 a) y b) intactos.
+        // Puntajes, calificación y obligatoriedad de 7.1 a) y b) intactos; la opción no tiene menú ni tipos propios.
         $this->assertSame($antes, [$filaEvaluacion(), $tipos71()]);
         $this->assertSame('15.50', $filaEvaluacion()['puntaje']);
+        $this->assertSame([], ConfiguracionFuncionalidades::estadoPublico()['menu_oculto']);
+        $this->assertSame(1, ConfiguracionFuncionalidades::registros('s07.evaluaciones.puntaje'));
 
         ConfiguracionFuncionalidades::cambiar('s07.evaluaciones.puntaje', true, 'Se incorpora la puntuación', $actor);
         $this->assertTrue(ConfiguracionFuncionalidades::activa('s07.evaluaciones.puntaje'));
         $this->assertSame($antes, [$filaEvaluacion(), $tipos71()]);
-        $this->assertSame(['funcionalidad.desactivar', 'funcionalidad.activar'], AuditoriaEvento::query()
-            ->where('entidad', 'configuracion_funcionalidades')->orderBy('id')->pluck('accion')->all());
     }
 
     public function test_score_option_cannot_be_reactivated_while_evaluations_are_inactive(): void
     {
-        // Supuesto de prueba: las evaluaciones fueran desactivables (en el catálogo real no lo son).
-        $catalogo = ConfiguracionFuncionalidades::catalogo();
-        $catalogo['s07.evaluaciones']['bloqueo'] = null;
-        config()->set('funcionalidades.funcionalidades', $catalogo);
         $actor = $this->actuarComo();
-
         ConfiguracionFuncionalidades::cambiar('s07.evaluaciones.puntaje', false, 'Sin puntuación', $actor);
-        ConfiguracionFuncionalidades::cambiar('s07.evaluaciones', false, 'Supuesto de prueba', $actor);
+        ConfiguracionFuncionalidades::cambiar('s07.evaluaciones', false, 'Sin evaluaciones', $actor);
         $this->assertFalse(ConfiguracionFuncionalidades::activa('s07.evaluaciones'));
-        $this->assertSame(['Necesita «Evaluaciones de desempeño», que está inactiva.'],
+        $this->assertSame(['Necesita «7.1 Evaluación de desempeño», que está inactiva.'],
             $this->rechazo(fn () => ConfiguracionFuncionalidades::cambiar('s07.evaluaciones.puntaje', true, 'Intento', $actor))['activa']);
-        // Las demás funcionalidades de la 07 no dependen de las evaluaciones.
-        foreach (['s07.progresiones', 's07.ratificaciones', 's07.desplazamientos'] as $codigo) {
+        foreach (['s07.progresion', 's07.desplazamientos'] as $codigo) {
             $this->assertTrue(ConfiguracionFuncionalidades::activa($codigo), $codigo);
         }
     }
@@ -265,9 +321,9 @@ class ConfiguracionFuncionalidadesTest extends TestCase
         $actor = $this->actuarComo();
         $permisos = $actor->permisos();
         $legajo = Legajo::factory()->create();
-        LegajoSeccion::factory()->create(['legajo_id' => $legajo->id, 'seccion_legajo_id' => 5, 'ultimo_folio' => 7]);
+        LegajoSeccion::factory()->create(['legajo_id' => $legajo->id, 'seccion_legajo_id' => 6, 'ultimo_folio' => 7]);
         $documento = DocumentoUsuario::factory()->create(['usuario_id' => $legajo->usuario_id, 'legajo_id' => $legajo->id,
-            'tipo_documento_id' => TipoDocumento::factory()->create(['seccion_legajo_id' => 5])->id, 'seccion_legajo_id' => 5,
+            'tipo_documento_id' => TipoDocumento::query()->where('seccion_legajo_id', 6)->where('activo', true)->value('id'), 'seccion_legajo_id' => 6,
             'estado' => 'cargado', 'archivo_id' => null, 'folio_inicio' => 1, 'folio_fin' => 7, 'created_by' => $actor->id]);
         $referencia = ReferenciaLegajoPasivo::factory()->create(['legajo_id' => $legajo->id]);
         $foto = fn (): array => [
@@ -276,9 +332,10 @@ class ConfiguracionFuncionalidadesTest extends TestCase
         ];
         $antes = $foto();
 
-        $this->catalogoDePrueba();
-        ConfiguracionFuncionalidades::cambiar('prueba.libre', false, 'Prueba de conservación', $actor);
-        ConfiguracionFuncionalidades::cambiar('prueba.libre', true, 'Prueba de conservación', $actor);
+        // Desactivar la 06 entera no toca sus documentos ni sus folios; los cuenta para avisar.
+        $this->assertSame(1, ConfiguracionFuncionalidades::registros('s06.compensaciones'));
+        ConfiguracionFuncionalidades::cambiar('s06.compensaciones', false, 'Prueba de conservación', $actor);
+        ConfiguracionFuncionalidades::cambiar('s06.compensaciones', true, 'Prueba de conservación', $actor);
 
         $this->assertSame($antes, $foto());
         $this->assertDatabaseHas('documentos_usuario', ['id' => $documento->id, 'folio_inicio' => 1, 'folio_fin' => 7]);

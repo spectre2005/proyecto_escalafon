@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\ConfiguracionFuncionalidades;
 use Database\Factories\ConfiguracionFuncionalidadFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -27,6 +28,17 @@ class ConfiguracionFuncionalidad extends Model
         'motivo',
         'updated_by',
     ];
+
+    /** Cualquier cambio invalida los estados que el servicio guarda en memoria durante la petición. */
+    protected static function booted(): void
+    {
+        static::saved(function (): void {
+            ConfiguracionFuncionalidades::olvidar();
+        });
+        static::deleted(function (): void {
+            ConfiguracionFuncionalidades::olvidar();
+        });
+    }
 
     /** @return array<string, string> */
     protected function casts(): array

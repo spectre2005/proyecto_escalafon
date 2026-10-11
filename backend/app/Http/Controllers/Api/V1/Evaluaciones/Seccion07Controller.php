@@ -9,6 +9,7 @@ use App\Models\ProgresionCarrera;
 use App\Models\RatificacionDocente;
 use App\Models\UnidadOrganica;
 use App\Models\Usuario;
+use App\Support\ConfiguracionFuncionalidades;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -36,6 +37,8 @@ class Seccion07Controller extends Controller
             'unidades' => UnidadOrganica::query()->where('activo', true)->orderBy('nombre')->get(['id', 'nombre']),
             'anios' => collect(self::TIPOS)->map(fn (array $tipo, string $clave): array => $this->anios($clave))->all(),
             've_calificacion' => $request->user()->can('seccion07.ver_calificacion'),
+            // Opción configurable: con la puntuación desactivada, la pantalla no muestra la columna de puntaje.
+            'puntaje_activo' => ConfiguracionFuncionalidades::activa('s07.evaluaciones.puntaje'),
         ]]);
     }
 

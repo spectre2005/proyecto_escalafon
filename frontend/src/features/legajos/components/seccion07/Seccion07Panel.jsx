@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../../auth/session'
 import { anularSeccion07 } from '../../api/seccion07Api'
-import { categoriasDocente, formulariosDatos07, resultadosRatificacion, rutaFormulario, subseccionesSeccion07, tiposDesplazamiento, tiposRatificacion } from '../../config/seccion07'
+import { categoriasDocente, columnasEvaluacion, formulariosDatos07, resultadosRatificacion, rutaFormulario, subseccionesSeccion07, tiposDesplazamiento, tiposRatificacion } from '../../config/seccion07'
 import { coloresEstadoDocumento, estadosDocumento, estadosSubseccion } from '../../config/seccion02'
 import { etiqueta } from '../../config/seccion01'
 import { folios } from '../../config/documentos'
@@ -103,7 +103,7 @@ function FormularioEnlazado({ usuario, data, tipo, documentoId, onDone }) {
   const [eleccion, setEleccion] = useState(null)
   const props = { usuario, documentoId, onSaved: () => onDone(true), onCancel: () => onDone(false) }
   const { vinculos_carrera: vinculos, perfiles_docentes: perfiles, unidades } = data.opciones
-  if (tipo.formulario_datos === 'evaluaciones_desempeno') return <EvaluacionForm veCalificacion={data.ve_calificacion} {...props} />
+  if (tipo.formulario_datos === 'evaluaciones_desempeno') return <EvaluacionForm veCalificacion={data.ve_calificacion} puntajeActivo={data.puntaje_activo} {...props} />
   if (tipo.formulario_datos === 'desplazamientos') return <DesplazamientoForm permitidos={tipo.desplazamientos} unidades={unidades} {...props} />
   if (tipo.formulario_datos !== 'progresiones_carrera') return null
   const opciones = [vinculos.length && 'progresiones_carrera', perfiles.length && 'ratificaciones_docentes'].filter(Boolean)
@@ -164,14 +164,14 @@ function Desempeno({ usuario, data, bloqueo }) {
   return <Registros titulo="Evaluaciones de desempeño" agregar="Registrar evaluación" registros={data.evaluaciones} bloqueo={bloqueo}
     vacio={bloqueo ? `No hay evaluaciones registradas. ${bloqueo}` : 'No hay evaluaciones registradas. Se registran al subir el formato de gestión del rendimiento (7.1 a) o con «Registrar evaluación».'}
     tituloRegistro={etiquetaEvaluacion} subtitulo={e => e.values.fecha_evaluacion ? `Evaluada el ${fecha(e.values.fecha_evaluacion)}` : 'Sin fecha de evaluación'}
-    campos={[
+    campos={columnasEvaluacion([
       ['Calificación', (v, r) => r.calificacion_oculta ? <Reservado /> : texto(v.calificacion)],
       ['Puntaje', (v, r) => r.calificacion_oculta ? <Reservado /> : texto(v.puntaje)],
       ['Plan de mejora', v => v.plan_mejora ? 'Sí' : 'No'],
       ['Evaluador', v => texto(v.evaluador)],
-    ]}
+    ], data.puntaje_activo)}
     onAnular={anular(usuario, 'evaluaciones_desempeno')}
-    renderForm={props => <EvaluacionForm key={props.record?.id || 'nuevo'} usuario={usuario} veCalificacion={data.ve_calificacion} {...props} />} />
+    renderForm={props => <EvaluacionForm key={props.record?.id || 'nuevo'} usuario={usuario} veCalificacion={data.ve_calificacion} puntajeActivo={data.puntaje_activo} {...props} />} />
 }
 
 function Progresion({ usuario, data, bloqueo }) {

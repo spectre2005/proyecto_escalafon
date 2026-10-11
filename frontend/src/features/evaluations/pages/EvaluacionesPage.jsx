@@ -2,7 +2,8 @@ import { useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from '../../../shared/queries/useLiveQuery'
 import Seccion07Filtros from '../components/Seccion07Filtros'
 import Seccion07Tabla from '../components/Seccion07Tabla'
-import { findTipo, porPagina, tiposSeccion07 } from '../config/seccion07'
+import { findTipo, porPagina, tiposSeccion07, tiposVisibles } from '../config/seccion07'
+import { useFuncionalidades } from '../../../shared/useFuncionalidades'
 
 const panel = 'rounded-2xl border border-slate-200 bg-white'
 const control = 'rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-teal-600 disabled:opacity-40'
@@ -31,7 +32,9 @@ function Pagination({ data, perPage, onChange }) {
 
 export default function EvaluacionesPage() {
   const [params, setParams] = useSearchParams()
-  const tipo = findTipo(params.get('tipo'))
+  // Solo las pestañas de funcionalidades activas en la configuración de la institución.
+  const visibles = tiposVisibles(useFuncionalidades())
+  const tipo = findTipo(params.get('tipo'), visibles.length ? visibles : tiposSeccion07)
   const query = new URLSearchParams()
   filtrosApi.forEach(key => params.get(key) && query.set(key, params.get(key)))
   if (tipo.key !== 'evaluaciones') query.delete('plan_mejora')
@@ -59,7 +62,7 @@ export default function EvaluacionesPage() {
     <div className="mb-7"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[.2em] text-teal-700">Sección 07 del legajo</p><h1 className="text-3xl font-bold text-slate-800">Evaluaciones</h1><p className="mt-3 max-w-2xl text-sm text-slate-500">Consulta de evaluación de desempeño, progresión en la carrera y desplazamientos del personal. Los registros se cargan desde el legajo de cada persona.</p></div>
 
     <div role="tablist" aria-label="Tipo de registro" className="mb-5 flex gap-2 overflow-x-auto pb-1">
-      {tiposSeccion07.map(item => <button key={item.key} role="tab" aria-selected={item.key === tipo.key} onClick={() => changeTipo(item.key)} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-medium ${item.key === tipo.key ? 'bg-teal-700 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>{item.label}</button>)}
+      {visibles.map(item => <button key={item.key} role="tab" aria-selected={item.key === tipo.key} onClick={() => changeTipo(item.key)} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-medium ${item.key === tipo.key ? 'bg-teal-700 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>{item.label}</button>)}
     </div>
 
     <Seccion07Filtros key={tipo.key} tipo={tipo} params={params} opciones={opciones.data?.data} onChange={change} />
@@ -71,9 +74,9 @@ export default function EvaluacionesPage() {
     {result && <section className={`${panel} overflow-hidden`} aria-label={tipo.label}>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
         <h2 className="text-sm font-semibold text-slate-800">{tipo.label} <span className="ml-2 rounded-full bg-teal-50 px-2 py-1 text-xs text-teal-700">{result.total}</span></h2>
-        {tipo.key === 'evaluaciones' && opciones.data?.data && !opciones.data.data.ve_calificacion && <p className="text-xs text-slate-500">Calificación y puntaje reservados hasta que la institución defina quién puede verlos.</p>}
+        {tipo.key === 'evaluaciones' && opciones.data?.data && !opciones.data.data.ve_calificacion && <p className="text-xs text-slate-500">{opciones.data.data.puntaje_activo === false ? 'Calificación reservada' : 'Calificación y puntaje reservados'} hasta que la institución defina quién puede verlos.</p>}
       </div>
-      {result.data.length ? <Seccion07Tabla tipo={tipo} registros={result.data} /> : <p className="p-10 text-center text-sm text-slate-500">{tipo.vacio}</p>}
+      {result.data.length ? <Seccion07Tabla tipo={tipo} registros={result.data} puntajeActivo={opciones.data?.data?.puntaje_activo} /> : <p className="p-10 text-center text-sm text-slate-500">{tipo.vacio}</p>}
       {result.total > 0 && <Pagination data={result} perPage={result.per_page} onChange={change} />}
     </section>}
   </>

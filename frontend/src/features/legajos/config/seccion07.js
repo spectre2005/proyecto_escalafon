@@ -32,3 +32,9 @@ export const rutaFormulario = {
 
 // Pestaña de la pantalla Evaluaciones => subsección de la ficha.
 export const categoriaPorConsulta = { evaluaciones: 's07-desempeno', progresiones: 's07-progresion', ratificaciones: 's07-progresion', desplazamientos: 's07-desplazamiento' }
+
+// Opción configurable s07.evaluaciones.puntaje: con la puntuación desactivada (puntaje_activo === false) no se muestra la
+// columna «Puntaje». Si el backend no informa la opción, se conserva la columna. Los puntajes guardados no se tocan.
+export function columnasEvaluacion(columnas, puntajeActivo) {
+  return puntajeActivo === false ? columnas.filter(([titulo]) => titulo !== 'Puntaje') : columnas
+}

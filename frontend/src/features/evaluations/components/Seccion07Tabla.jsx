@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { categoriaPorConsulta } from '../../legajos/config/seccion07'
+import { categoriaPorConsulta, columnasEvaluacion } from '../../legajos/config/seccion07'
 
 const cell = 'px-5 py-4 align-top'
 const muted = 'text-slate-400'
@@ -60,8 +60,9 @@ const columnas = {
   ],
 }
 
-export default function Seccion07Tabla({ tipo, registros }) {
-  const cols = columnas[tipo.key]
+// puntajeActivo: opción configurable s07.evaluaciones.puntaje (con false no se muestra la columna «Puntaje»).
+export default function Seccion07Tabla({ tipo, registros, puntajeActivo }) {
+  const cols = tipo.key === 'evaluaciones' ? columnasEvaluacion(columnas.evaluaciones, puntajeActivo) : columnas[tipo.key]
   return <div className="overflow-x-auto"><table className="w-full text-left text-sm">
     <thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="px-5 py-4 font-medium">Persona</th>{cols.map(([title]) => <th key={title} className="whitespace-nowrap px-5 py-4 font-medium">{title}</th>)}<th className="px-5 py-4 font-medium">Respaldo</th><th className="px-5 py-4 font-medium"><span className="sr-only">Legajo</span></th></tr></thead>
     <tbody>{registros.map(registro => <tr key={registro.id} className="border-t border-slate-100 hover:bg-teal-50/30">

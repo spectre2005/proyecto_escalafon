@@ -4,6 +4,7 @@ import Icon from '../../components/ui/Icon'
 import { normalizeInstitution } from '../../config/institution'
 import { apiErrorMessage } from '../../axios'
 import { usePuede } from '../auth/session'
+import FuncionalidadesConfig from './FuncionalidadesConfig'
 
 const inputClass = 'mt-2 block w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 font-normal text-slate-800 outline-none focus:ring-2 focus:ring-teal-600'
 const cardClass = 'rounded-2xl border border-slate-200 bg-white p-6 sm:p-8'
@@ -11,6 +12,8 @@ const cardClass = 'rounded-2xl border border-slate-200 bg-white p-6 sm:p-8'
 export default function SettingsPage() {
   const { institution, updateInstitution, institutionLoading, institutionError, institutionUpdatedAt, reloadInstitution } = useOutletContext()
   const canEdit = usePuede('sistema.administrar')
+  // Funcionalidades configurables: permiso explícito configuracion.modulos, independiente de sistema.administrar.
+  const canConfigure = usePuede('configuracion.modulos')
   const [localDraft, setDraft] = useState(null)
   const draft = localDraft || institution
   const [saving, setSaving] = useState(false)
@@ -91,7 +94,13 @@ export default function SettingsPage() {
     setNotice(null)
     await reloadInstitution()
   }
-  if (!canEdit) return <p role="alert" className={cardClass}>La configuración institucional requiere permisos de administración.</p>
+  if (!canEdit && !canConfigure) return <p role="alert" className={cardClass}>La configuración institucional requiere permisos de administración.</p>
+  // Solo configuracion.modulos: únicamente las funcionalidades.
+  if (!canEdit) return <div>
+    <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-teal-700">Administración</p>
+    <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-800">Configuración</h1>
+    <div className="mt-8"><FuncionalidadesConfig /></div>
+  </div>
   return <div>
     <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-teal-700">Administración</p>
     <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-800">Configuración institucional</h1>
@@ -137,5 +146,6 @@ export default function SettingsPage() {
         <button type="button" onClick={preview} disabled={previewBusy || logoBusy || institutionLoading} className="mt-5 w-full rounded-xl border border-teal-200 px-4 py-3 text-sm font-semibold text-teal-800 disabled:opacity-50">{previewBusy ? 'Generando…' : 'Descargar vista previa PDF'}</button>
       </aside>
     </div>
+    {canConfigure && <div className="mt-6"><FuncionalidadesConfig /></div>}
   </div>
 }

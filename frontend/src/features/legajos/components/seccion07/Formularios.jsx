@@ -30,11 +30,13 @@ const nota = record => record
   : 'No se elimina: si hay un error, se corrige o se anula con motivo (administración). El responsable se guarda con tu sesión.'
 
 // Evaluación de desempeño (evaluaciones_desempeno). Sin seccion07.ver_calificacion la calificación guardada no se muestra:
-// al corregir, esos campos quedan vacíos y solo se envían si se escriben.
-export function EvaluacionForm({ usuario, record, documentoId, veCalificacion, onSaved, onCancel }) {
+// al corregir, esos campos quedan vacíos y solo se envían si se escriben. Con la puntuación numérica desactivada en la
+// configuración (puntajeActivo === false) el campo puntaje no se muestra ni se envía; el puntaje guardado se conserva.
+export function EvaluacionForm({ usuario, record, documentoId, veCalificacion, puntajeActivo, onSaved, onCancel }) {
   const v = record?.values || {}
   const oculto = !!record && !veCalificacion
-  const inicial = { ciclo_anio: v.ciclo_anio ? String(v.ciclo_anio) : '', fecha_evaluacion: v.fecha_evaluacion || '', calificacion: oculto ? '' : v.calificacion || '', puntaje: oculto || v.puntaje == null ? '' : String(v.puntaje), plan_mejora: v.plan_mejora ?? false }
+  const conPuntaje = puntajeActivo !== false
+  const inicial = { ciclo_anio: v.ciclo_anio ? String(v.ciclo_anio) : '', fecha_evaluacion: v.fecha_evaluacion || '', calificacion: oculto ? '' : v.calificacion || '', ...(conPuntaje ? { puntaje: oculto || v.puntaje == null ? '' : String(v.puntaje) } : {}), plan_mejora: v.plan_mejora ?? false }
   const [draft, set] = useBorrador(inicial)
   const { busy, error, errors, guardar } = useGuardar07(usuario, 'evaluaciones-desempeno', record, documentoId, inicial, onSaved)
   return <Formulario titulo={record ? `Corregir evaluación del ciclo ${v.ciclo_anio}` : 'Registrar evaluación de desempeño'} guardar="Guardar evaluación" busy={busy} error={error} onSubmit={() => guardar(draft)} onCancel={onCancel} nota={nota(record)}>
@@ -42,7 +44,7 @@ export function EvaluacionForm({ usuario, record, documentoId, veCalificacion, o
     <Campo label="Ciclo (año)" required error={errors.ciclo_anio}><input type="number" required min={1900} max={new Date().getFullYear() + 1} value={draft.ciclo_anio} onChange={set('ciclo_anio')} /></Campo>
     <Campo label="Fecha de evaluación" error={errors.fecha_evaluacion}><input type="date" max={hoy()} value={draft.fecha_evaluacion} onChange={set('fecha_evaluacion')} /></Campo>
     <Campo label={oculto ? 'Calificación (reservada: vacío conserva la guardada)' : 'Calificación'} required={!record} error={errors.calificacion}><input required={!record} maxLength={40} value={draft.calificacion} onChange={set('calificacion')} /></Campo>
-    <Campo label={oculto ? 'Puntaje (reservado: vacío conserva el guardado)' : 'Puntaje'} error={errors.puntaje}><input type="number" step="0.01" min={0} max={999.99} value={draft.puntaje} onChange={set('puntaje')} /></Campo>
+    {conPuntaje && <Campo label={oculto ? 'Puntaje (reservado: vacío conserva el guardado)' : 'Puntaje'} error={errors.puntaje}><input type="number" step="0.01" min={0} max={999.99} value={draft.puntaje} onChange={set('puntaje')} /></Campo>}
     <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2"><input type="checkbox" className="size-4 accent-teal-700" checked={draft.plan_mejora} onChange={set('plan_mejora')} />Tiene plan de mejora (el acta se sube en 7.1 b)</label>
   </Formulario>
 }

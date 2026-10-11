@@ -31,6 +31,7 @@ return [
         'seccion08.sanciones.revisar' => 'Aceptar u observar documentos de sanciones en la sección 08.',
         'datos_sensibles.ver' => 'Ver datos sensibles y de salud (secciones 01, 09 y 10).',
         'sistema.administrar' => 'Configuración, catálogos y herramientas internas de la ORH.',
+        'configuracion.modulos' => 'Activar o desactivar funcionalidades configurables, con motivo y auditoría.',
     ],
 
     // Permisos que no se asignan por rol, sino que salen de una columna de roles.
@@ -43,10 +44,22 @@ return [
         'seccion07.ver_calificacion',
     ],
 
+    // Asignación explícita: no los da el comodín '*'; solo un rol que los nombre en su lista
+    // (docs/decisiones-configuracion-secciones.md, sección 8).
+    'explicitos' => [
+        'configuracion.modulos',
+    ],
+
     // Código de rol (roles.codigo) => permisos. '*' = todo el catálogo menos
-    // los derivados y los pendientes.
+    // los derivados, los pendientes y los explícitos.
     'roles' => [
         'ADMIN' => '*',
+
+        // Rol adicional para cambiar la configuración de funcionalidades. No existe en la base ni en los
+        // seeders: se asigna expresamente a una persona. Pendiente de confirmar quién es el responsable (U9).
+        'configuracion_modulos' => [
+            'configuracion.modulos',
+        ],
 
         // Pendiente de confirmar con el cliente: el rol no existe en la base
         // ni en los seeders. Basado en la tabla "Límites del asistente".
