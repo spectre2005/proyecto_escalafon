@@ -25,6 +25,10 @@ class AuthenticationTest extends TestCase
         config([
             'auth.administrador_inicial' => ['email' => self::EMAIL, 'password' => self::CLAVE],
             'sanctum.stateful' => ['localhost:5173'],
+            // El contenedor fija CACHE_STORE=file y phpunit.xml no lo impone: sin esto, los intentos de
+            // login (por correo e IP y el throttle de la ruta) se acumulan entre pruebas y entre ejecuciones.
+            // Cada prueba empieza con un limitador vacío en memoria; el limitador sigue activo.
+            'cache.limiter' => 'array',
         ]);
         // Como el SPA: las peticiones llegan desde un dominio "stateful" y usan la cookie de sesión.
         $this->withHeader('Origin', 'http://localhost:5173');
