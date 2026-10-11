@@ -7,6 +7,8 @@ import AbrirLegajo from '../AbrirLegajo'
 import VisorPdf from '../documentos/VisorPdf'
 import Revision03Form from '../seccion03/Revision03Form'
 import { revisarDocumento08 } from '../../api/seccion08Api'
+import { useNoAplicables } from '../../api/useNoAplicables'
+import { mostrarTipo, ofrecerTipo } from '../../config/aplicacion'
 import { folios } from '../../config/documentos'
 import { estados08, resultadoRecurso08, tipoSancion08 } from '../../config/seccion08'
 import Documento08Form from './Documento08Form'
@@ -27,6 +29,7 @@ export default function Seccion08Panel({ usuario, categoria }) {
   const request = useLiveQuery(`/expedientes/${usuario}/seccion-08`)
   const data = request.data?.data
   const puedeSubir = usePuede('documento.subir')
+  const noAplica = useNoAplicables(usuario)
   const puedeRegistrarSanciones = usePuede('seccion08.sanciones.registrar')
   const puedeRevisarDocumentos = usePuede('documento.revisar')
   const puedeRevisarSanciones = usePuede('seccion08.sanciones.revisar')
@@ -78,7 +81,7 @@ export default function Seccion08Panel({ usuario, categoria }) {
         {listaTiempo.length === 0 ? <p className="mt-2 text-sm text-slate-500">Todavía no hay documentos registrados.</p> : <ol className="mt-4 space-y-3">{[...listaTiempo].reverse().map(doc => <li key={doc.id} className="flex min-w-0 gap-3 border-l-2 border-teal-200 pl-4"><span aria-hidden="true" className={`mt-1 size-2.5 shrink-0 rounded-full ${doc.grupo === 'sanciones' ? 'bg-rose-600' : 'bg-teal-700'}`} /><div className="min-w-0"><p className="break-words text-sm font-medium text-slate-800">{doc.nombre}</p><p className="mt-1 text-xs text-slate-500">{fechaEvento(doc)} · {doc.grupo === 'sanciones' ? 'Sanción disciplinaria' : 'Reconocimiento'} · Folios {folios(doc.folio_inicio, doc.folio_fin)}</p></div></li>)}</ol>}
       </section>
       <section className="space-y-3" aria-label={titulo}>
-        {items?.map(item => <details key={item.codigo} className="group overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        {items?.filter(item => mostrarTipo(noAplica, item)).map(item => <details key={item.codigo} className="group overflow-hidden rounded-2xl border border-slate-200 bg-white">
           <summary id={`item-${item.codigo}`} className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 p-5 focus-visible:outline-2 focus-visible:outline-teal-600">
             <div className="min-w-0"><h4 className="break-words text-sm font-semibold text-slate-800">{item.nombre}</h4><p className="mt-1 text-xs text-slate-500">{item.motivo} · {item.cantidad} documento(s)</p></div><Estado estado={item.estado} />
           </summary>
@@ -104,7 +107,7 @@ export default function Seccion08Panel({ usuario, categoria }) {
               {formulario?.documento?.id === doc.id && <div className="mt-4"><Revision03Form key={`${doc.id}:${formulario.estado}`} usuario={usuario} documento={doc} item={item} estado={formulario.estado} revisar={revisarDocumento08} fechaActual={data.fecha_actual} onCancel={() => cerrar()} onSaved={() => cerrar(formulario.estado === 'aceptado' ? 'Documento aceptado.' : formulario.estado === 'anulado' ? 'Documento anulado; se conserva en el historial.' : 'Observación registrada. La corrección se presenta con un documento nuevo.')} nota="La revisión queda en el historial. Los documentos originales se conservan sin editar ni eliminar." /></div>}
               {visor?.id === doc.id && <VisorPdf usuario={usuario} documento={doc} titulo={doc.nombre} onClose={() => setVisor(null)} />}
             </article>)}
-            {item.aplica && data.legajo && (grupoActual === 'sanciones' ? puedeRegistrarSanciones : puedeSubir) && <>
+            {item.aplica && ofrecerTipo(noAplica, item) && data.legajo && (grupoActual === 'sanciones' ? puedeRegistrarSanciones : puedeSubir) && <>
               {formulario?.item === item.codigo && !formulario.documento ? <Documento08Form usuario={usuario} item={item} datos={data} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado. Queda en revisión de RR. HH.')} /> : <button id={`agregar-${item.codigo}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.codigo, origen: `agregar-${item.codigo}` }) }}>{item.cantidad ? 'Agregar otro documento' : 'Agregar documento'}</button>}
             </>}
           </div>

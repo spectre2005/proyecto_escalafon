@@ -18,6 +18,7 @@ class TipoDocumentoController extends ResourceController
         'aplica_carrera' => 'sometimes|boolean',
         'aplica_plazo_determinado' => 'sometimes|boolean',
         'aplica_designado' => 'sometimes|boolean',
+        'aplica_tipo_personal' => 'sometimes|in:ambos,docente,administrativo',
         'requiere_docente' => 'sometimes|boolean',
         'requiere_administrativo' => 'sometimes|boolean',
         'requiere_djbr' => 'sometimes|boolean',

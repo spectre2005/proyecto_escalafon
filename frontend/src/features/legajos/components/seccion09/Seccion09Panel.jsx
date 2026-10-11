@@ -3,6 +3,8 @@ import { useState } from 'react'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../../auth/session'
 import { anularSeccion09 } from '../../api/seccion09Api'
+import { useNoAplicables } from '../../api/useNoAplicables'
+import { mostrarTipo, ofrecerTipo } from '../../config/aplicacion'
 import { categoriasSeccion09, estadosControversia, instancias, permisosSeccion09, tipoControversiaDe } from '../../config/seccion09'
 import { coloresEstadoDocumento, estadosDocumento } from '../../config/seccion02'
 import { etiqueta } from '../../config/seccion01'
@@ -56,6 +58,7 @@ function FormularioEnlazado({ usuario, tipo, documentoId, onDone }) {
 // Tipos de documento del bloque: estado, documentos cargados y carga por el mecanismo común (folios, recepción, visor).
 function Documentos({ usuario, data, tipos, sinLegajo }) {
   const puedeSubir = usePuede('documento.subir')
+  const noAplica = useNoAplicables(usuario)
   const [subiendo, setSubiendo] = useState(null)
   const [enlazando, setEnlazando] = useState(null)
   const [aviso, setAviso] = useState('')
@@ -75,7 +78,7 @@ function Documentos({ usuario, data, tipos, sinLegajo }) {
     <h3 className="mb-1 text-base font-semibold text-slate-800">Documentos</h3>
     <p className="mb-4 text-xs text-slate-500">Cada documento se sube en PDF con sus metadatos. Los folios son correlativos en toda la sección. Ningún documento de esta sección es obligatorio: se incorpora solo si existe.{sinLegajo && puedeSubir ? ` ${sinLegajo}` : ''}</p>
     {aviso && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
-    <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">{tipos.map(tipo => <li key={tipo.id} className="p-4">
+    <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">{tipos.filter(tipo => mostrarTipo(noAplica, tipo)).map(tipo => <li key={tipo.id} className="p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-slate-800">{tipo.literal && <span className="mr-1 text-slate-500">{tipo.literal})</span>}{tipo.nombre}</p>
@@ -85,7 +88,7 @@ function Documentos({ usuario, data, tipos, sinLegajo }) {
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <Etiqueta clase="bg-slate-100 text-slate-600">Opcional</Etiqueta>
           <Etiqueta clase={coloresEstadoDocumento[tipo.estado] || 'bg-slate-100 text-slate-700'}>{etiqueta(estadosDocumento, tipo.estado)}{tipo.documentos > 1 ? ` · ${tipo.documentos} documentos` : ''}</Etiqueta>
-          {puedeSubir && <button disabled={ocupado || !!sinLegajo} title={sinLegajo || undefined} onClick={() => { setAviso(''); setSubiendo(tipo.id) }} className={`${enlace} inline-flex items-center gap-2`}><Icon name="paperclip" size={18} />Subir documento</button>}
+          {puedeSubir && ofrecerTipo(noAplica, tipo) && <button disabled={ocupado || !!sinLegajo} title={sinLegajo || undefined} onClick={() => { setAviso(''); setSubiendo(tipo.id) }} className={`${enlace} inline-flex items-center gap-2`}><Icon name="paperclip" size={18} />Subir documento</button>}
         </div>
       </div>
       {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={9} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo, data)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}

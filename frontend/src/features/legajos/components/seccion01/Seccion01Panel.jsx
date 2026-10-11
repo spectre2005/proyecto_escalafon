@@ -3,6 +3,8 @@ import { useState } from 'react'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../../auth/session'
 import { anularRegistro } from '../../api/seccion01Api'
+import { useNoAplicables } from '../../api/useNoAplicables'
+import { mostrarTipo, ofrecerTipo } from '../../config/aplicacion'
 import { folios } from '../../config/documentos'
 import { etiqueta, formulariosDatos01, gruposSeccion01, parentescos, personasCertificado, resultadosDeclaracion, tiposDeclaracion, tiposDocIdentidad } from '../../config/seccion01'
 import { coloresEstadoDocumento, estadosDocumento } from '../../config/seccion02'
@@ -87,11 +89,14 @@ function FormularioEnlazado({ usuario, data, tipo, documentoId, onDone }) {
 // metadatos (documento.subir). Un documento no se elimina ni se reemplaza: se subsana con uno nuevo.
 function Documentos({ usuario, data, codigos }) {
   const puedeSubir = usePuede('documento.subir')
+  const noAplica = useNoAplicables(usuario)
   const [subiendo, setSubiendo] = useState(null)
   const [enlazando, setEnlazando] = useState(null)
   const [aviso, setAviso] = useState('')
-  const tipos = codigos.map(codigo => data.tipos.find(tipo => tipo.codigo === codigo)).filter(Boolean)
-  if (!tipos.length) return <Aviso>El catálogo de documentos de la sección 01 no está cargado en la base de datos (Seccion01CatalogoSeeder).</Aviso>
+  const catalogo = codigos.map(codigo => data.tipos.find(tipo => tipo.codigo === codigo)).filter(Boolean)
+  // Solo los tipos que corresponden a la persona (o que ya tienen documentos).
+  const tipos = catalogo.filter(tipo => mostrarTipo(noAplica, tipo))
+  if (!catalogo.length) return <Aviso>El catálogo de documentos de la sección 01 no está cargado en la base de datos (Seccion01CatalogoSeeder).</Aviso>
   const sinLegajo = !data.legajo
   const ocupado = !!subiendo || !!enlazando
   function subido(tipo, documento) {
@@ -121,7 +126,7 @@ function Documentos({ usuario, data, codigos }) {
             {tipo.solo_anexo_05 && <Anexo05 />}
             <Etiqueta clase={exigeClase}>{exigeTexto}</Etiqueta>
             <Etiqueta clase={coloresEstadoDocumento[tipo.estado] || 'bg-slate-100 text-slate-700'}>{etiqueta(estadosDocumento, tipo.estado)}{tipo.documentos > 1 ? ` · ${tipo.documentos} documentos` : ''}</Etiqueta>
-            {puedeSubir && <button disabled={ocupado || sinLegajo} onClick={() => { setAviso(''); setSubiendo(tipo.id) }} className={`${enlace} inline-flex items-center gap-2`}><Icon name="paperclip" size={18} />{tipo.documento && !tipo.permite_multiples ? 'Subsanar documento' : 'Subir documento'}</button>}
+            {puedeSubir && ofrecerTipo(noAplica, tipo) && <button disabled={ocupado || sinLegajo} onClick={() => { setAviso(''); setSubiendo(tipo.id) }} className={`${enlace} inline-flex items-center gap-2`}><Icon name="paperclip" size={18} />{tipo.documento && !tipo.permite_multiples ? 'Subsanar documento' : 'Subir documento'}</button>}
           </div>
         </div>
         {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={1} tipo={tipo} titular={data.titular} relacion={relacionPorTipo[tipo.codigo]} enlaces={enlacesDe(tipo, data)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}

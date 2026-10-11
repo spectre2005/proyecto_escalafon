@@ -28,6 +28,7 @@ class TipoDocumento extends Model
         'aplica_carrera',
         'aplica_plazo_determinado',
         'aplica_designado',
+        'aplica_tipo_personal',
         'requiere_docente',
         'requiere_administrativo',
         'requiere_djbr',

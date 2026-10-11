@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../../auth/session'
+import { useNoAplicables } from '../../api/useNoAplicables'
+import { mostrarTipo, ofrecerTipo } from '../../config/aplicacion'
 import { grupos03, estados03, antivirus03 } from '../../config/seccion03'
 import { folios } from '../../config/documentos'
 import AbrirLegajo from '../AbrirLegajo'
@@ -21,6 +23,7 @@ export default function Seccion03Panel({ usuario }) {
   const request = useLiveQuery(`/expedientes/${usuario}/seccion-03`)
   const data = request.data?.data
   const puedeAgregar = usePuede('documento.subir')
+  const noAplica = useNoAplicables(usuario)
   const puedeRevisar = usePuede('documento.revisar')
   const [formulario, setFormulario] = useState(null)
   const [visor, setVisor] = useState(null)
@@ -53,7 +56,7 @@ export default function Seccion03Panel({ usuario }) {
     {data.items.length === 0 && <p className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600">No hay tipos documentales disponibles para tu perfil. Solicita a administración revisar el catálogo de la Sección 03.</p>}
     {grupos03.map(([titulo, descripcion], grupo) => <section key={titulo} aria-label={titulo} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <header className="border-b border-slate-100 p-5"><h3 className="font-semibold text-slate-800">{titulo}</h3><p className="mt-1 text-xs text-slate-500">{descripcion}</p></header>
-      {data.items.filter(item => item.grupo === grupo).map(item => <details key={item.id} open={item.letra === 'b'} className="border-b border-slate-100 last:border-b-0">
+      {data.items.filter(item => item.grupo === grupo && mostrarTipo(noAplica, item)).map(item => <details key={item.id} open={item.letra === 'b'} className="border-b border-slate-100 last:border-b-0">
         <summary id={`item-${item.id}`} className="grid cursor-pointer grid-cols-[28px_minmax(0,1fr)] items-start gap-3 p-4 focus-visible:outline-2 focus-visible:outline-teal-700 sm:grid-cols-[28px_minmax(0,1fr)_auto]">
           <span className="grid size-7 place-items-center rounded-lg bg-teal-50 text-sm font-bold text-teal-800">{item.letra}</span>
           <span className="min-w-0"><span className="block break-words text-sm font-semibold text-slate-800">{item.nombre}</span><span className="mt-1 block text-xs text-slate-500">{item.motivo}{item.requiere_fedateo && ' Requiere fedateo.'}</span><span className="mt-1 block text-xs text-slate-500">{item.cantidad} documento(s) vigente(s)</span></span>
@@ -77,7 +80,7 @@ export default function Seccion03Panel({ usuario }) {
             {visor?.id === doc.id && <VisorPdf usuario={usuario} documento={doc} titulo={doc.nombre} onClose={() => setVisor(null)} />}
           </li>)}</ul>
           {puedeAgregar && data.legajo && item.aplica && <>
-            {formulario?.item === item.id && !formulario.documento ? <Documento03Form usuario={usuario} item={item} datos={data} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado. Queda en revisión de RR. HH.')} /> : <button id={`agregar-${item.id}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.id, origen: `agregar-${item.id}` }) }}>{item.cantidad ? (item.permite_multiples ? 'Agregar otro documento' : 'Agregar documento que subsane al anterior') : 'Agregar documento'}</button>}
+            {formulario?.item === item.id && !formulario.documento ? <Documento03Form usuario={usuario} item={item} datos={data} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado. Queda en revisión de RR. HH.')} /> : ofrecerTipo(noAplica, item) && <button id={`agregar-${item.id}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.id, origen: `agregar-${item.id}` }) }}>{item.cantidad ? (item.permite_multiples ? 'Agregar otro documento' : 'Agregar documento que subsane al anterior') : 'Agregar documento'}</button>}
           </>}
         </div>
       </details>)}

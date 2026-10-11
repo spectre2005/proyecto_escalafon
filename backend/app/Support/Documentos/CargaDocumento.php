@@ -7,6 +7,7 @@ use App\Models\DocumentoUsuario;
 use App\Models\HistorialEstadoDocumento;
 use App\Models\Legajo;
 use App\Models\TipoDocumento;
+use App\Support\AplicacionDocumental;
 use Closure;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -31,6 +32,12 @@ final class CargaDocumento
      */
     public static function registrar(Legajo $legajo, TipoDocumento $tipo, UploadedFile $pdf, array $metadatos, string $autor, ?string $ip, ?string $subsanaA = null, ?string $enlaceId = null, string $estadoInicial = self::ESTADO_INICIAL, ?Closure $completar = null, bool $foliosAutomaticos = false): DocumentoUsuario
     {
+        // Solo se cargan los tipos que corresponden a la persona (AplicacionDocumental). Subsanar un documento ya
+        // existente se permite siempre: corrige algo que ya está en el legajo.
+        $noAplica = $subsanaA === null ? AplicacionDocumental::para($legajo->usuario()->firstOrFail())->noAplica($tipo) : null;
+        if ($noAplica !== null) {
+            throw ValidationException::withMessages(['tipo_documento_id' => "Este tipo de documento no corresponde a la persona. {$noAplica}"]);
+        }
         $disco = (string) config('legajo.disco_documentos');
         $ruta = sprintf('legajos/%s/seccion-%02d/%s.pdf', $legajo->id, $tipo->seccion_legajo_id, Str::uuid());
         $archivo = [

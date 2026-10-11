@@ -3,6 +3,8 @@ import { useState } from 'react'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../../auth/session'
 import { anularDesvinculacion } from '../../api/seccion11Api'
+import { useNoAplicables } from '../../api/useNoAplicables'
+import { mostrarTipo, ofrecerTipo } from '../../config/aplicacion'
 import { bloquesDocumentos11, categoriasSeccion11, etiquetaVinculo11, motivosCese, permisosSeccion11, regimenesLaborales11 } from '../../config/seccion11'
 import { coloresEstadoDocumento, estadosDocumento } from '../../config/seccion02'
 import { etiqueta } from '../../config/seccion01'
@@ -114,8 +116,8 @@ function Desvinculaciones({ usuario, data, sinLegajo, onNavigate }) {
 }
 
 // Un tipo de documento: estado, lista (recepción y visor comunes) y carga con enlace a la desvinculación o al vínculo.
-function TipoDocumento({ usuario, data, tipo, sinLegajo }) {
-  const puedeSubir = usePuede('documento.subir')
+function TipoDocumento({ usuario, data, tipo, sinLegajo, ofrecer }) {
+  const puedeSubir = usePuede('documento.subir') && ofrecer
   const [subiendo, setSubiendo] = useState(false)
   const [registrando, setRegistrando] = useState(null)
   const [aviso, setAviso] = useState('')
@@ -149,10 +151,11 @@ function TipoDocumento({ usuario, data, tipo, sinLegajo }) {
 }
 
 function Documentos({ usuario, data, sinLegajo }) {
+  const noAplica = useNoAplicables(usuario)
   if (!data.tipos.length) return <Aviso>El catálogo de documentos de la sección 11 no está cargado en la base de datos (Seccion11CatalogoSeeder).</Aviso>
   return Object.entries(bloquesDocumentos11).map(([bloque, titulo]) => <section key={bloque} aria-label={titulo} className="mb-8">
     <h3 className="mb-3 text-base font-semibold text-slate-800">{titulo}</h3>
-    <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">{data.tipos.filter(t => t.bloque === bloque).map(tipo => <TipoDocumento key={tipo.id} usuario={usuario} data={data} tipo={tipo} sinLegajo={sinLegajo} />)}</ul>
+    <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">{data.tipos.filter(t => t.bloque === bloque && mostrarTipo(noAplica, t)).map(tipo => <TipoDocumento key={tipo.id} usuario={usuario} data={data} tipo={tipo} sinLegajo={sinLegajo} ofrecer={ofrecerTipo(noAplica, tipo)} />)}</ul>
   </section>)
 }
 

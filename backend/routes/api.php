@@ -230,6 +230,9 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', Fu
         ->middleware('can:documento.recepcionar')->whereUuid(['usuario', 'documento']);
     Route::get('expedientes/{usuario}/documentos/{documento}/archivo', [DocumentoLegajoController::class, 'archivo'])
         ->middleware('can:legajo.ver')->whereUuid(['usuario', 'documento']);
+    // Tipos de documento que no corresponden a la persona (docente o administrativo, régimen): no se ofrecen para cargar.
+    Route::get('expedientes/{usuario}/documentos/no-aplicables', [DocumentoLegajoController::class, 'noAplicables'])
+        ->middleware('can:legajo.ver')->whereUuid('usuario');
 
     Route::middleware('can:sistema.administrar')->group(function (): void {
         // URI propia: la misma forma que la de la sección 01 la reemplazaría.

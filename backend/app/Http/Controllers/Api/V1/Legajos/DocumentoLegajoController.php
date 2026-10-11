@@ -8,6 +8,7 @@ use App\Models\DocumentoUsuario;
 use App\Models\Legajo;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
+use App\Support\AplicacionDocumental;
 use App\Support\Documentos\ArchivoPdf;
 use App\Support\Documentos\AuditoriaDocumento;
 use App\Support\Documentos\CargaDocumento;
@@ -42,6 +43,15 @@ class DocumentoLegajoController extends Controller
     private const CAMPOS = ['seccion_legajo_id', 'tipo_documento_id', 'pdf', 'folio_inicio', 'folio_fin', 'fecha_incorporacion', 'emisor', 'fecha_emision',
         'titular_nombre', 'titular_documento', 'num_resolucion', 'modalidad_presentacion', 'relacion_titular', 'motivo_incorporacion',
         'subsana_a_documento_id', 'enlace_id', 'fecha_caducidad'];
+
+    /**
+     * Tipos de documento que no corresponden a la persona (docente o administrativo, régimen), con su motivo. El
+     * frontend no los ofrece para cargar; CargaDocumento los rechaza igualmente.
+     */
+    public function noAplicables(string $usuario): JsonResponse
+    {
+        return response()->json(['data' => AplicacionDocumental::para(Usuario::query()->findOrFail($usuario))->noAplicables()]);
+    }
 
     /** Folio sugerido para la próxima carga en una sección: ultimo_folio + 1. */
     public function folio(Request $request, string $usuario): JsonResponse
