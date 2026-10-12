@@ -134,4 +134,21 @@ class ConfiguracionBloqueoTest extends TestCase
         $this->assertNotContains('S09_OTROS_UNIVERSIDAD', $data['tipos_inactivos']);
         $this->assertFalse($data['activas']['s06.compensaciones']);
     }
+
+    public function test_admin_wildcard_does_not_grant_configuracion_modulos(): void
+    {
+        // configuracion.modulos es de asignación explícita: el '*' de ADMIN no lo incluye.
+        $this->actuarComo();
+        $this->getJson('/api/v1/configuracion/funcionalidades')->assertForbidden();
+        $this->patchJson('/api/v1/configuracion/funcionalidades/s06.compensaciones', ['activa' => false, 'motivo' => 'Prueba'])->assertForbidden();
+        $this->assertDatabaseCount('configuracion_funcionalidades', 0);
+    }
+
+    public function test_changing_a_feature_without_configuracion_modulos_is_rejected(): void
+    {
+        $this->actuarComo(null, 'asistente_legajo');
+        $this->patchJson('/api/v1/configuracion/funcionalidades/s06.compensaciones', ['activa' => false, 'motivo' => 'Prueba'])->assertForbidden();
+        $this->assertDatabaseCount('configuracion_funcionalidades', 0);
+        $this->assertTrue(ConfiguracionFuncionalidades::activa('s06.compensaciones'));
+    }
 }

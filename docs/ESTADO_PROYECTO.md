@@ -131,3 +131,17 @@ Sección 05:
 - 30/09/2026: se definió el panel principal y la sección Legajos (mockups), y se generó el módulo `features/legajos/` con datos de ejemplo.
 - 02/10/2026: sección 02 cerrada en lo principal: subida de PDF con folios, recepción, visor con bitácora, anulación de vínculos y adendas, datos del puesto y apertura del legajo desde la ficha.
 - 04/10/2026: sección 01 alineada con la directiva: catálogo, seguridad del CRUD, PDF sin borrado, servicio común de documentos, exigencias por familiar y menú por grupos (sin commit).
+
+## Configuración (30/09 → 11/10/2026)
+- /configuracion tiene pestañas Institución y Funcionalidades (?pestana=...).
+  Archivos: features/settings/SettingsPage.jsx (contenedor), InstitucionConfig.jsx (nuevo),
+  FuncionalidadesConfig.jsx (sin cambios), layouts/AccountMenu.jsx.
+- Permisos: sistema.administrar → Institución; configuracion.modulos → Funcionalidades.
+  Cada ruta del backend valida su propio permiso (api.php:95-100). Tests en
+  ConfiguracionBloqueoTest e InstitutionSettingsTest.
+- ATENCIÓN: el comodín '*' del rol ADMIN NO incluye configuracion.modulos. Un
+  administrador nuevo necesita los dos roles (ADMIN y configuracion_modulos).
+- Un usuario sin ningún permiso no puede iniciar sesión (AuthController.php:31).
+- La base real tiene 68 tablas; escalafon_drawdb_55.sql está desactualizado.
+- asistente_legajo aún no existe en la base (pendiente de confirmar con el cliente).
+- Pendiente: Funcionalidades con 25 opciones es larga; plegar por sección (después).

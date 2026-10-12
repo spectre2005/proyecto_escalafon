@@ -11,7 +11,10 @@ const options = [
 
 export default function AccountMenu({ institution, account, onLogout, closing = false }) {
   const [open, setOpen] = useState(false)
-  const canConfigure = usePuede('sistema.administrar')
+  // Igual que el menú lateral: Configuración se ve con cualquiera de sus dos permisos.
+  const canAdministrar = usePuede('sistema.administrar')
+  const canModulos = usePuede('configuracion.modulos')
+  const canConfigure = canAdministrar || canModulos
   const rootRef = useRef(null)
   const buttonRef = useRef(null)
   useEffect(() => {

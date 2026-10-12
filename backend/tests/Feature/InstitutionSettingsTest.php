@@ -42,6 +42,15 @@ class InstitutionSettingsTest extends TestCase
         $this->assertDatabaseCount('institution_settings', 0);
     }
 
+    public function test_configuracion_modulos_alone_cannot_save_settings(): void
+    {
+        // Configurar funcionalidades no da acceso a la identidad institucional.
+        $this->actuarComo(null, 'configuracion_modulos');
+        $snapshot = $this->getJson('/api/v1/institucion')->assertOk()->json();
+        $this->putJson('/api/v1/institucion', $snapshot['data'], ['If-Match' => $snapshot['version']])->assertForbidden();
+        $this->assertDatabaseCount('institution_settings', 0);
+    }
+
     public function test_stale_configuration_cannot_overwrite_a_confirmed_save(): void
     {
         $this->actuarComo();
