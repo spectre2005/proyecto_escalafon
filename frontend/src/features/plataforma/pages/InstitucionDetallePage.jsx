@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { activarInstitucion, editarInstitucion, mensajeError, sesionTerminada, suspenderInstitucion, verInstitucion } from '../api'
 import { Aviso, EstadoInstitucion, SinAprovisionar } from '../componentes'
-import { accionesDisponibles, cambios, etiquetaAccion, fecha } from '../estado'
+import { AVISO_SUSPENSION, accionesDisponibles, cambios, etiquetaAccion, fecha } from '../estado'
 import { useSesionPlataforma } from '../sesion'
 
 const entrada = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 disabled:bg-slate-50 disabled:text-slate-500'
@@ -34,7 +34,8 @@ function ConfirmarEstado({ accion, institucion, onConfirmar, onCerrar }) {
   return <dialog ref={ref} onClose={onCerrar} aria-labelledby="titulo-confirmar" className="m-auto w-full max-w-md rounded-2xl p-0 backdrop:bg-slate-900/40">
     <form onSubmit={confirmar} aria-busy={busy} className="space-y-4 p-6">
       <h2 id="titulo-confirmar" className="text-lg font-bold text-slate-900">{suspender ? 'Suspender' : accionesDisponibles(institucion).textoActivar} «{institucion.nombre}»</h2>
-      <p className="text-sm text-slate-600">{suspender ? 'Su personal dejará de tener acceso cuando la plataforma resuelva instituciones. Su base de datos, sus archivos y sus datos se conservan: nada se borra.' : 'La institución quedará activa. Solo es posible porque su aprovisionamiento está verificado.'}</p>
+      <p className="text-sm text-slate-600">{suspender ? 'Su base de datos, sus archivos y sus datos se conservan: nada se borra.' : 'La institución quedará activa. Solo es posible porque su aprovisionamiento está verificado.'}</p>
+      {suspender && <Aviso tipo="info">{AVISO_SUSPENSION}</Aviso>}
       <Aviso>{error}</Aviso>
       <label className="grid gap-2 text-xs font-medium text-slate-600">{suspender ? 'Motivo *' : 'Motivo (opcional)'}<textarea required={suspender} minLength={suspender ? 5 : undefined} maxLength={500} rows={3} value={motivo} onChange={event => setMotivo(event.target.value)} disabled={busy} className={entrada} /></label>
       <div className="flex justify-end gap-3"><button type="button" onClick={() => ref.current.close()} disabled={busy} className="rounded-xl border border-slate-200 px-4 py-2 text-sm">Cancelar</button><button type="submit" disabled={busy} className={`rounded-xl px-4 py-2 text-sm font-semibold text-white ${suspender ? 'bg-rose-700' : 'bg-teal-700'}`}>{busy ? 'Guardando…' : suspender ? 'Suspender' : 'Confirmar'}</button></div>
@@ -103,10 +104,13 @@ export default function InstitucionDetallePage() {
     <Link to="/plataforma/instituciones" className="text-sm text-teal-700 underline">Volver a instituciones</Link>
     <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
       <div><h1 id="titulo-institucion" className="text-2xl font-bold text-slate-900">{institucion.nombre}</h1><div className="mt-2 flex flex-wrap gap-2"><EstadoInstitucion estado={institucion.estado} /><SinAprovisionar institucion={institucion} /></div></div>
-      <div className="flex flex-wrap gap-2">
-        {!borrador && <button type="button" onClick={() => { setAviso(''); setError(''); setBorrador({ nombre: institucion.nombre, slug: institucion.slug, base_datos: institucion.base_datos, almacenamiento: institucion.almacenamiento }) }} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm">Editar datos</button>}
-        <button type="button" disabled={!acciones.activar} title={institucion.motivo_no_activable || ''} onClick={() => { setAviso(''); setConfirmar('activar') }} className="rounded-xl bg-teal-700 px-4 py-2 text-sm font-semibold text-white">{acciones.textoActivar}</button>
-        <button type="button" disabled={!acciones.suspender} title={institucion.motivo_no_suspendible || ''} onClick={() => { setAviso(''); setConfirmar('suspender') }} className="rounded-xl border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-700">Suspender</button>
+      <div className="grid justify-items-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
+          {!borrador && <button type="button" onClick={() => { setAviso(''); setError(''); setBorrador({ nombre: institucion.nombre, slug: institucion.slug, base_datos: institucion.base_datos, almacenamiento: institucion.almacenamiento }) }} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm">Editar datos</button>}
+          <button type="button" disabled={!acciones.activar} title={institucion.motivo_no_activable || ''} onClick={() => { setAviso(''); setConfirmar('activar') }} className="rounded-xl bg-teal-700 px-4 py-2 text-sm font-semibold text-white">{acciones.textoActivar}</button>
+          <button type="button" disabled={!acciones.suspender} title={institucion.motivo_no_suspendible || ''} onClick={() => { setAviso(''); setConfirmar('suspender') }} className="rounded-xl border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-700">Suspender</button>
+        </div>
+        <p role="note" className="max-w-xs rounded-lg bg-amber-50 px-3 py-2 text-right text-xs text-amber-900">{AVISO_SUSPENSION}</p>
       </div>
     </div>
     <div className="mt-5 space-y-3">

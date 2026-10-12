@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { accionesDisponibles, cambios, etiquetaEstado, proponerSlug, proponerUbicacion } from './estado.js'
+import { AVISO_SUSPENSION, accionesDisponibles, cambios, etiquetaEstado, proponerSlug, proponerUbicacion } from './estado.js'
 import { esEscritura, mensajeError } from './api.js'
 
 test('state actions follow what the backend allows', () => {
@@ -12,6 +12,8 @@ test('state actions follow what the backend allows', () => {
     { activar: true, suspender: false, textoActivar: 'Reactivar' })
   assert.equal(accionesDisponibles(null).activar, false)
   assert.equal(etiquetaEstado('suspendida'), 'Suspendida')
+  // Hasta que exista el cambio de base por petición, suspender no bloquea el acceso: se avisa junto al botón.
+  assert.equal(AVISO_SUSPENSION, 'La suspensión queda registrada, pero aún no bloquea el acceso de la institución.')
 })
 
 test('identifier and location are proposed from the name', () => {

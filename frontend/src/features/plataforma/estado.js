@@ -5,6 +5,9 @@ export const ESTADOS = {
   suspendida: { etiqueta: 'Suspendida', clase: 'bg-rose-50 text-rose-700 ring-rose-200' },
 }
 
+/** Se quita cuando exista el cambio de base por petición (la suspensión pase a bloquear el acceso). */
+export const AVISO_SUSPENSION = 'La suspensión queda registrada, pero aún no bloquea el acceso de la institución.'
+
 export const etiquetaEstado = estado => ESTADOS[estado]?.etiqueta || estado || '—'
 
 /** Acciones de estado disponibles: activar solo si está aprovisionada; suspender solo si está activa. */
