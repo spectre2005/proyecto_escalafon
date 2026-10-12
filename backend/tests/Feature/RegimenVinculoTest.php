@@ -138,10 +138,21 @@ class RegimenVinculoTest extends TestCase
             ->assertUnprocessable()->assertJsonPath('errors', ['usuarios.0.regimen_normativo_id' => ['Indica la ley (régimen normativo) de la persona: CAS, 276, 30057, 728.']]);
     }
 
+    public function test_the_person_list_gives_the_law_and_null_when_it_is_undefined(): void
+    {
+        $this->actuarComo();
+        $this->persona->update(['regimen_normativo_id' => null, 'regimen_laboral' => '276']);
+        $this->getJson('/api/v1/usuarios/'.$this->persona->id)->assertOk()->assertJsonPath('data.ley', null)->assertJsonPath('data.regimen_laboral', '276');
+        $this->persona->update(['regimen_normativo_id' => $this->ley('276')->id]);
+        $this->getJson('/api/v1/usuarios/'.$this->persona->id)->assertOk()->assertJsonPath('data.ley.codigo', '276');
+        $fila = collect($this->getJson('/api/v1/usuarios?per_page=100')->assertOk()->json('data'))->firstWhere('id', $this->persona->id);
+        $this->assertSame('276', $fila['ley']['codigo'] ?? null);
+    }
+
     public function test_cas_non_renewal_with_an_undefined_link_says_where_to_define_it(): void
     {
         $general = 'No corresponde.';
-        $this->assertSame('Define el tipo de vínculo en la sección 02 (Corregir vínculo).', Seccion11::motivoRechazo(Seccion11::NO_RENOVACION_CAS, 'no_renovacion', null, $general));
+        $this->assertSame('Define el tipo de vínculo en la sección 02 (2.2: «Completar tipo» si el vínculo está cerrado).', Seccion11::motivoRechazo(Seccion11::NO_RENOVACION_CAS, 'no_renovacion', null, $general));
         $this->assertSame($general, Seccion11::motivoRechazo(Seccion11::NO_RENOVACION_CAS, 'no_renovacion', 'carrera', $general));
         $this->assertSame($general, Seccion11::motivoRechazo(Seccion11::NO_RENOVACION_CAS, 'renuncia', null, $general));
         $this->assertNull(Seccion11::motivoRechazo(Seccion11::NO_RENOVACION_CAS, 'no_renovacion', 'plazo_determinado', $general));
@@ -155,8 +166,14 @@ class RegimenVinculoTest extends TestCase
         $dl276 = $this->vinculo(null, ['regimen_normativo_id' => $this->ley('276')->id]);
         $this->assertSame('carrera', RegimenesLaborales::sugerencia($docente->fresh())['valor']);
         $this->assertSame('plazo_determinado', RegimenesLaborales::sugerencia($cas->fresh())['valor']);
-        $this->assertNull(RegimenesLaborales::sugerencia($dl276->fresh())['valor']);
+        $this->assertSame(['valor' => null, 'motivo' => 'Confirma si es carrera o designado.'], RegimenesLaborales::sugerencia($dl276->fresh()));
         $this->assertNull(RegimenesLaborales::sugerencia($this->vinculo('carrera')));
         $this->assertNull($docente->fresh()->regimen_laboral);
+
+        // Por HTTP (2.2), con la ley cargada desde el listado de vínculos.
+        $this->actuarComo();
+        $vinculos = collect($this->getJson('/api/v1/expedientes/'.$this->persona->id.'/seccion-02')->assertOk()->json('data.vinculos'))->keyBy('id');
+        $this->assertSame(['valor' => 'plazo_determinado', 'motivo' => 'Contrato CAS (D.L. 1057).'], $vinculos[$cas->id]['tipo_sugerido']);
+        $this->assertSame(['valor' => null, 'motivo' => 'Confirma si es carrera o designado.'], $vinculos[$dl276->id]['tipo_sugerido']);
     }
 }

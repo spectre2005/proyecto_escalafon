@@ -45,6 +45,7 @@ use App\Http\Controllers\Api\V1\Legajos\Seccion08Controller;
 use App\Http\Controllers\Api\V1\Legajos\Seccion09Controller;
 use App\Http\Controllers\Api\V1\Legajos\Seccion10Controller;
 use App\Http\Controllers\Api\V1\Legajos\Seccion11Controller;
+use App\Http\Controllers\Api\V1\Legajos\VinculoTipoController;
 use App\Http\Controllers\Api\V1\LegajoSeccionController;
 use App\Http\Controllers\Api\V1\LicenciaPermisoController;
 use App\Http\Controllers\Api\V1\MovimientoCustodiaLegajoController;
@@ -163,6 +164,8 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', Fu
         Route::post('expedientes/{usuario}/vinculos-laborales', [Seccion02Controller::class, 'storeVinculo'])->whereUuid('usuario');
         Route::patch('expedientes/{usuario}/vinculos-laborales/{vinculo}', [Seccion02Controller::class, 'updateVinculo'])->whereUuid(['usuario', 'vinculo']);
         Route::put('expedientes/{usuario}/vinculos-laborales/{vinculo}/datos-puesto', [Seccion02Controller::class, 'guardarDatosPuesto'])->whereUuid(['usuario', 'vinculo']);
+        // Vínculo cerrado Sin definir: solo se completa el tipo, una vez (auditado).
+        Route::post('expedientes/{usuario}/vinculos-laborales/{vinculo}/completar-tipo', [VinculoTipoController::class, 'completar'])->whereUuid(['usuario', 'vinculo']);
         Route::post('expedientes/{usuario}/vinculo-adendas', [Seccion02Controller::class, 'storeAdenda'])->whereUuid('usuario');
         Route::post('expedientes/{usuario}/inducciones', [Seccion02Controller::class, 'storeInduccion'])->whereUuid('usuario');
         Route::post('expedientes/{usuario}/periodos-prueba', [Seccion02Controller::class, 'storePeriodo'])->whereUuid('usuario');

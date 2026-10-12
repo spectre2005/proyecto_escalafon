@@ -1,19 +1,26 @@
 import { columns, parseUsersCsv } from './usuariosCsv.js'
+import { codigoVisible, leyesDelTipo } from './leyes.js'
 
 export const excelFields = [
   ['numero_doc_identidad', 'DNI *', 14], ['nombres', 'Nombres *', 25],
   ['apellido_paterno', 'Apellido paterno *', 24], ['apellido_materno', 'Apellido materno', 24],
   ['email_institucional', 'Correo institucional *', 38], ['telefono', 'Teléfono', 16],
-  ['tipo_personal', 'Tipo de personal *', 24], ['regimen_laboral', 'Régimen laboral *', 24],
+  ['tipo_personal', 'Tipo de personal *', 24], ['ley', 'Ley (código) *', 24],
   ['region', 'Región', 24], ['provincia', 'Provincia', 24], ['distrito', 'Distrito', 24],
 ]
+
+// Plantillas anteriores: la ley venía como «Régimen laboral».
+const encabezadosAnteriores = { 'Régimen laboral *': 'ley' }
 
 async function workbook() {
   const { default: ExcelJS } = await import('exceljs')
   return new ExcelJS.Workbook()
 }
 
-export async function createUsersTemplate() {
+// catalogo: leyes de /expediente-opciones; las listas de la plantilla salen de él (por tipo de personal).
+export async function createUsersTemplate(catalogo) {
+  const codigos = tipo => leyesDelTipo(catalogo, tipo).map(codigoVisible)
+  const docentes = codigos('docente').join(','), administrativos = codigos('administrativo').join(',')
   const book = await workbook()
   const sheet = book.addWorksheet('Personal', { views: [{ state: 'frozen', ySplit: 1 }] })
   sheet.columns = excelFields.map(([key, header, width]) => ({ key, header, width, style: { numFmt: '@' } }))
@@ -27,21 +34,22 @@ export async function createUsersTemplate() {
   excelFields.forEach(([, label], index) => { sheet.getCell(1, index + 1).note = label.includes('*') ? 'Campo obligatorio.' : 'Campo opcional.' })
   for (let row = 2; row <= 1001; row++) {
     sheet.getCell(row, 7).dataValidation = { type: 'list', allowBlank: false, formulae: ['"docente,administrativo"'], showErrorMessage: true, errorTitle: 'Tipo inválido', error: 'Selecciona docente o administrativo.' }
-    sheet.getCell(row, 8).dataValidation = { type: 'list', allowBlank: false, formulae: [`IF(G${row}="docente","30220","CAS,276,728,30057")`], showErrorMessage: true, errorTitle: 'Régimen inválido', error: 'Selecciona un régimen correspondiente al tipo de personal.' }
+    sheet.getCell(row, 8).dataValidation = { type: 'list', allowBlank: false, formulae: [`IF(G${row}="docente","${docentes}","${administrativos}")`], showErrorMessage: true, errorTitle: 'Ley inválida', error: 'Selecciona una ley correspondiente al tipo de personal.' }
   }
   const help = book.addWorksheet('Instrucciones')
   help.columns = [{ width: 30 }, { width: 100 }]
   const instructions = [
     ['Campo', 'Cómo completar la plantilla'],
     ['Registro', 'Completa la hoja Personal desde la fila 2. Una fila por usuario. Máximo 1,000 usuarios. No cambies los encabezados.'],
-    ['Obligatorios', 'DNI, nombres, apellido paterno, correo institucional, tipo de personal y régimen laboral.'],
+    ['Obligatorios', 'DNI, nombres, apellido paterno, correo institucional, tipo de personal y ley.'],
     ['DNI', '8 dígitos. Las celdas están en formato texto para conservar ceros iniciales.'],
     ['Teléfono', 'Opcional. 9 dígitos, sin espacios ni prefijos.'],
-    ['Docentes', 'Tipo: docente. Régimen: 30220 (Ley Universitaria).'],
-    ['Administrativos', 'Tipo: administrativo. Régimen: CAS, 276, 728 o 30057.'],
+    ['Docentes', `Tipo: docente. Ley: ${docentes.replaceAll(',', ', ') || 'sin leyes activas en el catálogo'}.`],
+    ['Administrativos', `Tipo: administrativo. Ley: ${administrativos.replaceAll(',', ', ') || 'sin leyes activas en el catálogo'}. CAS es el D.L. 1057.`],
+    ['Tipo de vínculo', 'No se indica aquí: carrera, plazo determinado o designado se registra con el vínculo laboral, en la sección 02.'],
     ['Ubicación', 'Opcional. Completa región, provincia y distrito juntos, con los nombres del catálogo del formulario manual.'],
     ['Validación', 'No repitas DNI ni correo. Revisa la vista previa y corrige los errores antes de guardar.'],
-    ['Ejemplo ficticio', 'DNI: 99000001 | Nombres: Ana | Apellido paterno: Ejemplo | Correo: ana.ejemplo@example.test | Tipo: docente | Régimen: 30220'],
+    ['Ejemplo ficticio', 'DNI: 99000001 | Nombres: Ana | Apellido paterno: Ejemplo | Correo: ana.ejemplo@example.test | Tipo: docente | Ley: 30220'],
   ]
   instructions.forEach(row => help.addRow(row))
   help.getRow(1).font = { bold: true }
@@ -49,8 +57,8 @@ export async function createUsersTemplate() {
   return book.xlsx.writeBuffer()
 }
 
-export async function downloadUsersTemplate() {
-  const buffer = await createUsersTemplate()
+export async function downloadUsersTemplate(catalogo) {
+  const buffer = await createUsersTemplate(catalogo)
   const url = URL.createObjectURL(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
   const link = document.createElement('a')
   link.href = url
@@ -65,7 +73,7 @@ export async function parseUsersExcel(buffer) {
   const sheet = book.getWorksheet('Personal')
   if (!sheet) throw new Error('No se encontró la hoja Personal. Utiliza la plantilla de Excel.')
   const headers = sheet.getRow(1).values.slice(1)
-  const keys = headers.map(label => excelFields.find(field => field[1] === label)?.[0])
+  const keys = headers.map(label => excelFields.find(field => field[1] === label)?.[0] || encabezadosAnteriores[label])
   if (keys.length !== excelFields.length || keys.some(key => !key) || new Set(keys).size !== keys.length) throw new Error('Los encabezados no coinciden con la plantilla de Excel.')
   const records = []
   sheet.eachRow((row, number) => {
@@ -95,7 +103,7 @@ export function resolveUsersLocations(records, locations) {
   return records.map((record, index) => {
     const user = Object.fromEntries(columns.map(key => [key, record[key] || '']))
     user.tipo_personal = user.tipo_personal.toLowerCase()
-    if (user.regimen_laboral.toLowerCase() === 'cas') user.regimen_laboral = 'CAS'
+    user.ley = user.ley.toUpperCase()
     const fields = ['region', 'provincia', 'distrito']
     if (!fields.some(key => record[key])) return user
     if (fields.some(key => !record[key])) throw new Error(`Registro ${index + 1}: completa región, provincia y distrito juntos.`)

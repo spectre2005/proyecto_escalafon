@@ -2,6 +2,7 @@ import AbrirLegajo from './AbrirLegajo'
 import CerrarLegajo from './CerrarLegajo'
 import ReabrirLegajo from './ReabrirLegajo'
 import PersonalPhoto from './PersonalPhoto'
+import { textoRegimen } from '../config/seccion02'
 
 function SummaryField({ title, value }) {
   const registered = value !== null && value !== undefined && String(value).trim() !== ''
@@ -15,6 +16,7 @@ export default function PersonalHeader({ data, usuario }) {
   const person = data.usuario.values
   const personnelType = { docente: 'Docente', administrativo: 'Administrativo' }[person.tipo_personal] || person.tipo_personal
   const documentType = person.tipo_doc_identidad?.trim()
+  const regimen = textoRegimen(data.regimen)
 
   return <header className="mb-6 overflow-hidden rounded-2xl border border-teal-100 bg-white shadow-sm">
     <div className="h-1 bg-teal-600" />
@@ -27,7 +29,8 @@ export default function PersonalHeader({ data, usuario }) {
           <SummaryField title="Tipo de personal" value={personnelType} />
           <SummaryField title="Puesto registrado" value={person.nombre_puesto} />
           <SummaryField title="Unidad orgánica" value={person.unidad_organica_id} />
-          <SummaryField title="Régimen laboral" value={person.regimen_laboral} />
+          <SummaryField title="Ley / régimen normativo" value={regimen.ley} />
+          <SummaryField title="Tipo de vínculo vigente" value={regimen.tipo} />
           <SummaryField title="Correo institucional" value={person.email_institucional} />
         </dl>
         <section aria-label="Legajos registrados" className="mt-6 border-t border-slate-100 pt-5">

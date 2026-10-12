@@ -15,3 +15,8 @@ export function saveDatosPuesto(usuario, vinculo, data) {
 export function anularSeccion02(usuario, tipo, id, motivo) {
   return api.post(`/expedientes/${usuario}/seccion-02/${tipo}/${id}/anular`, { motivo_anulacion: motivo })
 }
+
+// Vínculo cerrado con el tipo Sin definir: solo se completa el tipo, una vez (el backend lo audita).
+export function completarTipoVinculo(usuario, vinculo, tipo) {
+  return api.post(`/expedientes/${usuario}/vinculos-laborales/${vinculo}/completar-tipo`, { regimen_laboral: tipo })
+}

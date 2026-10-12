@@ -79,7 +79,7 @@ export function createPersonalPdf({ values = {}, families = [], blank = false, i
       ['region', 'provincia', 'distrito'],
       ['domicilio'],
       ['tipo_personal', 'nombre_puesto', 'unidad_organica_id'],
-      ['regimen_laboral', 'regimen_normativo_id', 'activo'],
+      ['ley', 'tipo_vinculo', 'activo'],
       ['con_discapacidad', 'tiene_derechohabientes', 'exige_colegiatura'],
       ['obligado_djbr', 'exige_estudios_basicos', 'tiene_periodo_prueba'],
       ['es_derechohabiente', 'anulado'],

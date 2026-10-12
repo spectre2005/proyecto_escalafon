@@ -14,14 +14,16 @@ import {
 } from '../utils/usuariosCsv'
 import { filterUsers } from '../utils/usuariosFiltering'
 import { updateUserDraft } from '../utils/usuariosEmail'
-import { regimenesPorTipo, regimenInicial } from '../utils/regimenesLaborales'
+import { conLey, leyDelRegistro, leyesDelTipo, leyInicial, nombreLey } from '../utils/leyes'
+import { useLiveQuery } from '../../../shared/queries/useLiveQuery'
 import TresEstados from '../../../components/ui/TresEstados'
 import { usePuede } from '../../auth/session'
 
 const emptyUser = {
   ...Object.fromEntries(columns.map((key) => [key, ''])),
   tipo_personal: 'docente',
-  regimen_laboral: regimenInicial('docente'),
+  // Ley desde el catálogo; vacía se toma la única del tipo de personal (leyInicial). El tipo de vínculo se registra en 2.2.
+  regimen_normativo_id: '',
 }
 // Banderas de la persona en el alta: Sí / No / Sin responder (por defecto, nunca No). Las del puesto se registran
 // en el vínculo laboral. con_discapacidad exige discapacidad.editar (el backend lo valida y audita).
@@ -43,6 +45,9 @@ export default function UsersPage() {
   const [draft, setDraft] = useState(emptyUser)
   const [condiciones, setCondiciones] = useState(condicionesVacias)
   const puedeDiscapacidad = usePuede('discapacidad.editar')
+  const opciones = useLiveQuery('/expediente-opciones')
+  const catalogo = opciones.data?.data.regimenes
+  const leyElegida = draft.regimen_normativo_id || leyInicial(catalogo, draft.tipo_personal)
   const [location, setLocation] = useState({ region: '', provincia: '', distrito: '' })
   const [ubigeoId, setUbigeoId] = useState('')
   const [batch, setBatch] = useState([])
@@ -97,7 +102,7 @@ export default function UsersPage() {
     setSaving(true)
     setMessage(null)
     try {
-      const saved = await saveUsers(records)
+      const saved = await saveUsers(records.map(record => conLey(catalogo, record)))
       setUsers((previous) => [...saved, ...previous.filter(user => !saved.some(record => record.id === user.id))])
       changePage(1)
       setMessage({
@@ -114,7 +119,7 @@ export default function UsersPage() {
   }
 
   const checked = batch.map((user, index) => {
-    const errors = validateUser(user)
+    const errors = validateUser(user, catalogo)
     const previous = [...users, ...batch.slice(0, index)]
     if (
       previous.some(
@@ -172,9 +177,9 @@ export default function UsersPage() {
   async function addManual(event) {
     event.preventDefault()
     const user = Object.fromEntries(
-      Object.entries(draft).map(([key, value]) => [key, value.trim()]),
+      Object.entries({ ...draft, regimen_normativo_id: leyElegida }).map(([key, value]) => [key, value.trim()]),
     )
-    const errors = validateUser(user)
+    const errors = validateUser(user, catalogo)
     if (Object.values(location).some(Boolean) && !ubigeoId) errors.push('Selecciona región, provincia y distrito para completar la ubicación.')
     if (
       users.some(
@@ -300,7 +305,7 @@ export default function UsersPage() {
                     <th>DNI</th>
                     <th>Correo institucional</th>
                     <th>Tipo de personal</th>
-                    <th>Régimen laboral</th>
+                    <th>Ley</th>
                     <th>Estado</th>
                     <th>Reportes</th>
                   </tr>
@@ -325,7 +330,7 @@ export default function UsersPage() {
                             : 'Administrativo'}
                         </span>
                       </td>
-                      <td>{user.regimen_laboral}</td>
+                      <td className={user.ley ? '' : 'text-[#9b7a37]'}>{nombreLey(user)}</td>
                       <td>
                         <span
                           className={`rounded-full px-2.5 py-1 text-[10px] ${user.activo ? 'bg-[#eaf4ee] text-[#3d8060]' : 'bg-[#faf3e5] text-[#9b7a37]'}`}
@@ -473,10 +478,10 @@ export default function UsersPage() {
                     </span>
                     <button
                       type="button"
-                      disabled={busy || saving}
+                      disabled={busy || saving || !catalogo}
                       onClick={async () => {
                         setBusy(true)
-                        try { await downloadUsersTemplate() }
+                        try { await downloadUsersTemplate(catalogo) }
                         catch { setMessage({ error: true, text: 'No se pudo descargar la plantilla. Intenta nuevamente.' }) }
                         finally { setBusy(false) }
                       }}
@@ -551,7 +556,7 @@ export default function UsersPage() {
                           setDraft({
                             ...draft,
                             tipo_personal: event.target.value,
-                            regimen_laboral: regimenInicial(event.target.value),
+                            regimen_normativo_id: '',
                           })
                         }
                       >
@@ -560,29 +565,32 @@ export default function UsersPage() {
                       </select>
                     </label>
                     <label>
-                      Régimen laboral *
+                      Ley / régimen normativo *
                       <select
-                        name="regimen_laboral"
+                        name="regimen_normativo_id"
                         required
-                        value={draft.regimen_laboral}
+                        disabled={!catalogo}
+                        value={leyElegida}
                         onChange={(event) =>
                           setDraft({
                             ...draft,
-                            regimen_laboral: event.target.value,
+                            regimen_normativo_id: event.target.value,
                           })
                         }
                       >
                         <option value="" disabled>
-                          Selecciona un régimen
+                          {catalogo ? 'Selecciona una ley' : 'Cargando leyes…'}
                         </option>
-                        {(regimenesPorTipo[draft.tipo_personal] || []).map(
-                          (regimen) => (
-                            <option key={regimen.value} value={regimen.value}>
-                              {regimen.label}
+                        {leyesDelTipo(catalogo, draft.tipo_personal).map(
+                          (ley) => (
+                            <option key={ley.id} value={ley.id}>
+                              {ley.nombre}
                             </option>
                           ),
                         )}
                       </select>
+                      <small>El tipo de vínculo (carrera, plazo determinado o designado) se registra con el vínculo laboral, en 2.2.</small>
+                      {opciones.error && <span role="alert" className="text-red-700">No se pudo cargar el catálogo de leyes. <button type="button" className="underline" onClick={opciones.retry}>Reintentar</button></span>}
                     </label>
                     <UbigeoFields value={location} onChange={(next, id) => { setLocation(next); setUbigeoId(id) }} disabled={saving} />
                     <div className="col-span-full grid gap-4 border-t border-slate-100 pt-4 md:grid-cols-2">
@@ -649,7 +657,7 @@ export default function UsersPage() {
                       <th>Usuario</th>
                       <th>Correo institucional</th>
                       <th>Tipo de personal</th>
-                      <th>Régimen laboral</th>
+                      <th>Ley</th>
                       <th>Teléfono</th>
                       <th>Validación</th>
                     </tr>
@@ -665,7 +673,7 @@ export default function UsersPage() {
                         </td>
                         <td>{user.email_institucional}</td>
                         <td>{user.tipo_personal}</td>
-                        <td>{user.regimen_laboral}</td>
+                        <td>{leyDelRegistro(catalogo, user)?.nombre || user.ley || '—'}</td>
                         <td>{user.telefono || '—'}</td>
                         <td
                           className={

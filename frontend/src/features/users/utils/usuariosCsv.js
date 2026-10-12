@@ -1,8 +1,10 @@
-import { regimenesPorTipo } from './regimenesLaborales.js'
+import { errorLey } from './leyes.js'
 
-export const columns = ['numero_doc_identidad', 'nombres', 'apellido_paterno', 'apellido_materno', 'email_institucional', 'tipo_personal', 'regimen_laboral', 'telefono']
+// ley: código de la ley (régimen normativo) del catálogo; CAS = 1057. Archivos anteriores la traen como regimen_laboral.
+export const columns = ['numero_doc_identidad', 'nombres', 'apellido_paterno', 'apellido_materno', 'email_institucional', 'tipo_personal', 'ley', 'telefono']
+const columnasAnteriores = { regimen_laboral: 'ley' }
 
-export function validateUser(user) {
+export function validateUser(user, catalogo) {
   const errors = []
   if (!/^\d{8}$/.test(user.numero_doc_identidad)) errors.push('El DNI debe contener 8 dígitos.')
   if (!user.nombres || user.nombres.length > 120) errors.push('Los nombres son obligatorios (máximo 120 caracteres).')
@@ -10,8 +12,8 @@ export function validateUser(user) {
   if (user.apellido_materno.length > 80) errors.push('El apellido materno admite hasta 80 caracteres.')
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.email_institucional) || user.email_institucional.length > 255) errors.push('El correo no es válido.')
   if (!['docente', 'administrativo'].includes(user.tipo_personal)) errors.push('El tipo debe ser docente o administrativo.')
-  const regimenes = (regimenesPorTipo[user.tipo_personal] || []).map(regimen => regimen.value)
-  if (regimenes.length && !regimenes.includes(user.regimen_laboral)) errors.push(`El régimen laboral debe ser uno de: ${regimenes.join(', ')}.`)
+  const ley = errorLey(catalogo, user)
+  if (ley) errors.push(ley)
   if (user.telefono && !/^[0-9]{9}$/.test(user.telefono)) errors.push('El teléfono debe contener 9 dígitos.')
   return errors
 }
@@ -43,7 +45,7 @@ export function parseUsersCsv(text) {
   if (quoted) throw new Error('El CSV contiene comillas sin cerrar.')
   row.push(value.trim())
   if (row.some(Boolean)) rows.push(row)
-  const header = rows.shift() || []
+  const header = (rows.shift() || []).map(key => columnasAnteriores[key] || key)
   if (header.length !== columns.length || new Set(header).size !== columns.length || columns.some(key => !header.includes(key))) {
     throw new Error('Las columnas no coinciden con la plantilla. Descarga la plantilla e inténtalo nuevamente.')
   }

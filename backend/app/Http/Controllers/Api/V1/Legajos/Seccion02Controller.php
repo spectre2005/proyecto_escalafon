@@ -96,7 +96,7 @@ class Seccion02Controller extends Controller
         $persona = Usuario::query()->findOrFail($usuario);
         $legajo = Legajo::paraConsulta($usuario);
         $vinculos = VinculoLaboral::query()->where('usuario_id', $usuario)->where('anulado', false)
-            ->with(['regimenNormativo:id,nombre', 'unidadOrganica:id,nombre', 'perfilDocente', 'perfilAdministrativo', 'registradoPor',
+            ->with(['regimenNormativo:id,codigo,nombre', 'unidadOrganica:id,nombre', 'perfilDocente', 'perfilAdministrativo', 'registradoPor',
                 'vinculoAdendas' => fn ($query) => $query->where('anulado', false)->with('registradoPor')->orderBy('fecha_inicio')->orderBy('created_at')->orderBy('id')])
             ->orderByDesc('fecha_inicio')->orderBy('id')->get();
         $perfil = PerfilDocumental::de($persona, $vinculos);

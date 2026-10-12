@@ -76,7 +76,7 @@ final class Seccion11
         }
 
         return $codigo === self::NO_RENOVACION_CAS && $regimenVinculo === null && self::admite($codigo, $motivo, 'plazo_determinado')
-            ? 'Define el tipo de vínculo en la sección 02 (Corregir vínculo).' : $general;
+            ? 'Define el tipo de vínculo en la sección 02 (2.2: «Completar tipo» si el vínculo está cerrado).' : $general;
     }
 
     /** ¿Este tipo de documento puede enlazarse a una desvinculación con ese motivo y régimen del vínculo? */

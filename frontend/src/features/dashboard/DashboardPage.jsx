@@ -3,6 +3,7 @@ import Icon from '../../components/ui/Icon'
 import { useUsers } from '../users/hooks/useUsers'
 import { usePuede } from '../auth/session'
 import { useLiveQuery } from '../../shared/queries/useLiveQuery'
+import { nombreLey, SIN_DEFINIR } from '../users/utils/leyes'
 
 const nombresBandera = {
   tiene_derechohabientes: 'Tiene derechohabientes', con_discapacidad: 'Con discapacidad (servidor o hijos)',
@@ -43,11 +44,12 @@ export default function DashboardPage() {
     { label: 'Administrativos', count: users.filter(user => user.tipo_personal === 'administrativo').length, to: '/personal?tipo=administrativo', color: 'bg-sky-500' },
     { label: 'Sin clasificación', count: users.filter(user => !['docente', 'administrativo'].includes(user.tipo_personal)).length, color: 'bg-slate-400' },
   ]
+  // Por ley (regimen_normativo_id); sin ley, Sin definir (al final). El tipo de vínculo está en cada vínculo (2.2).
   const regimes = Object.entries(users.reduce((counts, user) => {
-    const name = user.regimen_laboral?.trim() || 'Sin régimen registrado'
+    const name = nombreLey(user)
     counts[name] = (counts[name] || 0) + 1
     return counts
-  }, {})).sort((a, b) => b[1] - a[1])
+  }, {})).sort((a, b) => (a[0] === SIN_DEFINIR) - (b[0] === SIN_DEFINIR) || b[1] - a[1])
   const panel = 'rounded-2xl border border-slate-200/80 bg-white p-6'
   return <>
     <header className="mb-7 flex flex-wrap items-end justify-between gap-5">
@@ -70,8 +72,8 @@ export default function DashboardPage() {
         </div>)}</div>
       </section>
       <section className={panel} aria-busy={loading}>
-        <h2 className="text-sm font-semibold text-slate-800">Regímenes laborales</h2><p className="mt-1 text-xs text-slate-500">Cantidad de personal por régimen registrado</p>
-        <div className="mt-5 max-h-72 space-y-4 overflow-y-auto">{!ready ? <p className="text-sm text-slate-500">{loading ? 'Consultando registros…' : 'Datos no disponibles'}</p> : !regimes.length ? <p className="text-sm text-slate-500">Aún no hay regímenes registrados.</p> : regimes.map(([name, count]) => <div key={name}><div className="mb-2 flex justify-between gap-4 text-xs"><span className="text-slate-600">{name}</span><span className="shrink-0 font-semibold text-slate-700">{count} · {percent(count)}%</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100" aria-hidden="true"><div className="h-full rounded-full bg-violet-400" style={{ width: `${percent(count)}%` }} /></div></div>)}</div>
+        <h2 className="text-sm font-semibold text-slate-800">Leyes / regímenes normativos</h2><p className="mt-1 text-xs text-slate-500">Cantidad de personal por ley. «Sin definir»: sin ley registrada.</p>
+        <div className="mt-5 max-h-72 space-y-4 overflow-y-auto">{!ready ? <p className="text-sm text-slate-500">{loading ? 'Consultando registros…' : 'Datos no disponibles'}</p> : !regimes.length ? <p className="text-sm text-slate-500">Aún no hay personal registrado.</p> : regimes.map(([name, count]) => <div key={name}><div className="mb-2 flex justify-between gap-4 text-xs"><span className={name === SIN_DEFINIR ? 'text-amber-700' : 'text-slate-600'}>{name}</span><span className="shrink-0 font-semibold text-slate-700">{count} · {percent(count)}%</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100" aria-hidden="true"><div className="h-full rounded-full bg-violet-400" style={{ width: `${percent(count)}%` }} /></div></div>)}</div>
       </section>
       {administra && <BanderasSinResponder panel={panel} />}
       <section className={`${panel} lg:col-span-2`} aria-busy={loading}>

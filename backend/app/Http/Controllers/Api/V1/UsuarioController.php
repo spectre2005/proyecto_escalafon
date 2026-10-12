@@ -24,12 +24,12 @@ class UsuarioController extends Controller
 {
     public function index(): AnonymousResourceCollection
     {
-        return UsuarioResource::collection(Usuario::query()->orderBy('id')->paginate(100));
+        return UsuarioResource::collection(Usuario::query()->with('regimenNormativo')->orderBy('id')->paginate(100));
     }
 
     public function show(string $record): UsuarioResource
     {
-        return new UsuarioResource(Usuario::query()->findOrFail($record));
+        return new UsuarioResource(Usuario::query()->with('regimenNormativo')->findOrFail($record));
     }
 
     public function update(Request $request, string $record): UsuarioResource
@@ -80,7 +80,7 @@ class UsuarioController extends Controller
             throw ValidationException::withMessages(['usuario' => 'Un DNI o correo ya está registrado.']);
         }
 
-        return new UsuarioResource($usuario->refresh());
+        return new UsuarioResource($usuario->refresh()->load('regimenNormativo'));
     }
 
     /**
@@ -171,7 +171,7 @@ class UsuarioController extends Controller
         }
 
         return UsuarioResource::collection(
-            Usuario::query()->whereIn('id', array_column($records, 'id'))->orderBy('id')->get(),
+            Usuario::query()->with('regimenNormativo')->whereIn('id', array_column($records, 'id'))->orderBy('id')->get(),
         )->response()->setStatusCode(201);
     }
 }

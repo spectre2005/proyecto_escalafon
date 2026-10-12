@@ -2,6 +2,7 @@ import { useState } from 'react'
 import api, { apiErrorMessage } from '../../../axios'
 import { cacheInstitution, normalizeInstitution, readInstitution } from '../../../config/institution'
 import { fetchInstitution } from '../../settings/institutionApi'
+import { textoRegimen } from '../../legajos/config/seccion02'
 
 export default function DownloadPersonalReport({ usuario, blank = false, className }) {
   const [busy, setBusy] = useState(false)
@@ -19,7 +20,9 @@ export default function DownloadPersonalReport({ usuario, blank = false, classNa
       const families = []
       if (!blank) {
         const response = await api.get(`/expedientes/${usuario}`)
-        values = response.data.data.usuario.values
+        // La ley y el tipo de vínculo vigente salen de regimen (regimen_laboral de la persona es solo un respaldo).
+        const regimen = textoRegimen(response.data.data.regimen)
+        values = { ...response.data.data.usuario.values, ley: regimen.ley, tipo_vinculo: regimen.tipo }
         let page = 1
         let lastPage
         do {

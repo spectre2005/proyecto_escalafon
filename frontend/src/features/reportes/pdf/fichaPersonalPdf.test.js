@@ -44,6 +44,15 @@ test('exports classified personal data and preserves leading zeros without techn
   assert.equal(reportValue('2000-01-02'), '02/01/2000')
 })
 
+test('the law and the link type are printed, and a missing law reads Sin definir', () => {
+  const output = createPersonalPdf({ values: { ley: 'Sin definir', tipo_vinculo: 'Sin definir: se define al registrar el vínculo en 2.2.', regimen_laboral: 'RESPALDO_SENTINEL' } }).output()
+  assert.ok(output.includes('LEY / R'))
+  assert.ok(output.includes('Sin definir'))
+  assert.ok(!output.includes('RESPALDO_SENTINEL'))
+  const campos = personalGroups.flatMap(([, fields]) => fields.map(([key]) => key))
+  assert.ok(campos.includes('ley') && campos.includes('tipo_vinculo') && !campos.includes('regimen_laboral'))
+})
+
 test('blank sheet ignores any supplied personal values and leaves boxes empty', () => {
   const output = createPersonalPdf({ blank: true, values: { nombres: 'PRIVATE_NAME_SENTINEL' } }).output()
   assert.ok(!output.includes('PRIVATE_NAME_SENTINEL'))

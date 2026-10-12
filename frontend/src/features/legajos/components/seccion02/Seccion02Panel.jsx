@@ -2,10 +2,10 @@ import Icon from '../../../../components/ui/Icon'
 import { useState } from 'react'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../../auth/session'
-import { anularSeccion02 } from '../../api/seccion02Api'
+import { anularSeccion02, completarTipoVinculo } from '../../api/seccion02Api'
 import { useNoAplicables } from '../../api/useNoAplicables'
 import { mostrarTipo, ofrecerTipo } from '../../config/aplicacion'
-import { pruebaEnNoConDatos, pruebaNoAplica, camposDatosPuesto, coloresEstadoDocumento, estadosDocumento, estadosSubseccion, estadosVencimiento, etiquetaVinculo, formulariosDatos, regimenesLaborales, resultadosPeriodo, subseccionesSeccion02, tiposInduccion, tiposPersonal } from '../../config/seccion02'
+import { pruebaEnNoConDatos, pruebaNoAplica, camposDatosPuesto, coloresEstadoDocumento, estadosDocumento, estadosSubseccion, estadosVencimiento, etiquetaVinculo, formulariosDatos, regimenesLaborales, resultadosPeriodo, subseccionesSeccion02, tiposInduccion, tiposPersonal, tipoVinculo } from '../../config/seccion02'
 import { etiqueta } from '../../config/seccion01'
 import { folios } from '../../config/documentos'
 import ListaDocumentos from '../documentos/ListaDocumentos'
@@ -195,16 +195,59 @@ function AvisoVencimiento({ vinculo, aviso }) {
   return null
 }
 
+// Vínculo anterior con el tipo Sin definir: su sugerencia (si la hay) se aplica desde «Corregir vínculo», nunca sola.
+function AvisoSinDefinir({ vinculo, corregir }) {
+  const sugerencia = vinculo.tipo_sugerido
+  if (!sugerencia) return null
+  return <Aviso accion={corregir}>
+    <strong>Tipo de vínculo sin definir.</strong>{' '}
+    {sugerencia.valor ? <>Sugerencia: {regimenesLaborales[sugerencia.valor]} ({sugerencia.motivo}) Se aplica desde «Corregir vínculo» y se guarda solo al confirmarla.</> : sugerencia.motivo}
+    {vinculo.cerrado && ' El vínculo está cerrado (con fecha de cese): solo se puede completar el tipo, una vez.'}
+  </Aviso>
+}
+
+// Vínculo cerrado Sin definir: se completa solo el tipo, una vez y con confirmación explícita (queda auditado).
+function CompletarTipo({ usuario, vinculo, disabled }) {
+  const sugerido = vinculo.tipo_sugerido?.valor
+  const [tipo, setTipo] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  async function guardar(event) {
+    event.preventDefault()
+    if (busy || !tipo) return
+    setBusy(true)
+    setError('')
+    try {
+      await completarTipoVinculo(usuario, vinculo.id, tipo)
+    } catch (failure) {
+      setError(apiErrorMessage(failure))
+      setBusy(false)
+    }
+  }
+  return <form onSubmit={guardar} className="mb-5 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+    <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">Completar tipo de vínculo
+      <select required value={tipo} disabled={disabled || busy} onChange={event => setTipo(event.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+        <option value="">Selecciona</option>
+        {Object.entries(regimenesLaborales).map(([valor, texto]) => <option key={valor} value={valor}>{texto}</option>)}
+      </select>
+    </label>
+    {sugerido && tipo !== sugerido && <button type="button" disabled={disabled || busy} onClick={() => setTipo(sugerido)} className={enlace}>Aplicar sugerencia</button>}
+    <button type="submit" disabled={disabled || busy || !tipo} className={boton}>{busy ? 'Guardando…' : 'Guardar tipo'}</button>
+    <p className="basis-full text-xs text-slate-500">Solo se guarda el tipo; el resto del vínculo cerrado no cambia. Una vez guardado no se puede cambiar.</p>
+    {error && <p role="alert" className="basis-full text-xs text-rose-700">{error}</p>}
+  </form>
+}
+
 // Un vínculo con su vigencia, sus adendas en orden cronológico, el fin efectivo y los datos del puesto.
-function VinculoCard({ vinculo, aviso, acciones, accionAdenda, destacado }) {
+function VinculoCard({ vinculo, aviso, acciones, accionAdenda, destacado, corregir, completar }) {
   const v = vinculo.values
   const [estadoTexto, estadoClase] = estadosVencimiento[vinculo.vencimiento.estado]
   return <article className={`rounded-2xl border bg-white p-5 ${destacado ? 'border-teal-300 ring-1 ring-teal-100' : 'border-slate-200'}`}>
-    <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h4 className="font-semibold text-slate-800">{v.nombre_puesto}</h4><p className="mt-1 text-xs text-slate-500">{etiqueta(tiposPersonal, v.tipo_personal)} · {etiqueta(regimenesLaborales, v.regimen_laboral)} · {v.numero_documento_vinculo || 'sin N.º de resolución o contrato'}</p></div><Etiqueta clase={estadoClase}>{estadoTexto}</Etiqueta></div>
-    <div className="mt-4"><AvisoVencimiento vinculo={vinculo} aviso={aviso} /></div>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h4 className="font-semibold text-slate-800">{v.nombre_puesto}</h4><p className="mt-1 text-xs text-slate-500">{etiqueta(tiposPersonal, v.tipo_personal)} · {tipoVinculo(v.regimen_laboral)} · {v.numero_documento_vinculo || 'sin N.º de resolución o contrato'}</p></div><Etiqueta clase={estadoClase}>{estadoTexto}</Etiqueta></div>
+    <div className="mt-4"><AvisoSinDefinir vinculo={vinculo} corregir={corregir} />{completar}<AvisoVencimiento vinculo={vinculo} aviso={aviso} /></div>
     <dl className="grid gap-3 text-sm sm:grid-cols-3">
       {[['Inicio', fecha(v.fecha_inicio)], ['Fin prevista', v.fecha_fin_prevista ? fecha(v.fecha_fin_prevista) : 'Sin fecha de fin'], ['Fin efectivo', vinculo.vencimiento.fin_efectivo ? `${fecha(vinculo.vencimiento.fin_efectivo)}${vinculo.vencimiento.por_adenda ? ' (por adenda)' : ''}` : 'Sin fecha de fin'],
-        ['Fecha de cese', fecha(v.fecha_cese)], ['Régimen normativo', vinculo.regimen_normativo || 'No registrado'], ['Unidad orgánica', vinculo.unidad_organica || 'No registrada'],
+        ['Fecha de cese', fecha(v.fecha_cese)], ['Ley / régimen normativo', vinculo.regimen_normativo || 'Sin definir'], ['Unidad orgánica', vinculo.unidad_organica || 'No registrada'],
         ['Obligado a DJBR', textoBandera(v.obligado_djbr)], ['Exige colegiatura', textoBandera(v.exige_colegiatura)], ['Exige estudios básicos', textoBandera(v.exige_estudios_basicos)], ['Período de prueba', textoBandera(v.tiene_periodo_prueba)],
         ['Registrado por', vinculo.registrado_por || 'No registrado (registro anterior)'],
       ].map(([label, valor]) => <div key={label}><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 break-words text-slate-800">{valor}</dd></div>)}
@@ -266,7 +309,11 @@ function Formalizacion({ usuario, data, sinLegajo }) {
     ? <AdendaForm usuario={usuario} vinculos={[form.vinculo]} onSaved={() => cerrar(true)} onCancel={() => cerrar(false)} />
     : form.tipo === 'puesto' ? <DatosPuestoForm key={form.vinculo.id} usuario={usuario} vinculo={form.vinculo} onSaved={() => cerrar(true)} onCancel={() => cerrar(false)} />
       : <VinculoForm key={form.record?.id || 'nuevo'} usuario={usuario} record={form.record} onSaved={() => cerrar(true)} onCancel={() => cerrar(false)} />)
-  const tarjeta = (v, destacado) => <VinculoCard key={v.id} vinculo={v} aviso={data.dias_aviso_vencimiento} destacado={destacado} acciones={acciones(v)} accionAdenda={accionAdenda(v)} />
+  const corregir = vinculo => puedeRegistrar && !vinculo.cerrado && !sinLegajo && vinculo.tipo_sugerido
+    && <button disabled={ocupado} onClick={() => empezar(() => setForm({ tipo: 'vinculo', record: vinculo }))} className={enlace}>Corregir vínculo</button>
+  const completar = vinculo => puedeRegistrar && vinculo.cerrado && !sinLegajo && vinculo.values.regimen_laboral === null && !vinculo.values.anulado
+    && <CompletarTipo usuario={usuario} vinculo={vinculo} disabled={ocupado} />
+  const tarjeta = (v, destacado) => <VinculoCard key={v.id} vinculo={v} aviso={data.dias_aviso_vencimiento} destacado={destacado} acciones={acciones(v)} accionAdenda={accionAdenda(v)} corregir={corregir(v)} completar={completar(v)} />
   return <section aria-label="Vínculos laborales" className="mb-8">
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h3 className="text-base font-semibold text-slate-800">Vínculos laborales</h3>{puedeRegistrar && <div className="flex flex-wrap items-center gap-3">{sinLegajo && <Bloqueo>{sinLegajo}</Bloqueo>}<button disabled={ocupado || !!sinLegajo} onClick={() => empezar(() => setForm({ tipo: 'vinculo' }))} className={boton}>Registrar vínculo</button></div>}</div>
     {aviso && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
@@ -280,7 +327,7 @@ function Formalizacion({ usuario, data, sinLegajo }) {
       <div className="mt-4 space-y-4">{historial.map(v => tarjeta(v, false))}</div>
     </details>}
     <div className="mt-6 flex flex-wrap gap-x-6">
-      <Anulados usuario={usuario} clave="vinculos_laborales" etiqueta="vínculos anulados" titulo={v => v.nombre_puesto} campos={[['Tipo de personal', v => etiqueta(tiposPersonal, v.tipo_personal)], ['Régimen laboral', v => etiqueta(regimenesLaborales, v.regimen_laboral)], ['N.º de resolución o contrato', v => texto(v.numero_documento_vinculo)], ['Inicio', v => fecha(v.fecha_inicio)]]} />
+      <Anulados usuario={usuario} clave="vinculos_laborales" etiqueta="vínculos anulados" titulo={v => v.nombre_puesto} campos={[['Tipo de personal', v => etiqueta(tiposPersonal, v.tipo_personal)], ['Tipo de vínculo', v => tipoVinculo(v.regimen_laboral)], ['N.º de resolución o contrato', v => texto(v.numero_documento_vinculo)], ['Inicio', v => fecha(v.fecha_inicio)]]} />
       <Anulados usuario={usuario} clave="vinculo_adendas" etiqueta="adendas anuladas" titulo={v => `Adenda ${v.numero || 'sin número'}`} campos={[['Motivo de la adenda', v => texto(v.motivo)], ['Vigencia', v => `${fecha(v.fecha_inicio)} – ${fecha(v.fecha_fin)}`], ['Vínculo', v => etiquetaVinculo(data.vinculos.find(item => item.id === v.vinculo_laboral_id) || { values: { nombre_puesto: 'Vínculo anulado o no encontrado' } })]]} />
     </div>
   </section>

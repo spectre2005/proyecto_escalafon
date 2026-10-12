@@ -12,7 +12,8 @@ export const personalGroups = [
   ]],
   ['Información laboral', [
     ['tipo_personal', 'Tipo de personal'], ['nombre_puesto', 'Puesto'], ['unidad_organica_id', 'Unidad orgánica'],
-    ['regimen_laboral', 'Régimen laboral'], ['regimen_normativo_id', 'Régimen normativo'], ['activo', 'Activo'],
+    // ley y tipo_vinculo: del campo regimen del expediente (DownloadPersonalReport); sin ley, «Sin definir».
+    ['ley', 'Ley / régimen normativo'], ['tipo_vinculo', 'Tipo de vínculo vigente'], ['activo', 'Activo'],
   ]],
   ['Condiciones del personal', [
     ['con_discapacidad', 'Con discapacidad'], ['tiene_derechohabientes', 'Tiene derechohabientes'],

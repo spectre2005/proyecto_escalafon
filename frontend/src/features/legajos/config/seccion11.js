@@ -19,8 +19,6 @@ export const bloquesDocumentos11 = {
   otros: 'Otros documentos de la universidad',
 }
 
-export const regimenesLaborales11 = { carrera: 'Carrera', plazo_determinado: 'Plazo determinado', designado: 'Designado (confianza)' }
-
 // Permisos de la sección (no es sensible; la liquidación sí lo es y la filtra el backend).
 export const permisosSeccion11 = { registrar: ['legajo.editar'], anular: ['sistema.administrar'] }
 

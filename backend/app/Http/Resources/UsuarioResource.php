@@ -26,6 +26,8 @@ class UsuarioResource extends JsonResource
             // Respaldo de lectura (código de ley); la ley va en regimen_normativo_id.
             'regimen_laboral' => $this->regimen_laboral,
             'regimen_normativo_id' => $this->regimen_normativo_id,
+            // Ley para listados y reportes; null = Sin definir (nunca se lee regimen_laboral como si fuera la ley).
+            'ley' => $this->whenLoaded('regimenNormativo', fn () => $this->regimenNormativo?->only(['id', 'codigo', 'nombre'])),
             'telefono' => $this->telefono ?? '',
             'activo' => $this->activo,
         ];

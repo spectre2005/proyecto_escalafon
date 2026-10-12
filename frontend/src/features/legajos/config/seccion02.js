@@ -9,8 +9,20 @@ export const subseccionesSeccion02 = {
 
 export const tiposPersonal = { docente: 'Docente', administrativo: 'Administrativo' }
 
-// Enum del esquema (vinculos_laborales.regimen_laboral).
+// Tipo de vínculo (vinculos_laborales.regimen_laboral). Sincronía con backend RegimenesLaborales::TIPOS_VINCULO.
 export const regimenesLaborales = { carrera: 'Carrera', plazo_determinado: 'Plazo determinado', designado: 'Designado (confianza)' }
+
+// null = Sin definir: vínculo anterior cuyo valor era una ley; se confirma en «Corregir vínculo». Nunca es un tipo.
+export const tipoVinculo = valor => regimenesLaborales[valor] || 'Tipo de vínculo sin definir'
+
+// Ley y tipo de vínculo vigente de la persona (GET /expedientes/{id}, campo regimen). Sin ley: Sin definir.
+export function textoRegimen(regimen) {
+  const tipos = (regimen?.tipos_vinculo || []).map(tipo => regimenesLaborales[tipo] || tipo).join(' · ')
+  return {
+    ley: regimen?.ley?.nombre || 'Sin definir',
+    tipo: [tipos, regimen?.mensaje].filter(Boolean).join(' · ') || 'Sin definir: se define al registrar el vínculo en 2.2.',
+  }
+}
 
 export const tiposInduccion = { general: 'General', especifica: 'Específica' }
 
