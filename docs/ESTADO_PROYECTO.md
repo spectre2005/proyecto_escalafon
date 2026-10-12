@@ -186,3 +186,28 @@ Sección 05:
   unificar regimen_laboral (hoy mezcla ley y eje); clasificación del catálogo por régimen
   y tipo de personal (propuesta con 3 decisiones abiertas); documentos "por evento";
   sección 08 y 7.2.
+
+  ## Régimen: ley y tipo de vínculo (12/10/2026)
+- La ley va en usuarios.regimen_normativo_id (catálogo: 1057/CAS, 276, 728, 30057,
+  30220), filtrada por tipo de personal. usuarios.regimen_laboral queda solo como
+  respaldo y ya no se edita.
+- El tipo de vínculo (carrera / plazo_determinado / designado) sale solo de
+  vinculos_laborales.regimen_laboral, con CHECK en la base. Sin vínculo o vínculo
+  antiguo sin tipo = «Sin definir» (NULL): no se oculta nada por régimen y lo que
+  depende del tipo queda «por determinar». Todo vínculo nuevo exige tipo.
+- Migración aplicada en la base real (12/10, lote 15): 12 personas completadas con su
+  ley, 4 vínculos con «276» pasaron a «Sin definir». Valores anteriores en
+  respaldo_regimen; el rollback los restaura. Respaldos en
+  /home/willian/proyectos/respaldos_escalafon/.
+- Sugerencias de tipo (nunca se aplican solas): docente ordinario → carrera;
+  contratado → plazo determinado; confianza → designado; CAS → plazo determinado;
+  D.L. 276 sin sugerencia, lo confirma el administrador.
+- Vínculo cerrado sin tipo: se puede completar solo el tipo (POST .../completar-tipo),
+  queda en auditoría y no se vuelve a cambiar.
+- Personas con ley sin definir (6) y 3 con código y ley en conflicto (75855996,
+  99000007, ADMIN-SISTEMA): las revisa el administrador.
+- Incoherencias de tipo de personal entre persona y vínculo (75855996, 46945470):
+  requisito previo de la clasificación del catálogo.
+- Cada compañero debe correr php artisan migrate.
+- Pendiente: clasificación del catálogo por régimen y tipo de personal, documentos
+  «por evento», test intermitente (UniqueConstraintViolation), preguntas 11, 18 y 20.
