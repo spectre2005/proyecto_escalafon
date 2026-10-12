@@ -169,10 +169,20 @@ Sección 05:
   PENDIENTE de confirmar con el cliente (pregunta 18).
 - Sigue abierta la pregunta 20 (¿k aplica también a los hijos con un certificado por
   persona?).
+- Las banderas también ocultan módulos: Discapacidad y Familia (sección 01) si están en
+  No y sin datos registrados (familiares, certificados o documentos g, i, j, k); y la
+  subsección 2.4 si período de prueba está en No y sin períodos ni documentos m. Con datos,
+  se mantienen. El backend sigue permisivo: acepta registros aunque el módulo esté oculto.
+  Quien no tiene datos_sensibles.ver no recibe la lista de módulos ocultos.
+- Si lo oculta una bandera, se redirige a la primera categoría con un aviso; si lo
+  desactiva Funcionalidades, sigue «Función no disponible».
 - Cada compañero debe correr php artisan migrate en su base local tras traer los commits.
 - Reglas para pruebas con Code: solo en copia de la base; nunca artisan serve con
   DB_DATABASE para cambiar de base; borrar solo archivos que él creó, por nombre; no tocar
   sesiones del navegador.
-- Pendientes de esta línea: unificar regimen_laboral (hoy mezcla ley y eje),
-  clasificación del catálogo por régimen y tipo de personal (propuesta con 3 decisiones
-  abiertas), documentos "por evento", sección 08 y 7.2.
+- Pendientes de esta línea: entrada «Colegiaturas» del menú (solo lectura, no sigue la
+  bandera); test intermitente de la suite (2 fallos en 32 corridas, UniqueConstraint
+  Violation en ExpedienteApiTest y Seccion06ApiTest; falta capturar el mensaje completo);
+  unificar regimen_laboral (hoy mezcla ley y eje); clasificación del catálogo por régimen
+  y tipo de personal (propuesta con 3 decisiones abiertas); documentos "por evento";
+  sección 08 y 7.2.
