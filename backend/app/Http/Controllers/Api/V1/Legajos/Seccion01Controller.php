@@ -256,23 +256,34 @@ class Seccion01Controller extends Controller
      */
     private function avisos(PerfilDocumental $perfil, Collection $familiares, Collection $certificados): array
     {
+        // Banderas en tres estados: Sí (true), No (false) y Sin responder (null).
         $avisos = [];
         $derechohabientes = $familiares->where('es_derechohabiente', true)->count();
-        if ($perfil->banderas['tiene_derechohabientes'] && $derechohabientes === 0) {
+        $tieneDerechohabientes = $perfil->banderas['tiene_derechohabientes'];
+        if ($tieneDerechohabientes === true && $familiares->isEmpty()) {
+            $avisos[] = 'La persona figura con derechohabientes: falta registrar familiares en Familia y derechohabientes.';
+        } elseif ($tieneDerechohabientes === true && $derechohabientes === 0) {
             $avisos[] = 'La persona figura con derechohabientes, pero no hay familiares vigentes marcados como derechohabientes.';
         }
-        if (! $perfil->banderas['tiene_derechohabientes'] && $derechohabientes > 0) {
+        if ($tieneDerechohabientes === false && $derechohabientes > 0) {
             $avisos[] = "La persona figura sin derechohabientes, pero hay {$derechohabientes} familiar(es) vigente(s) marcado(s) como derechohabiente(s).";
         }
-        $propios = $certificados->where('persona', 'servidor')->count();
-        if ($perfil->banderas['con_discapacidad'] && $propios === 0) {
-            $avisos[] = 'La persona figura con discapacidad, pero no tiene un certificado CONADIS propio registrado.';
+        if ($tieneDerechohabientes === null) {
+            $avisos[] = 'Falta definir si la persona tiene derechohabientes (ficha de datos personales).';
         }
-        if (! $perfil->banderas['con_discapacidad'] && $propios > 0) {
-            $avisos[] = 'La persona tiene un certificado CONADIS propio registrado, pero figura sin discapacidad.';
+        // Con discapacidad: el servidor o alguno de sus hijos (Directiva, punto 1 k), así que vale cualquier certificado.
+        $conDiscapacidad = $perfil->banderas['con_discapacidad'];
+        if ($conDiscapacidad === true && $certificados->isEmpty()) {
+            $avisos[] = 'La persona figura con discapacidad (el servidor o alguno de sus hijos), pero no hay un certificado CONADIS registrado.';
+        }
+        if ($conDiscapacidad === false && $certificados->isNotEmpty()) {
+            $avisos[] = 'Hay un certificado CONADIS registrado, pero la persona figura sin discapacidad (el servidor ni sus hijos).';
+        }
+        if ($conDiscapacidad === null) {
+            $avisos[] = 'Falta definir si hay discapacidad del servidor o de alguno de sus hijos (ficha de datos personales).';
         }
 
-        return $avisos;
+        return [...$avisos, ...$perfil->aplicacion->avisos()];
     }
 
     /**

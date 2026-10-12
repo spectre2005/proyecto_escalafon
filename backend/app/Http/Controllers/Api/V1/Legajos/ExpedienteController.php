@@ -56,7 +56,8 @@ use App\Models\Usuario;
 use App\Models\UsuarioRol;
 use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
-use App\Support\PerfilDocumental;
+use App\Support\AplicacionDocumental;
+use App\Support\CambioDiscapacidad;
 use App\Support\Seccion05;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -221,6 +222,9 @@ class ExpedienteController extends Controller
         if (! $veSensibles) {
             $presented['values'] = array_diff_key($presented['values'], array_flip(self::DATOS_PERSONALES_SENSIBLES));
         }
+        $aplicacion = AplicacionDocumental::para($person);
+        // tiene_derechohabientes y con_discapacidad son datos sensibles: sin datos_sensibles.ver no se informan.
+        $banderas = $veSensibles ? $aplicacion->banderas : array_diff_key($aplicacion->banderas, array_flip(self::DATOS_PERSONALES_SENSIBLES));
 
         return response()->json(['data' => [
             'version' => $this->version($person),
@@ -228,8 +232,10 @@ class ExpedienteController extends Controller
             'usuario' => $presented,
             'edit_values' => $person->only(['unidad_organica_id', 'regimen_normativo_id']),
             'nombre' => trim($person->nombres.' '.$person->apellido_paterno.' '.$person->apellido_materno),
-            // La subsección 2.4 (período de prueba) solo se muestra si la persona lo tiene.
-            'tiene_periodo_prueba' => PerfilDocumental::de($person, $person->vinculosLaborales()->get())->tienePeriodoPrueba(),
+            // 2.4: Sí, No o Sin responder (null); se ofrece si algún vínculo no anulado dice Sí.
+            'tiene_periodo_prueba' => $aplicacion->bandera('tiene_periodo_prueba', paraOfrecer: true),
+            // Banderas del perfil (para exigir) y avisos, p. ej. condiciones del puesto sin vínculo vigente.
+            'condiciones' => ['banderas' => $banderas, 'sin_vinculo_vigente' => $aplicacion->sinVinculoVigente, 'avisos' => $aplicacion->avisos()],
             'document_sections' => SeccionLegajo::query()->orderBy('orden')->get(['id', 'nombre']),
             'document_states' => DocumentoUsuario::query()->where('usuario_id', $usuario)->whereHas('legajo', fn (Builder $query): Builder => $query->where('usuario_id', $usuario))
                 ->when(! $veSensibles, fn (Builder $query): Builder => $query->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES))
@@ -258,6 +264,10 @@ class ExpedienteController extends Controller
                 if ($request->hasHeader('If-Match') && ! hash_equals($this->version($person), $request->header('If-Match'))) {
                     abort(409, 'Los datos cambiaron mientras editabas. Cancela y vuelve a editar la ficha actualizada.');
                 }
+                $discapacidad = array_key_exists(CambioDiscapacidad::CAMPO, $data) ? [$person->con_discapacidad, CambioDiscapacidad::valor($data[CambioDiscapacidad::CAMPO])] : null;
+                if ($discapacidad) {
+                    CambioDiscapacidad::autorizar($request->user(), ...$discapacidad);
+                }
                 if (array_key_exists('ubicacion', $data)) {
                     $location = $data['ubicacion'];
                     unset($data['ubicacion']);
@@ -276,6 +286,9 @@ class ExpedienteController extends Controller
                     }
                 }
                 $person->update($data);
+                if ($discapacidad) {
+                    CambioDiscapacidad::auditar($person->id, $discapacidad[0], $discapacidad[1], $request->user(), $request);
+                }
             });
         } catch (UniqueConstraintViolationException) {
             throw ValidationException::withMessages(['usuario' => 'El documento de identidad o correo ya está registrado.']);

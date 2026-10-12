@@ -30,6 +30,8 @@ return [
         'seccion08.sanciones.registrar' => 'Registrar sanciones y recursos impugnatorios en la sección 08.',
         'seccion08.sanciones.revisar' => 'Aceptar u observar documentos de sanciones en la sección 08.',
         'datos_sensibles.ver' => 'Ver datos sensibles y de salud (secciones 01, 09 y 10).',
+        // Qué puede hacer el asistente con este dato está pendiente del cliente: de momento no lo tiene.
+        'discapacidad.editar' => 'Registrar o cambiar si la persona tiene discapacidad (el servidor o alguno de sus hijos). Cada cambio queda en la auditoría.',
         'sistema.administrar' => 'Configuración, catálogos y herramientas internas de la ORH.',
         'configuracion.modulos' => 'Activar o desactivar funcionalidades configurables, con motivo y auditoría.',
     ],

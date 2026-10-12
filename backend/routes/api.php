@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AfiliacionController;
 use App\Http\Controllers\Api\V1\ArchivoDocumentoController;
 use App\Http\Controllers\Api\V1\AuditoriaEventoController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\BanderasSinResponderController;
 use App\Http\Controllers\Api\V1\BitacoraAccesoLegajoController;
 use App\Http\Controllers\Api\V1\CapacitacionController;
 use App\Http\Controllers\Api\V1\CertificadoDiscapacidadController;
@@ -235,6 +236,8 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', Fu
         ->middleware('can:legajo.ver')->whereUuid('usuario');
 
     Route::middleware('can:sistema.administrar')->group(function (): void {
+        // Personas con banderas del perfil sin responder (Sí / No / Sin responder).
+        Route::get('personal/banderas-sin-responder', BanderasSinResponderController::class);
         // URI propia: la misma forma que la de la sección 01 la reemplazaría.
         Route::post('expedientes/{usuario}/seccion-02/{tipo}/{registro}/anular', [Seccion02Controller::class, 'anularRegistro'])
             ->whereUuid(['usuario', 'registro'])->whereIn('tipo', ['vinculos-laborales', 'vinculo-adendas', 'inducciones', 'periodos-prueba']);

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreUsuariosRequest;
 use App\Http\Resources\UsuarioResource;
 use App\Models\Usuario;
+use App\Support\CambioDiscapacidad;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -49,6 +50,10 @@ class UsuarioController extends Controller
             throw ValidationException::withMessages(array_fill_keys($unknown, 'Campo no permitido.'));
         }
         $data = $request->validate($rules);
+        $discapacidad = array_key_exists(CambioDiscapacidad::CAMPO, $data) ? [$usuario->con_discapacidad, CambioDiscapacidad::valor($data[CambioDiscapacidad::CAMPO])] : null;
+        if ($discapacidad) {
+            CambioDiscapacidad::autorizar($request->user(), ...$discapacidad);
+        }
         if (isset($data['email_institucional'])) {
             $data['email_institucional'] = strtolower($data['email_institucional']);
             if (Usuario::query()->whereKeyNot($usuario->id)->whereRaw('LOWER(email_institucional) = ?', [$data['email_institucional']])->exists()) {
@@ -56,7 +61,12 @@ class UsuarioController extends Controller
             }
         }
         try {
-            $usuario->update($data);
+            DB::transaction(function () use ($usuario, $data, $discapacidad, $request): void {
+                $usuario->update($data);
+                if ($discapacidad) {
+                    CambioDiscapacidad::auditar($usuario->id, $discapacidad[0], $discapacidad[1], $request->user(), $request);
+                }
+            });
         } catch (UniqueConstraintViolationException) {
             throw ValidationException::withMessages(['usuario' => 'Un DNI o correo ya está registrado.']);
         }
@@ -83,6 +93,9 @@ class UsuarioController extends Controller
     public function store(StoreUsuariosRequest $request): JsonResponse
     {
         $rows = $request->validated('usuarios');
+        foreach ($rows as $row) {
+            CambioDiscapacidad::autorizar($request->user(), null, CambioDiscapacidad::valor($row[CambioDiscapacidad::CAMPO] ?? null));
+        }
         $emails = array_map(fn (array $row): string => strtolower($row['email_institucional']), $rows);
         $existingEmails = Usuario::query()
             ->whereIn(DB::raw('LOWER(email_institucional)'), $emails)
@@ -111,6 +124,9 @@ class UsuarioController extends Controller
             'apellido_materno' => $row['apellido_materno'] ?? null,
             'telefono' => $row['telefono'] ?? null,
             'ubigeo_id' => $row['ubigeo_id'] ?? null,
+            // Todas las filas con las mismas columnas (inserción por bloques); sin respuesta, Sin responder.
+            'tiene_derechohabientes' => CambioDiscapacidad::valor($row['tiene_derechohabientes'] ?? null),
+            'con_discapacidad' => CambioDiscapacidad::valor($row['con_discapacidad'] ?? null),
             'password' => $unissuedPassword,
             'activo' => false,
             'created_at' => $now,
@@ -118,9 +134,12 @@ class UsuarioController extends Controller
         ], $rows);
 
         try {
-            DB::transaction(function () use ($records): void {
+            DB::transaction(function () use ($records, $request): void {
                 foreach (array_chunk($records, 100) as $chunk) {
                     Usuario::query()->insert($chunk);
+                }
+                foreach ($records as $record) {
+                    CambioDiscapacidad::auditar($record['id'], null, $record['con_discapacidad'], $request->user(), $request);
                 }
             });
         } catch (UniqueConstraintViolationException) {

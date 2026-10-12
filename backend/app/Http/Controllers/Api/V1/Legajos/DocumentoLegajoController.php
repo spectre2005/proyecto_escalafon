@@ -45,12 +45,19 @@ class DocumentoLegajoController extends Controller
         'subsana_a_documento_id', 'enlace_id', 'fecha_caducidad'];
 
     /**
-     * Tipos de documento que no corresponden a la persona (docente o administrativo, régimen), con su motivo. El
-     * frontend no los ofrece para cargar; CargaDocumento los rechaza igualmente.
+     * Tipos de documento que no corresponden a la persona (docente o administrativo, régimen, bandera en No), con su
+     * motivo: el frontend no los ofrece para cargar y CargaDocumento los rechaza igualmente. En por_definir, los que se
+     * ofrecen con el aviso «Falta definir si corresponde» (bandera sin responder).
+     * Sin datos_sensibles.ver no se informan los de las secciones 01, 09 y 10: sus motivos revelan banderas sensibles.
      */
-    public function noAplicables(string $usuario): JsonResponse
+    public function noAplicables(Request $request, string $usuario): JsonResponse
     {
-        return response()->json(['data' => AplicacionDocumental::para(Usuario::query()->findOrFail($usuario))->noAplicables()]);
+        $aplicacion = AplicacionDocumental::para(Usuario::query()->findOrFail($usuario));
+        $ocultos = $request->user()->veDatosSensibles() ? collect()
+            : TipoDocumento::query()->whereIn('seccion_legajo_id', self::SECCIONES_SENSIBLES)->pluck('id');
+        $visibles = fn (array $lista): array => array_values(array_filter($lista, fn (array $tipo): bool => ! $ocultos->contains($tipo['id'])));
+
+        return response()->json(['data' => $visibles($aplicacion->noAplicables()), 'por_definir' => $visibles($aplicacion->porDefinirTipos())]);
     }
 
     /** Folio sugerido para la próxima carga en una sección: ultimo_folio + 1. */

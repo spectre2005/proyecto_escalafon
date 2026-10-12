@@ -148,9 +148,7 @@ class UpdateExpedienteTest extends TestCase
         $this->patchJson($uri, [
             'nombre_puesto' => 'Puesto de prueba', 'unidad_organica_id' => $unit->id,
             'regimen_normativo_id' => $regime->id, 'regimen_laboral' => 'CAS',
-            'tipo_personal' => 'administrativo', 'con_discapacidad' => true,
-            'obligado_djbr' => true, 'exige_colegiatura' => true,
-            'tiene_periodo_prueba' => true, 'tiene_derechohabientes' => true,
+            'tipo_personal' => 'administrativo', 'con_discapacidad' => true, 'tiene_derechohabientes' => true,
         ])->assertOk()->assertJsonPath('data.usuario.values.unidad_organica_id', $unit->nombre)
             ->assertJsonPath('data.edit_values.unidad_organica_id', $unit->id)
             ->assertJsonPath('data.usuario.values.nombre_puesto', 'Puesto de prueba')
@@ -160,6 +158,13 @@ class UpdateExpedienteTest extends TestCase
         $this->patchJson($uri, ['unidad_organica_id' => null, 'regimen_normativo_id' => null, 'con_discapacidad' => false])
             ->assertOk()->assertJsonPath('data.edit_values.unidad_organica_id', null)
             ->assertJsonPath('data.usuario.values.con_discapacidad', false)->assertJsonPath('data.usuario.values.activo', false);
+        // Las banderas de la persona vuelven a Sin responder (null).
+        $this->patchJson($uri, ['con_discapacidad' => null, 'tiene_derechohabientes' => null])->assertOk()
+            ->assertJsonPath('data.usuario.values.con_discapacidad', null)->assertJsonPath('data.usuario.values.tiene_derechohabientes', null);
+        // Las del puesto se registran solo en el vínculo laboral.
+        $this->patchJson($uri, ['obligado_djbr' => true, 'exige_colegiatura' => true, 'exige_estudios_basicos' => true, 'tiene_periodo_prueba' => true])
+            ->assertUnprocessable()->assertJsonValidationErrors(['obligado_djbr', 'exige_colegiatura', 'exige_estudios_basicos', 'tiene_periodo_prueba'])
+            ->assertJsonPath('errors.obligado_djbr.0', 'Las condiciones del puesto se registran en el vínculo laboral (sección 02).');
         $this->patchJson($uri, ['unidad_organica_id' => '00000000-0000-4000-8000-000000000000'])
             ->assertUnprocessable()->assertJsonValidationErrors('unidad_organica_id');
         $this->getJson('/api/v1/expediente-opciones')->assertOk()

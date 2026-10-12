@@ -34,7 +34,8 @@ class Seccion03ApiTest extends TestCase
         parent::setUp();
         Storage::fake(config('legajo.disco_documentos'));
         $this->seed([SeccionesLegajoCatalogoSeeder::class, Seccion03CatalogoSeeder::class]);
-        $this->persona = Usuario::factory()->create(['tipo_personal' => 'docente']);
+        // Sin vínculo vigente, las condiciones del puesto salen de la persona: en No, a y c no aplican.
+        $this->persona = Usuario::factory()->create(['tipo_personal' => 'docente', 'exige_estudios_basicos' => false, 'exige_colegiatura' => false]);
         $this->legajo = Legajo::factory()->create(['usuario_id' => $this->persona->id]);
         $this->autor = $this->actuarComo();
     }

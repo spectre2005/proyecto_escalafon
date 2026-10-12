@@ -45,12 +45,15 @@ class UpdateExpedienteRequest extends FormRequest
             'unidad_organica_id' => 'sometimes|nullable|uuid|exists:unidades_organicas,id',
             'regimen_normativo_id' => 'sometimes|nullable|uuid|exists:regimenes_normativos,id',
             'activo' => 'prohibited',
-            'con_discapacidad' => 'sometimes|required|boolean',
-            'obligado_djbr' => 'sometimes|required|boolean',
-            'exige_colegiatura' => 'sometimes|required|boolean',
-            'exige_estudios_basicos' => 'sometimes|required|boolean',
-            'tiene_periodo_prueba' => 'sometimes|required|boolean',
-            'tiene_derechohabientes' => 'sometimes|required|boolean',
+            // Banderas de la persona: Sí (true), No (false) o Sin responder (null). con_discapacidad exige además
+            // discapacidad.editar (CambioDiscapacidad, en el controlador).
+            'con_discapacidad' => 'sometimes|nullable|boolean',
+            'tiene_derechohabientes' => 'sometimes|nullable|boolean',
+            // Las del puesto se registran solo en el vínculo laboral (sección 02).
+            'obligado_djbr' => 'prohibited',
+            'exige_colegiatura' => 'prohibited',
+            'exige_estudios_basicos' => 'prohibited',
+            'tiene_periodo_prueba' => 'prohibited',
             'ubicacion' => 'sometimes|nullable|array:region,provincia,distrito|min:3',
             'ubicacion.region' => 'required_with:ubicacion|string|max:100',
             'ubicacion.provincia' => 'required_with:ubicacion|string|max:100',
@@ -60,7 +63,10 @@ class UpdateExpedienteRequest extends FormRequest
 
     public function messages(): array
     {
-        return ['telefono.regex' => 'El teléfono debe contener 9 dígitos.'];
+        $puesto = 'Las condiciones del puesto se registran en el vínculo laboral (sección 02).';
+
+        return ['telefono.regex' => 'El teléfono debe contener 9 dígitos.', 'obligado_djbr.prohibited' => $puesto,
+            'exige_colegiatura.prohibited' => $puesto, 'exige_estudios_basicos.prohibited' => $puesto, 'tiene_periodo_prueba.prohibited' => $puesto];
     }
 
     public function withValidator(Validator $validator): void

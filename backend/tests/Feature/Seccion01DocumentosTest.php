@@ -128,6 +128,8 @@ class Seccion01DocumentosTest extends TestCase
     public function test_each_type_with_a_data_form_links_to_the_right_record(): void
     {
         $this->actuarComo();
+        // e (DJBR) y k (discapacidad) solo se cargan con su bandera en Sí: con No se rechazan (BanderasTresEstadosTest).
+        $this->persona->update(['obligado_djbr' => true, 'con_discapacidad' => true]);
         $declaraciones = [
             'S01_C_ANTECEDENTES_PENALES' => 'antecedente_penal', 'S01_D_ANTECEDENTES_POLICIALES' => 'antecedente_policial',
             'S01_E_DJ_BIENES_RENTAS' => 'djbr', 'S01_F_DJ_NO_IMPEDIMENTOS_31419' => 'dj_no_impedimentos',
@@ -333,7 +335,7 @@ class Seccion01DocumentosTest extends TestCase
         $this->assertSame([], $data['certificados']);
         $this->assertFalse(collect($data['tipos'])->firstWhere('codigo', 'S01_J_DNI_HIJOS_MENORES')['exigido']);
         // Un certificado anulado no cuenta para el aviso de discapacidad.
-        $this->assertSame([], $data['avisos']);
+        $this->assertSame([], $this->avisosDeBanderas($data['avisos']));
         // Administración ve los anulados aparte.
         $this->assertSame([$anulada->id], array_column($data['anulados']['declaraciones'], 'id'));
         $this->assertCount(1, $data['anulados']['familiares']);
@@ -365,14 +367,28 @@ class Seccion01DocumentosTest extends TestCase
         $this->actuarComo();
         $this->persona->update(['tiene_derechohabientes' => true, 'con_discapacidad' => false]);
         CertificadoDiscapacidad::factory()->create(['usuario_id' => $this->persona->id, 'persona' => 'servidor']);
-        $avisos = $this->seccion()['avisos'];
+        $avisos = $this->avisosDeBanderas($this->seccion()['avisos']);
         $this->assertCount(2, $avisos);
-        $this->assertStringContainsString('con derechohabientes', $avisos[0]);
+        $this->assertStringContainsString('falta registrar familiares', $avisos[0]);
         $this->assertStringContainsString('figura sin discapacidad', $avisos[1]);
 
         $this->persona->update(['tiene_derechohabientes' => false, 'con_discapacidad' => true]);
         $this->familiar(['parentesco' => 'hijo', 'es_derechohabiente' => true]);
-        $this->assertStringContainsString('sin derechohabientes', $this->seccion()['avisos'][0]);
-        $this->assertCount(1, $this->seccion()['avisos']);
+        $avisos = $this->avisosDeBanderas($this->seccion()['avisos']);
+        $this->assertCount(1, $avisos);
+        $this->assertStringContainsString('sin derechohabientes', $avisos[0]);
+
+        // Sin responder: se avisa que falta definir cada bandera de la persona.
+        $this->persona->update(['tiene_derechohabientes' => null, 'con_discapacidad' => null]);
+        $avisos = $this->avisosDeBanderas($this->seccion()['avisos']);
+        $this->assertCount(2, $avisos);
+        $this->assertStringContainsString('Falta definir si la persona tiene derechohabientes', $avisos[0]);
+        $this->assertStringContainsString('Falta definir si hay discapacidad', $avisos[1]);
+    }
+
+    /** Avisos de las banderas de la persona, sin el de las condiciones del puesto (la persona no tiene vínculo). */
+    private function avisosDeBanderas(array $avisos): array
+    {
+        return array_values(array_filter($avisos, fn (string $aviso): bool => ! str_starts_with($aviso, 'No tiene un vínculo laboral vigente')));
     }
 }

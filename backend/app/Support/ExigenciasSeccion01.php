@@ -15,8 +15,10 @@ use Illuminate\Support\Collection;
  * - i) DNI del cónyuge o concubino/a: uno por cada cónyuge o concubino/a registrado.
  * - j) DNI de los hijos menores de edad: uno por cada hijo/a menor de 18 años, según su fecha de nacimiento.
  *   Sin fecha no se puede determinar (exigido = null). Al cumplir 18 años deja de exigirse; el documento se conserva.
- * TODO pendiente de confirmar con el cliente: la directiva no condiciona g, i ni j a una bandera
- * (tiene_derechohabientes, estado civil); hoy dependen solo de los familiares registrados.
+ * Sin familiares registrados, g, i y j dependen de tiene_derechohabientes (AplicacionDocumental): Sí, por determinar
+ * con aviso «falta registrar familiares»; No, no aplican; Sin responder, por determinar.
+ * TODO PENDIENTE de confirmar con el cliente (ESTADO_PROYECTO.md, pregunta 18): la directiva no condiciona g, i ni j
+ * a una bandera; antes dependían solo de los familiares registrados.
  *
  * El resumen no es la fórmula de completitud del legajo (decisión abierta del cliente): entrega cargados y
  * recepcionados por separado y no cuenta como pendiente lo que no se exige.
@@ -67,6 +69,17 @@ final class ExigenciasSeccion01
      */
     public static function tipo(TipoDocumento $tipo, PerfilDocumental $perfil, Collection $familiares, array $porFamiliar): array
     {
+        if (in_array($tipo->codigo, AplicacionDocumental::DE_DERECHOHABIENTES, true) && $familiares->isEmpty()) {
+            // Sin familiares registrados decide tiene_derechohabientes (PENDIENTE pregunta 18).
+            $noAplica = $perfil->aplicacion->noAplica($tipo);
+
+            return match (true) {
+                $noAplica !== null => ['exigido' => false, 'aplica' => false, 'motivo' => $noAplica],
+                $perfil->banderas['tiene_derechohabientes'] === true => ['exigido' => null, 'aplica' => true,
+                    'motivo' => 'Por determinar: falta registrar familiares en Familia y derechohabientes.'],
+                default => ['exigido' => null, 'aplica' => true, 'motivo' => (string) $perfil->aplicacion->porDefinir($tipo)],
+            };
+        }
         if ($tipo->codigo === Seccion01::PARTIDA_MATRIMONIO) {
             $hay = $familiares->contains(fn (Familiar $familiar): bool => in_array($familiar->parentesco, Seccion01::CONYUGES, true));
 
@@ -81,11 +94,9 @@ final class ExigenciasSeccion01
                 default => ['exigido' => false, 'motivo' => $tipo->codigo === Seccion01::DNI_HIJOS ? 'No se exige: no hay hijos/as menores de edad registrados.' : 'No se exige: no hay cónyuge ni concubino/a registrado/a.'],
             };
         }
-        $exigencia = $perfil->exigencia($tipo);
-        // e y k: sin su bandera (obligado_djbr, con_discapacidad) no aplican a la persona y se muestran atenuados.
-        $aplica = ! ($tipo->requiere_djbr && ! $perfil->banderas['obligado_djbr']) && ! ($tipo->requiere_discapacidad && ! $perfil->banderas['con_discapacidad']);
 
-        return [...$exigencia, 'aplica' => $aplica];
+        // e y k: con su bandera en No no aplican (AplicacionDocumental); sin responder quedan por determinar.
+        return [...$perfil->exigencia($tipo), 'aplica' => $perfil->aplicacion->noAplica($tipo) === null];
     }
 
     /**

@@ -39,7 +39,8 @@ class Seccion02ApiTest extends TestCase
         $this->actuarComo();
         $this->seed(Seccion02CatalogoSeeder::class);
         $persona = Usuario::factory()->create(['tiene_periodo_prueba' => false]);
-        VinculoLaboral::factory()->create(['usuario_id' => $persona->id, 'regimen_laboral' => 'designado']);
+        // Con vínculo vigente, las condiciones del puesto salen del vínculo.
+        VinculoLaboral::factory()->create(['usuario_id' => $persona->id, 'regimen_laboral' => 'designado', 'tiene_periodo_prueba' => false]);
 
         $response = $this->getJson($this->url($persona, 'seccion-02'))->assertOk()
             ->assertJsonPath('data.legajo', null)->assertJsonPath('data.tiene_periodo_prueba', false)

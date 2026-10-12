@@ -27,7 +27,7 @@ class StoreUsuariosRequest extends FormRequest
     {
         return [
             'usuarios' => ['required', 'array', 'list', 'min:1', 'max:1000'],
-            'usuarios.*' => ['required', 'array:numero_doc_identidad,nombres,apellido_paterno,apellido_materno,email_institucional,tipo_personal,regimen_laboral,telefono,ubigeo_id'],
+            'usuarios.*' => ['required', 'array:numero_doc_identidad,nombres,apellido_paterno,apellido_materno,email_institucional,tipo_personal,regimen_laboral,telefono,ubigeo_id,tiene_derechohabientes,con_discapacidad'],
             'usuarios.*.ubigeo_id' => ['nullable', 'uuid', Rule::exists('ubigeo', 'id')],
             'usuarios.*.numero_doc_identidad' => ['bail', 'required', 'string', 'regex:/^[0-9]{8}$/', 'distinct:strict', Rule::unique('usuarios', 'numero_doc_identidad')],
             'usuarios.*.nombres' => ['required', 'string', 'max:120'],
@@ -37,6 +37,10 @@ class StoreUsuariosRequest extends FormRequest
             'usuarios.*.tipo_personal' => ['required', Rule::in(['docente', 'administrativo'])],
             'usuarios.*.regimen_laboral' => ['bail', 'required', 'string', 'max:20', $this->regimenDelTipo(...)],
             'usuarios.*.telefono' => ['nullable', 'string', 'regex:/^[0-9]{9}$/'],
+            // Banderas de la persona: Sí (true), No (false) o Sin responder (null, por defecto). con_discapacidad exige
+            // además discapacidad.editar (CambioDiscapacidad, en el controlador).
+            'usuarios.*.tiene_derechohabientes' => ['nullable', 'boolean'],
+            'usuarios.*.con_discapacidad' => ['nullable', 'boolean'],
         ];
     }
 

@@ -13,6 +13,7 @@ use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
+use App\Support\AplicacionDocumental;
 use App\Support\Documentos\EstadoDocumento;
 use App\Support\Documentos\FormulariosDatos;
 use App\Support\Parametros;
@@ -51,10 +52,10 @@ class Seccion02Controller extends Controller
         'regimen_normativo_id' => 'required|uuid|exists:regimenes_normativos,id',
         'unidad_organica_id' => 'nullable|uuid|exists:unidades_organicas,id',
         'nombre_puesto' => 'required|string|max:150',
-        'obligado_djbr' => 'sometimes|boolean',
-        'exige_colegiatura' => 'sometimes|boolean',
-        'exige_estudios_basicos' => 'sometimes|boolean',
-        'tiene_periodo_prueba' => 'sometimes|boolean',
+        'obligado_djbr' => 'sometimes|nullable|boolean',
+        'exige_colegiatura' => 'sometimes|nullable|boolean',
+        'exige_estudios_basicos' => 'sometimes|nullable|boolean',
+        'tiene_periodo_prueba' => 'sometimes|nullable|boolean',
         'proceso_seleccion' => 'nullable|string|max:100',
         'fecha_resultado_seleccion' => 'nullable|date_format:Y-m-d|before_or_equal:today',
         'numero_documento_vinculo' => 'nullable|string|max:60',
@@ -119,8 +120,9 @@ class Seccion02Controller extends Controller
         $subsecciones = SubseccionLegajo::query()->where('seccion_legajo_id', Seccion02CatalogoSeeder::SECCION)->orderBy('orden')
             ->with(['tiposDocumento' => fn ($query) => $query->where('activo', true)->orderBy('orden')])->get()
             ->map(function (SubseccionLegajo $subseccion) use ($perfil, $documentos, $datos): array {
-                // 2.4 existe siempre; solo aplica (y exige) si la persona tiene período de prueba.
-                $aplica = $subseccion->codigo !== '2.4' || $perfil->tienePeriodoPrueba();
+                // 2.4 existe siempre; no aplica solo con «Tiene período de prueba» en No (AplicacionDocumental: se
+                // ofrece si algún vínculo no anulado dice Sí). Sin responder aplica y sus tipos quedan por determinar.
+                $aplica = $subseccion->codigo !== '2.4' || $perfil->aplicacion->bandera('tiene_periodo_prueba', paraOfrecer: true) !== false;
                 $tipos = $subseccion->tiposDocumento->map(fn (TipoDocumento $tipo): array => $this->tipo($tipo, $perfil, $documentos->get($tipo->id, new EloquentCollection)))->values()->all();
 
                 return ['codigo' => $subseccion->codigo, 'nombre' => $subseccion->nombre, 'aplica' => $aplica, 'datos' => $datos[$subseccion->codigo] ?? 'ninguno',
@@ -133,8 +135,10 @@ class Seccion02Controller extends Controller
             'titular' => ['nombre' => trim($persona->nombres.' '.$persona->apellido_paterno.' '.$persona->apellido_materno), 'documento' => $persona->numero_doc_identidad],
             'hoy' => today()->format('Y-m-d'),
             'dias_aviso_vencimiento' => $aviso,
-            'tiene_periodo_prueba' => $perfil->tienePeriodoPrueba(),
+            // Sí, No o Sin responder (null), como la 2.4: se ofrece si algún vínculo no anulado dice Sí.
+            'tiene_periodo_prueba' => $perfil->aplicacion->bandera('tiene_periodo_prueba', paraOfrecer: true),
             'perfil' => ['regimenes' => $perfil->regimenes, 'regimenes_clasificados' => $perfil->regimenesClasificados(), 'tipos_personal' => $perfil->tiposPersonal, 'banderas' => $perfil->banderas],
+            'avisos_perfil' => $perfil->aplicacion->avisos(),
             'resumen' => ResumenSeccion02::total($subsecciones->all()),
             'subsecciones' => $subsecciones,
             'vinculos' => $filasVinculos,
@@ -401,8 +405,10 @@ class Seccion02Controller extends Controller
     {
         $persona = Usuario::query()->findOrFail($usuario);
         $vinculos = VinculoLaboral::query()->where('usuario_id', $usuario)->where('anulado', false)->get();
-        if (! PerfilDocumental::de($persona, $vinculos)->tienePeriodoPrueba()) {
-            throw ValidationException::withMessages(['vinculo_laboral_id' => 'La persona no tiene período de prueba (tiene_periodo_prueba = No).']);
+        // Solo se rechaza con la bandera en No; sin responder se permite (AplicacionDocumental).
+        if (AplicacionDocumental::de($persona, $vinculos)->bandera('tiene_periodo_prueba', paraOfrecer: true) === false) {
+            throw ValidationException::withMessages(['vinculo_laboral_id' => 'No se puede registrar: «Tiene período de prueba» está en No en el vínculo laboral. '
+                .'Si corresponde, cámbialo a Sí en el vínculo (sección 02) y vuelve a intentarlo.']);
         }
     }
 

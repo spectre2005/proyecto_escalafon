@@ -51,7 +51,8 @@ class Seccion03Controller extends Controller
             $lista = $documentos->where('tipo_documento_id', $tipo->id)->map(fn (DocumentoUsuario $doc): array => $this->documento($doc, $request))->values();
             [$letra, $grupo] = ResumenSeccion03::ITEMS[$tipo->codigo];
             $opcional = ! $tipo->obligatorio || ($tipo->requiere_docente && $exigencia['exigido'] === false);
-            $aplica = ! (($tipo->requiere_estudios_basicos || $tipo->requiere_colegiatura) && $exigencia['exigido'] === false);
+            // Estudios básicos y colegiatura con su bandera en No no aplican (AplicacionDocumental).
+            $aplica = $perfil->aplicacion->noAplica($tipo) === null;
 
             return [...$tipo->only(['id', 'codigo', 'nombre', 'permite_multiples', 'requiere_fedateo']),
                 'letra' => $letra, 'grupo' => $grupo, ...$exigencia,
@@ -79,10 +80,7 @@ class Seccion03Controller extends Controller
         $tipo = TipoDocumento::query()->findOrFail($request->input('tipo_documento_id'));
         abort_unless(isset(ResumenSeccion03::ITEMS[$tipo->codigo]), 422, 'El tipo no pertenece al catálogo de formación académica.');
         $this->exigirSensibles($request, $tipo);
-        $exigencia = PerfilDocumental::de($persona, $persona->vinculosLaborales)->exigencia($tipo);
-        if (($tipo->requiere_estudios_basicos || $tipo->requiere_colegiatura) && $exigencia['exigido'] === false) {
-            throw ValidationException::withMessages(['tipo_documento_id' => 'Este documento no aplica al puesto registrado. Revisa sus indicadores en la ficha o el vínculo laboral.']);
-        }
+        // Un tipo cuya bandera está en No lo rechaza CargaDocumento (AplicacionDocumental), con qué hacer.
         [$letra] = ResumenSeccion03::ITEMS[$tipo->codigo];
         $reglas = [
             'tipo_documento_id' => 'required|uuid', 'nombre' => 'required|string|max:200',

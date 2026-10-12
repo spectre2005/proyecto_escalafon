@@ -75,7 +75,8 @@ class Seccion02ResumenTest extends TestCase
 
         $persona = Usuario::factory()->create(['tiene_periodo_prueba' => true]);
         $legajo = Legajo::factory()->create(['usuario_id' => $persona->id]);
-        $vinculo = VinculoLaboral::factory()->create(['usuario_id' => $persona->id, 'fecha_inicio' => '2025-01-01', 'proceso_seleccion' => 'Concurso 1', 'fecha_resultado_seleccion' => '2024-12-20']);
+        // Con vínculo vigente, «Tiene período de prueba» sale del vínculo.
+        $vinculo = VinculoLaboral::factory()->create(['usuario_id' => $persona->id, 'fecha_inicio' => '2025-01-01', 'proceso_seleccion' => 'Concurso 1', 'fecha_resultado_seleccion' => '2024-12-20', 'tiene_periodo_prueba' => true]);
         $documento = fn (string $codigo, string $estado) => DocumentoUsuario::factory()->create([
             'usuario_id' => $persona->id, 'legajo_id' => $legajo->id, 'seccion_legajo_id' => 2, 'estado' => $estado,
             'tipo_documento_id' => TipoDocumento::query()->where('codigo', $codigo)->where('activo', true)->value('id'),
