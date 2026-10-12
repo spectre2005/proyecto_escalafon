@@ -97,7 +97,8 @@ class Seccion02CierreTest extends TestCase
         $this->postJson($this->url($persona, 'seccion-02/vinculos-laborales/'.$vinculo->id.'/anular'), ['motivo_anulacion' => 'Vínculo duplicado'])->assertOk();
 
         $this->getJson($this->url($persona, 'seccion-02'))->assertOk()->assertJsonCount(0, 'data.vinculos')
-            ->assertJsonPath('data.subsecciones.1.datos', 'ninguno')->assertJsonPath('data.perfil.regimenes', ['30220']);
+            // Sin vínculos, el tipo de vínculo queda Sin definir: no se toma la ley de la persona.
+            ->assertJsonPath('data.subsecciones.1.datos', 'ninguno')->assertJsonPath('data.perfil.regimenes', []);
         $this->getJson($this->url($persona, 'seccion-02/anulados'))->assertJsonPath('data.vinculos_laborales.0.id', $vinculo->id);
         // Tampoco en el listado genérico de la ficha.
         $this->getJson($this->url($persona, 'vinculos-laborales'))->assertOk()->assertJsonPath('total', 0);

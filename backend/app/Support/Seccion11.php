@@ -68,6 +68,17 @@ final class Seccion11
         return self::TIPOS_DOCUMENTO[$codigo ?? ''][3] ?? null;
     }
 
+    /** Por qué no se admite (con el tipo de vínculo Sin definir, dice dónde se define), o null si se admite. */
+    public static function motivoRechazo(?string $codigo, ?string $motivo, ?string $regimenVinculo, string $general): ?string
+    {
+        if (self::admite($codigo, $motivo, $regimenVinculo)) {
+            return null;
+        }
+
+        return $codigo === self::NO_RENOVACION_CAS && $regimenVinculo === null && self::admite($codigo, $motivo, 'plazo_determinado')
+            ? 'Define el tipo de vínculo en la sección 02 (Corregir vínculo).' : $general;
+    }
+
     /** ¿Este tipo de documento puede enlazarse a una desvinculación con ese motivo y régimen del vínculo? */
     public static function admite(?string $codigo, ?string $motivo, ?string $regimenVinculo): bool
     {

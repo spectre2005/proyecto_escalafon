@@ -58,6 +58,7 @@ use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
 use App\Support\AplicacionDocumental;
 use App\Support\CambioDiscapacidad;
+use App\Support\RegimenesLaborales;
 use App\Support\Seccion05;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -231,6 +232,7 @@ class ExpedienteController extends Controller
             'datos_sensibles_ocultos' => ! $veSensibles,
             'usuario' => $presented,
             'edit_values' => $person->only(['unidad_organica_id', 'regimen_normativo_id']),
+            'regimen' => $this->regimen($person),
             'nombre' => trim($person->nombres.' '.$person->apellido_paterno.' '.$person->apellido_materno),
             // 2.4: Sí, No o Sin responder (null); se ofrece si algún vínculo no anulado dice Sí.
             'tiene_periodo_prueba' => $aplicacion->bandera('tiene_periodo_prueba', paraOfrecer: true),
@@ -290,6 +292,10 @@ class ExpedienteController extends Controller
                         $data['ubigeo_id'] = $matched->id;
                     }
                 }
+                // La ley manda; su código queda como respaldo de lectura en regimen_laboral.
+                if (! empty($data['regimen_normativo_id'])) {
+                    $data['regimen_laboral'] = RegimenesLaborales::codigoRespaldo(RegimenNormativo::query()->findOrFail($data['regimen_normativo_id']));
+                }
                 $person->update($data);
                 if ($discapacidad) {
                     CambioDiscapacidad::auditar($person->id, $discapacidad[0], $discapacidad[1], $request->user(), $request);
@@ -302,6 +308,28 @@ class ExpedienteController extends Controller
         return $this->show($request, $usuario);
     }
 
+    /**
+     * Ley de la persona y tipo de vínculo de sus vínculos vigentes. Sin vínculo vigente, o con uno anterior sin tipo, el
+     * tipo está «Sin definir» (no se oculta nada por régimen). ley_anterior: código guardado antes, sin ley confirmada.
+     */
+    private function regimen(Usuario $person): array
+    {
+        $tipos = $person->vinculosLaborales()->where('anulado', false)->whereNull('fecha_cese')->pluck('regimen_laboral');
+        $ley = $person->regimenNormativo;
+
+        return [
+            'ley' => $ley?->only(['id', 'codigo', 'nombre']),
+            'ley_anterior' => $ley ? null : $person->regimen_laboral,
+            'tipos_vinculo' => $tipos->filter()->unique()->values()->all(),
+            'sin_definir' => $tipos->isEmpty() || $tipos->contains(null),
+            'mensaje' => match (true) {
+                $tipos->isEmpty() => RegimenesLaborales::SIN_DEFINIR,
+                $tipos->contains(null) => RegimenesLaborales::SIN_DEFINIR_VINCULO,
+                default => null,
+            },
+        ];
+    }
+
     private function version(Usuario $person): string
     {
         return hash('sha256', json_encode($person->only(array_diff($person->getFillable(), ['password', 'ultimo_acceso'])), JSON_THROW_ON_ERROR));
@@ -311,7 +339,7 @@ class ExpedienteController extends Controller
     {
         return response()->json(['data' => [
             'unidades' => UnidadOrganica::query()->orderBy('nombre')->get(['id', 'nombre', 'activo']),
-            'regimenes' => RegimenNormativo::query()->orderBy('nombre')->get(['id', 'nombre', 'activo']),
+            'regimenes' => RegimenNormativo::query()->orderBy('nombre')->get(['id', 'codigo', 'nombre', 'aplica_a', 'activo']),
         ]]);
     }
 

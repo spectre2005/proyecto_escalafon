@@ -80,3 +80,16 @@ Ya restringidos hoy: `S07_72A_RESOLUCION_PROGRESION` (carrera), `S11_A_TERMINO_D
 1. Ajustar `aplica_tipo_personal` (y, si se aprueba la tabla 2, `aplica_*`) en los seeders de catálogo de cada sección (`database/seeders/SeccionNNCatalogoSeeder.php`).
 2. Una migración que actualice solo los campos de aplicabilidad en las bases ya instaladas. Hay que revisarla seeder por seeder: algunos (por ejemplo, 02 y 07) no alteran un tipo que ya tiene documentos, y la aplicabilidad sí debe poder cambiarse en esos tipos sin tocar nada más.
 3. Pruebas que verifiquen la clasificación cargada.
+
+## Requisito previo: tipo de personal incoherente entre persona y vínculo
+
+Detectado al unificar el régimen (rama `feature/regimen-vinculo`, 11/10/2026). Solo se marca, **no se corrige**: debe
+resolverse antes de cargar la clasificación, porque el tipo de personal decide qué tipos se ofrecen (`aplica_tipo_personal`).
+
+| DNI | Persona | Vínculos |
+|---|---|---|
+| 75855996 | administrativo | dos vínculos de docente (designado y carrera, Ley 30220), ambos cesados |
+| 46945470 | administrativo | un vínculo de docente (carrera, Ley 30220), cesado |
+
+`AplicacionDocumental` toma el tipo de personal de los vínculos no anulados (también los cesados) y solo usa el de la
+persona si no tiene vínculos, así que hoy estas dos personas cuentan como docentes aunque figuran como administrativas.

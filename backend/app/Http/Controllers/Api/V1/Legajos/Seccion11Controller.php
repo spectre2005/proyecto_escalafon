@@ -110,8 +110,9 @@ class Seccion11Controller extends Controller
             // Con documento de término enlazado, el motivo debe seguir correspondiendo a ese documento.
             if ($actual->documento && (isset($data['motivo_cese']) || isset($data['vinculo_laboral_id']))) {
                 $regimen = VinculoLaboral::query()->whereKey($data['vinculo_laboral_id'] ?? $actual->vinculo_laboral_id)->value('regimen_laboral');
-                if (! Seccion11::admite($actual->documento->tipoDocumento?->codigo, $data['motivo_cese'] ?? $actual->motivo_cese, $regimen)) {
-                    throw ValidationException::withMessages(['motivo_cese' => 'El documento de término enlazado no corresponde a ese motivo de cese o régimen.']);
+                if ($rechazo = Seccion11::motivoRechazo($actual->documento->tipoDocumento?->codigo, $data['motivo_cese'] ?? $actual->motivo_cese, $regimen,
+                    'El documento de término enlazado no corresponde a ese motivo de cese o régimen.')) {
+                    throw ValidationException::withMessages(['motivo_cese' => $rechazo]);
                 }
             }
             $actual->update($data);

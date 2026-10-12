@@ -167,8 +167,9 @@ final class FormulariosDatos
             throw ValidationException::withMessages(['enlace_id' => 'Selecciona una desvinculación de esta persona que no esté anulada.']);
         }
         $codigo = $documento->tipoDocumento?->codigo;
-        if (! Seccion11::admite($codigo, $registro->motivo_cese, $registro->vinculoLaboral?->regimen_laboral)) {
-            throw ValidationException::withMessages(['enlace_id' => 'Este tipo de documento no corresponde al motivo de cese o al régimen del vínculo de esa desvinculación.']);
+        if ($rechazo = Seccion11::motivoRechazo($codigo, $registro->motivo_cese, $registro->vinculoLaboral?->regimen_laboral,
+            'Este tipo de documento no corresponde al motivo de cese o al régimen del vínculo de esa desvinculación.')) {
+            throw ValidationException::withMessages(['enlace_id' => $rechazo]);
         }
         if (Seccion11::principal($codigo)) {
             if (Desvinculacion::query()->whereKey($registro->id)->whereNull('documento_id')->update(['documento_id' => $documento->id]) !== 1) {

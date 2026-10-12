@@ -23,7 +23,9 @@ class UsuarioResource extends JsonResource
             'apellido_materno' => $this->apellido_materno ?? '',
             'email_institucional' => $this->email_institucional,
             'tipo_personal' => $this->tipo_personal,
+            // Respaldo de lectura (código de ley); la ley va en regimen_normativo_id.
             'regimen_laboral' => $this->regimen_laboral,
+            'regimen_normativo_id' => $this->regimen_normativo_id,
             'telefono' => $this->telefono ?? '',
             'activo' => $this->activo,
         ];

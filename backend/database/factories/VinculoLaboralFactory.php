@@ -18,7 +18,7 @@ class VinculoLaboralFactory extends Factory
         return [
             'usuario_id' => Usuario::factory(),
             'tipo_personal' => 'administrativo',
-            'regimen_laboral' => '276',
+            'regimen_laboral' => 'plazo_determinado',
             'regimen_normativo_id' => RegimenNormativo::factory(),
             'nombre_puesto' => substr(fake()->word(), 0, 150),
             'fecha_inicio' => now(),

@@ -7,6 +7,7 @@ use App\Http\Requests\StoreUsuariosRequest;
 use App\Http\Resources\UsuarioResource;
 use App\Models\Usuario;
 use App\Support\CambioDiscapacidad;
+use App\Support\RegimenesLaborales;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -50,6 +51,14 @@ class UsuarioController extends Controller
             throw ValidationException::withMessages(array_fill_keys($unknown, 'Campo no permitido.'));
         }
         $data = $request->validate($rules);
+        // Ley: por id o por código; debe corresponder al tipo de personal (el nuevo, si también cambia).
+        if (array_key_exists('regimen_normativo_id', $data) || array_key_exists('regimen_laboral', $data)) {
+            $ley = RegimenesLaborales::ley($data['regimen_normativo_id'] ?? null, $data['regimen_laboral'] ?? null);
+            if ($error = RegimenesLaborales::error($ley, $data['tipo_personal'] ?? $usuario->tipo_personal)) {
+                throw ValidationException::withMessages(['regimen_normativo_id' => $error]);
+            }
+            $data = [...$data, 'regimen_normativo_id' => $ley->id, 'regimen_laboral' => RegimenesLaborales::codigoRespaldo($ley)];
+        }
         $discapacidad = array_key_exists(CambioDiscapacidad::CAMPO, $data) ? [$usuario->con_discapacidad, CambioDiscapacidad::valor($data[CambioDiscapacidad::CAMPO])] : null;
         if ($discapacidad) {
             CambioDiscapacidad::autorizar($request->user(), ...$discapacidad);
@@ -72,6 +81,18 @@ class UsuarioController extends Controller
         }
 
         return new UsuarioResource($usuario->refresh());
+    }
+
+    /**
+     * Ley de la fila (ya validada por StoreUsuariosRequest): su id y su código como respaldo de lectura.
+     *
+     * @return array{regimen_normativo_id: string, regimen_laboral: string}
+     */
+    private function ley(array $row): array
+    {
+        $ley = RegimenesLaborales::ley($row['regimen_normativo_id'] ?? null, $row['regimen_laboral'] ?? null);
+
+        return ['regimen_normativo_id' => $ley->id, 'regimen_laboral' => RegimenesLaborales::codigoRespaldo($ley)];
     }
 
     public function destroy(string $record): JsonResponse
@@ -117,6 +138,7 @@ class UsuarioController extends Controller
         $now = now();
         $records = array_map(fn (array $row): array => [
             ...$row,
+            ...$this->ley($row),
             'id' => (string) Str::uuid(),
             'tipo_doc_identidad' => 'dni',
             'nacionalidad' => 'Peruano',

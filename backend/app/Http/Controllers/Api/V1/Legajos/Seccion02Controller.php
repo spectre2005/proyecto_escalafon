@@ -18,6 +18,7 @@ use App\Support\Documentos\EstadoDocumento;
 use App\Support\Documentos\FormulariosDatos;
 use App\Support\Parametros;
 use App\Support\PerfilDocumental;
+use App\Support\RegimenesLaborales;
 use App\Support\ResumenSeccion02;
 use Database\Seeders\Seccion02CatalogoSeeder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -331,6 +332,8 @@ class Seccion02Controller extends Controller
         return [
             ...$this->fila($vinculo, ['tipo_personal', 'regimen_laboral', 'regimen_normativo_id', 'unidad_organica_id', 'nombre_puesto', 'obligado_djbr', 'exige_colegiatura', 'exige_estudios_basicos', 'tiene_periodo_prueba', 'proceso_seleccion', 'fecha_resultado_seleccion', 'numero_documento_vinculo', 'fecha_inicio', 'fecha_fin_prevista', 'fecha_cese']),
             'regimen_normativo' => $vinculo->regimenNormativo?->nombre,
+            // Vínculo anterior con el tipo Sin definir: sugerencia para confirmar al corregirlo (no se guarda sola).
+            'tipo_sugerido' => RegimenesLaborales::sugerencia($vinculo),
             'registrado_por' => $this->nombre($vinculo->registradoPor),
             'unidad_organica' => $vinculo->unidadOrganica?->nombre,
             'cerrado' => $vinculo->fecha_cese !== null,

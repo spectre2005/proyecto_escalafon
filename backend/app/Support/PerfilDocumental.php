@@ -37,7 +37,9 @@ final class PerfilDocumental
         $aplicacion = AplicacionDocumental::de($usuario, $vinculos);
 
         return new self(
-            $origen->pluck('regimen_laboral')->filter()->unique()->values()->all(),
+            // Tipo de vínculo: solo de los vínculos vigentes (la persona guarda la ley, que no lo determina). Sin vínculo
+            // vigente queda vacío: Sin definir. Un vínculo anterior sin tipo aporta null.
+            $vigentes->pluck('regimen_laboral')->unique()->values()->all(),
             $origen->pluck('tipo_personal')->filter()->unique()->values()->all(),
             $aplicacion->banderas,
             $origen->pluck('nombre_puesto')->filter()->unique()->values()->all(),
@@ -45,7 +47,7 @@ final class PerfilDocumental
         );
     }
 
-    /** Regímenes que son del enum del esquema; los demás (p. ej. códigos normativos) no se pueden cruzar. */
+    /** Tipos de vínculo definidos (carrera, plazo determinado, designado); null (Sin definir) no se puede cruzar. */
     public function regimenesClasificados(): array
     {
         return array_values(array_intersect($this->regimenes, array_keys(self::APLICA)));
@@ -77,11 +79,15 @@ final class PerfilDocumental
         $aplica = array_filter(self::APLICA, fn (string $columna): bool => (bool) $tipo->{$columna});
         if (count($aplica) < count(self::APLICA)) {
             $clasificados = $this->regimenesClasificados();
+            $sinDefinir = 'No se puede determinar: el tipo de vínculo (carrera, plazo determinado o designado) está sin definir. '
+                .'Se define al registrar o corregir el vínculo en la sección 02.';
             if ($clasificados === []) {
-                return ['exigido' => null, 'motivo' => 'No se puede determinar: el régimen laboral registrado no es carrera, plazo determinado ni designado.'];
+                return ['exigido' => null, 'motivo' => $sinDefinir];
             }
             if (array_intersect($clasificados, array_keys($aplica)) === []) {
-                return ['exigido' => false, 'motivo' => 'No se exige para su régimen laboral.'];
+                // Con otro vínculo vigente sin definir no se puede descartar: podría ser de un tipo al que sí aplica.
+                return count($clasificados) < count($this->regimenes) ? ['exigido' => null, 'motivo' => $sinDefinir]
+                    : ['exigido' => false, 'motivo' => 'No se exige para su tipo de vínculo.'];
             }
         }
 

@@ -67,18 +67,23 @@ class UpdateExpedienteTest extends TestCase
         $this->getJson('/api/v1/ubicaciones?region=A&provincia=B')->assertOk()->assertExactJson(['data' => ['C']]);
     }
 
-    public function test_nationality_is_not_editable_and_labor_regime_must_match_staff_type(): void
+    public function test_nationality_is_not_editable_and_the_law_must_match_staff_type(): void
     {
-        $person = Usuario::factory()->create(['tipo_personal' => 'docente', 'regimen_laboral' => '30220', 'nacionalidad' => 'Peruano']);
+        $ley = fn (string $codigo): string => RegimenNormativo::query()->where('codigo', $codigo)->value('id');
+        $person = Usuario::factory()->create(['tipo_personal' => 'docente', 'regimen_laboral' => '30220', 'regimen_normativo_id' => $ley('30220'), 'nacionalidad' => 'Peruano']);
         $uri = '/api/v1/expedientes/'.$person->id;
         $this->patchJson($uri, ['nacionalidad' => 'Otra'])->assertUnprocessable()->assertJsonValidationErrors('nacionalidad');
         $this->assertSame('Peruano', $person->refresh()->nacionalidad);
+        // La ley se edita en regimen_normativo_id; regimen_laboral queda como respaldo y no se edita.
         $this->patchJson($uri, ['regimen_laboral' => 'CAS'])->assertUnprocessable()->assertJsonValidationErrors('regimen_laboral');
-        $this->patchJson($uri, ['tipo_personal' => 'administrativo'])->assertUnprocessable()->assertJsonValidationErrors('regimen_laboral');
-        foreach (['CAS', '276', '728', '30057'] as $code) {
-            $this->patchJson($uri, ['tipo_personal' => 'administrativo', 'regimen_laboral' => $code])->assertOk();
+        $this->patchJson($uri, ['regimen_normativo_id' => $ley('1057')])->assertUnprocessable()->assertJsonValidationErrors('regimen_normativo_id');
+        $this->patchJson($uri, ['tipo_personal' => 'administrativo'])->assertUnprocessable()->assertJsonValidationErrors('regimen_normativo_id');
+        foreach (['1057' => 'CAS', '276' => '276', '728' => '728', '30057' => '30057'] as $codigo => $respaldo) {
+            $this->patchJson($uri, ['tipo_personal' => 'administrativo', 'regimen_normativo_id' => $ley($codigo)])->assertOk()
+                ->assertJsonPath('data.regimen.ley.codigo', (string) $codigo);
+            $this->assertSame($respaldo, $person->refresh()->regimen_laboral);
         }
-        $this->patchJson($uri, ['tipo_personal' => 'docente', 'regimen_laboral' => '30220'])->assertOk();
+        $this->patchJson($uri, ['tipo_personal' => 'docente', 'regimen_normativo_id' => $ley('30220')])->assertOk();
         $this->assertSame('30220', $person->refresh()->regimen_laboral);
     }
 
@@ -142,12 +147,12 @@ class UpdateExpedienteTest extends TestCase
     public function test_labor_fields_and_flags_can_be_edited_and_cleared(): void
     {
         $unit = UnidadOrganica::factory()->create();
-        $regime = RegimenNormativo::factory()->create();
+        $regime = RegimenNormativo::query()->where('codigo', '1057')->firstOrFail();
         $person = Usuario::factory()->create();
         $uri = '/api/v1/expedientes/'.$person->id;
         $this->patchJson($uri, [
             'nombre_puesto' => 'Puesto de prueba', 'unidad_organica_id' => $unit->id,
-            'regimen_normativo_id' => $regime->id, 'regimen_laboral' => 'CAS',
+            'regimen_normativo_id' => $regime->id,
             'tipo_personal' => 'administrativo', 'con_discapacidad' => true, 'tiene_derechohabientes' => true,
         ])->assertOk()->assertJsonPath('data.usuario.values.unidad_organica_id', $unit->nombre)
             ->assertJsonPath('data.edit_values.unidad_organica_id', $unit->id)

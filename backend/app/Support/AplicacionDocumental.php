@@ -18,7 +18,8 @@ use Illuminate\Support\Collection;
  * - Tipo de personal: tipos_documento.aplica_tipo_personal (ambos, docente o administrativo).
  * - Régimen: aplica_carrera / aplica_plazo_determinado / aplica_designado.
  * - Fuente: todos los vínculos no anulados, también los cesados (el legajo guarda la historia y al digitalizarlo se
- *   cargan documentos de vínculos anteriores); sin vínculos, los datos de la persona.
+ *   cargan documentos de vínculos anteriores); sin vínculos, el tipo de personal de la persona. El tipo de vínculo sale
+ *   solo de los vínculos: sin vínculos, o con uno sin tipo, está Sin definir y no se oculta nada por régimen.
  * - Si no se puede saber (sin tipo de personal, o con un régimen que no es carrera, plazo determinado ni designado),
  *   el tipo se ofrece: nunca se impide cargar algo legítimo por falta de datos.
  * - El cargo (puesto) no se usa: el catálogo no relaciona documentos con puestos (pendiente U4).
@@ -103,7 +104,9 @@ final class AplicacionDocumental
         return new self(
             (string) $persona->getKey(),
             $origen->pluck('tipo_personal')->filter()->map(fn (string $tipo): string => mb_strtolower($tipo))->unique()->values()->all(),
-            $origen->pluck('regimen_laboral')->filter()->unique()->values()->all(),
+            // Tipo de vínculo: solo de los vínculos (no de la persona, que guarda la ley). null = Sin definir: con uno así
+            // no todos son conocidos y no se oculta nada por régimen.
+            $noAnulados->pluck('regimen_laboral')->unique()->values()->all(),
             $banderas,
             $ofrecidas,
             $vigentes->isEmpty(),
