@@ -12,6 +12,7 @@ import { folios } from '../../config/documentos'
 import AdjuntarDocumento from '../documentos/AdjuntarDocumento'
 import GruposTipos from '../documentos/GruposTipos'
 import ListaDocumentos from '../documentos/ListaDocumentos'
+import EnlazarDocumento from '../documentos/EnlazarDocumento'
 import SubirDocumentoForm from '../documentos/SubirDocumentoForm'
 import { apiErrorMessage } from '../../../../axios'
 import AbrirLegajo from '../AbrirLegajo'
@@ -142,9 +143,11 @@ function Documentos({ usuario, data, subseccion, sinLegajo, aplica = true }) {
   const [subiendo, setSubiendo] = useState(null)
   const [enlazando, setEnlazando] = useState(null)
   const [subsanando, setSubsanando] = useState(null)
+  // Documento ya cargado que quedó sin registro: se enlaza a uno existente o se registran sus datos.
+  const [recuperando, setRecuperando] = useState(null)
   const [aviso, setAviso] = useState('')
   if (!subseccion) return <Aviso>El catálogo de documentos de esta subsección no está cargado en la base de datos (Seccion02CatalogoSeeder).</Aviso>
-  const ocupado = !!subiendo || !!enlazando || !!subsanando
+  const ocupado = !!subiendo || !!enlazando || !!subsanando || !!recuperando
   const vigentes = data.vinculos.filter(v => v.vigente)
   function subido(tipo, documento) {
     setSubiendo(null)
@@ -173,7 +176,8 @@ function Documentos({ usuario, data, subseccion, sinLegajo, aplica = true }) {
             <p className="text-sm font-medium text-slate-800">{tipo.literal && <span className="mr-1 text-slate-500">{tipo.literal})</span>}{tipo.nombre}</p>
             <p className={`mt-1 text-xs ${aplica && tipo.exigido === null ? 'text-amber-800' : 'text-slate-500'}`}>{aplica ? tipo.motivo : 'No aplica a esta persona.'}{tipo.permite_multiples ? ' Admite varios documentos.' : ''}{tipo.formulario_datos ? ` Datos: ${formulariosDatos[tipo.formulario_datos] || tipo.formulario_datos}.` : ''}</p>
             <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo.formulario_datos, documento, data)}
-              onSubsanar={puedeSubir && !sinLegajo && !ocupado ? documento => { setAviso(''); setSubsanando({ tipoId: tipo.id, documento }) } : null} />
+              onSubsanar={puedeSubir && !sinLegajo && !ocupado ? documento => { setAviso(''); setSubsanando({ tipoId: tipo.id, documento }) } : null}
+              onEnlazar={puedeSubir && !sinLegajo && !ocupado && ofrecerTipo(noAplica, tipo) ? documento => { setAviso(''); setRecuperando({ tipoId: tipo.id, documento }) } : null} />
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             <Etiqueta clase={exigeClase}>{exigeTexto}</Etiqueta>
@@ -182,6 +186,9 @@ function Documentos({ usuario, data, subseccion, sinLegajo, aplica = true }) {
           </div>
         </div>
         {/* Los documentos del vínculo admiten varios: la subsanación se agrupa con el mismo vínculo (editable). */}
+        {recuperando?.tipoId === tipo.id && <EnlazarDocumento usuario={usuario} documento={recuperando.documento} opciones={enlacesDe(tipo.formulario_datos, data)}
+          onRegistrarNuevo={() => { setEnlazando({ tipoId: tipo.id, formulario: tipo.formulario_datos, documentoId: recuperando.documento.id, confirmar: tipo.formulario_datos === 'vinculos_laborales' && vigentes.length > 0 }); setRecuperando(null) }}
+          onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} />}
         {subsanando?.tipoId === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={2} tipo={tipo} titular={data.titular} subsanar={subsanando.documento}
           enlaces={tipo.formulario_datos === 'vinculos_laborales' ? enlacesDe(tipo.formulario_datos, data) : null} enlaceInicial={tipo.formulario_datos === 'vinculos_laborales' ? subsanando.documento.values.vinculo_laboral_id || '' : ''}
           precarga={id => precargaDe(tipo, data, id)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubsanando(null)} /></div>}

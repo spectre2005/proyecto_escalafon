@@ -9,6 +9,7 @@ use App\Models\Legajo;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Support\AplicacionDocumental;
+use App\Support\ConfiguracionFuncionalidades;
 use App\Support\Documentos\ArchivoPdf;
 use App\Support\Documentos\AuditoriaDocumento;
 use App\Support\Documentos\CargaDocumento;
@@ -139,6 +140,42 @@ class DocumentoLegajoController extends Controller
             'formulario_datos' => $tipo->formulario_datos,
             'enlazado' => ! empty($data['enlace_id']),
         ]], 201);
+    }
+
+    /**
+     * Enlazar más tarde un documento ya cargado que quedó sin registro (p. ej. se canceló el formulario de datos tras
+     * subirlo) con un registro existente compatible, sin volver a subir el archivo (documento.subir, en la ruta). Mismas
+     * reglas que el enlace al subir (FormulariosDatos::enlazarRegistro): el documento debe seguir sin enlace y no estar
+     * subsanado; el registro, ser de la persona, estar vigente y sin documento (salvo los vínculos) y corresponder al
+     * tipo. Respeta los datos sensibles, el legajo abierto, la funcionalidad activa y la aplicabilidad del tipo, como la
+     * carga. Queda en auditoría. Para registrar los datos de un registro nuevo se usa el formulario con documento_id.
+     */
+    public function enlazar(Request $request, string $usuario, string $documento): JsonResponse
+    {
+        $this->legajoAbierto($usuario);
+        $registro = $this->documentoDe($request, $usuario, $documento);
+        $desconocidos = array_diff(array_keys($request->all()), ['enlace_id']);
+        if ($desconocidos !== []) {
+            throw ValidationException::withMessages(array_fill_keys($desconocidos, 'Campo no permitido.'));
+        }
+        $enlace = $request->validate(['enlace_id' => 'required|uuid'], ['enlace_id.required' => 'Selecciona el registro que acredita el documento.'])['enlace_id'];
+        $tipo = $registro->tipoDocumento;
+        if ($nombre = ConfiguracionFuncionalidades::inactivaPorTipo($tipo->id)) {
+            return response()->json(['message' => "«{$nombre}» está desactivada en la configuración de la institución."], 409);
+        }
+        // Igual que la carga: un tipo que ya no corresponde a la persona no recibe enlaces nuevos (lo cargado se conserva).
+        if ($motivo = AplicacionDocumental::para(Usuario::query()->findOrFail($usuario))->noAplica($tipo)) {
+            throw ValidationException::withMessages(['enlace_id' => "Este tipo de documento no corresponde a la persona. {$motivo}"]);
+        }
+        $antes = $registro->only(['vinculo_laboral_id']);
+        DB::transaction(function () use ($registro, $enlace, $request, $antes, $tipo): void {
+            FormulariosDatos::enlazarExistente($registro, $enlace);
+            AuditoriaDocumento::registrar($registro, $request, 'documento.enlazado', $antes,
+                ['formulario_datos' => $tipo->formulario_datos, 'registro_id' => $enlace, 'vinculo_laboral_id' => $registro->refresh()->vinculo_laboral_id]);
+        });
+
+        return response()->json(['data' => [...$registro->only(['id', 'tipo_documento_id', 'seccion_legajo_id', 'vinculo_laboral_id']),
+            'formulario_datos' => $tipo->formulario_datos, 'registro_id' => $enlace, 'enlazado' => true]]);
     }
 
     /**

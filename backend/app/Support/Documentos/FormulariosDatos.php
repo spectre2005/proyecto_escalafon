@@ -108,11 +108,71 @@ final class FormulariosDatos
         if (! self::compatible($documento->tipoDocumento, $registro)) {
             throw ValidationException::withMessages(['enlace_id' => 'El registro no corresponde a este tipo de documento.']);
         }
-        if ($formulario === 'vinculos_laborales') {
-            $documento->update(['vinculo_laboral_id' => $registro->getKey()]);
-        } else {
-            $registro->update(['documento_id' => $documento->id]);
+        // Una sola vez y de vacío a un valor: si otro documento lo tomó entre tanto, no se pisa.
+        $tabla = $formulario === 'vinculos_laborales' ? DocumentoUsuario::query()->whereKey($documento->id)->whereNull('vinculo_laboral_id')
+            : $registro->newQuery()->whereKey($registro->getKey())->whereNull('documento_id');
+        $columna = $formulario === 'vinculos_laborales' ? ['vinculo_laboral_id' => $registro->getKey()] : ['documento_id' => $documento->id];
+        $modelo = $formulario === 'vinculos_laborales' ? $documento : $registro;
+        if ($tabla->update([...$columna, ...($modelo->usesTimestamps() && $modelo->getUpdatedAtColumn() ? [$modelo->getUpdatedAtColumn() => now()] : [])]) !== 1) {
+            throw ValidationException::withMessages(['enlace_id' => 'El registro o el documento ya tiene un enlace. Actualiza la ficha y vuelve a intentarlo.']);
         }
+        $modelo->forceFill($columna)->syncOriginal();
+    }
+
+    /**
+     * Documento ya cargado que todavía no acredita ningún registro de su formulario (ni, en los vínculos y la sección 11,
+     * está agrupado con un vínculo): p. ej. se subió para «registrar uno nuevo después» y se canceló ese formulario.
+     * Un documento subsanado no cuenta (se enlaza el que lo corrige) ni uno cuya cadena de subsanación ya acredita un
+     * registro (el registro sigue acreditado por esa cadena). Sin formulario de datos, nunca tiene registro que enlazar.
+     */
+    public static function sinEnlace(DocumentoUsuario $documento): bool
+    {
+        $formulario = $documento->tipoDocumento?->formulario_datos;
+        if (! self::soportado($formulario) || DocumentoUsuario::query()->where('subsana_a_documento_id', $documento->id)->exists()) {
+            return false;
+        }
+        $actual = $documento;
+        for ($paso = 0; $actual && $paso < 50; $paso++) {
+            if (self::acredita($actual, $formulario)) {
+                return false;
+            }
+            $actual = $actual->subsana_a_documento_id ? DocumentoUsuario::query()->find($actual->subsana_a_documento_id) : null;
+        }
+
+        return true;
+    }
+
+    /** ¿El documento acredita un registro vigente (no anulado) de su formulario o está agrupado con un vínculo? */
+    private static function acredita(DocumentoUsuario $documento, string $formulario): bool
+    {
+        if (in_array($formulario, ['vinculos_laborales', 'desvinculaciones'], true) && $documento->vinculo_laboral_id !== null) {
+            return true;
+        }
+        if ($formulario === 'vinculos_laborales') {
+            return false;
+        }
+
+        return collect(self::familia($formulario))->contains(fn (string $opcion): bool => (self::MODELOS[$opcion])::query()
+            ->where('documento_id', $documento->id)->where('anulado', false)->exists());
+    }
+
+    /**
+     * Enlaza más tarde un documento ya cargado y sin enlace (sinEnlace) con un registro existente de su formulario, con
+     * las mismas reglas que al subirlo (enlazarRegistro): registro de la persona, sin documento (salvo los vínculos), no
+     * anulado y compatible con el tipo. En una transacción con el documento bloqueado: dos enlaces simultáneos no
+     * toman el mismo documento ni el mismo registro.
+     */
+    public static function enlazarExistente(DocumentoUsuario $documento, string $registroId): void
+    {
+        DB::transaction(function () use ($documento, $registroId): void {
+            $bloqueado = DocumentoUsuario::query()->whereKey($documento->id)->lockForUpdate()->with('tipoDocumento')->firstOrFail();
+            if (! self::sinEnlace($bloqueado)) {
+                throw ValidationException::withMessages(['enlace_id' => self::soportado($bloqueado->tipoDocumento?->formulario_datos)
+                    ? 'El documento ya está enlazado a un registro (o lo corrige otro documento): no se vuelve a enlazar.'
+                    : 'Este tipo de documento no se enlaza a un registro de datos.']);
+            }
+            self::enlazarRegistro($bloqueado, (string) $bloqueado->tipoDocumento->formulario_datos, $registroId);
+        });
     }
 
     /** Documento de la persona, del tipo que abre este formulario, al que se enlaza un registro nuevo. */

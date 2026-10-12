@@ -13,6 +13,7 @@ import AbrirLegajo from '../AbrirLegajo'
 import AdjuntarDocumento from '../documentos/AdjuntarDocumento'
 import GruposTipos from '../documentos/GruposTipos'
 import ListaDocumentos from '../documentos/ListaDocumentos'
+import EnlazarDocumento from '../documentos/EnlazarDocumento'
 import SubirDocumentoForm from '../documentos/SubirDocumentoForm'
 import Registros from '../seccion02/Registros'
 import FamiliarForm from './FamiliarForm'
@@ -113,11 +114,13 @@ function Documentos({ usuario, data, codigos }) {
   const [subiendo, setSubiendo] = useState(null)
   const [enlazando, setEnlazando] = useState(null)
   const [subsanando, setSubsanando] = useState(null)
+  // Documento ya cargado que quedó sin registro: se enlaza a uno existente o se registran sus datos.
+  const [recuperando, setRecuperando] = useState(null)
   const [aviso, setAviso] = useState('')
   const catalogo = codigos.map(codigo => data.tipos.find(tipo => tipo.codigo === codigo)).filter(Boolean)
   if (!catalogo.length) return <Aviso>El catálogo de documentos de la sección 01 no está cargado en la base de datos (Seccion01CatalogoSeeder).</Aviso>
   const sinLegajo = !data.legajo
-  const ocupado = !!subiendo || !!enlazando || !!subsanando
+  const ocupado = !!subiendo || !!enlazando || !!subsanando || !!recuperando
   function subido(tipo, documento) {
     setSubiendo(null)
     setSubsanando(null)
@@ -143,7 +146,8 @@ function Documentos({ usuario, data, codigos }) {
             <p className="text-sm font-medium text-slate-800">{tipo.literal && <span className="mr-1 text-slate-500">{tipo.literal})</span>}{tipo.nombre}</p>
             <p className={`mt-1 text-xs ${tipo.aplica && tipo.exigido === null ? 'text-amber-800' : 'text-slate-500'}`}>{tipo.motivo}{tipo.permite_multiples ? ' Admite varios documentos.' : ''}{tipo.formulario_datos ? ` Datos: ${formulariosDatos01[tipo.formulario_datos]}.` : ''}</p>
             <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo, documento, data)}
-              onSubsanar={puedeSubir && !sinLegajo && !ocupado ? documento => { setAviso(''); setSubsanando({ tipoId: tipo.id, documento }) } : null} />
+              onSubsanar={puedeSubir && !sinLegajo && !ocupado ? documento => { setAviso(''); setSubsanando({ tipoId: tipo.id, documento }) } : null}
+              onEnlazar={puedeSubir && !sinLegajo && !ocupado && ofrecerTipo(noAplica, tipo) ? documento => { setAviso(''); setRecuperando({ tipoId: tipo.id, documento }) } : null} />
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {tipo.solo_anexo_05 && <Anexo05 />}
@@ -153,6 +157,9 @@ function Documentos({ usuario, data, codigos }) {
           </div>
         </div>
         {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={1} tipo={tipo} titular={data.titular} relacion={relacionPorTipo[tipo.codigo]} enlaces={enlacesDe(tipo, data)} precarga={id => precargaDe(tipo, data, id)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}
+        {recuperando?.tipoId === tipo.id && <EnlazarDocumento usuario={usuario} documento={recuperando.documento} opciones={enlacesDe(tipo, data)}
+          onRegistrarNuevo={() => { setEnlazando({ tipoId: tipo.id, documentoId: recuperando.documento.id }); setRecuperando(null) }}
+          onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} />}
         {subsanando?.tipoId === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={1} tipo={tipo} titular={data.titular} relacion={relacionPorTipo[tipo.codigo]} subsanar={subsanando.documento} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubsanando(null)} /></div>}
         {enlazando?.tipoId === tipo.id && <div className="mt-4"><FormularioEnlazado usuario={usuario} data={data} tipo={tipo} documentoId={enlazando.documentoId} onDone={enlazado} /></div>}
       </li>

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { aplicarPrecarga, CAMPOS_PRECARGA, conValor, precargaDesdeDocumento, precargaDesdeRegistro, reemplazarPropuesta, titularFamiliar } from './acreditacion.js'
+import { aplicarPrecarga, CAMPOS_PRECARGA, conValor, precargaDesdeDocumento, precargaDesdeRegistro, puedeEnlazar, reemplazarPropuesta, titularFamiliar } from './acreditacion.js'
 import { agruparTipos, cantidadDocumentos, indiceNoAplica, tiposQueAcreditan } from './aplicacion.js'
 
 const tipo = (codigo, formulario_datos, extra = {}) => ({ codigo, formulario_datos, ...extra })
@@ -98,4 +98,12 @@ test('attach from a record only offers types that are offered and can accredit i
   const indice = indiceNoAplica([{ id: 't3', codigo: 'T3', motivo: 'No corresponde.' }])
   assert.deepEqual(tiposQueAcreditan(tipos, indice, tipoActual => enlaces[tipoActual.id], 'r1').map(t => t.id), ['t1'])
   assert.deepEqual(tiposQueAcreditan(tipos, indice, () => null, 'r1'), [])
+})
+
+test('a document left without its record can be linked later, unless another document corrects it', () => {
+  assert.equal(puedeEnlazar({ sin_registro: true, subsanado: false }), true)
+  assert.equal(puedeEnlazar({ sin_registro: false, subsanado: false }), false)
+  // Subsanado: se enlaza el documento que lo corrige, no este.
+  assert.equal(puedeEnlazar({ sin_registro: true, subsanado: true }), false)
+  assert.equal(puedeEnlazar(null), false)
 })

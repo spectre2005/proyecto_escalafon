@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { apiErrorMessage } from '../../../../axios'
 import { usePuede } from '../../../auth/session'
 import { recepcionarDocumento } from '../../api/documentosApi'
+import { puedeEnlazar } from '../../config/acreditacion'
 import { folios, modalidadesPresentacion, relacionesTitular } from '../../config/documentos'
 import { etiqueta } from '../../config/seccion01'
 import { coloresEstadoDocumento, estadosDocumento } from '../../config/seccion02'
@@ -17,8 +18,9 @@ const kb = bytes => bytes ? `${Math.max(1, Math.round(bytes / 1024))} KB` : ''
  * enlazado(documento): texto con el registro de datos que acredita (vínculo, adenda, inducción…) o null.
  * onSubsanar(documento): «Subsanar» en cada documento vigente (no subsanado). Abre la subsanación de ese documento, que el
  *   backend admite aunque el tipo ya no se ofrezca para cargas nuevas.
+ * onEnlazar(documento): «Enlazar ahora» en un documento cargado que quedó sin registro (sin_registro del backend).
  */
-export default function ListaDocumentos({ usuario, tipo, enlazado, onSubsanar }) {
+export default function ListaDocumentos({ usuario, tipo, enlazado, onSubsanar, onEnlazar }) {
   const puedeVer = usePuede('legajo.ver')
   const puedeRecepcionar = usePuede('documento.recepcionar')
   const [visor, setVisor] = useState(null)
@@ -55,6 +57,7 @@ export default function ListaDocumentos({ usuario, tipo, enlazado, onSubsanar })
           <p className="text-xs font-semibold text-slate-700">{tipo.codigo === 'S01_B_DOCUMENTO_IDENTIDAD' ? 'Copia de DNI' : `Folios ${folios(v.folio_inicio, v.folio_fin)}`}{documento.archivo?.num_paginas ? ` · ${documento.archivo.num_paginas} página(s)` : ''}{documento.archivo ? ` · ${kb(documento.archivo.tamano_bytes)}` : ''}</p>
           <div className="flex flex-wrap items-center gap-2">
             {subsanado && <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-medium text-slate-600">Subsanado</span>}
+            {puedeEnlazar(documento) && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800">Sin registro asociado</span>}
             <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${coloresEstadoDocumento[documento.estado_visible] || 'bg-slate-100 text-slate-700'}`}>{etiqueta(estadosDocumento, documento.estado_visible)}</span>
           </div>
         </div>
@@ -74,6 +77,7 @@ export default function ListaDocumentos({ usuario, tipo, enlazado, onSubsanar })
         </dl>
         <div className="mt-2 flex flex-wrap items-center gap-4">
           {puedeVer && documento.archivo && <button type="button" onClick={() => setVisor(visor === documento.id ? null : documento.id)} className="text-xs font-semibold text-teal-700">{visor === documento.id ? 'Ocultar PDF' : 'Ver PDF'}</button>}
+          {onEnlazar && puedeEnlazar(documento) && <button type="button" onClick={() => onEnlazar(documento)} className="text-xs font-semibold text-teal-700">Enlazar ahora</button>}
           {onSubsanar && !subsanado && tipo.codigo !== 'S01_B_DOCUMENTO_IDENTIDAD' && <button type="button" onClick={() => onSubsanar(documento)} className="text-xs font-semibold text-amber-800">Subsanar</button>}
           {puedeRecepcionar && !v.fecha_recepcion && !subsanado && confirmando !== documento.id && <button type="button" onClick={() => { setError(''); setConfirmando(documento.id) }} className="text-xs font-semibold text-teal-700">Recepcionar</button>}
           {confirmando === documento.id && <span className="flex flex-wrap items-center gap-3 text-xs text-slate-600">Se registrará tu nombre y la fecha de hoy como recepción (art. 4.5).

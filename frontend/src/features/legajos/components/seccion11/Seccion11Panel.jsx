@@ -13,6 +13,7 @@ import { folios } from '../../config/documentos'
 import AdjuntarDocumento from '../documentos/AdjuntarDocumento'
 import GruposTipos from '../documentos/GruposTipos'
 import ListaDocumentos from '../documentos/ListaDocumentos'
+import EnlazarDocumento from '../documentos/EnlazarDocumento'
 import SubirDocumentoForm from '../documentos/SubirDocumentoForm'
 import AbrirLegajo from '../AbrirLegajo'
 import Registros from '../seccion07/Registros'
@@ -139,6 +140,8 @@ function TipoDocumento({ usuario, data, tipo, sinLegajo, ofrecer }) {
   const puedeSubir = puedeCargar && ofrecer
   const [subiendo, setSubiendo] = useState(false)
   const [subsanando, setSubsanando] = useState(null)
+  // Documento ya cargado que quedó sin desvinculación: se enlaza a una existente o (los del término) se registra.
+  const [recuperando, setRecuperando] = useState(null)
   const [registrando, setRegistrando] = useState(null)
   const [aviso, setAviso] = useState('')
   const libres = disponibles(data).filter(v => !tipo.solo_plazo_determinado || v.values.regimen_laboral === 'plazo_determinado')
@@ -160,7 +163,8 @@ function TipoDocumento({ usuario, data, tipo, sinLegajo, ofrecer }) {
         {sinDefinir && <p role="note" className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">Hay vínculos con el tipo de vínculo sin definir y este documento solo corresponde a plazo determinado. Define el tipo de vínculo en la sección 02 (2.2: «Completar tipo» si el vínculo está cerrado).</p>}
         {tipo.restringido ? <p className="mt-2 text-[11px] text-slate-400">Documento con datos sensibles: requiere acceso a datos sensibles.</p>
           : <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo, documento, data)}
-            onSubsanar={puedeCargar && !sinLegajo && !subiendo && !subsanando && !registrando ? documento => { setAviso(''); setSubsanando(documento) } : null} />}
+            onSubsanar={puedeCargar && !sinLegajo && !subiendo && !subsanando && !registrando && !recuperando ? documento => { setAviso(''); setSubsanando(documento) } : null}
+            onEnlazar={puedeSubir && !sinLegajo && !subiendo && !subsanando && !registrando && !recuperando ? documento => { setAviso(''); setRecuperando(documento) } : null} />}
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         {tipo.es_dato_sensible && <Etiqueta clase="bg-rose-50 text-rose-700">Dato sensible</Etiqueta>}
@@ -170,6 +174,9 @@ function TipoDocumento({ usuario, data, tipo, sinLegajo, ofrecer }) {
     </div>
     {aviso && <p role="status" className="mt-3 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
     {subiendo && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={11} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo, data)} precarga={id => precargaDe(tipo, data, id)} onSaved={subido} onCancel={() => setSubiendo(false)} /></div>}
+    {recuperando && <EnlazarDocumento usuario={usuario} documento={recuperando} opciones={enlacesDe(tipo, data)}
+      onRegistrarNuevo={tipo.principal ? () => { setRegistrando(recuperando.id); setRecuperando(null) } : null}
+      onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} />}
     {subsanando && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={11} tipo={tipo} titular={data.titular} subsanar={subsanando} onSaved={subido} onCancel={() => setSubsanando(null)} /></div>}
     {registrando && (libres.length
       ? <div className="mt-4"><DesvinculacionForm usuario={usuario} vinculos={libres} motivos={tipo.motivos} documentoId={registrando} onSaved={() => { setRegistrando(null); setAviso('Desvinculación registrada y acreditada por el documento.') }} onCancel={() => { setRegistrando(null); setAviso('El documento quedó cargado sin desvinculación enlazada.') }} /></div>

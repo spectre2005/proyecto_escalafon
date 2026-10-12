@@ -12,6 +12,7 @@ import { folios } from '../../config/documentos'
 import AdjuntarDocumento from '../documentos/AdjuntarDocumento'
 import GruposTipos from '../documentos/GruposTipos'
 import ListaDocumentos from '../documentos/ListaDocumentos'
+import EnlazarDocumento from '../documentos/EnlazarDocumento'
 import SubirDocumentoForm from '../documentos/SubirDocumentoForm'
 import AbrirLegajo from '../AbrirLegajo'
 import Registros from '../seccion07/Registros'
@@ -72,9 +73,11 @@ function Documentos({ usuario, data, tipos, sinLegajo }) {
   const [subiendo, setSubiendo] = useState(null)
   const [enlazando, setEnlazando] = useState(null)
   const [subsanando, setSubsanando] = useState(null)
+  // Documento ya cargado que quedó sin registro: se enlaza a uno existente o se registran sus datos.
+  const [recuperando, setRecuperando] = useState(null)
   const [aviso, setAviso] = useState('')
   if (!tipos.length) return <Aviso>El catálogo de documentos de este bloque no está cargado en la base de datos (Seccion09CatalogoSeeder).</Aviso>
-  const ocupado = !!subiendo || !!enlazando || !!subsanando
+  const ocupado = !!subiendo || !!enlazando || !!subsanando || !!recuperando
   function subido(tipo, documento) {
     setSubiendo(null)
     setSubsanando(null)
@@ -97,7 +100,8 @@ function Documentos({ usuario, data, tipos, sinLegajo }) {
           <p className="text-sm font-medium text-slate-800">{tipo.literal && <span className="mr-1 text-slate-500">{tipo.literal})</span>}{tipo.nombre}</p>
           <p className="mt-1 text-xs text-slate-500">{tipo.descripcion ? `${tipo.descripcion} ` : ''}Admite varios documentos.{tipo.formulario_datos ? '' : ' Solo metadatos (sin formulario de datos).'}</p>
           <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo, documento, data)}
-            onSubsanar={puedeSubir && !sinLegajo && !ocupado ? documento => { setAviso(''); setSubsanando({ tipoId: tipo.id, documento }) } : null} />
+            onSubsanar={puedeSubir && !sinLegajo && !ocupado ? documento => { setAviso(''); setSubsanando({ tipoId: tipo.id, documento }) } : null}
+              onEnlazar={puedeSubir && !sinLegajo && !ocupado && ofrecerTipo(noAplica, tipo) ? documento => { setAviso(''); setRecuperando({ tipoId: tipo.id, documento }) } : null} />
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <Etiqueta clase="bg-slate-100 text-slate-600">Opcional</Etiqueta>
@@ -106,6 +110,9 @@ function Documentos({ usuario, data, tipos, sinLegajo }) {
         </div>
       </div>
       {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={9} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo, data)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}
+      {recuperando?.tipoId === tipo.id && <EnlazarDocumento usuario={usuario} documento={recuperando.documento} opciones={enlacesDe(tipo, data)}
+        onRegistrarNuevo={() => { setEnlazando({ tipo, documentoId: recuperando.documento.id }); setRecuperando(null) }}
+        onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} />}
       {subsanando?.tipoId === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={9} tipo={tipo} titular={data.titular} subsanar={subsanando.documento} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubsanando(null)} /></div>}
       {enlazando?.tipo.id === tipo.id && <div className="mt-4"><FormularioEnlazado usuario={usuario} tipo={enlazando.tipo} documentoId={enlazando.documentoId} onDone={enlazado} /></div>}
     </li>} />

@@ -14,6 +14,7 @@ import AbrirLegajo from '../AbrirLegajo'
 import AdjuntarDocumento from '../documentos/AdjuntarDocumento'
 import GruposTipos from '../documentos/GruposTipos'
 import ListaDocumentos from '../documentos/ListaDocumentos'
+import EnlazarDocumento from '../documentos/EnlazarDocumento'
 import SubirDocumentoForm from '../documentos/SubirDocumentoForm'
 import Registros from '../seccion02/Registros'
 import { GoceForm, LicenciaForm, PeriodoVacacionalForm } from './Formularios'
@@ -93,9 +94,11 @@ function Documentos({ usuario, data, tipos, sinLegajo, subiendo, setSubiendo }) 
   const noAplica = useNoAplicables(usuario)
   const [enlazando, setEnlazando] = useState(null)
   const [subsanando, setSubsanando] = useState(null)
+  // Documento ya cargado que quedó sin registro: se enlaza a uno existente o se registran sus datos.
+  const [recuperando, setRecuperando] = useState(null)
   const [aviso, setAviso] = useState('')
   if (!tipos.length) return <Aviso>El catálogo de documentos de la sección 05 no está cargado en la base de datos (Seccion05CatalogoSeeder).</Aviso>
-  const ocupado = !!subiendo || !!enlazando || !!subsanando
+  const ocupado = !!subiendo || !!enlazando || !!subsanando || !!recuperando
   function subido(tipo, documento) {
     setSubiendo(null)
     setSubsanando(null)
@@ -119,7 +122,8 @@ function Documentos({ usuario, data, tipos, sinLegajo, subiendo, setSubiendo }) 
           <p className="mt-1 text-xs text-slate-500">{tipo.descripcion}{tipo.formulario_datos ? ` Acredita: ${(formulariosSeccion05[tipo.formulario_datos] || tipo.formulario_datos).toLowerCase()}.` : ''}{tipo.codigo === 'S05_D_ROL_VACACIONES' ? ' Solo documento: está pendiente de confirmar si además requiere datos estructurados.' : ''}</p>
           {tipo.restringido ? <p className="mt-2 text-[11px] text-slate-400">Dato de salud: sus documentos requieren acceso a datos sensibles (Directiva, num. 6.2).</p>
             : <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo, documento, data)}
-              onSubsanar={puedeSubir && !sinLegajo && !ocupado ? documento => { setAviso(''); setSubsanando({ tipoId: tipo.id, documento }) } : null} />}
+              onSubsanar={puedeSubir && !sinLegajo && !ocupado ? documento => { setAviso(''); setSubsanando({ tipoId: tipo.id, documento }) } : null}
+              onEnlazar={puedeSubir && !sinLegajo && !ocupado && ofrecerTipo(noAplica, tipo) ? documento => { setAviso(''); setRecuperando({ tipoId: tipo.id, documento }) } : null} />}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           {!tipo.restringido && <Etiqueta clase={coloresEstadoDocumento[tipo.estado] || 'bg-slate-100 text-slate-700'}>{etiqueta(estadosDocumento, tipo.estado)}{tipo.documentos > 1 ? ` · ${tipo.documentos} documentos` : ''}</Etiqueta>}
@@ -127,6 +131,9 @@ function Documentos({ usuario, data, tipos, sinLegajo, subiendo, setSubiendo }) 
         </div>
       </div>
       {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={5} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo, data)} precarga={id => precargaDe(tipo, data, id)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}
+      {recuperando?.tipoId === tipo.id && <EnlazarDocumento usuario={usuario} documento={recuperando.documento} opciones={enlacesDe(tipo, data)}
+        onRegistrarNuevo={() => { setEnlazando({ tipoId: tipo.id, documentoId: recuperando.documento.id }); setRecuperando(null) }}
+        onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} />}
       {subsanando?.tipoId === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={5} tipo={tipo} titular={data.titular} subsanar={subsanando.documento} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubsanando(null)} /></div>}
       {enlazando?.tipoId === tipo.id && <div className="mt-4"><FormularioEnlazado usuario={usuario} data={data} tipo={tipo} documentoId={enlazando.documentoId} onDone={enlazado} /></div>}
     </li>} />

@@ -310,6 +310,8 @@ class Seccion07Controller extends Controller
             'lista' => $documentos->map(fn (DocumentoUsuario $documento): array => [
                 ...$this->fila($documento, ['estado', 'folio_inicio', 'folio_fin', 'fecha_incorporacion', 'emisor', 'fecha_emision', 'titular_nombre', 'titular_documento', 'num_resolucion', 'modalidad_presentacion', 'relacion_titular', 'subsana_a_documento_id', 'fecha_recepcion', 'created_at']),
                 'subsanado' => $documentos->contains('subsana_a_documento_id', $documento->id),
+                // Cargado sin registro que lo acredite (se puede enlazar después: DocumentoLegajoController::enlazar).
+                'sin_registro' => FormulariosDatos::sinEnlace($documento),
                 'estado_visible' => EstadoDocumento::visible($documento),
                 'aprobado' => EstadoDocumento::aprobado($documento, $tipo),
                 'subido_por' => $this->nombre($documento->createdBy),

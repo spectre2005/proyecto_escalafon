@@ -97,3 +97,8 @@ export function reemplazarPropuesta(borrador, anterior, nueva, vacios) {
 export function conValor(datos) {
   return Object.fromEntries(Object.entries(datos).filter(([, valor]) => valor !== null && valor !== undefined && valor !== ''))
 }
+
+/** Documento cargado que quedó sin el registro que debería acreditar (sin_registro del backend) y aún se puede enlazar. */
+export function puedeEnlazar(documento) {
+  return !!documento?.sin_registro && !documento.subsanado
+}
