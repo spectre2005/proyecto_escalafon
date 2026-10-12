@@ -172,7 +172,8 @@ Sección 05:
 - Las banderas también ocultan módulos: Discapacidad y Familia (sección 01) si están en
   No y sin datos registrados (familiares, certificados o documentos g, i, j, k); y la
   subsección 2.4 si período de prueba está en No y sin períodos ni documentos m. Con datos,
-  se mantienen. El backend sigue permisivo: acepta registros aunque el módulo esté oculto.
+  se mantienen. Desde el 12/10 (commit feb8c99) el backend rechaza los registros nuevos
+  incompatibles con una condición en No: ver «Condiciones del perfil» más abajo.
   Quien no tiene datos_sensibles.ver no recibe la lista de módulos ocultos.
 - Si lo oculta una bandera, se redirige a la primera categoría con un aviso; si lo
   desactiva Funcionalidades, sigue «Función no disponible».
@@ -180,8 +181,8 @@ Sección 05:
 - Reglas para pruebas con Code: solo en copia de la base; nunca artisan serve con
   DB_DATABASE para cambiar de base; borrar solo archivos que él creó, por nombre; no tocar
   sesiones del navegador.
-- Pendientes de esta línea: entrada «Colegiaturas» del menú (solo lectura, no sigue la
-  bandera); test intermitente de la suite (2 fallos en 32 corridas, UniqueConstraint
+- Pendientes de esta línea: entrada «Colegiaturas» del menú (resuelto el 12/10: ahora sigue
+  la bandera, ver «Condiciones del perfil»); test intermitente de la suite (2 fallos en 32 corridas, UniqueConstraint
   Violation en ExpedienteApiTest y Seccion06ApiTest; falta capturar el mensaje completo);
   unificar regimen_laboral (hoy mezcla ley y eje); clasificación del catálogo por régimen
   y tipo de personal (propuesta con 3 decisiones abiertas); documentos "por evento";
@@ -211,3 +212,75 @@ Sección 05:
 - Cada compañero debe correr php artisan migrate.
 - Pendiente: clasificación del catálogo por régimen y tipo de personal, documentos
   «por evento», test intermitente (UniqueConstraintViolation), preguntas 11, 18 y 20.
+
+## Condiciones del perfil: Sí, No y Sin responder (12/10/2026, commit feb8c99)
+- Seis condiciones revisadas. De la persona (usuarios): tiene_derechohabientes y
+  con_discapacidad. Del puesto (vinculos_laborales): obligado_djbr, exige_colegiatura,
+  exige_estudios_basicos y tiene_periodo_prueba. Las seis admiten los tres estados
+  (null = Sin responder); no hizo falta migración.
+- Qué controla cada una:
+  - tiene_derechohabientes: módulo Familia, documentos g, i, j y familiares marcados como
+    derechohabientes.
+  - con_discapacidad: módulo Discapacidad, documento k y certificados de discapacidad.
+  - obligado_djbr: documento S01_E y la declaración «djbr» (sección 01).
+  - exige_colegiatura: documento FORM_COLEGIATURA, colegiaturas y la entrada
+    «Colegiaturas» del menú (sección 03).
+  - exige_estudios_basicos: documento FORM_ESTUDIOS_BASICOS y la formación de nivel
+    educación básica (sección 03).
+  - tiene_periodo_prueba: subsección 2.4, documento S02_M y períodos de prueba.
+- Sí: todo se muestra y funciona normalmente, con las validaciones y permisos de siempre.
+- No:
+  - Se ocultan solo el apartado y los tipos que controla la condición, y solo si no hay
+    datos registrados. Nunca una sección completa.
+  - La 2.4 y «Colegiaturas» ahora se ocultan del menú, con aviso al redirigir, igual que
+    Familia y Discapacidad. Antes la 2.4 solo se atenuaba.
+  - No se ofrecen registros ni documentos nuevos. El backend rechaza los documentos
+    (CargaDocumento, ya existía) y, desde feb8c99, también los registros nuevos
+    incompatibles (App\Support\CondicionesRegistro):
+    - familiar marcado como derechohabiente;
+    - certificado de discapacidad;
+    - declaración «djbr»;
+    - colegiatura;
+    - formación de educación básica;
+    - período de prueba (Seccion02Controller, ya existía).
+  - Un familiar que no es derechohabiente sí se puede registrar.
+- Sin responder:
+  - Se muestra «Por definir» o «Falta definir si corresponde»; en la 2.4 hay un aviso nuevo.
+  - No se interpreta como Sí ni como No y no cuenta en la completitud.
+  - Se permite registrar y cargar.
+- Datos históricos: con No se conservan y se pueden consultar.
+  - Si hay datos, el apartado sigue visible.
+  - Los registros existentes se corrigen y se anulan; una DJBR existente se sigue
+    corrigiendo y un familiar ya marcado como derechohabiente lo sigue siendo.
+  - Los documentos se pueden subsanar aunque su tipo ya no se ofrezca, también en las
+    secciones 03 y 08: «Subsanar» ya no depende de que el tipo aplique.
+- Qué se valida al corregir en los endpoints del expediente:
+  - Marcar como derechohabiente un familiar que no lo era: se rechaza con No.
+  - Cambiar una declaración a tipo «djbr»: se rechaza con No.
+  - Las demás correcciones se permiten.
+- Limitación del CRUD de administración (/api/v1/familiares, certificados-discapacidad,
+  declaraciones-verificaciones, colegiaturas y formacion-academica; permiso
+  sistema.administrar):
+  - Al crear se aplican las mismas reglas.
+  - Al actualizar solo se comprueba marcar un familiar como derechohabiente y cambiar una
+    formación a educación básica.
+  - En familiares, colegiaturas y formación se puede reactivar un registro anulado
+    (anulado = false) sin comprobar la condición.
+  - En certificados y declaraciones la actualización solo permite anular.
+- Pruebas (informe de feb8c99):
+  - Backend: 539 pruebas en verde en dos corridas seguidas. 7 nuevas en
+    CondicionesRegistroTest: los tres estados de cada condición, la 2.4, S02_M (carga
+    rechazada con No y subsanación admitida), Colegiaturas y el rol sin datos sensibles.
+  - Pruebas adaptadas: ModulosBanderasSeccion01Test (antes comprobaba que el backend
+    aceptaba los registros) y Seccion01DocumentosTest («Tiene derechohabientes» en Sí
+    para registrar una hija derechohabiente).
+  - Frontend: lint, 65 pruebas y compilación en verde. Render en servidor del bloqueo de
+    la casilla de derechohabiente.
+  - No se revisaron las pantallas en un navegador.
+- Sigue abierto:
+  - La limitación del CRUD de administración descrita arriba.
+  - Pregunta 18: con familiares registrados, g, i y j se exigen por familiar sea cual sea
+    la bandera.
+  - Pregunta 20: ¿k aplica a los hijos con un certificado por persona?
+  - Si una persona puede tener varios vínculos vigentes y qué criterio de vigencia se usa
+    (un vínculo vencido sin cese sigue contando para las condiciones del puesto).
