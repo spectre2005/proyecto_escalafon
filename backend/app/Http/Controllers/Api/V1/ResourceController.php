@@ -63,6 +63,7 @@ abstract class ResourceController extends Controller
     {
         $data = $this->validatedData($request);
         $this->protegerSst($data);
+        $this->exigirCondiciones($data);
         try {
             $record = $this->model::query()->create($data);
         } catch (QueryException $exception) {
@@ -78,6 +79,7 @@ abstract class ResourceController extends Controller
         $this->protegerSst($model->getAttributes());
         $data = $this->validatedData($request, true);
         $this->protegerSst([...$model->getAttributes(), ...$data]);
+        $this->exigirCondiciones($data, $model);
         try {
             $model->update($data);
         } catch (QueryException $exception) {
@@ -101,6 +103,12 @@ abstract class ResourceController extends Controller
     }
 
     /** @return array<string, mixed> */
+    /**
+     * Condiciones del perfil que hacen incompatible el registro (App\Support\CondicionesRegistro). $actual es el
+     * registro que se corrige (null al crear). Por defecto no hay ninguna.
+     */
+    protected function exigirCondiciones(array $data, ?Model $actual = null): void {}
+
     protected function validatedData(Request $request, bool $updating = false): array
     {
         $rules = $this->rules;

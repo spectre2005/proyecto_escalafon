@@ -443,9 +443,13 @@ function NoAplicaPrueba({ onNavigate }) {
 
 function Prueba({ usuario, data, bloqueo }) {
   const vencidos = data.periodos_prueba.filter(p => p.alerta === 'pendiente_vencido')
+  // «Tiene período de prueba»: No no ofrece registros nuevos (el backend los rechaza; los existentes se conservan, se
+  // registra su resultado y se anulan). Sin responder: por definir, sin interpretarlo como Sí ni como No.
+  const enNo = data.tiene_periodo_prueba === false
   return <>
+    {data.tiene_periodo_prueba === null && <Aviso>Por definir: «Tiene período de prueba» está sin responder en el vínculo laboral (2.2). Mientras tanto, el período y su evaluación quedan por determinar y no cuentan en la completitud.</Aviso>}
     {vencidos.map(p => <Aviso key={p.id} tono="rose">El período de prueba terminó el {fecha(p.values.fecha_fin)} y el resultado sigue pendiente (hace {-p.dias_restantes} día(s)). Registra el resultado.</Aviso>)}
-    <Registros titulo="Períodos de prueba" agregar="Registrar período de prueba" vacio={bloqueo ? `No hay períodos de prueba registrados. ${bloqueo}` : 'No hay períodos de prueba registrados.'} registros={data.periodos_prueba} bloqueo={bloqueo}
+    <Registros titulo="Períodos de prueba" agregar={enNo ? undefined : 'Registrar período de prueba'} vacio={bloqueo ? `No hay períodos de prueba registrados. ${bloqueo}` : 'No hay períodos de prueba registrados.'} registros={data.periodos_prueba} bloqueo={bloqueo}
       tituloRegistro={record => `Período de prueba ${fecha(record.values.fecha_inicio)} – ${fecha(record.values.fecha_fin)}`} subtitulo={record => `Resultado: ${etiqueta(resultadosPeriodo, record.values.resultado)}`}
       adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={`Período de prueba ${fecha(record.values.fecha_inicio)} – ${fecha(record.values.fecha_fin)}`} bloqueo={!data.legajo && 'La persona no tiene un legajo abierto.'} />}
       campos={[

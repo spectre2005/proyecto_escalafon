@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Models\FormacionAcademica;
+use App\Support\CondicionesRegistro;
+use Illuminate\Database\Eloquent\Model;
 
 class FormacionAcademicaController extends ResourceController
 {
@@ -24,4 +26,12 @@ class FormacionAcademicaController extends ResourceController
         'anulado' => 'sometimes|boolean',
         'motivo_anulacion' => 'nullable|string',
     ];
+
+    /** Sin estudios básicos nuevos con «El puesto exige estudios básicos» en No (CondicionesRegistro). */
+    protected function exigirCondiciones(array $data, ?Model $actual = null): void
+    {
+        if (($data['nivel'] ?? null) === 'educacion_basica' && $actual?->nivel !== 'educacion_basica') {
+            CondicionesRegistro::formacion((string) ($data['usuario_id'] ?? $actual?->usuario_id), 'educacion_basica');
+        }
+    }
 }

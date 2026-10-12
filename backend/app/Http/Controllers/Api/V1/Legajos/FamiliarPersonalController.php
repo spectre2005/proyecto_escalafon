@@ -7,8 +7,10 @@ use App\Models\DocumentoUsuario;
 use App\Models\Familiar;
 use App\Models\Usuario;
 use App\Support\Catalogos;
+use App\Support\CondicionesRegistro;
 use App\Support\Documentos\FormulariosDatos;
 use App\Support\Seccion01;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -43,6 +45,7 @@ class FamiliarPersonalController extends ResourceController
     {
         Usuario::query()->findOrFail($usuario);
         $data = $this->validatedData($request);
+        CondicionesRegistro::familiar($usuario, (bool) ($data['es_derechohabiente'] ?? false));
         $record = new Familiar([...collect($data)->except('documento_id')->all(), 'usuario_id' => $usuario, 'registrado_por' => $request->user()->getAuthIdentifier()]);
 
         return (new JsonResource(FormulariosDatos::crearEnlazado('familiares', $usuario, $data['documento_id'] ?? null, $record)))->response()->setStatusCode(201);
@@ -76,5 +79,13 @@ class FamiliarPersonalController extends ResourceController
         }
 
         return $data;
+    }
+
+    /** Un familiar derechohabiente no se registra con «Tiene derechohabientes» en No (CondicionesRegistro). */
+    protected function exigirCondiciones(array $data, ?Model $actual = null): void
+    {
+        if (($data['es_derechohabiente'] ?? false) && ! $actual?->es_derechohabiente) {
+            CondicionesRegistro::familiar((string) ($data['usuario_id'] ?? $actual?->usuario_id), true);
+        }
     }
 }

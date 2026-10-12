@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Models\DeclaracionVerificacion;
+use App\Support\CondicionesRegistro;
+use Illuminate\Database\Eloquent\Model;
 
 class DeclaracionVerificacionController extends RegistroAnulableController
 {
@@ -20,4 +22,12 @@ class DeclaracionVerificacionController extends RegistroAnulableController
         'vigente_hasta' => 'nullable|date',
         'observacion' => 'nullable|string|max:300',
     ];
+
+    /** Sin DJBR nueva con «Obligado a presentar declaración jurada de bienes y rentas» en No (CondicionesRegistro). */
+    protected function exigirCondiciones(array $data, ?Model $actual = null): void
+    {
+        if (! $actual) {
+            CondicionesRegistro::declaracion((string) $data['usuario_id'], $data['tipo'] ?? null);
+        }
+    }
 }

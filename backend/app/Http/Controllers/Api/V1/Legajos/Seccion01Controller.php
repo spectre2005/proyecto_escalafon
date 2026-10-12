@@ -14,6 +14,7 @@ use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
 use App\Support\Catalogos;
+use App\Support\CondicionesRegistro;
 use App\Support\Documentos\EstadoDocumento;
 use App\Support\Documentos\FormulariosDatos;
 use App\Support\ExigenciasSeccion01;
@@ -113,6 +114,7 @@ class Seccion01Controller extends Controller
     {
         Usuario::query()->findOrFail($usuario);
         $data = $this->validarDeclaracion($request, true);
+        CondicionesRegistro::declaracion($usuario, $data['tipo'] ?? null);
         $registro = new DeclaracionVerificacion([...collect($data)->except('documento_id')->all(), 'usuario_id' => $usuario, 'registrado_por' => $request->user()->getAuthIdentifier()]);
 
         return $this->creado(FormulariosDatos::crearEnlazado('declaraciones_verificaciones', $usuario, $data['documento_id'] ?? null, $registro));
@@ -121,14 +123,20 @@ class Seccion01Controller extends Controller
     public function updateDeclaracion(Request $request, string $usuario, string $declaracion): JsonResponse
     {
         $registro = DeclaracionVerificacion::query()->where('usuario_id', $usuario)->findOrFail($declaracion);
+        $data = $this->validarDeclaracion($request, false);
+        // Corregir una DJBR existente se permite; convertir otra declaración en DJBR con la condición en No, no.
+        if (isset($data['tipo']) && $data['tipo'] !== $registro->tipo) {
+            CondicionesRegistro::declaracion($usuario, $data['tipo']);
+        }
 
-        return $this->corregir($registro, $this->validarDeclaracion($request, false));
+        return $this->corregir($registro, $data);
     }
 
     public function storeCertificado(Request $request, string $usuario): JsonResponse
     {
         Usuario::query()->findOrFail($usuario);
         $data = $this->validarCertificado($request, $usuario, true);
+        CondicionesRegistro::certificado($usuario);
         $registro = new CertificadoDiscapacidad([...collect($data)->except('documento_id')->all(), 'usuario_id' => $usuario, 'registrado_por' => $request->user()->getAuthIdentifier()]);
 
         return $this->creado(FormulariosDatos::crearEnlazado('certificados_discapacidad', $usuario, $data['documento_id'] ?? null, $registro));

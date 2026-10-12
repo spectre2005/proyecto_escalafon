@@ -129,7 +129,8 @@ class Seccion01DocumentosTest extends TestCase
     {
         $this->actuarComo();
         // e (DJBR) y k (discapacidad) solo se cargan con su bandera en Sí: con No se rechazan (BanderasTresEstadosTest).
-        $this->persona->update(['obligado_djbr' => true, 'con_discapacidad' => true]);
+        // Un familiar derechohabiente tampoco se registra con «Tiene derechohabientes» en No (CondicionesRegistroTest).
+        $this->persona->update(['obligado_djbr' => true, 'con_discapacidad' => true, 'tiene_derechohabientes' => true]);
         $declaraciones = [
             'S01_C_ANTECEDENTES_PENALES' => 'antecedente_penal', 'S01_D_ANTECEDENTES_POLICIALES' => 'antecedente_policial',
             'S01_E_DJ_BIENES_RENTAS' => 'djbr', 'S01_F_DJ_NO_IMPEDIMENTOS_31419' => 'dj_no_impedimentos',

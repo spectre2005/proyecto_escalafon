@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Models\CertificadoDiscapacidad;
+use App\Support\CondicionesRegistro;
+use Illuminate\Database\Eloquent\Model;
 
 class CertificadoDiscapacidadController extends RegistroAnulableController
 {
@@ -19,4 +21,12 @@ class CertificadoDiscapacidadController extends RegistroAnulableController
         'fecha_emision' => 'nullable|date',
         'vigente_hasta' => 'nullable|date',
     ];
+
+    /** Sin certificados nuevos con «Con discapacidad» en No (CondicionesRegistro). Solo se crean: no se editan. */
+    protected function exigirCondiciones(array $data, ?Model $actual = null): void
+    {
+        if (! $actual) {
+            CondicionesRegistro::certificado((string) $data['usuario_id']);
+        }
+    }
 }

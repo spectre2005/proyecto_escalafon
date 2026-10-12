@@ -73,7 +73,7 @@ export default function Seccion03Panel({ usuario }) {
             <div className="mt-3 flex flex-wrap gap-2">
               {doc.archivo && doc.archivo.estado_antivirus !== 'infectado' && <button className={boton} onClick={() => setVisor(visor?.id === doc.id ? null : doc)}>Ver PDF</button>}
               {/* Subsanar un documento vigente también si su tipo ya no se ofrece (lo admite el backend); propone sus datos. */}
-              {puedeAgregar && data.legajo && item.aplica && !doc.subsanado && doc.estado !== 'anulado' && !formulario && <button id={`subsanar-${doc.id}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.id, subsana: doc.id, origen: `subsanar-${doc.id}` }) }}>Subsanar</button>}
+              {puedeAgregar && data.legajo && !doc.subsanado && doc.estado !== 'anulado' && !formulario && <button id={`subsanar-${doc.id}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.id, subsana: doc.id, origen: `subsanar-${doc.id}` }) }}>Subsanar</button>}
               {puedeRevisar && doc.puede_revisar && doc.estado !== 'aceptado' && <button id={`aceptar-${doc.id}`} className={boton} onClick={() => setFormulario({ item: item.id, documento: doc.id, estado: 'aceptado', origen: `aceptar-${doc.id}` })}>Aceptar</button>}
               {puedeRevisar && doc.puede_revisar && doc.estado !== 'observado' && <button id={`observar-${doc.id}`} className={boton} onClick={() => setFormulario({ item: item.id, documento: doc.id, estado: 'observado', origen: `observar-${doc.id}` })}>Observar</button>}
             </div>
@@ -81,7 +81,8 @@ export default function Seccion03Panel({ usuario }) {
             {formulario?.documento === doc.id && <div className="mt-4"><Revision03Form key={`${doc.id}:${formulario.estado}`} usuario={usuario} documento={doc} item={item} estado={formulario.estado} onCancel={() => cerrar()} onSaved={() => cerrar(formulario.estado === 'aceptado' ? 'Documento aceptado. La fiscalización posterior sigue siendo independiente.' : 'Observación registrada. La corrección se presenta con un documento nuevo.')} /></div>}
             {visor?.id === doc.id && <VisorPdf usuario={usuario} documento={doc} titulo={doc.nombre} onClose={() => setVisor(null)} />}
           </li>)}</ul>
-          {puedeAgregar && data.legajo && item.aplica && <>
+          {/* Subsanar no depende de que el tipo aplique (lo admite el backend); la carga nueva sí (ofrecerTipo). */}
+          {puedeAgregar && data.legajo && <>
             {formulario?.item === item.id && !formulario.documento ? <Documento03Form usuario={usuario} item={item} datos={data} subsana={formulario.subsana || ''} soloSubsanar={!ofrecerTipo(noAplica, item)} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado. Queda en revisión de RR. HH.')} /> : ofrecerTipo(noAplica, item) && <button id={`agregar-${item.id}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.id, origen: `agregar-${item.id}` }) }}>{item.cantidad ? (item.permite_multiples ? 'Agregar otro documento' : 'Agregar documento que subsane al anterior') : 'Agregar documento'}</button>}
           </>}
         </div>

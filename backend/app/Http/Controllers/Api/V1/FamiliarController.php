@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Models\Familiar;
+use App\Support\CondicionesRegistro;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -38,5 +40,13 @@ class FamiliarController extends ResourceController
         }
 
         return $data;
+    }
+
+    /** Un familiar derechohabiente no se registra con «Tiene derechohabientes» en No (CondicionesRegistro). */
+    protected function exigirCondiciones(array $data, ?Model $actual = null): void
+    {
+        if (($data['es_derechohabiente'] ?? false) && ! $actual?->es_derechohabiente) {
+            CondicionesRegistro::familiar((string) ($data['usuario_id'] ?? $actual?->usuario_id), true);
+        }
     }
 }

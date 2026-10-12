@@ -247,10 +247,11 @@ class ExpedienteController extends Controller
             // Con la bandera en No, la 2.4 se sigue viendo si tiene períodos o documentos m (no se atenúa en el menú).
             'prueba_con_datos' => $aplicacion->hayDatosPeriodoPrueba(),
             // Banderas del perfil (para exigir) y avisos, p. ej. condiciones del puesto sin vínculo vigente.
-            // modulos_ocultos: módulos de la sección 01 que su bandera oculta (AplicacionDocumental::MODULOS). Sin
-            // datos_sensibles.ver va vacío: ocultar la entrada revelaría que la bandera está en No.
+            // modulos_ocultos: entradas del menú que su condición oculta (No y sin datos). Las de la sección 01
+            // (AplicacionDocumental::MODULOS) solo con datos_sensibles.ver: ocultarlas revelaría la bandera; las del
+            // puesto (2.4 y colegiaturas, modulosOcultosPuesto) no son sensibles.
             'condiciones' => ['banderas' => $banderas, 'sin_vinculo_vigente' => $aplicacion->sinVinculoVigente, 'avisos' => $aplicacion->avisos(),
-                'modulos_ocultos' => $veSensibles ? $aplicacion->modulosOcultos() : []],
+                'modulos_ocultos' => [...($veSensibles ? $aplicacion->modulosOcultos() : []), ...$aplicacion->modulosOcultosPuesto()]],
             'document_sections' => SeccionLegajo::query()->orderBy('orden')->get(['id', 'nombre']),
             'document_states' => DocumentoUsuario::query()->where('usuario_id', $usuario)->whereHas('legajo', fn (Builder $query): Builder => $query->where('usuario_id', $usuario))
                 ->when(! $veSensibles, fn (Builder $query): Builder => $query->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES))

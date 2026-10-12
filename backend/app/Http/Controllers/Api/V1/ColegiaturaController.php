@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Models\Colegiatura;
+use App\Support\CondicionesRegistro;
+use Illuminate\Database\Eloquent\Model;
 
 class ColegiaturaController extends ResourceController
 {
@@ -21,4 +23,12 @@ class ColegiaturaController extends ResourceController
         'anulado' => 'sometimes|boolean',
         'motivo_anulacion' => 'nullable|string',
     ];
+
+    /** Sin colegiatura nueva con «El puesto exige colegiatura» en No (CondicionesRegistro); la existente se corrige. */
+    protected function exigirCondiciones(array $data, ?Model $actual = null): void
+    {
+        if (! $actual) {
+            CondicionesRegistro::colegiatura((string) $data['usuario_id']);
+        }
+    }
 }

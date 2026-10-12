@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\CertificadoDiscapacidad;
+use App\Models\Colegiatura;
 use App\Models\DocumentoUsuario;
 use App\Models\Familiar;
 use App\Models\PeriodoPrueba;
@@ -250,6 +251,34 @@ final class AplicacionDocumental
     {
         return array_keys(array_filter(self::MODULOS, fn (array $modulo, string $clave): bool => $this->banderas[$modulo[0]] === false
             && ! $this->hayDatosDelModulo($clave), ARRAY_FILTER_USE_BOTH));
+    }
+
+    /**
+     * Entradas del menú que ocultan las condiciones del puesto, con el mismo criterio que MODULOS: la condición en No
+     * para ofrecer (ningún vínculo no anulado dice Sí) y sin datos registrados. Con datos, Sí o Sin responder se ven.
+     * - s02-prueba (2.4): «Tiene período de prueba»; datos = períodos no anulados o documentos m.
+     * - colegiaturas (sección 03): «El puesto exige colegiatura»; datos = colegiaturas no anuladas o documentos de colegiatura.
+     * No son datos sensibles: se informan a todos los que ven el legajo.
+     *
+     * @return list<string>
+     */
+    public function modulosOcultosPuesto(): array
+    {
+        $ocultos = [];
+        if ($this->ofrecidas['tiene_periodo_prueba'] === false && ! $this->hayDatosPeriodoPrueba()) {
+            $ocultos[] = 's02-prueba';
+        }
+        if ($this->ofrecidas['exige_colegiatura'] === false && ! $this->hayColegiaturas()) {
+            $ocultos[] = 'colegiaturas';
+        }
+
+        return $ocultos;
+    }
+
+    private function hayColegiaturas(): bool
+    {
+        return Colegiatura::query()->where('usuario_id', $this->personaId)->where('anulado', false)->exists()
+            || DocumentoUsuario::query()->where('usuario_id', $this->personaId)->whereHas('tipoDocumento', fn ($tipo) => $tipo->where('requiere_colegiatura', true))->exists();
     }
 
     /** Registros no anulados del módulo (familiares o certificados) o documentos de sus tipos, en cualquier estado. */

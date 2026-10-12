@@ -4,7 +4,7 @@ import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../../auth/session'
 import { anularRegistro } from '../../api/seccion01Api'
 import { useNoAplicables } from '../../api/useNoAplicables'
-import { ofrecerTipo, tiposQueAcreditan } from '../../config/aplicacion'
+import { motivoNoAplica, ofrecerTipo, tiposQueAcreditan } from '../../config/aplicacion'
 import { precargaDesdeRegistro } from '../../config/acreditacion'
 import { folios } from '../../config/documentos'
 import { etiqueta, formulariosDatos01, gruposSeccion01, parentescos, personasCertificado, resultadosDeclaracion, tiposDeclaracion, tiposDocIdentidad } from '../../config/seccion01'
@@ -99,7 +99,7 @@ function enlazadoA(tipo, documento, data) {
 // Formulario de datos que se abre al subir un documento cuyo tipo lo tiene, enlazado a ese documento.
 function FormularioEnlazado({ usuario, data, tipo, documentoId, onDone }) {
   const props = { usuario, documentoId, onSaved: () => onDone(true), onCancel: () => onDone(false) }
-  if (tipo.formulario_datos === 'familiares') return <FamiliarForm parentescosPermitidos={tipo.parentescos} {...props} />
+  if (tipo.formulario_datos === 'familiares') return <FamiliarForm parentescosPermitidos={tipo.parentescos} sinDerechohabientes={data.banderas?.tiene_derechohabientes === false} {...props} />
   if (tipo.formulario_datos === 'declaraciones_verificaciones') return <DeclaracionForm tipos={tipo.declaraciones} {...props} />
   if (tipo.formulario_datos === 'certificados_discapacidad') return <CertificadoForm familiares={data.familiares} {...props} />
   return null
@@ -187,8 +187,11 @@ function Declaraciones({ usuario, data, codigos, titulo }) {
   const registros = data.declaraciones.filter(r => tipos.includes(r.values.tipo))
   const tituloRegistro = record => etiqueta(tiposDeclaracion, record.values.tipo)
   const noAplica = useNoAplicables(usuario)
+  // DJBR con «Obligado a presentar declaración jurada de bienes y rentas» en No: no se ofrece como registro nuevo (el
+  // backend la rechaza); una DJBR ya registrada se sigue corrigiendo.
+  const tiposNuevos = motivoNoAplica(noAplica, { codigo: 'S01_E_DJ_BIENES_RENTAS' }) ? tipos.filter(tipo => tipo !== 'djbr') : tipos
   return <>
-    <Registros titulo={titulo} agregar="Registrar" vacio="No hay registros." registros={registros}
+    <Registros titulo={titulo} agregar={tiposNuevos.length ? 'Registrar' : undefined} vacio="No hay registros." registros={registros}
       adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={`${tituloRegistro(record)} · ${fecha(record.values.fecha)}`} noAplica={noAplica} />}
       tituloRegistro={record => <>{tituloRegistro(record)}{declaracionesAnexo05.includes(record.values.tipo) && <span className="ml-2 align-middle"><Anexo05 /></span>}</>}
       subtitulo={record => `${fecha(record.values.fecha)}${record.values.anio ? ` · Año ${record.values.anio}` : ''}`}
@@ -196,7 +199,7 @@ function Declaraciones({ usuario, data, codigos, titulo }) {
       corregir={{ etiqueta: 'Corregir', puede: () => true }}
       onAnular={(record, motivo) => anularRegistro(usuario, 'declaraciones-verificaciones', record.id, motivo)}
       detalle={record => <PdfAnterior usuario={usuario} tipo="declaraciones-verificaciones" record={record} />}
-      renderForm={props => <DeclaracionForm key={props.record?.id || 'nuevo'} usuario={usuario} tipos={tipos} {...props} />} />
+      renderForm={props => <DeclaracionForm key={props.record?.id || 'nuevo'} usuario={usuario} tipos={props.record ? tipos : tiposNuevos} {...props} />} />
     <Anulados registros={data.anulados?.declaraciones.filter(r => tipos.includes(r.values.tipo))} titulo={tituloRegistro} />
   </>
 }
@@ -223,7 +226,7 @@ function Familia({ usuario, data }) {
       })}</ul>}
       corregir={{ etiqueta: 'Corregir', puede: () => true }}
       onAnular={(record, motivo) => anularRegistro(usuario, 'familiares', record.id, motivo)}
-      renderForm={props => <FamiliarForm key={props.record?.id || 'nuevo'} usuario={usuario} {...props} />} />
+      renderForm={props => <FamiliarForm key={props.record?.id || 'nuevo'} usuario={usuario} sinDerechohabientes={data.banderas?.tiene_derechohabientes === false} {...props} />} />
     <Anulados registros={data.anulados?.familiares} titulo={titulo} />
   </>
 }
@@ -232,8 +235,9 @@ function Discapacidad({ usuario, data, aplica }) {
   const titulo = record => `Certificado CONADIS ${record.values.numero_conadis}`
   const noAplica = useNoAplicables(usuario)
   return <>
-    {!aplica && <p className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">No aplica: la persona no figura con discapacidad. Se puede registrar el certificado de un familiar si corresponde.</p>}
-    <Registros titulo="Certificados de discapacidad" agregar="Registrar certificado" vacio="No hay certificados de discapacidad registrados." registros={data.certificados}
+    {!aplica && <p className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">No aplica: la persona figura sin discapacidad (el servidor ni sus hijos). Los certificados ya registrados se conservan; para registrar uno nuevo, cambia «Con discapacidad» a Sí en Información personal.</p>}
+    {/* Con «Con discapacidad» en No no se ofrecen certificados nuevos (el backend los rechaza). */}
+    <Registros titulo="Certificados de discapacidad" agregar={aplica ? 'Registrar certificado' : undefined} vacio="No hay certificados de discapacidad registrados." registros={data.certificados}
       adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={titulo(record)} noAplica={noAplica} />}
       tituloRegistro={titulo} subtitulo={record => record.values.persona === 'familiar' ? `De un familiar: ${record.familiar || 'no identificado'}` : etiqueta(personasCertificado, 'servidor')}
       campos={[['Fecha de emisión', v => fecha(v.fecha_emision)], ['Vigente hasta', v => v.vigente_hasta ? fecha(v.vigente_hasta) : 'Sin vencimiento registrado'], ['Documento', v => v.documento_id ? 'Enlazado a un documento del legajo' : 'Sin documento enlazado']]}

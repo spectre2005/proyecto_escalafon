@@ -86,14 +86,19 @@ class ModulosBanderasSeccion01Test extends TestCase
             ->assertJsonPath('data.condiciones.modulos_ocultos', []);
     }
 
-    public function test_hidden_modules_still_accept_records(): void
+    public function test_hidden_modules_reject_new_records_that_contradict_their_flag(): void
     {
         $this->actuarComo();
         $this->assertSame(['s01-familia', 's01-discapacidad'], $this->ocultos());
         $url = '/api/v1/expedientes/'.$this->persona->id;
-        $this->postJson($url.'/familiares', ['apellidos_nombres' => 'Hija Prueba', 'parentesco' => 'hijo', 'es_derechohabiente' => true])->assertCreated();
-        $this->postJson($url.'/certificados-discapacidad', ['persona' => 'servidor', 'numero_conadis' => 'C-123'])->assertCreated();
-        $this->assertSame([], $this->ocultos());
+        // Con la bandera en No, los registros que la contradicen se rechazan (CondicionesRegistro).
+        $this->postJson($url.'/familiares', ['apellidos_nombres' => 'Hija Prueba', 'parentesco' => 'hijo', 'es_derechohabiente' => true])
+            ->assertUnprocessable()->assertJsonValidationErrors('es_derechohabiente');
+        $this->postJson($url.'/certificados-discapacidad', ['persona' => 'servidor', 'numero_conadis' => 'C-123'])->assertUnprocessable()->assertJsonValidationErrors('persona');
+        $this->assertSame(['s01-familia', 's01-discapacidad'], $this->ocultos());
+        // Un familiar que no es derechohabiente no contradice la bandera; al registrarlo, Familia vuelve a verse.
+        $this->postJson($url.'/familiares', ['apellidos_nombres' => 'Padre Prueba', 'parentesco' => 'otro', 'es_derechohabiente' => false])->assertCreated();
+        $this->assertSame(['s01-discapacidad'], $this->ocultos());
     }
 
     public function test_without_sensitive_data_no_module_is_hidden_and_no_person_flag_is_sent(): void
