@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\LegajoSoloLectura;
 use App\Http\Middleware\RequireAdministrator;
+use App\Http\Middleware\SesionPlataforma;
 use Illuminate\Auth\Middleware\Authorize;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -15,8 +16,8 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
-        // Panel de la plataforma SaaS: rutas propias bajo api/plataforma (routes/plataforma.php).
-        then: fn () => Route::middleware('api')->prefix('api/plataforma')->group(base_path('routes/plataforma.php')),
+        // Panel de la plataforma SaaS: rutas propias bajo api/plataforma (routes/plataforma.php), con su cookie de sesión.
+        then: fn () => Route::middleware([SesionPlataforma::class, 'api'])->prefix('api/plataforma')->group(base_path('routes/plataforma.php')),
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();

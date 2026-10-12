@@ -14,13 +14,19 @@ use Illuminate\Validation\ValidationException;
 /**
  * Sesión del panel de plataforma (guard «plataforma», cuentas de administradores_plataforma). Igual que el login
  * institucional: sesión con CSRF de Sanctum (statefulApi), límite de intentos por correo e IP y la misma respuesta
- * para cualquier rechazo. No hay registro público: la primera cuenta se crea con plataforma:crear-administrador.
+ * para cualquier rechazo; pero con su propia cookie de sesión (SesionPlataforma). No hay registro público: la primera cuenta se crea con plataforma:crear-administrador.
  */
 class AuthController extends Controller
 {
     private const INTENTOS_MAXIMOS = 5;
 
     private const BLOQUEO_SEGUNDOS = 60;
+
+    /** Token CSRF de la sesión de plataforma, para la cabecera X-CSRF-TOKEN (su cookie XSRF-TOKEN no es legible desde el SPA). */
+    public function csrf(Request $request): JsonResponse
+    {
+        return response()->json(['data' => ['token' => $request->session()->token()]]);
+    }
 
     public function login(Request $request): JsonResponse
     {

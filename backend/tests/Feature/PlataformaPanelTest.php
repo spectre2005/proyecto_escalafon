@@ -5,7 +5,10 @@ namespace Tests\Feature;
 use App\Models\Plataforma\AuditoriaPlataforma;
 use App\Models\Plataforma\Institucion;
 use App\Models\Usuario;
+use Database\Seeders\AdministradorSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
 use Tests\Concerns\UsaPlataforma;
 use Tests\TestCase;
@@ -51,7 +54,61 @@ class PlataformaPanelTest extends TestCase
         $this->app->instance('env', 'local');
         $datos = ['email' => 'super@example.test', 'password' => 'Clave-segura-2026'];
         $this->postJson('/api/plataforma/auth/login', $datos)->assertStatus(419);
-        $this->withSession(['_token' => 'token-csrf'])->withHeader('X-CSRF-TOKEN', 'token-csrf')->postJson('/api/plataforma/auth/login', $datos)->assertOk();
+        // El token se pide a la plataforma (su sesión, su cookie) y viaja en X-CSRF-TOKEN.
+        $token = $this->getJson('/api/plataforma/auth/csrf')->assertOk()->json('data.token');
+        $this->assertIsString($token);
+        $this->withHeader('X-CSRF-TOKEN', 'otro-token')->postJson('/api/plataforma/auth/login', $datos)->assertStatus(419);
+        $this->withHeader('X-CSRF-TOKEN', $token)->postJson('/api/plataforma/auth/login', $datos)->assertOk();
+    }
+
+    /**
+     * Con sesiones reales (archivos en una carpeta temporal y cookies entre peticiones, sin el almacén en memoria de
+     * las pruebas): la plataforma usa su cookie y su path, y cerrar sesión ahí no cierra la institucional.
+     */
+    public function test_the_platform_session_cookie_is_separate_from_the_institutional_one(): void
+    {
+        $carpeta = storage_path('framework/testing/sesiones-plataforma-'.bin2hex(random_bytes(4)));
+        mkdir($carpeta, 0755, true);
+        try {
+            config(['session.driver' => 'file', 'session.files' => $carpeta,
+                'auth.administrador_inicial' => ['email' => 'admin@example.test', 'password' => 'clave-de-prueba-1']]);
+            $this->seed(AdministradorSeeder::class);
+            $this->administrador();
+            $institucional = config('session.cookie');
+            $plataforma = config('plataforma.sesion.cookie');
+            $this->assertNotSame($institucional, $plataforma);
+            $peticion = function (string $metodo, string $url, array $cookies, array $datos = []) {
+                // Como un proceso nuevo por petición: nada de la sesión anterior queda en memoria.
+                $this->app['session']->forgetDrivers();
+                $this->app->forgetInstance('session.store');
+                $this->defaultCookies = [];
+                Auth::forgetGuards();
+
+                return $this->withCredentials()->withCookies($cookies)->json($metodo, $url, $datos);
+            };
+
+            $login = $peticion('POST', '/api/v1/auth/login', [], ['email' => 'admin@example.test', 'password' => 'clave-de-prueba-1'])->assertOk();
+            $cookiesInst = [$institucional => $login->getCookie($institucional)->getValue()];
+
+            $entrada = $peticion('POST', '/api/plataforma/auth/login', $cookiesInst, ['email' => 'super@example.test', 'password' => 'Clave-segura-2026'])->assertOk();
+            $cookieP = $entrada->getCookie($plataforma);
+            $this->assertNotNull($cookieP);
+            $this->assertSame('/api/plataforma', $cookieP->getPath());
+            $this->assertNull($entrada->getCookie($institucional, false), 'La plataforma no reescribe la cookie institucional.');
+            $ambas = [...$cookiesInst, $plataforma => $cookieP->getValue()];
+
+            // Cada sesión se lee con su cookie: la institucional no abre la plataforma.
+            $peticion('GET', '/api/plataforma/auth/me', $cookiesInst)->assertUnauthorized();
+            $peticion('GET', '/api/plataforma/auth/me', $ambas)->assertOk()->assertJsonPath('data.administrador.email', 'super@example.test');
+
+            $salida = $peticion('POST', '/api/plataforma/auth/logout', $ambas)->assertOk();
+            $this->assertNull($salida->getCookie($institucional, false));
+            $peticion('GET', '/api/plataforma/auth/me', $ambas)->assertUnauthorized();
+            // La sesión institucional sigue abierta.
+            $peticion('GET', '/api/v1/auth/me', $cookiesInst)->assertOk()->assertJsonPath('data.usuario.email_institucional', 'admin@example.test');
+        } finally {
+            File::deleteDirectory($carpeta);
+        }
     }
 
     public function test_inactive_accounts_and_repeated_failures_are_rejected(): void

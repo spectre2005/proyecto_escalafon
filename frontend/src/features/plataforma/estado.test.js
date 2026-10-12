@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { accionesDisponibles, cambios, etiquetaEstado, proponerSlug, proponerUbicacion } from './estado.js'
-import { mensajeError } from './api.js'
+import { esEscritura, mensajeError } from './api.js'
 
 test('state actions follow what the backend allows', () => {
   assert.deepEqual(accionesDisponibles({ estado: 'registrada', motivo_no_activable: 'Aún no está aprovisionada.', motivo_no_suspendible: 'No opera.' }),
@@ -32,4 +32,9 @@ test('api errors become readable messages', () => {
   assert.equal(mensajeError({ response: { status: 409, data: { message: 'Aún no está aprovisionada.' } } }), 'Aún no está aprovisionada.')
   assert.match(mensajeError({ response: { status: 419, data: {} } }), /sesión terminó/)
   assert.match(mensajeError({}), /conectar/)
+})
+
+test('the platform CSRF token is only sent on writes', () => {
+  assert.deepEqual(['get', 'GET', 'head', 'options', undefined].map(esEscritura), [false, false, false, false, false])
+  assert.deepEqual(['post', 'patch', 'PUT', 'delete'].map(esEscritura), [true, true, true, true])
 })

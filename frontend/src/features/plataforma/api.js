@@ -2,23 +2,42 @@ import axios from 'axios'
 
 /**
  * Cliente del panel de plataforma (api/plataforma, guard «plataforma»). Separado del cliente institucional: no comparte
- * su interceptor (que redirige a /login_principal) ni sus avisos de actualización. Misma cookie de sesión y CSRF de
- * Sanctum: la cookie XSRF-TOKEN se pide antes de iniciar sesión.
+ * su interceptor (que redirige a /login_principal) ni sus avisos de actualización. Tiene su propia cookie de sesión
+ * (path /api/plataforma, no legible desde aquí), así que el token CSRF de esa sesión se pide a auth/csrf y viaja en
+ * X-CSRF-TOKEN; no se envía el XSRF-TOKEN de la sesión institucional.
  */
 const plataforma = axios.create({
   baseURL: '/api/plataforma',
   timeout: 30000,
   withCredentials: true,
-  withXSRFToken: true,
+  withXSRFToken: false,
   headers: { Accept: 'application/json' },
 })
 
+let tokenCsrf = null
+const pedirToken = async () => (tokenCsrf = (await plataforma.get('/auth/csrf')).data.data.token)
+export const esEscritura = metodo => !['get', 'head', 'options'].includes(String(metodo || 'get').toLowerCase())
+
+plataforma.interceptors.request.use(async config => {
+  if (esEscritura(config.method)) config.headers.set('X-CSRF-TOKEN', tokenCsrf || await pedirToken())
+  return config
+})
+// 419: el token cambió (sesión nueva o cerrada). Se pide otro y se reintenta una sola vez.
+plataforma.interceptors.response.use(undefined, async error => {
+  const config = error.config
+  if (error.response?.status === 419 && config && !config.reintentoCsrf) {
+    tokenCsrf = null
+    return plataforma.request({ ...config, reintentoCsrf: true })
+  }
+  return Promise.reject(error)
+})
+
 export const iniciarSesion = async (email, password) => {
-  await plataforma.get(new URL('/sanctum/csrf-cookie', window.location.origin).href)
+  await pedirToken()
   return (await plataforma.post('/auth/login', { email, password })).data.data
 }
 export const sesionActual = signal => plataforma.get('/auth/me', { signal }).then(r => r.data.data)
-export const cerrarSesion = () => plataforma.post('/auth/logout')
+export const cerrarSesion = () => plataforma.post('/auth/logout').finally(() => { tokenCsrf = null })
 export const resumen = signal => plataforma.get('/dashboard', { signal }).then(r => r.data.data)
 export const listarInstituciones = (params, signal) => plataforma.get('/instituciones', { params, signal }).then(r => r.data)
 export const verInstitucion = (id, signal) => plataforma.get(`/instituciones/${id}`, { signal }).then(r => r.data.data)

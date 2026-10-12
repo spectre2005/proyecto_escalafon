@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Route;
  * mientras no exista el despliegue. Solo instituciones y su auditoría: ninguna ruta a personas, legajos ni documentos.
  */
 Route::middleware(LocalDevelopmentOnly::class)->group(function (): void {
+    Route::get('auth/csrf', [AuthController::class, 'csrf']);
     Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:20,1');
 
     Route::middleware('auth:plataforma')->group(function (): void {
