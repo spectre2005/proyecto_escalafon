@@ -284,3 +284,20 @@ Sección 05:
   - Pregunta 20: ¿k aplica a los hijos con un certificado por persona?
   - Si una persona puede tener varios vínculos vigentes y qué criterio de vigencia se usa
     (un vínculo vencido sin cese sigue contando para las condiciones del puesto).
+
+
+## Panel de plataforma (SaaS) — primera entrega (12/10/2026)
+- Rama feature/panel-superadmin (sin unir). Panel del dueño del producto en
+  /plataforma, con su base propia (escalafon_plataforma), login aislado y cookie de
+  sesión propia. No tiene ninguna ruta a personas, legajos ni documentos.
+- Permite registrar instituciones, activarlas (solo si están aprovisionadas) y
+  suspenderlas con motivo; todo queda auditado.
+- LIMITACIÓN: suspender NO bloquea todavía el acceso de la institución.
+- Pendiente para SaaS real: identificar la institución por subdominio y cambiar de
+  base y almacenamiento por petición, aprovisionamiento automático, producción (la API
+  solo responde en local y testing).
+- Cada desarrollador: copiar las variables PLATAFORMA_* de .env.example si quiere
+  cambiar los valores por defecto, crear la base escalafon_plataforma, migrar con
+  --database=plataforma --path=database/migrations/plataforma y crear su superadmin
+  con plataforma:crear-administrador. No subir contraseñas ni .env.
+- Se entra por http://localhost:5173/plataforma/login (no por /login_principal).
