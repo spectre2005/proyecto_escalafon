@@ -145,3 +145,34 @@ Sección 05:
 - La base real tiene 68 tablas; escalafon_drawdb_55.sql está desactualizado.
 - asistente_legajo aún no existe en la base (pendiente de confirmar con el cliente).
 - Pendiente: Funcionalidades con 25 opciones es larga; plegar por sección (después).
+
+## Banderas con tres estados (11/10/2026)
+- Las banderas admiten Sí / No / Sin responder (null). Migración aplicada en la base
+  real el 11/10 (lote 14): 155 valores false pasaron a Sin responder; los true se
+  conservaron. Respaldos en /home/willian/proyectos/respaldos_escalafon/.
+- Regla: Sí = se exige; No = se oculta y la carga se rechaza con 422 (salvo que ya haya
+  documentos cargados; subsanar siempre se permite); Sin responder = se ofrece con aviso
+  "Falta definir si corresponde" y no cuenta en la completitud.
+- Varios vínculos: Sí si alguno vigente es Sí; No solo si todos son No; si no, null.
+  Se ofrece el tipo si cualquier vínculo no anulado (también cesado) dice Sí.
+- Las 4 banderas del puesto (DJBR, colegiatura, estudios básicos, período de prueba) se
+  editan solo en el vínculo. En la persona quedan tiene_derechohabientes y con_discapacidad.
+  Quien no tiene vínculo vigente no puede responder las del puesto.
+- con_discapacidad ("el servidor o alguno de sus hijos", punto 1k) exige el permiso
+  discapacidad.editar (ADMIN lo recibe; el asistente no). Cada cambio queda en
+  auditoria_eventos. Quien no tiene datos_sensibles.ver no ve los tipos de las secciones
+  01, 09 y 10 en no-aplicables.
+- Dashboard: tarjeta "Condiciones del personal sin responder" (sistema.administrar).
+  Endpoint GET personal/banderas-sin-responder. Hoy: 19 personas.
+- Regla 5 (g, i, j): con familiares registrados se exigen por familiar sea cual sea la
+  bandera; sin familiares: Sí = por determinar, No = no aplica, Sin responder = falta definir.
+  PENDIENTE de confirmar con el cliente (pregunta 18).
+- Sigue abierta la pregunta 20 (¿k aplica también a los hijos con un certificado por
+  persona?).
+- Cada compañero debe correr php artisan migrate en su base local tras traer los commits.
+- Reglas para pruebas con Code: solo en copia de la base; nunca artisan serve con
+  DB_DATABASE para cambiar de base; borrar solo archivos que él creó, por nombre; no tocar
+  sesiones del navegador.
+- Pendientes de esta línea: unificar regimen_laboral (hoy mezcla ley y eje),
+  clasificación del catálogo por régimen y tipo de personal (propuesta con 3 decisiones
+  abiertas), documentos "por evento", sección 08 y 7.2.
