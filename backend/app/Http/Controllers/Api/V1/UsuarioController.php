@@ -3,10 +3,14 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreUsuarioConVinculoRequest;
 use App\Http\Requests\StoreUsuariosRequest;
 use App\Http\Resources\UsuarioResource;
 use App\Models\Usuario;
+use App\Models\VinculoLaboral;
+use App\Support\AperturaLegajo;
 use App\Support\CambioDiscapacidad;
+use App\Support\ConfiguracionFuncionalidades;
 use App\Support\RegimenesLaborales;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -113,7 +117,54 @@ class UsuarioController extends Controller
 
     public function store(StoreUsuariosRequest $request): JsonResponse
     {
-        $rows = $request->validated('usuarios');
+        $records = $this->registros($request->validated('usuarios'), $request);
+        $this->insertar($records, $request);
+
+        return UsuarioResource::collection(
+            Usuario::query()->with('regimenNormativo')->whereIn('id', array_column($records, 'id'))->orderBy('id')->get(),
+        )->response()->setStatusCode(201);
+    }
+
+    /**
+     * Registro manual: la persona con su primer vínculo laboral (obligatorio), en una sola transacción: persona, apertura
+     * del legajo, vínculo y datos del puesto. Si falla un paso no queda nada. Exige los mismos permisos que esos pasos por
+     * separado (usuarios.gestionar en la ruta, legajo.abrir y legajo.editar aquí) y que 2.2 esté activa. La importación
+     * por lotes (store) no cambia: da de alta personas sin vínculo.
+     */
+    public function storeConVinculo(StoreUsuarioConVinculoRequest $request): JsonResponse
+    {
+        $actor = $request->user();
+        abort_unless($actor->can('legajo.abrir') && $actor->can('legajo.editar'), 403,
+            'Registrar a la persona con su vínculo requiere abrir legajos (legajo.abrir) y registrar vínculos (legajo.editar).');
+        abort_unless(ConfiguracionFuncionalidades::activa('s02.vinculos'), 409,
+            '«'.ConfiguracionFuncionalidades::definicion('s02.vinculos')['nombre'].'» está desactivada en la configuración de la institución.');
+        [$registro] = $this->registros($request->validated('usuarios'), $request);
+
+        [$legajo, $vinculo] = DB::transaction(function () use ($registro, $request, $actor): array {
+            $this->insertar([$registro], $request);
+            $legajo = AperturaLegajo::abrir($registro['id']);
+            // El tipo de personal y la ley del vínculo son los de la persona; el tipo de vínculo, el que se indicó.
+            $vinculo = VinculoLaboral::query()->create([...$request->vinculo(), 'usuario_id' => $registro['id'], 'tipo_personal' => $registro['tipo_personal'],
+                'regimen_normativo_id' => $registro['regimen_normativo_id'], 'registrado_por' => $actor->getAuthIdentifier()]);
+            ($registro['tipo_personal'] === 'docente' ? $vinculo->perfilDocente() : $vinculo->perfilAdministrativo())->create($request->datosPuesto());
+
+            return [$legajo, $vinculo];
+        });
+
+        return response()->json(['data' => [
+            'usuario' => new UsuarioResource(Usuario::query()->with('regimenNormativo')->findOrFail($registro['id'])),
+            'legajo' => $legajo->only(['id', 'numero_legajo', 'estado_legajo']),
+            'vinculo' => $vinculo->only(['id', 'regimen_laboral', 'nombre_puesto']),
+        ]], 201);
+    }
+
+    /**
+     * Filas validadas del alta listas para insertar: permiso de discapacidad, correos ya registrados y valores por defecto.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function registros(array $rows, Request $request): array
+    {
         foreach ($rows as $row) {
             CambioDiscapacidad::autorizar($request->user(), null, CambioDiscapacidad::valor($row[CambioDiscapacidad::CAMPO] ?? null));
         }
@@ -136,7 +187,8 @@ class UsuarioController extends Controller
         /** These records cannot sign in until a separate account activation flow sets their credentials. */
         $unissuedPassword = Hash::make(Str::random(64));
         $now = now();
-        $records = array_map(fn (array $row): array => [
+
+        return array_map(fn (array $row): array => [
             ...$row,
             ...$this->ley($row),
             'id' => (string) Str::uuid(),
@@ -154,7 +206,11 @@ class UsuarioController extends Controller
             'created_at' => $now,
             'updated_at' => $now,
         ], $rows);
+    }
 
+    /** Inserta las filas y audita la discapacidad, en una transacción; un DNI o correo repetido es un error de validación. */
+    private function insertar(array $records, Request $request): void
+    {
         try {
             DB::transaction(function () use ($records, $request): void {
                 foreach (array_chunk($records, 100) as $chunk) {
@@ -169,9 +225,5 @@ class UsuarioController extends Controller
                 'usuarios' => 'Un DNI o correo ya está registrado. Actualiza la lista y revisa el archivo.',
             ]);
         }
-
-        return UsuarioResource::collection(
-            Usuario::query()->with('regimenNormativo')->whereIn('id', array_column($records, 'id'))->orderBy('id')->get(),
-        )->response()->setStatusCode(201);
     }
 }

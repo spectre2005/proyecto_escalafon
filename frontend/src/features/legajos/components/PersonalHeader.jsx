@@ -2,13 +2,14 @@ import AbrirLegajo from './AbrirLegajo'
 import CerrarLegajo from './CerrarLegajo'
 import ReabrirLegajo from './ReabrirLegajo'
 import PersonalPhoto from './PersonalPhoto'
-import { textoRegimen } from '../config/seccion02'
+import { puestoActual, textoRegimen } from '../config/seccion02'
 
-function SummaryField({ title, value }) {
+function SummaryField({ title, value, nota }) {
   const registered = value !== null && value !== undefined && String(value).trim() !== ''
   return <div className="min-w-0">
     <dt className="text-xs font-medium text-slate-500">{title}</dt>
     <dd className={`mt-1.5 break-words text-sm font-semibold ${registered ? 'text-slate-800' : 'font-normal text-slate-400'}`}>{registered ? value : 'No registrado'}</dd>
+    {registered && nota && <dd className="mt-1 text-[11px] text-slate-500">{nota}</dd>}
   </div>
 }
 
@@ -17,6 +18,7 @@ export default function PersonalHeader({ data, usuario }) {
   const personnelType = { docente: 'Docente', administrativo: 'Administrativo' }[person.tipo_personal] || person.tipo_personal
   const documentType = person.tipo_doc_identidad?.trim()
   const regimen = textoRegimen(data.regimen)
+  const actual = puestoActual(data.puesto_actual)
 
   return <header className="mb-6 overflow-hidden rounded-2xl border border-teal-100 bg-white shadow-sm">
     <div className="h-1 bg-teal-600" />
@@ -27,8 +29,8 @@ export default function PersonalHeader({ data, usuario }) {
         <dl className="mt-6 grid gap-x-8 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">
           <SummaryField title={documentType ? `Documento de identidad · ${documentType.toUpperCase()}` : 'Documento de identidad'} value={person.numero_doc_identidad} />
           <SummaryField title="Tipo de personal" value={personnelType} />
-          <SummaryField title="Puesto registrado" value={person.nombre_puesto} />
-          <SummaryField title="Unidad orgánica" value={person.unidad_organica_id} />
+          <SummaryField title="Puesto actual" value={actual.puesto} nota={actual.nota} />
+          <SummaryField title="Unidad orgánica actual" value={actual.unidad} nota={actual.nota} />
           <SummaryField title="Ley / régimen normativo" value={regimen.ley} />
           <SummaryField title="Tipo de vínculo vigente" value={regimen.tipo} />
           <SummaryField title="Correo institucional" value={person.email_institucional} />

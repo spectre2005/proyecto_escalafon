@@ -2,7 +2,7 @@ import { useState } from 'react'
 import api, { apiErrorMessage } from '../../../axios'
 import { cacheInstitution, normalizeInstitution, readInstitution } from '../../../config/institution'
 import { fetchInstitution } from '../../settings/institutionApi'
-import { textoRegimen } from '../../legajos/config/seccion02'
+import { puestoActual, textoRegimen } from '../../legajos/config/seccion02'
 
 export default function DownloadPersonalReport({ usuario, blank = false, className }) {
   const [busy, setBusy] = useState(false)
@@ -22,7 +22,9 @@ export default function DownloadPersonalReport({ usuario, blank = false, classNa
         const response = await api.get(`/expedientes/${usuario}`)
         // La ley y el tipo de vínculo vigente salen de regimen (regimen_laboral de la persona es solo un respaldo).
         const regimen = textoRegimen(response.data.data.regimen)
-        values = { ...response.data.data.usuario.values, ley: regimen.ley, tipo_vinculo: regimen.tipo }
+        // Puesto y unidad actuales: del vínculo vigente (o los registrados antes en la persona).
+        const actual = puestoActual(response.data.data.puesto_actual)
+        values = { ...response.data.data.usuario.values, ley: regimen.ley, tipo_vinculo: regimen.tipo, nombre_puesto: actual.puesto, unidad_organica_id: actual.unidad }
         let page = 1
         let lastPage
         do {

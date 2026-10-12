@@ -1,10 +1,10 @@
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { saveDatosPuesto, saveSeccion02 } from '../../api/seccion02Api'
-import { categoriasDocente, condicionesDocente, dedicacionesDocente, etiquetaVinculo, funcionesPrevias, gruposOcupacionales, regimenesLaborales, resultadosPeriodo, subtiposExtraordinario, tiposInduccion, tiposPersonal } from '../../config/seccion02'
+import { etiquetaVinculo, regimenesLaborales, resultadosPeriodo, tiposInduccion, tiposPersonal } from '../../config/seccion02'
+import { CamposDatosPuesto, CamposVinculo, OpcionesCatalogo } from './CamposVinculo'
+import { datosPuestoInicial, limpiarDatosPuesto, vinculoInicial } from './borradoresVinculo'
 import Campo, { Formulario, Opciones } from '../seccion01/Campo'
 import { hoy, useBorrador, useGuardar } from '../seccion01/useGuardar'
-import TresEstados from '../../../../components/ui/TresEstados'
-import { valorBandera } from '../../../../shared/banderas'
 
 // documentoId: documento recién subido que este registro acredita (el formulario se abre al subir el PDF).
 const conDocumento = (data, documentoId) => documentoId ? { ...data, documento_id: documentoId } : data
@@ -21,13 +21,6 @@ function CampoVinculo({ vinculos, draft, set, errors }) {
   </select></Campo>
 }
 
-// Opciones con estado activo: los inactivos solo se conservan si ya están guardados.
-function OpcionesCatalogo({ lista, actual }) {
-  return <>
-    <option value="">Selecciona</option>
-    {(lista || []).filter(item => item.activo !== false || item.id === actual).map(item => <option key={item.id} value={item.id}>{item.nombre}</option>)}
-  </>
-}
 
 // Vínculo laboral (vinculos_laborales), con los datos del proceso de selección. Se corrige solo mientras no tenga cese.
 // El tipo de vínculo es obligatorio; uno anterior Sin definir trae una sugerencia (tipo_sugerido) que solo se aplica con
@@ -38,13 +31,10 @@ export function VinculoForm({ usuario, record, documentoId, onSaved, onCancel })
   const persona = useLiveQuery(`/expedientes/${usuario}`).data?.data
   const sugerencia = record?.tipo_sugerido
   const [draft, set, poner] = useBorrador({
-    tipo_personal: v.tipo_personal || (record ? '' : persona?.usuario?.values?.tipo_personal) || '', regimen_laboral: v.regimen_laboral || '',
+    ...vinculoInicial(v),
+    tipo_personal: v.tipo_personal || (record ? '' : persona?.usuario?.values?.tipo_personal) || '',
     regimen_normativo_id: v.regimen_normativo_id || (record ? '' : persona?.edit_values?.regimen_normativo_id) || '',
-    unidad_organica_id: v.unidad_organica_id || '', nombre_puesto: v.nombre_puesto || '', numero_documento_vinculo: v.numero_documento_vinculo || '',
-    fecha_inicio: v.fecha_inicio || '', fecha_fin_prevista: v.fecha_fin_prevista || '', fecha_cese: v.fecha_cese || '',
-    proceso_seleccion: v.proceso_seleccion || '', fecha_resultado_seleccion: v.fecha_resultado_seleccion || '',
-    // Condiciones del puesto: Sí / No / Sin responder (por defecto, nunca No).
-    obligado_djbr: valorBandera(v.obligado_djbr), exige_colegiatura: valorBandera(v.exige_colegiatura), exige_estudios_basicos: valorBandera(v.exige_estudios_basicos), tiene_periodo_prueba: valorBandera(v.tiene_periodo_prueba),
+    fecha_cese: v.fecha_cese || '',
   })
   const { busy, error, errors, guardar } = useGuardar(data => saveSeccion02(usuario, 'vinculos-laborales', record?.id, conDocumento(data, documentoId)), onSaved)
   // El tipo de personal precargado se puede cambiar; la ley se conserva solo si también corresponde al nuevo.
@@ -57,24 +47,13 @@ export function VinculoForm({ usuario, record, documentoId, onSaved, onCancel })
     nota="Datos de la resolución o contrato. Con fecha de cese el vínculo queda cerrado y ya no se corrige.">
     <NotaDocumento documentoId={documentoId} />
     <Campo label="Tipo de personal" required error={errors.tipo_personal}><select required value={draft.tipo_personal} onChange={cambiarTipoPersonal}><Opciones lista={tiposPersonal} actual={draft.tipo_personal} vacio="Selecciona" /></select></Campo>
-    <Campo label="Tipo de vínculo" required error={errors.regimen_laboral}><select required value={draft.regimen_laboral} onChange={set('regimen_laboral')}><Opciones lista={regimenesLaborales} actual={draft.regimen_laboral} vacio="Selecciona" /></select></Campo>
-    <Campo label="Ley / régimen normativo" required error={errors.regimen_normativo_id}><select required value={draft.regimen_normativo_id} onChange={set('regimen_normativo_id')} disabled={!opciones}><OpcionesCatalogo lista={(opciones?.regimenes || []).filter(ley => !draft.tipo_personal || ley.aplica_a === draft.tipo_personal || ley.id === draft.regimen_normativo_id)} actual={draft.regimen_normativo_id} /></select></Campo>
-    {sugerencia && <div role="note" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 sm:col-span-2">
-      <span>Tipo de vínculo sin definir. {sugerencia.valor ? <>Sugerencia: <strong>{regimenesLaborales[sugerencia.valor]}</strong> ({sugerencia.motivo}) Revísala antes de guardar.</> : sugerencia.motivo}</span>
-      {sugerencia.valor && draft.regimen_laboral !== sugerencia.valor && <button type="button" onClick={() => poner('regimen_laboral')(sugerencia.valor)} className="font-semibold text-amber-900 underline">Aplicar sugerencia</button>}
-    </div>}
-    <Campo label="Unidad orgánica" error={errors.unidad_organica_id}><select value={draft.unidad_organica_id} onChange={set('unidad_organica_id')} disabled={!opciones}><OpcionesCatalogo lista={opciones?.unidades} actual={draft.unidad_organica_id} /></select></Campo>
-    <Campo label="Puesto" required error={errors.nombre_puesto}><input required maxLength={150} value={draft.nombre_puesto} onChange={set('nombre_puesto')} /></Campo>
-    <Campo label="N.º de resolución o contrato" error={errors.numero_documento_vinculo}><input maxLength={60} value={draft.numero_documento_vinculo} onChange={set('numero_documento_vinculo')} /></Campo>
-    <Campo label="Fecha de inicio" required error={errors.fecha_inicio}><input type="date" required value={draft.fecha_inicio} onChange={set('fecha_inicio')} /></Campo>
-    <Campo label="Fecha de fin prevista" error={errors.fecha_fin_prevista}><input type="date" min={draft.fecha_inicio || undefined} value={draft.fecha_fin_prevista} onChange={set('fecha_fin_prevista')} /></Campo>
-    <Campo label="Proceso de selección" error={errors.proceso_seleccion}><input maxLength={100} placeholder="Ej.: concurso o proceso CAS" value={draft.proceso_seleccion} onChange={set('proceso_seleccion')} /></Campo>
-    <Campo label="Fecha del resultado de selección" error={errors.fecha_resultado_seleccion}><input type="date" max={hoy()} value={draft.fecha_resultado_seleccion} onChange={set('fecha_resultado_seleccion')} /></Campo>
-    <Campo label="Fecha de cese (solo si el vínculo ya terminó)" error={errors.fecha_cese}><input type="date" min={draft.fecha_inicio || undefined} max={hoy()} value={draft.fecha_cese} onChange={set('fecha_cese')} /></Campo>
-    <div className="col-span-full grid gap-5 border-t border-slate-100 pt-4 sm:grid-cols-2">
-      {[['obligado_djbr', 'Obligado a presentar declaración jurada de bienes y rentas'], ['exige_colegiatura', 'El puesto exige colegiatura'], ['exige_estudios_basicos', 'El puesto exige estudios básicos'], ['tiene_periodo_prueba', 'Tiene período de prueba']]
-        .map(([key, text]) => <TresEstados key={key} name={`vinculo-${key}`} label={text} value={draft[key]} onChange={poner(key)} error={errors[key]} />)}
-    </div>
+    <CamposVinculo draft={draft} set={set} poner={poner} errors={errors} opciones={opciones} tipoPersonal={draft.tipo_personal} conCese>
+      <Campo label="Ley / régimen normativo" required error={errors.regimen_normativo_id}><select required value={draft.regimen_normativo_id} onChange={set('regimen_normativo_id')} disabled={!opciones}><OpcionesCatalogo lista={(opciones?.regimenes || []).filter(ley => !draft.tipo_personal || ley.aplica_a === draft.tipo_personal || ley.id === draft.regimen_normativo_id)} actual={draft.regimen_normativo_id} /></select></Campo>
+      {sugerencia && <div role="note" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 sm:col-span-2">
+        <span>Tipo de vínculo sin definir. {sugerencia.valor ? <>Sugerencia: <strong>{regimenesLaborales[sugerencia.valor]}</strong> ({sugerencia.motivo}) Revísala antes de guardar.</> : sugerencia.motivo}</span>
+        {sugerencia.valor && draft.regimen_laboral !== sugerencia.valor && <button type="button" onClick={() => poner('regimen_laboral')(sugerencia.valor)} className="font-semibold text-amber-900 underline">Aplicar sugerencia</button>}
+      </div>}
+    </CamposVinculo>
   </Formulario>
 }
 
@@ -94,27 +73,11 @@ export function SeleccionForm({ usuario, record, onSaved, onCancel }) {
 export function DatosPuestoForm({ usuario, vinculo, onSaved, onCancel }) {
   const docente = vinculo.values.tipo_personal === 'docente'
   const v = vinculo.datos_puesto[0]?.values || {}
-  const [draft, set] = useBorrador(docente
-    ? { condicion_docente: v.condicion_docente || '', categoria: v.categoria || '', dedicacion: v.dedicacion || '', subtipo_extraordinario: v.subtipo_extraordinario || '', funcion_previa: v.funcion_previa || '', codigo_renacyt: v.codigo_renacyt || '' }
-    : { grupo_ocupacional: v.grupo_ocupacional || '', nivel_carrera: v.nivel_carrera || '', cargo_estructural: v.cargo_estructural || '', es_cargo_confianza: v.es_cargo_confianza ?? false })
-  // La categoría es solo de ordinarios y el subtipo, de extraordinarios: si no corresponde, se envía vacío.
-  const limpiar = data => docente ? { ...data, categoria: data.condicion_docente === 'ordinario' ? data.categoria : null, subtipo_extraordinario: data.condicion_docente === 'extraordinario' ? data.subtipo_extraordinario : null } : data
-  const { busy, error, errors, guardar } = useGuardar(data => saveDatosPuesto(usuario, vinculo.id, limpiar(data)), onSaved)
+  const [draft, set] = useBorrador(datosPuestoInicial(docente, v))
+  const { busy, error, errors, guardar } = useGuardar(data => saveDatosPuesto(usuario, vinculo.id, limpiarDatosPuesto(docente, data)), onSaved)
   return <Formulario titulo={`Datos del puesto: ${vinculo.values.nombre_puesto}`} guardar="Guardar datos del puesto" busy={busy} error={error} onSubmit={() => guardar(draft)} onCancel={onCancel}
     nota="Se corrigen mientras el vínculo no tenga fecha de cese. El responsable se guarda con tu sesión.">
-    {docente ? <>
-      <Campo label="Condición docente" required error={errors.condicion_docente}><select required value={draft.condicion_docente} onChange={set('condicion_docente')}><Opciones lista={condicionesDocente} actual={draft.condicion_docente} vacio="Selecciona" /></select></Campo>
-      <Campo label="Categoría (solo ordinarios)" error={errors.categoria}><select disabled={draft.condicion_docente !== 'ordinario'} value={draft.condicion_docente === 'ordinario' ? draft.categoria : ''} onChange={set('categoria')}><Opciones lista={categoriasDocente} actual={draft.categoria} vacio="Sin categoría" /></select></Campo>
-      <Campo label="Dedicación" error={errors.dedicacion}><select value={draft.dedicacion} onChange={set('dedicacion')}><Opciones lista={dedicacionesDocente} actual={draft.dedicacion} vacio="Sin registrar" /></select></Campo>
-      <Campo label="Subtipo (solo extraordinarios)" error={errors.subtipo_extraordinario}><select disabled={draft.condicion_docente !== 'extraordinario'} value={draft.condicion_docente === 'extraordinario' ? draft.subtipo_extraordinario : ''} onChange={set('subtipo_extraordinario')}><Opciones lista={subtiposExtraordinario} actual={draft.subtipo_extraordinario} vacio="Sin subtipo" /></select></Campo>
-      <Campo label="Función previa" error={errors.funcion_previa}><select value={draft.funcion_previa} onChange={set('funcion_previa')}><Opciones lista={funcionesPrevias} actual={draft.funcion_previa} vacio="Sin registrar" /></select></Campo>
-      <Campo label="Código RENACYT" error={errors.codigo_renacyt}><input maxLength={30} value={draft.codigo_renacyt} onChange={set('codigo_renacyt')} /></Campo>
-    </> : <>
-      <Campo label="Grupo ocupacional" error={errors.grupo_ocupacional}><select value={draft.grupo_ocupacional} onChange={set('grupo_ocupacional')}><Opciones lista={gruposOcupacionales} actual={draft.grupo_ocupacional} vacio="Sin registrar" /></select></Campo>
-      <Campo label="Nivel de carrera" error={errors.nivel_carrera}><input maxLength={20} value={draft.nivel_carrera} onChange={set('nivel_carrera')} /></Campo>
-      <Campo label="Cargo estructural" error={errors.cargo_estructural} className="sm:col-span-2"><input maxLength={150} value={draft.cargo_estructural} onChange={set('cargo_estructural')} /></Campo>
-      <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2"><input type="checkbox" className="size-4 accent-teal-700" checked={draft.es_cargo_confianza} onChange={set('es_cargo_confianza')} />Es cargo de confianza</label>
-    </>}
+    <CamposDatosPuesto docente={docente} draft={draft} set={set} errors={errors} />
   </Formulario>
 }
 

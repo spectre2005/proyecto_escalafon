@@ -58,10 +58,12 @@ use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
 use App\Support\AplicacionDocumental;
 use App\Support\CambioDiscapacidad;
+use App\Support\PuestoActual;
 use App\Support\RegimenesLaborales;
 use App\Support\Seccion05;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -192,7 +194,7 @@ class ExpedienteController extends Controller
         ]);
         $veSensibles = $request->user()->can('datos_sensibles.ver');
         $query = Usuario::query()->select(['id', 'nombres', 'apellido_paterno', 'apellido_materno', 'numero_doc_identidad', 'tipo_personal', 'nombre_puesto', 'unidad_organica_id'])
-            ->with('unidadOrganica:id,nombre')->withCount(['legajos',
+            ->with(['unidadOrganica:id,nombre', 'vinculosLaborales' => fn (HasMany $vinculos): HasMany => PuestoActual::vigentes($vinculos)])->withCount(['legajos',
                 // Sin datos_sensibles.ver no se cuentan los documentos de las secciones 01, 09 y 10.
                 'documentosUsuarioPorUsuario' => fn (Builder $query): Builder => $veSensibles ? $query : $query->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES),
             ]);
@@ -211,7 +213,12 @@ class ExpedienteController extends Controller
             $filters['legajo'] === 'con' ? $query->has('legajos') : $query->doesntHave('legajos');
         }
 
-        return response()->json($query->orderBy('apellido_paterno')->orderBy('nombres')->orderBy('id')->paginate(20)->withQueryString());
+        // Puesto y unidad actuales: del vínculo vigente (o los registrados antes en la persona). Los vínculos no se envían.
+        $pagina = $query->orderBy('apellido_paterno')->orderBy('nombres')->orderBy('id')->paginate(20)->withQueryString()
+            ->through(fn (Usuario $persona): array => [...$persona->makeHidden('vinculosLaborales')->toArray(),
+                'puesto_actual' => PuestoActual::de($persona)]);
+
+        return response()->json($pagina);
     }
 
     public function show(Request $request, string $usuario): JsonResponse
@@ -233,6 +240,7 @@ class ExpedienteController extends Controller
             'usuario' => $presented,
             'edit_values' => $person->only(['unidad_organica_id', 'regimen_normativo_id']),
             'regimen' => $this->regimen($person),
+            'puesto_actual' => PuestoActual::de($person),
             'nombre' => trim($person->nombres.' '.$person->apellido_paterno.' '.$person->apellido_materno),
             // 2.4: Sí, No o Sin responder (null); se ofrece si algún vínculo no anulado dice Sí.
             'tiene_periodo_prueba' => $aplicacion->bandera('tiene_periodo_prueba', paraOfrecer: true),

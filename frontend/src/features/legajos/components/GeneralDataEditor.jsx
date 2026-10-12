@@ -24,7 +24,8 @@ const fields = [
   ['domicilio', 'Domicilio', 'text', 250],
   ['telefono', 'Teléfono', 'tel', 9],
   ['email_institucional', 'Correo institucional', 'email', 255, true],
-  ['nombre_puesto', 'Puesto', 'text', 150],
+  // Dato histórico de la persona: el puesto y la unidad actuales se toman del vínculo vigente (sección 02).
+  ['nombre_puesto', 'Puesto registrado en la persona', 'text', 150],
 ]
 
 // Listas cerradas que valida el backend.
@@ -112,7 +113,7 @@ export default function GeneralDataEditor({ usuario, data, onSaved, onCancel, on
         </div>
       })}
       <label className="flex flex-col gap-2 text-xs font-medium text-slate-600">Tipo de personal *<select name="tipo_personal" className={inputClass} value={draft.tipo_personal} onChange={event => setDraft(previous => ({ ...previous, tipo_personal: event.target.value, regimen_normativo_id: leyDelTipo(previous.regimen_normativo_id, event.target.value) }))}><option value="docente">Docente</option><option value="administrativo">Administrativo</option></select></label>
-      {[['unidad_organica_id', 'Unidad orgánica', 'unidades', 'Sin asignar'], ['regimen_normativo_id', 'Ley / régimen normativo', 'regimenes', 'Sin definir']].map(([key, title, catalog, vacio]) => <label key={key} className="flex flex-col gap-2 text-xs font-medium text-slate-600">{title}<select name={key} className={inputClass} value={draft[key]} disabled={!options.data} onChange={event => setDraft(previous => ({ ...previous, [key]: event.target.value }))}><option value="">{vacio}</option>{!options.data && draft[key] && <option value={draft[key]}>{data.usuario.values[key]}</option>}{opcionesDe(catalog, draft[key]).map(item => <option key={item.id} value={item.id}>{item.nombre}{item.activo ? '' : ' (inactivo)'}</option>)}</select>{key === 'regimen_normativo_id' && <span className="font-normal text-slate-500">Leyes del personal {draft.tipo_personal}. El tipo de vínculo (carrera, plazo determinado o designado) se registra en el vínculo laboral, en 2.2.</span>}{fieldErrors[key] && <span className="text-rose-700">{fieldErrors[key].join(' ')}</span>}</label>)}
+      {[['unidad_organica_id', 'Unidad orgánica registrada en la persona', 'unidades', 'Sin asignar'], ['regimen_normativo_id', 'Ley / régimen normativo', 'regimenes', 'Sin definir']].map(([key, title, catalog, vacio]) => <label key={key} className="flex flex-col gap-2 text-xs font-medium text-slate-600">{title}<select name={key} className={inputClass} value={draft[key]} disabled={!options.data} onChange={event => setDraft(previous => ({ ...previous, [key]: event.target.value }))}><option value="">{vacio}</option>{!options.data && draft[key] && <option value={draft[key]}>{data.usuario.values[key]}</option>}{opcionesDe(catalog, draft[key]).map(item => <option key={item.id} value={item.id}>{item.nombre}{item.activo ? '' : ' (inactivo)'}</option>)}</select>{key === 'regimen_normativo_id' && <span className="font-normal text-slate-500">Leyes del personal {draft.tipo_personal}. El tipo de vínculo (carrera, plazo determinado o designado) se registra en el vínculo laboral, en 2.2.</span>}{fieldErrors[key] && <span className="text-rose-700">{fieldErrors[key].join(' ')}</span>}</label>)}
       {options.error && <p role="alert" className="col-span-full text-xs text-rose-700">No se pudieron cargar las unidades y regímenes. <button type="button" className="underline" onClick={options.retry}>Reintentar</button></p>}
       <div className="col-span-full border-t border-slate-100 pt-5"><h3 className="mb-4 text-sm font-semibold text-slate-700">Estado y condiciones del personal</h3><div className="grid gap-5 sm:grid-cols-2">{flags.map(([key, title, ayuda]) => {
         const bloqueada = key === 'con_discapacidad' && !puedeDiscapacidad

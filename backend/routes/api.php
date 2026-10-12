@@ -266,6 +266,8 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', Fu
 
     Route::middleware('can:usuarios.gestionar')->group(function (): void {
         Route::post('usuarios', [UsuarioController::class, 'store'])->name('api.v1.usuarios.store');
+        // Registro manual: persona con su primer vínculo (además exige legajo.abrir y legajo.editar, en el controlador).
+        Route::post('usuarios/con-vinculo', [UsuarioController::class, 'storeConVinculo'])->name('api.v1.usuarios.store-con-vinculo');
         Route::match(['put', 'patch'], 'usuarios/{record}', [UsuarioController::class, 'update'])->whereUuid('record')->name('api.v1.usuarios.update');
         Route::delete('usuarios/{record}', [UsuarioController::class, 'destroy'])->whereUuid('record')->name('api.v1.usuarios.destroy');
     });

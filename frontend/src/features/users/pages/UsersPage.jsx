@@ -1,55 +1,31 @@
 import DownloadPersonalReport from '../../reportes/components/DownloadPersonalReport'
-import { advanceOnEnter } from '../../../shared/forms/advanceOnEnter'
 import { useEffect, useRef, useState } from 'react'
 import api, { apiErrorMessage } from '../../../axios'
 import { downloadUsersTemplate, parseUsersFile, resolveUsersLocations } from '../utils/usuariosExcel'
-import { saveUsers } from '../api/usuariosApi'
+import { saveUserWithLink, saveUsers } from '../api/usuariosApi'
+import RegistroManual from '../components/RegistroManual'
 import { useUsers } from '../hooks/useUsers'
 import Icon from '../../../components/ui/Icon'
-import UbigeoFields from '../../../components/ui/UbigeoFields'
 import { Link, useSearchParams } from 'react-router-dom'
-import {
-  columns,
-  validateUser,
-} from '../utils/usuariosCsv'
+import { validateUser } from '../utils/usuariosCsv'
 import { filterUsers } from '../utils/usuariosFiltering'
-import { updateUserDraft } from '../utils/usuariosEmail'
-import { conLey, leyDelRegistro, leyesDelTipo, leyInicial, nombreLey } from '../utils/leyes'
+import { conLey, leyDelRegistro, nombreLey } from '../utils/leyes'
 import { useLiveQuery } from '../../../shared/queries/useLiveQuery'
-import TresEstados from '../../../components/ui/TresEstados'
 import { usePuede } from '../../auth/session'
-
-const emptyUser = {
-  ...Object.fromEntries(columns.map((key) => [key, ''])),
-  tipo_personal: 'docente',
-  // Ley desde el catálogo; vacía se toma la única del tipo de personal (leyInicial). El tipo de vínculo se registra en 2.2.
-  regimen_normativo_id: '',
-}
-// Banderas de la persona en el alta: Sí / No / Sin responder (por defecto, nunca No). Las del puesto se registran
-// en el vínculo laboral. con_discapacidad exige discapacidad.editar (el backend lo valida y audita).
-const condicionesVacias = { tiene_derechohabientes: null, con_discapacidad: null }
-const labels = {
-  numero_doc_identidad: 'DNI',
-  nombres: 'Nombres',
-  apellido_paterno: 'Apellido paterno',
-  apellido_materno: 'Apellido materno',
-  email_institucional: 'Correo institucional',
-  telefono: 'Teléfono',
-}
 
 export default function UsersPage() {
   const { users, setUsers, loading, loadError } = useUsers()
   const [tab, setTab] = useState('manual')
   const [registrationOpen, setRegistrationOpen] = useState(false)
   const registrationDialog = useRef(null)
-  const [draft, setDraft] = useState(emptyUser)
-  const [condiciones, setCondiciones] = useState(condicionesVacias)
   const puedeDiscapacidad = usePuede('discapacidad.editar')
   const opciones = useLiveQuery('/expediente-opciones')
   const catalogo = opciones.data?.data.regimenes
-  const leyElegida = draft.regimen_normativo_id || leyInicial(catalogo, draft.tipo_personal)
-  const [location, setLocation] = useState({ region: '', provincia: '', distrito: '' })
-  const [ubigeoId, setUbigeoId] = useState('')
+  // Registrar con vínculo abre el legajo y crea el vínculo: exige también esos permisos (el backend los valida).
+  const puedeAbrir = usePuede('legajo.abrir')
+  const puedeVincular = usePuede('legajo.editar')
+  // Al registrar, el asistente se vuelve a montar vacío.
+  const [registroKey, setRegistroKey] = useState(0)
   const [batch, setBatch] = useState([])
   const [filename, setFilename] = useState('')
   const [busy, setBusy] = useState(false)
@@ -96,26 +72,33 @@ export default function UsersPage() {
     registrationDialog.current.close()
   }
 
-  async function persistUsers(records) {
-    if (savingRef.current || loading || loadError) return false
+  // enviar devuelve { saved: usuarios guardados, text: mensaje }. Resultado: { ok } o { ok: false, errors } (errores por campo).
+  async function persist(enviar) {
+    if (savingRef.current || loading || loadError) return { ok: false }
     savingRef.current = true
     setSaving(true)
     setMessage(null)
     try {
-      const saved = await saveUsers(records.map(record => conLey(catalogo, record)))
+      const { saved, text } = await enviar()
       setUsers((previous) => [...saved, ...previous.filter(user => !saved.some(record => record.id === user.id))])
       changePage(1)
-      setMessage({
-        text: `${saved.length} registro(s) guardado(s) en la base de datos.`,
-      })
-      return true
+      setMessage({ text })
+      return { ok: true }
     } catch (error) {
       setMessage({ error: true, text: apiErrorMessage(error) })
-      return false
+      return { ok: false, errors: error.response?.data?.errors || {} }
     } finally {
       savingRef.current = false
       setSaving(false)
     }
+  }
+
+  // Importación por lotes: igual que antes (personas sin vínculo).
+  function persistUsers(records) {
+    return persist(async () => {
+      const saved = await saveUsers(records.map(record => conLey(catalogo, record)))
+      return { saved, text: `${saved.length} registro(s) guardado(s) en la base de datos.` }
+    })
   }
 
   const checked = batch.map((user, index) => {
@@ -174,37 +157,22 @@ export default function UsersPage() {
     }
   }
 
-  async function addManual(event) {
-    event.preventDefault()
-    const user = Object.fromEntries(
-      Object.entries({ ...draft, regimen_normativo_id: leyElegida }).map(([key, value]) => [key, value.trim()]),
-    )
-    const errors = validateUser(user, catalogo)
-    if (Object.values(location).some(Boolean) && !ubigeoId) errors.push('Selecciona región, provincia y distrito para completar la ubicación.')
-    if (
-      users.some(
-        (item) =>
-          item.numero_doc_identidad === user.numero_doc_identidad ||
-          item.email_institucional.toLowerCase() ===
-            user.email_institucional.toLowerCase(),
-      )
-    )
-      errors.push('Ya existe un usuario con ese DNI o correo.')
-    if (errors.length)
-      return setMessage({ error: true, text: errors.join(' ') })
-    const respuestas = { tiene_derechohabientes: condiciones.tiene_derechohabientes, con_discapacidad: puedeDiscapacidad ? condiciones.con_discapacidad : null }
-    if (await persistUsers([{ ...user, ubigeo_id: ubigeoId || null, ...respuestas }])) {
-      setDraft(emptyUser)
-      setCondiciones(condicionesVacias)
-      setLocation({ region: '', provincia: '', distrito: '' })
-      setUbigeoId('')
+  // Registro manual (asistente de tres pasos): una sola operación transaccional con la persona y su primer vínculo.
+  async function registrarManual(payload) {
+    const resultado = await persist(async () => {
+      const { usuario, legajo } = await saveUserWithLink(payload)
+      return { saved: [usuario], text: `Persona registrada con su primer vínculo laboral. Se abrió su legajo ${legajo.numero_legajo}.` }
+    })
+    if (resultado.ok) {
+      setRegistroKey(key => key + 1)
       registrationDialog.current.close()
     }
+    return resultado
   }
 
   async function importBatch() {
     if (!batch.length || invalid || busy) return
-    if (await persistUsers(batch)) {
+    if ((await persistUsers(batch)).ok) {
       setBatch([])
       setFilename('')
       registrationDialog.current.close()
@@ -384,31 +352,28 @@ export default function UsersPage() {
             ref={registrationDialog}
             aria-labelledby="registration-title"
             aria-busy={saving || busy}
-            className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-3xl overflow-y-auto rounded-2xl border-0 bg-[#f6f8fa] p-0 text-[#243f43] shadow-2xl backdrop:bg-slate-900/50"
+            className={`fixed inset-0 m-auto max-h-[92dvh] w-[calc(100%_-_1.5rem)] overflow-hidden rounded-2xl border-0 bg-[#f6f8fa] p-0 text-[#243f43] shadow-2xl backdrop:bg-slate-900/50 open:flex open:flex-col ${tab === 'manual' ? 'max-w-5xl md:h-[min(760px,92dvh)]' : 'max-w-3xl'}`}
             onCancel={event => { if (savingRef.current || busy) event.preventDefault() }}
             onClose={() => setRegistrationOpen(false)}
           >
             {loading && <p role="status" className="px-6 pt-4 text-xs text-[#4f6d63]">Cargando usuarios para comprobar duplicados…</p>}
             {loadError && <p role="alert" className="px-6 pt-4 text-xs text-red-700">{loadError}</p>}
-          <div
-            className="grid scroll-mt-5 grid-cols-1 gap-6"
-            id="carga"
-          >
-            <section className="overflow-hidden rounded-xl border border-[#e0e9e4] bg-white">
-              <div className="flex items-center gap-3 px-4 py-5 md:p-6 [&_p]:mt-1.5 [&_p]:text-[11px] [&_p]:leading-relaxed [&_p]:text-[#889991]">
+            {/* Cabecera fija (título y método de carga); el contenido de cada método tiene su propio desplazamiento. */}
+            <section id="carga" className="shrink-0 border-b border-[#e0e9e4] bg-white">
+              <div className="flex items-center gap-3 px-4 py-4 md:px-6 [&_p]:mt-1.5 [&_p]:text-[11px] [&_p]:leading-relaxed [&_p]:text-[#889991]">
                 <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#edf5f1] text-[11px] text-[#518775]">
                   01
                 </span>
                 <div>
                   <h2 id="registration-title">Agregar personal</h2>
-                  <p>Elige cómo deseas cargar los datos de los usuarios.</p>
+                  <p>{tab === 'manual' ? 'Registra a la persona con su primer vínculo laboral en tres pasos.' : 'Elige cómo deseas cargar los datos de los usuarios.'}</p>
                 </div>
                 <button type="button" onClick={closeRegistration} disabled={saving || busy} aria-label="Cerrar formulario" className="ml-auto grid size-9 shrink-0 place-items-center rounded-lg text-[#4f6d63] hover:bg-[#edf6f2]">
                   <Icon name="close" size={20} />
                 </button>
               </div>
               <div
-                className="flex gap-6 border-b border-[#e9efec] px-6"
+                className="flex gap-6 px-6"
                 aria-label="Método de carga"
               >
                 <button
@@ -430,7 +395,10 @@ export default function UsersPage() {
                   <Icon name="plus" size={17} /> Registro manual
                 </button>
               </div>
-              {tab === 'csv' ? (
+            </section>
+            {tab === 'csv' && (
+              <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="m-4 rounded-xl border border-[#e0e9e4] bg-white md:m-6">
                 <div className="px-4 py-5 md:p-6">
                   <div
                     className="rounded-xl border-2 border-dashed border-[#bbd4c8] bg-[#fbfdfc] px-4 pt-7 pb-6 text-center [&_h3]:mb-2 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mb-4.5 [&_p]:text-xs [&_p]:text-[#8a9b93] [&_small]:mt-4 [&_small]:block [&_small]:text-[10px] [&_small]:text-[#93a399]"
@@ -495,130 +463,7 @@ export default function UsersPage() {
                     si la incluyes, completa región, provincia y distrito. Revisa los datos antes de guardar.
                   </p>
                 </div>
-              ) : (
-                <form
-                  className="grid grid-cols-1 gap-4 px-4 py-5 md:grid-cols-2 md:p-6 [&_label]:flex [&_label]:flex-col [&_label]:gap-2 [&_label]:text-[11px] [&_label]:text-[#557566]"
-                  onSubmit={addManual}
-                  onKeyDown={advanceOnEnter}
-                  aria-busy={saving}
-                >
-                  <fieldset
-                    disabled={saving || loading || !!loadError}
-                    className="contents"
-                  >
-                    {Object.entries(labels).map(([key, label]) => (
-                      <label key={key}>
-                        {label}
-                        {!['apellido_materno', 'telefono'].includes(key) &&
-                          ' *'}
-                        <input
-                          name={key}
-                          placeholder={key === 'email_institucional' ? 'nombre-apellido@uniq.edu.pe' : undefined}
-                          value={draft[key]}
-                          type={
-                            key === 'email_institucional' ? 'email' : 'text'
-                          }
-                          inputMode={
-                            ['numero_doc_identidad', 'telefono'].includes(key)
-                              ? 'numeric'
-                              : undefined
-                          }
-                          maxLength={
-                            key === 'numero_doc_identidad'
-                              ? 8
-                              : key === 'telefono'
-                                ? 9
-                                : key === 'nombres'
-                                  ? 120
-                                  : key === 'email_institucional'
-                                    ? 255
-                                    : 80
-                          }
-                          required={
-                            !['apellido_materno', 'telefono'].includes(key)
-                          }
-                          pattern={key === 'numero_doc_identidad' ? '[0-9]{8}' : key === 'telefono' ? '[0-9]{9}' : undefined}
-                          title={key === 'numero_doc_identidad' ? 'El DNI debe contener 8 dígitos.' : key === 'telefono' ? 'El teléfono debe contener 9 dígitos.' : undefined}
-                          onChange={(event) =>
-                            setDraft(updateUserDraft(draft, key, ['numero_doc_identidad', 'telefono'].includes(key) ? event.target.value.replace(/\D/g, '').slice(0, key === 'telefono' ? 9 : 8) : event.target.value))
-                          }
-                        />
-                        {key === 'email_institucional' && (
-                          <small>Se completa con el primer nombre y apellido paterno. Puedes editarlo.</small>
-                        )}
-                      </label>
-                    ))}
-                    <label>
-                      Tipo de personal *
-                      <select
-                        value={draft.tipo_personal}
-                        onChange={(event) =>
-                          setDraft({
-                            ...draft,
-                            tipo_personal: event.target.value,
-                            regimen_normativo_id: '',
-                          })
-                        }
-                      >
-                        <option value="docente">Docente</option>
-                        <option value="administrativo">Administrativo</option>
-                      </select>
-                    </label>
-                    <label>
-                      Ley / régimen normativo *
-                      <select
-                        name="regimen_normativo_id"
-                        required
-                        disabled={!catalogo}
-                        value={leyElegida}
-                        onChange={(event) =>
-                          setDraft({
-                            ...draft,
-                            regimen_normativo_id: event.target.value,
-                          })
-                        }
-                      >
-                        <option value="" disabled>
-                          {catalogo ? 'Selecciona una ley' : 'Cargando leyes…'}
-                        </option>
-                        {leyesDelTipo(catalogo, draft.tipo_personal).map(
-                          (ley) => (
-                            <option key={ley.id} value={ley.id}>
-                              {ley.nombre}
-                            </option>
-                          ),
-                        )}
-                      </select>
-                      <small>El tipo de vínculo (carrera, plazo determinado o designado) se registra con el vínculo laboral, en 2.2.</small>
-                      {opciones.error && <span role="alert" className="text-red-700">No se pudo cargar el catálogo de leyes. <button type="button" className="underline" onClick={opciones.retry}>Reintentar</button></span>}
-                    </label>
-                    <UbigeoFields value={location} onChange={(next, id) => { setLocation(next); setUbigeoId(id) }} disabled={saving} />
-                    <div className="col-span-full grid gap-4 border-t border-slate-100 pt-4 md:grid-cols-2">
-                      <TresEstados name="alta-tiene_derechohabientes" label="¿Tiene derechohabientes?" ayuda="Cónyuge, concubino/a o hijos."
-                        value={condiciones.tiene_derechohabientes} onChange={valor => setCondiciones(previas => ({ ...previas, tiene_derechohabientes: valor }))} />
-                      <TresEstados name="alta-con_discapacidad" label="¿Tiene discapacidad el servidor o alguno de sus hijos?"
-                        ayuda={puedeDiscapacidad ? 'Directiva, punto 1 k.' : 'Solo administración de la ORH puede registrarlo.'} disabled={!puedeDiscapacidad}
-                        value={condiciones.con_discapacidad} onChange={valor => setCondiciones(previas => ({ ...previas, con_discapacidad: valor }))} />
-                      <p className="text-xs text-slate-500 md:col-span-2">Si no lo sabes, deja «Sin responder». Las condiciones del puesto se registran en el vínculo laboral.</p>
-                    </div>
-                    <div className="col-span-full flex items-center justify-between gap-2.5 [&_small]:text-[10px] [&_small]:text-[#8b9c91]">
-                      <small>* Campos obligatorios</small>
-                      <button
-                        className="inline-flex items-center justify-center gap-2 rounded-lg border px-4.5 py-3 text-xs font-semibold transition-colors border-transparent bg-[#26776d] text-white hover:bg-[#1b625a]"
-                        type="submit"
-                      >
-                        <Icon name="plus" size={17} />{' '}
-                        {saving ? 'Guardando…' : 'Guardar usuario'}
-                      </button>
-                    </div>
-                  </fieldset>
-                </form>
-              )}
-            </section>
-
-          </div>
-
-
+              </div>
           {message && (
             <div
               className={`mt-5 rounded-lg px-5 py-4 text-xs leading-relaxed ${message.error ? 'bg-[#fff0ed] text-[#ac4d3a]' : 'bg-[#e4f2e9] text-[#2c7650]'}`}
@@ -726,6 +571,13 @@ export default function UsersPage() {
 
             <div className="flex justify-end px-6 py-4">
               <button type="button" onClick={closeRegistration} disabled={saving || busy} className="rounded-lg border border-[#dbe6e1] bg-white px-4 py-2.5 text-xs font-semibold text-[#4f6d63] hover:bg-[#edf6f2]">Cancelar</button>
+            </div>
+              </div>
+            )}
+            {/* El asistente sigue montado al cambiar de método: no se pierde lo ya escrito. */}
+            <div className={tab === 'manual' ? 'contents' : 'hidden'}>
+              <RegistroManual key={registroKey} usuarios={users} opciones={opciones} puedeDiscapacidad={puedeDiscapacidad} puedeRegistrar={puedeAbrir && puedeVincular}
+                saving={saving} bloqueado={loading || !!loadError} mensaje={message} onGuardar={registrarManual} onCancel={closeRegistration} />
             </div>
           </dialog>
     </div>
