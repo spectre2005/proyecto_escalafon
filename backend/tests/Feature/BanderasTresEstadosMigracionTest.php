@@ -13,7 +13,7 @@ use Tests\TestCase;
  * Migración de las banderas a tres estados: los false pasan a Sin responder (null), los true se conservan, y al
  * revertir los null vuelven a false. Sin la transacción de RefreshDatabase: en SQLite change() reconstruye la tabla
  * y solo puede hacerlo con las claves foráneas desactivadas (PostgreSQL altera la columna en su lugar). Por eso el
- * test deja el esquema migrado y borra lo que crea.
+ * test deja el esquema migrado y borra por id solo lo que crea.
  */
 class BanderasTresEstadosMigracionTest extends TestCase
 {
@@ -36,16 +36,24 @@ class BanderasTresEstadosMigracionTest extends TestCase
             if (! collect(Schema::getColumns('usuarios'))->firstWhere('name', 'con_discapacidad')['nullable']) {
                 $ejecutar('up');
             }
-            DB::table('vinculos_laborales')->delete();
-            DB::table('regimenes_normativos')->delete();
-            DB::table('usuarios')->delete();
+            // Solo lo que creó este test (por id): las tablas no se vacían, otras migraciones siembran datos (p. ej. leyes).
+            DB::table('vinculos_laborales')->whereIn('id', $this->creados['vinculos_laborales'])->delete();
+            DB::table('regimenes_normativos')->whereIn('id', $this->creados['regimenes_normativos'])->delete();
+            DB::table('usuarios')->whereIn('id', $this->creados['usuarios'])->delete();
         }
     }
+
+    /** @var array<string, list<string>> Filas creadas por el test, para borrarlas por id. */
+    private array $creados = ['vinculos_laborales' => [], 'regimenes_normativos' => [], 'usuarios' => []];
 
     private function comprobar(\Closure $ejecutar): void
     {
         $id = Usuario::factory()->create(['obligado_djbr' => true])->id;
-        $vinculo = VinculoLaboral::factory()->create(['usuario_id' => $id, 'tiene_periodo_prueba' => true])->id;
+        $this->creados['usuarios'][] = $id;
+        $creado = VinculoLaboral::factory()->create(['usuario_id' => $id, 'tiene_periodo_prueba' => true]);
+        $vinculo = $creado->id;
+        $this->creados['vinculos_laborales'][] = $vinculo;
+        $this->creados['regimenes_normativos'][] = $creado->regimen_normativo_id;
         $usuario = fn (): array => (array) DB::table('usuarios')->where('id', $id)->first(['obligado_djbr', 'exige_colegiatura', 'tiene_derechohabientes', 'con_discapacidad']);
         $enVinculo = fn (): array => (array) DB::table('vinculos_laborales')->where('id', $vinculo)->first(['obligado_djbr', 'tiene_periodo_prueba']);
         $this->assertEquals(['obligado_djbr' => 1, 'exige_colegiatura' => 0, 'tiene_derechohabientes' => 0, 'con_discapacidad' => 0], $usuario());
