@@ -98,6 +98,29 @@ return [
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 
+        // Base de la plataforma SaaS (instituciones, superadministradores y su auditoría), separada de la base
+        // institucional. Sus migraciones están en database/migrations/plataforma y se aplican aparte:
+        // php artisan migrate --database=plataforma --path=database/migrations/plataforma
+        // En las pruebas es SQLite en memoria (phpunit.xml), distinta de la institucional.
+        'plataforma' => env('PLATAFORMA_DB_DRIVER', 'pgsql') === 'sqlite' ? [
+            'driver' => 'sqlite',
+            'database' => env('PLATAFORMA_DB_DATABASE', ':memory:'),
+            'prefix' => '',
+            'foreign_key_constraints' => true,
+        ] : [
+            'driver' => 'pgsql',
+            'host' => env('PLATAFORMA_DB_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('PLATAFORMA_DB_PORT', env('DB_PORT', '5432')),
+            'database' => env('PLATAFORMA_DB_DATABASE', 'escalafon_plataforma'),
+            'username' => env('PLATAFORMA_DB_USERNAME', env('DB_USERNAME', 'root')),
+            'password' => env('PLATAFORMA_DB_PASSWORD', env('DB_PASSWORD', '')),
+            'charset' => 'utf8',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('PLATAFORMA_DB_SSLMODE', env('DB_SSLMODE', 'prefer')),
+        ],
+
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),

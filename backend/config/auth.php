@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Plataforma\AdministradorPlataforma;
 use App\Models\Usuario;
 
 return [
@@ -42,6 +43,12 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+        // Panel de la plataforma SaaS: cuentas de superadministrador en la base de plataforma, separadas de usuarios.
+        // Sanctum solo mira el guard web, así que esta sesión no da acceso a las rutas institucionales.
+        'plataforma' => [
+            'driver' => 'session',
+            'provider' => 'administradores_plataforma',
+        ],
     ],
 
     /*
@@ -65,6 +72,11 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', Usuario::class),
+        ],
+
+        'administradores_plataforma' => [
+            'driver' => 'eloquent',
+            'model' => AdministradorPlataforma::class,
         ],
 
         // 'users' => [
