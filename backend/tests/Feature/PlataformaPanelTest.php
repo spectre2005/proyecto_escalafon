@@ -8,10 +8,12 @@ use App\Models\Usuario;
 use Database\Seeders\AdministradorSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
 use Tests\Concerns\UsaPlataforma;
 use Tests\TestCase;
+use Throwable;
 
 /**
  * Panel de la plataforma SaaS: autenticación separada (guard plataforma frente a la sesión institucional), instituciones
@@ -231,6 +233,52 @@ class PlataformaPanelTest extends TestCase
             ->expectsQuestion('Repite la contraseña', 'Clave-larga-2026')->assertSuccessful();
         $this->postJson('/api/plataforma/auth/login', ['email' => 'primera@example.test', 'password' => 'Clave-larga-2026'])->assertOk();
         $this->assertSame('administrador.creado', AuditoriaPlataforma::query()->where('accion', 'administrador.creado')->value('accion'));
+    }
+
+    /**
+     * Caso correcto contra PostgreSQL real (el servidor de Docker): una base temporal con las migraciones institucionales
+     * y una carpeta temporal escribible. Ambas llevan nombre único y se borran por nombre al terminar.
+     */
+    public function test_provisioning_is_marked_when_its_database_is_migrated_and_its_storage_writable(): void
+    {
+        $sufijo = bin2hex(random_bytes(4));
+        $base = 'escalafon_prueba_aprov_'.$sufijo;
+        $raiz = storage_path('app/private/instituciones');
+        $creoRaiz = ! is_dir($raiz);
+        $carpeta = $raiz.'/prueba-aprov-'.$sufijo;
+        config(['database.connections.aprovisionamiento_servidor' => [...config('database.connections.pgsql'), 'database' => 'postgres'],
+            'database.connections.aprovisionamiento_base' => [...config('database.connections.pgsql'), 'database' => $base]]);
+        try {
+            DB::connection('aprovisionamiento_servidor')->getPdo();
+        } catch (Throwable $e) {
+            $this->markTestSkipped('Necesita el servidor PostgreSQL de Docker: '.$e->getMessage());
+        }
+        $institucion = $this->institucion(['slug' => 'prueba-aprov-'.$sufijo, 'base_datos' => $base, 'almacenamiento' => 'instituciones/prueba-aprov-'.$sufijo]);
+        try {
+            DB::connection('aprovisionamiento_servidor')->statement('CREATE DATABASE "'.$base.'"');
+            $this->artisan('migrate', ['--database' => 'aprovisionamiento_base', '--force' => true])->assertSuccessful();
+            mkdir($carpeta, 0755, true);
+
+            $this->artisan('plataforma:verificar-aprovisionamiento', ['slug' => $institucion->slug])
+                ->expectsOutputToContain('Institución aprovisionada')->assertSuccessful();
+            $institucion->refresh();
+            $this->assertTrue($institucion->aprovisionada());
+            $this->assertSame(Institucion::REGISTRADA, $institucion->estado, 'Aprovisionar no la activa: se activa desde el panel.');
+            $this->assertSame(1, AuditoriaPlataforma::query()->where('institucion_id', $institucion->id)->where('accion', 'institucion.aprovisionada')->count());
+            // Ya se puede activar, y su ubicación deja de ser editable.
+            $this->entrar();
+            $this->postJson("/api/plataforma/instituciones/{$institucion->id}/activar")->assertOk()->assertJsonPath('data.estado', Institucion::ACTIVA);
+            $this->patchJson("/api/plataforma/instituciones/{$institucion->id}", ['slug' => 'otro-slug'])->assertUnprocessable()->assertJsonValidationErrors('slug');
+        } finally {
+            DB::purge('aprovisionamiento_base');
+            DB::purge('verificacion_institucion');
+            DB::connection('aprovisionamiento_servidor')->statement('DROP DATABASE IF EXISTS "'.$base.'" WITH (FORCE)');
+            DB::purge('aprovisionamiento_servidor');
+            File::deleteDirectory($carpeta);
+            if ($creoRaiz) {
+                File::deleteDirectory($raiz);
+            }
+        }
     }
 
     public function test_provisioning_is_not_marked_when_its_database_or_storage_are_missing(): void

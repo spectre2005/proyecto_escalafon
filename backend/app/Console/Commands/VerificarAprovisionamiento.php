@@ -56,8 +56,9 @@ class VerificarAprovisionamiento extends Command
     /** @return array{bool, string} */
     private function baseLista(string $base): array
     {
+        // La conexión «pgsql» describe el servidor PostgreSQL institucional; solo cambia la base.
         $plantilla = config('database.connections.pgsql');
-        if (config('database.default') !== 'pgsql' || ! is_array($plantilla)) {
+        if (! is_array($plantilla) || ($plantilla['driver'] ?? null) !== 'pgsql') {
             return [false, 'solo se verifica contra el servidor PostgreSQL institucional.'];
         }
         config(['database.connections.verificacion_institucion' => [...$plantilla, 'database' => $base]]);
