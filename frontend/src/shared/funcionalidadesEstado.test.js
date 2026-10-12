@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { activa, estadoVacio, seccionesVisibles } from './funcionalidadesEstado.js'
+import { activa, conModulosOcultos, estadoVacio, primeraCategoria, seccionesVisibles } from './funcionalidadesEstado.js'
 
 const secciones = [
   { number: '06', title: 'Compensaciones', categories: ['seccion-06', 'compensaciones-beneficios'] },
@@ -26,4 +26,20 @@ test('hidden sections and inactive entries disappear, other entries stay', () =>
 test('the section documents entry is hidden with its section', () => {
   const [seccion] = seccionesVisibles([{ number: '03', categories: ['seccion-03'] }], { menu_oculto: ['documentos-03'] })
   assert.equal(seccion.sinDocumentos, true)
+})
+
+const seccion01 = [{ number: '01', title: 'Información personal', categories: ['general', 's01-familia', 's01-discapacidad'], sinDocumentos: true }]
+
+test('a module is visible only if its feature is active and its flag does not hide it', () => {
+  const categorias = (estado, ocultos) => seccionesVisibles(seccion01, conModulosOcultos(estado, ocultos))[0].categories
+  assert.deepEqual(categorias(estadoVacio, ['s01-discapacidad']), ['general', 's01-familia'])
+  assert.deepEqual(categorias({ menu_oculto: ['s01-familia'] }, ['s01-discapacidad']), ['general'])
+  assert.deepEqual(categorias({ menu_oculto: ['s01-familia'] }, []), ['general', 's01-discapacidad'])
+  assert.deepEqual(categorias(undefined, undefined), ['general', 's01-familia', 's01-discapacidad'])
+})
+
+test('a hidden module falls back to the first available entry', () => {
+  assert.equal(primeraCategoria(seccionesVisibles(seccion01, conModulosOcultos(estadoVacio, ['s01-familia']))), 'general')
+  assert.equal(primeraCategoria(seccionesVisibles(secciones, { menu_oculto: ['seccion-06', 'compensaciones-beneficios', 'documentos-06'], secciones_ocultas: [6] })), 's07-desempeno')
+  assert.equal(primeraCategoria([]), 'general')
 })

@@ -235,7 +235,10 @@ class ExpedienteController extends Controller
             // 2.4: Sí, No o Sin responder (null); se ofrece si algún vínculo no anulado dice Sí.
             'tiene_periodo_prueba' => $aplicacion->bandera('tiene_periodo_prueba', paraOfrecer: true),
             // Banderas del perfil (para exigir) y avisos, p. ej. condiciones del puesto sin vínculo vigente.
-            'condiciones' => ['banderas' => $banderas, 'sin_vinculo_vigente' => $aplicacion->sinVinculoVigente, 'avisos' => $aplicacion->avisos()],
+            // modulos_ocultos: módulos de la sección 01 que su bandera oculta (AplicacionDocumental::MODULOS). Sin
+            // datos_sensibles.ver va vacío: ocultar la entrada revelaría que la bandera está en No.
+            'condiciones' => ['banderas' => $banderas, 'sin_vinculo_vigente' => $aplicacion->sinVinculoVigente, 'avisos' => $aplicacion->avisos(),
+                'modulos_ocultos' => $veSensibles ? $aplicacion->modulosOcultos() : []],
             'document_sections' => SeccionLegajo::query()->orderBy('orden')->get(['id', 'nombre']),
             'document_states' => DocumentoUsuario::query()->where('usuario_id', $usuario)->whereHas('legajo', fn (Builder $query): Builder => $query->where('usuario_id', $usuario))
                 ->when(! $veSensibles, fn (Builder $query): Builder => $query->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES))

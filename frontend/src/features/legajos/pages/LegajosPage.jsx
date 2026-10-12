@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from '../../../shared/queries/useLiveQuery'
-import { seccionesVisibles } from '../../../shared/funcionalidadesEstado'
+import { conModulosOcultos, primeraCategoria, seccionesVisibles } from '../../../shared/funcionalidadesEstado'
 import { useFuncionalidades } from '../../../shared/useFuncionalidades'
 import Seccion01Panel from '../components/seccion01/Seccion01Panel'
 import Seccion02Panel from '../components/seccion02/Seccion02Panel'
@@ -136,9 +136,14 @@ function Desactivada() {
   return <section className={`${panel} p-10 text-center`}><span className="mx-auto mb-3 grid size-12 place-items-center rounded-2xl bg-slate-50 text-slate-400"><Icon name="settings" /></span><h2 className="text-sm font-semibold text-slate-700">Función no disponible</h2><p className="mt-2 text-xs text-slate-500">La institución desactivó esta función en su configuración. Lo registrado antes se conserva; para volver a usarla, debe activarse en Configuración.</p></section>
 }
 
+// Aviso al redirigir desde un módulo de la sección 01 que su bandera oculta (condiciones.modulos_ocultos de la ficha).
+const avisosModuloOculto = {
+  's01-familia': '«Familia y derechohabientes» no se muestra: la persona figura sin derechohabientes y no tiene familiares ni documentos registrados. Para verlo, cambia «Tiene derechohabientes» en Información personal.',
+  's01-discapacidad': '«Discapacidad» no se muestra: la persona figura sin discapacidad (el servidor ni sus hijos) y no tiene certificados ni documentos registrados. Para verlo, cambia «Con discapacidad» en Información personal.',
+}
+
 function Detail({ usuario }) {
   const funcionalidades = useFuncionalidades()
-  const secciones = seccionesVisibles(legajoSections, funcionalidades)
   const veSensibles = usePuede('datos_sensibles.ver')
   const permisoEditar = usePuede('legajo.editar') && veSensibles
   const permisoSubir = usePuede('documento.subir')
@@ -148,23 +153,43 @@ function Detail({ usuario }) {
   const request = useRead(`/expedientes/${usuario}`)
   const [params, setParams] = useSearchParams()
   const categoria = params.get('categoria') || 'general'
-  const selected = categoria === 'tiempo-servicios-reconocidos' ? 'seccion-06' : ['seccion-10', 'registros-sst-bienestar', 'documentos-10'].includes(categoria) ? 's10-sst' : categoria
+  const pedida = categoria === 'tiempo-servicios-reconocidos' ? 'seccion-06' : ['seccion-10', 'registros-sst-bienestar', 'documentos-10'].includes(categoria) ? 's10-sst' : categoria
   function change(key, value) {
     const next = new URLSearchParams(params)
     if (value) next.set(key, value)
     else next.delete(key)
     if (key !== 'page') next.delete('page')
+    next.delete('oculto')
     setParams(next)
   }
   const data = request.data?.data
+  // Lo que desactiva Funcionalidades muestra «Función no disponible»; lo que oculta una bandera de la persona (sin
+  // datos registrados) desaparece del menú y redirige a la primera entrada disponible, con un aviso breve.
+  const modulosOcultos = data?.condiciones?.modulos_ocultos || []
+  const porFuncionalidad = seccionesVisibles(legajoSections, funcionalidades)
+  const secciones = seccionesVisibles(legajoSections, conModulosOcultos(funcionalidades, modulosOcultos))
+  const ocultaPorBandera = modulosOcultos.includes(pedida)
+  const selected = ocultaPorBandera ? primeraCategoria(secciones) : pedida
+  useEffect(() => {
+    if (!ocultaPorBandera) return
+    setParams(previos => {
+      const next = new URLSearchParams(previos)
+      next.set('categoria', selected)
+      next.set('oculto', pedida)
+      next.delete('page')
+      return next
+    }, { replace: true })
+  }, [ocultaPorBandera, pedida, selected, setParams])
+  // Solo mientras siga oculto: si la bandera cambia (p. ej. a Sí), el aviso ya no aplica.
+  const avisoOculto = modulosOcultos.includes(params.get('oculto')) ? avisosModuloOculto[params.get('oculto')] : null
   const hasActiveLegajo = data?.legajos.some(legajo => legajo.values.estado_legajo === 'activo')
   const readOnly = !!data?.legajos.length && !hasActiveLegajo
   const puedeEditar = permisoEditar && !readOnly
   const puedeSubir = permisoSubir && veSensibles && !readOnly
   const group = legajoSections.find(item => item.categories.includes(selected) || (!item.sinDocumentos && selected === `documentos-${item.number}`))
   const categorias = item => [...item.categories, ...(item.sinDocumentos ? [] : [`documentos-${item.number}`])]
-  // La categoría existe pero su funcionalidad o su sección está desactivada.
-  const desactivada = !!group && !secciones.some(item => categorias(item).includes(selected))
+  // La categoría existe pero su funcionalidad o su sección está desactivada (no cuenta lo que oculta una bandera).
+  const desactivada = !!group && !porFuncionalidad.some(item => categorias(item).includes(selected))
   // 2.4 siempre está en el menú; atenuada solo con «Tiene período de prueba» en No (Sin responder no la atenúa).
   const noAplica = key => key === 's02-prueba' && data?.tiene_periodo_prueba === false
   const isDocuments = selected.startsWith('documentos-')
@@ -177,6 +202,7 @@ function Detail({ usuario }) {
     <Feedback {...request} />
     {data && <>
       <PersonalHeader data={data} usuario={usuario} />
+      {avisoOculto && <p role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{avisoOculto}</p>}
       {readOnly && <p role="status" className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">Legajo cerrado. Puedes consultar las secciones y visualizar o descargar sus documentos.</p>}
       {(hasActiveLegajo || data.legajos.length > 0) ? <div className="grid items-start gap-6 lg:grid-cols-[280px_minmax(0,1fr)]"><nav aria-label="Secciones del legajo" className={`${panel} p-3`}>{secciones.map(item => <details key={item.number} open={group?.number === item.number} className="border-b border-slate-100 py-2 last:border-b-0"><summary className="cursor-pointer px-3 py-2 text-xs font-semibold leading-relaxed text-slate-700">{item.title}</summary><div className="mt-1 space-y-1">{categorias(item).map(key => <button key={key} aria-current={selected === key ? 'page' : undefined} onClick={() => change('categoria', key)} className={`w-full rounded-lg px-3 py-2.5 text-left text-xs ${selected === key ? 'bg-teal-50 font-semibold text-teal-800' : noAplica(key) ? 'text-slate-400 hover:bg-slate-50' : 'text-slate-500 hover:bg-slate-50'}`}>{subseccionesSeccion10[key] ? subseccionesSeccion10[key].titulo : key === 'seccion-06' ? 'Documentos de compensaciones' : key === 'seccion-04' ? 'Documentos y tiempo de experiencia' : key === 'seccion-03' ? 'Documentos y avance de formación' : key === "reconocimientos" ? "Reconocimientos" : key === "sanciones" ? "Sanciones disciplinarias" : gruposSeccion01[key] ? gruposSeccion01[key].titulo : subseccionesSeccion02[key] ? <>{subseccionesSeccion02[key].titulo}{noAplica(key) && <span className="ml-1 text-[10px]">· No aplica</span>}</> : categoriasSeccion05[key] ? categoriasSeccion05[key].titulo : subseccionesSeccion07[key] ? subseccionesSeccion07[key].titulo : categoriasSeccion09[key] ? categoriasSeccion09[key].titulo : categoriasSeccion11[key] ? categoriasSeccion11[key].titulo : key.startsWith('documentos-') ? 'Documentos de la sección' : data.sections.find(category => category.key === key)?.label}</button>)}</div></details>)}</nav>
         <div className="min-w-0">{desactivada ? <Desactivada /> : (selected === "reconocimientos" || selected === "sanciones") ? <Seccion08Panel key={`${usuario}:${selected}`} usuario={usuario} categoria={selected} /> : (categoriasSensibles.includes(selected) || categoriasSeccion09[selected]) && !veSensibles ? <Bloqueado /> : subseccionesSeccion02[selected] ? <Seccion02Panel key={`${usuario}:${selected}`} usuario={usuario} categoria={selected} onNavigate={key => change('categoria', key)} /> : subseccionesSeccion10[selected] ? <Seccion10Panel key={usuario + ':' + selected} usuario={usuario} subseccion={subseccionesSeccion10[selected].codigo} /> : selected === 'seccion-06' ? <Seccion06Panel key={usuario} usuario={usuario} /> : selected === 'seccion-04' ? <Seccion04Panel key={usuario} usuario={usuario} /> : selected === 'seccion-03' ? <Seccion03Panel key={usuario} usuario={usuario} /> : categoriasSeccion05[selected] ? <Seccion05Panel key={`${usuario}:${selected}`} usuario={usuario} categoria={selected} /> : categoriasSeccion11[selected] ? <Seccion11Panel key={`${usuario}:${selected}`} usuario={usuario} categoria={selected} onNavigate={key => change('categoria', key)} /> : categoriasSeccion09[selected] ? <Seccion09Panel key={`${usuario}:${selected}`} usuario={usuario} categoria={selected} /> : subseccionesSeccion07[selected] ? <Seccion07Panel key={`${usuario}:${selected}`} usuario={usuario} categoria={selected} onNavigate={key => change('categoria', key)} /> : gruposSeccion01[selected] && selected !== 'general' ? <Seccion01Panel key={`${usuario}:${selected}`} usuario={usuario} categoria={selected} /> : selected === 'general' ? <><section className={`${panel} p-6`}>{editing && !readOnly ? <GeneralDataEditor usuario={usuario} data={data} onUploadDni={puedeSubir ? () => setUploadCode('S01_B_DOCUMENTO_IDENTIDAD') : undefined} onUploadFicha={puedeSubir ? () => setUploadCode('S01_A_FICHA_DATOS') : undefined} onCancel={() => setEditing(false)} onSaved={updated => { request.setData(updated); setEditing(false); setSaved(true) }} /> : <><div className="mb-6 flex flex-wrap items-center justify-between gap-4"><h2 className="text-lg font-semibold text-slate-800">Información personal</h2><div className="flex flex-wrap items-center gap-3">{puedeSubir && <button type="button" onClick={() => setUploadCode('S01_A_FICHA_DATOS')} className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"><Icon name="upload" size={17} />Subir ficha personal</button>}{puedeEditar && <button onClick={() => { setEditing(true); setSaved(false) }} className="rounded-xl border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-100">Editar</button>}</div></div>{(data.condiciones?.avisos || []).map(aviso => <p key={aviso} role="note" className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">{aviso}</p>)}{data.datos_sensibles_ocultos && <p className="mb-5 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">Se muestran solo los datos de identificación. Los datos personales sensibles (nacimiento, domicilio, teléfono, estado civil, discapacidad) requieren acceso a datos sensibles.</p>}{saved && <p role="status" className="mb-5 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">Cambios guardados.</p>}<Fields values={Object.fromEntries([...['nombres', 'apellido_paterno', 'apellido_materno'].map(key => [key, data.usuario.values[key]]), ...Object.entries(data.usuario.values).filter(([key]) => !['nombres', 'apellido_paterno', 'apellido_materno', 'foto_path'].includes(key))])} /></>}{veSensibles && <PersonalDocuments usuario={usuario} uploadCode={readOnly ? null : uploadCode} onClose={() => setUploadCode(null)} />}</section></> : group && isDocuments && !documentSection ? <section className={`${panel} p-6`}><h2 className="text-lg font-semibold text-slate-800">Documentos: {group?.title}</h2><p className="mt-3 text-sm text-slate-500">Esta sección todavía no tiene un catálogo documental asociado en la base de datos.</p></section> : section ? <SectionRecords key={`${usuario}:${section.key}`} usuario={usuario} section={section} filters={sectionFilters} onFilter={change} documentSections={isDocuments ? [documentSection] : data.document_sections} documentStates={data.document_states} page={params.get('page') || '1'} onPage={page => change('page', page)} /> : <p role="alert" className="p-6 text-sm text-slate-500">La categoría solicitada no existe. Selecciona una categoría del menú.</p>}</div>

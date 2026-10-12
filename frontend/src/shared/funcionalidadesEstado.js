@@ -20,3 +20,14 @@ export function seccionesVisibles(secciones, estado) {
       sinDocumentos: seccion.sinDocumentos || menuOculto.has(`documentos-${seccion.number}`),
     }))
 }
+
+// Junta lo que ocultan las banderas de la persona (condiciones.modulos_ocultos de la ficha) con lo que oculta la
+// configuración: un módulo se ve solo si su funcionalidad está activa y su bandera no lo oculta.
+export function conModulosOcultos(estado, modulosOcultos) {
+  return { ...estadoVacio, ...estado, menu_oculto: [...(estado?.menu_oculto || []), ...(modulosOcultos || [])] }
+}
+
+// Primera entrada disponible del menú (destino al entrar a un módulo oculto); «general» si no queda ninguna.
+export function primeraCategoria(secciones) {
+  return secciones.find(seccion => seccion.categories.length)?.categories[0] || 'general'
+}

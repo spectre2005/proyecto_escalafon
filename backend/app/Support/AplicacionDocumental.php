@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Models\CertificadoDiscapacidad;
+use App\Models\DocumentoUsuario;
 use App\Models\Familiar;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
@@ -53,6 +55,16 @@ final class AplicacionDocumental
      * documentos a la bandera; antes dependían solo de los familiares registrados.
      */
     public const DE_DERECHOHABIENTES = [Seccion01::PARTIDA_MATRIMONIO, Seccion01::DNI_CONYUGE, Seccion01::DNI_HIJOS];
+
+    /**
+     * Módulos de la sección 01 (claves del menú, como «menu» en config/funcionalidades.php) que sigue una bandera de la
+     * persona: con la bandera en No y sin datos registrados (registros no anulados ni documentos de sus tipos), el
+     * módulo entero se oculta. Con No y datos, Sí o Sin responder, se mantiene. El backend no rechaza sus registros.
+     */
+    public const MODULOS = [
+        's01-familia' => ['tiene_derechohabientes', self::DE_DERECHOHABIENTES],
+        's01-discapacidad' => ['con_discapacidad', ['S01_K_CERTIFICADO_DISCAPACIDAD']],
+    ];
 
     private ?bool $hayFamiliares = null;
 
@@ -227,6 +239,23 @@ final class AplicacionDocumental
     private function deDerechohabientes(TipoDocumento $tipo): bool
     {
         return (int) $tipo->seccion_legajo_id === 1 && in_array($tipo->codigo, self::DE_DERECHOHABIENTES, true);
+    }
+
+    /** @return list<string> Módulos de la sección 01 que se ocultan por su bandera en No y sin datos (MODULOS). */
+    public function modulosOcultos(): array
+    {
+        return array_keys(array_filter(self::MODULOS, fn (array $modulo, string $clave): bool => $this->banderas[$modulo[0]] === false
+            && ! $this->hayDatosDelModulo($clave), ARRAY_FILTER_USE_BOTH));
+    }
+
+    /** Registros no anulados del módulo (familiares o certificados) o documentos de sus tipos, en cualquier estado. */
+    private function hayDatosDelModulo(string $clave): bool
+    {
+        $registros = $clave === 's01-familia' ? $this->hayFamiliares()
+            : CertificadoDiscapacidad::query()->where('usuario_id', $this->personaId)->where('anulado', false)->exists();
+
+        return $registros || DocumentoUsuario::query()->where('usuario_id', $this->personaId)
+            ->whereHas('tipoDocumento', fn ($tipo) => $tipo->where('seccion_legajo_id', 1)->whereIn('codigo', self::MODULOS[$clave][1]))->exists();
     }
 
     /** Familiares vigentes (sin anulados): con alguno registrado, g, i y j se resuelven por familiar. */
