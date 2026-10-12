@@ -6,13 +6,30 @@ import { hoy, useBorrador, useGuardar } from '../seccion01/useGuardar'
 import { agregarDocumento03 } from '../../api/seccion03Api'
 import { modalidadesPresentacion, folios } from '../../config/documentos'
 import { niveles03, capacitaciones03 } from '../../config/seccion03'
+import { conValor, reemplazarPropuesta } from '../../config/acreditacion'
 
+// Datos del documento que se subsana y de su registro (formación, colegiatura o capacitación, en doc.datos): se proponen
+// para corregir solo lo necesario. Folios y PDF son del documento nuevo.
+function datosDe(doc) {
+  if (!doc) return {}
+  const registro = doc.datos || {}
+  return conValor({
+    nombre: doc.nombre, emisor: doc.emisor, fecha_emision: doc.fecha_emision, modalidad_presentacion: doc.modalidad_presentacion,
+    nivel: registro.nivel, numero_registro: registro.numero_registro, numero_colegiatura: registro.numero_colegiatura, vigente_hasta: registro.vigente_hasta,
+    tipo_capacitacion: registro.tipo_capacitacion, horas: registro.horas === undefined || registro.horas === null ? '' : String(registro.horas),
+  })
+}
+
+// subsana: documento que se subsana (desde «Subsanar»). soloSubsanar: el tipo ya no se ofrece a la persona; solo se
+// admite subsanar un documento existente (el backend rechaza una carga nueva).
 export default function Documento03Form({
   usuario,
   item,
   datos,
   onSaved,
-  onCancel
+  onCancel,
+  subsana = '',
+  soloSubsanar = false
 }) {
   const nombre = useRef(null)
 
@@ -27,12 +44,10 @@ export default function Documento03Form({
     doc => !doc.subsanado && doc.estado !== 'anulado'
   )
 
-  const [draft, set] = useBorrador({
+  const vacios = {
     nombre: '',
     emisor: '',
     fecha_emision: '',
-    folio_inicio: datos.folio_sugerido,
-    folio_fin: datos.folio_sugerido,
     modalidad_presentacion: '',
     numero_registro: '',
     nivel: '',
@@ -40,11 +55,26 @@ export default function Documento03Form({
     vigente_hasta: '',
     tipo_capacitacion: '',
     horas: '',
-    subsana_a_documento_id:
-      !item.permite_multiples && vigentes.length === 1
-        ? vigentes[0].id
-        : '',
+  }
+  // Un tipo de un solo documento con uno vigente solo se subsana: se elige ese documento y se proponen sus datos.
+  const inicial = subsana || (!item.permite_multiples && vigentes.length === 1 ? vigentes[0].id : '')
+  const documento = id => item.documentos.find(doc => doc.id === id)
+  const [propuesta, setPropuesta] = useState(() => datosDe(documento(inicial)))
+  const [draft, set, poner] = useBorrador({
+    ...vacios,
+    ...propuesta,
+    folio_inicio: datos.folio_sugerido,
+    folio_fin: datos.folio_sugerido,
+    subsana_a_documento_id: inicial,
   })
+  function elegirSubsana(event) {
+    const nueva = datosDe(documento(event.target.value))
+    const siguiente = reemplazarPropuesta(draft, propuesta, nueva, vacios)
+    setPropuesta(nueva)
+    poner('subsana_a_documento_id')(event.target.value)
+    for (const campo of Object.keys(vacios)) if (siguiente[campo] !== draft[campo]) poner(campo)(siguiente[campo])
+  }
+  const debeSubsanar = soloSubsanar || !item.permite_multiples
 
   const { busy, error, errors, guardar } = useGuardar(values => {
     const comunes = [
@@ -85,7 +115,7 @@ export default function Documento03Form({
   return (
     <Formulario
       modal
-      titulo="Agregar documento"
+      titulo={draft.subsana_a_documento_id ? 'Subsanar documento' : 'Agregar documento'}
       guardar="Guardar documento"
       busy={busy}
       error={error}
@@ -305,17 +335,17 @@ export default function Documento03Form({
         {vigentes.length > 0 && (
           <Campo
             label="Documento que subsana"
-            required={!item.permite_multiples}
+            required={debeSubsanar}
             error={errors.subsana_a_documento_id}
             className="sm:col-span-2"
           >
             <select
-              required={!item.permite_multiples}
+              required={debeSubsanar}
               value={draft.subsana_a_documento_id}
-              onChange={set('subsana_a_documento_id')}
+              onChange={elegirSubsana}
             >
               <option value="">
-                {item.permite_multiples
+                {!debeSubsanar
                   ? 'Es un documento adicional'
                   : 'Selecciona el documento que corriges'}
               </option>

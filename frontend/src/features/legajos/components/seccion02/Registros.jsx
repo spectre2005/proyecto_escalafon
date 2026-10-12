@@ -14,9 +14,10 @@ export function Bloqueo({ children }) {
  * Bloque de datos de una subsección de la 02: registrar, corregir (solo registros abiertos) y anular con
  * motivo cuando el esquema lo permite. Los registros llegan ya filtrados (sin anulados) desde el backend.
  * bloqueo: texto que explica por qué no se puede registrar (sin legajo, sin vínculo); deshabilita el botón y se muestra.
+ * adjuntar(record): «Adjuntar documento» del registro (AdjuntarDocumento), si puede acreditarse con algún tipo.
  * corregir: { etiqueta, puede(record), motivo } — motivo se muestra cuando el registro ya no se corrige.
  */
-export default function Registros({ titulo, agregar, vacio, registros, bloqueo, tituloRegistro, subtitulo, campos, renderForm, corregir, onAnular, detalle }) {
+export default function Registros({ titulo, agregar, vacio, registros, bloqueo, tituloRegistro, subtitulo, campos, renderForm, corregir, onAnular, detalle, adjuntar }) {
   const puedeRegistrar = usePuede('legajo.editar')
   const puedeAnular = usePuede('sistema.administrar') && !!onAnular
   const [editing, setEditing] = useState(null)
@@ -68,6 +69,7 @@ export default function Registros({ titulo, agregar, vacio, registros, bloqueo, 
           {puedeAnular && <button disabled={ocupado} onClick={() => start(record, setAnulando)} className="text-sm font-semibold text-rose-700 disabled:opacity-50">Anular</button>}
           {motivoNoCorrige && <Bloqueo>{motivoNoCorrige}</Bloqueo>}
         </div>}
+        {adjuntar?.(record)}
         {anulando?.id === record.id && <AnularForm record={record} titulo={tituloRegistro} busy={busy} onCancel={() => setAnulando(null)} onConfirm={anular} />}
       </article>
     })}</div>

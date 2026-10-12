@@ -15,8 +15,10 @@ const kb = bytes => bytes ? `${Math.max(1, Math.round(bytes / 1024))} KB` : ''
  * Acciones: ver el PDF (legajo.ver) y registrar la recepción (documento.recepcionar). No hay editar ni eliminar:
  * un documento subsanado se muestra atenuado junto al que lo corrige.
  * enlazado(documento): texto con el registro de datos que acredita (vínculo, adenda, inducción…) o null.
+ * onSubsanar(documento): «Subsanar» en cada documento vigente (no subsanado). Abre la subsanación de ese documento, que el
+ *   backend admite aunque el tipo ya no se ofrezca para cargas nuevas.
  */
-export default function ListaDocumentos({ usuario, tipo, enlazado }) {
+export default function ListaDocumentos({ usuario, tipo, enlazado, onSubsanar }) {
   const puedeVer = usePuede('legajo.ver')
   const puedeRecepcionar = usePuede('documento.recepcionar')
   const [visor, setVisor] = useState(null)
@@ -72,6 +74,7 @@ export default function ListaDocumentos({ usuario, tipo, enlazado }) {
         </dl>
         <div className="mt-2 flex flex-wrap items-center gap-4">
           {puedeVer && documento.archivo && <button type="button" onClick={() => setVisor(visor === documento.id ? null : documento.id)} className="text-xs font-semibold text-teal-700">{visor === documento.id ? 'Ocultar PDF' : 'Ver PDF'}</button>}
+          {onSubsanar && !subsanado && tipo.codigo !== 'S01_B_DOCUMENTO_IDENTIDAD' && <button type="button" onClick={() => onSubsanar(documento)} className="text-xs font-semibold text-amber-800">Subsanar</button>}
           {puedeRecepcionar && !v.fecha_recepcion && !subsanado && confirmando !== documento.id && <button type="button" onClick={() => { setError(''); setConfirmando(documento.id) }} className="text-xs font-semibold text-teal-700">Recepcionar</button>}
           {confirmando === documento.id && <span className="flex flex-wrap items-center gap-3 text-xs text-slate-600">Se registrará tu nombre y la fecha de hoy como recepción (art. 4.5).
             <button type="button" disabled={busy} onClick={() => recepcionar(documento)} className="rounded-lg bg-teal-700 px-3 py-1.5 font-semibold text-white disabled:opacity-50">{busy ? 'Registrando…' : 'Confirmar recepción'}</button>

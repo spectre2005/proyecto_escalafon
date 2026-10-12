@@ -4,12 +4,15 @@ import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../../auth/session'
 import { anularSeccion05 } from '../../api/seccion05Api'
 import { useNoAplicables } from '../../api/useNoAplicables'
-import { mostrarTipo, ofrecerTipo } from '../../config/aplicacion'
+import { ofrecerTipo, tiposQueAcreditan } from '../../config/aplicacion'
+import { precargaDesdeRegistro } from '../../config/acreditacion'
 import { folios } from '../../config/documentos'
 import { etiqueta } from '../../config/seccion01'
 import { coloresEstadoDocumento, estadosDocumento } from '../../config/seccion02'
 import { categoriasSeccion05, coloresGoce, formasPermiso, formulariosSeccion05, movimientosLicencia, movimientoDe, tiposGoce, tiposLicencia } from '../../config/seccion05'
 import AbrirLegajo from '../AbrirLegajo'
+import AdjuntarDocumento from '../documentos/AdjuntarDocumento'
+import GruposTipos from '../documentos/GruposTipos'
 import ListaDocumentos from '../documentos/ListaDocumentos'
 import SubirDocumentoForm from '../documentos/SubirDocumentoForm'
 import Registros from '../seccion02/Registros'
@@ -52,6 +55,20 @@ function enlacesDe(tipo, data) {
   return null
 }
 
+// Número del documento ya guardado en el movimiento elegido (numero_documento), editable.
+function precargaDe(tipo, data, registroId) {
+  const lista = tipo.formulario_datos === 'licencias_permisos' ? data.licencias : tipo.formulario_datos === 'goces_vacacionales' ? data.goces : []
+  return precargaDesdeRegistro(tipo, lista.find(record => record.id === registroId)?.values)
+}
+
+// «Adjuntar documento» en la tarjeta del movimiento. Los tipos con datos de salud restringidos no se ofrecen aquí.
+function Adjuntar({ usuario, data, record, etiqueta: texto, sinLegajo }) {
+  const noAplica = useNoAplicables(usuario)
+  const tipos = tiposQueAcreditan(data.tipos.filter(tipo => !tipo.restringido), noAplica, tipo => enlacesDe(tipo, data), record.id)
+  return <AdjuntarDocumento usuario={usuario} seccion={5} record={record} etiqueta={texto} tipos={tipos} titular={data.titular}
+    precarga={(tipo, id) => precargaDe(tipo, data, id)} bloqueo={sinLegajo} />
+}
+
 // Registros que acredita un documento ya cargado.
 function enlazadoA(tipo, documento, data) {
   const lista = tipo.formulario_datos === 'licencias_permisos' ? data.licencias.filter(r => r.values.documento_id === documento.id).map(r => etiquetaLicencia(r.values))
@@ -75,12 +92,15 @@ function Documentos({ usuario, data, tipos, sinLegajo, subiendo, setSubiendo }) 
   const puedeSubir = usePuede('documento.subir')
   const noAplica = useNoAplicables(usuario)
   const [enlazando, setEnlazando] = useState(null)
+  const [subsanando, setSubsanando] = useState(null)
   const [aviso, setAviso] = useState('')
   if (!tipos.length) return <Aviso>El catálogo de documentos de la sección 05 no está cargado en la base de datos (Seccion05CatalogoSeeder).</Aviso>
-  const ocupado = !!subiendo || !!enlazando
+  const ocupado = !!subiendo || !!enlazando || !!subsanando
   function subido(tipo, documento) {
     setSubiendo(null)
-    const abre = documento.formulario_datos && !documento.enlazado
+    setSubsanando(null)
+    // Una subsanación no crea otro movimiento: el anterior sigue acreditado por la cadena de subsanación.
+    const abre = documento.formulario_datos && !documento.enlazado && !documento.subsana_a_documento_id
     setAviso(`Documento cargado (folios ${folios(documento.folio_inicio, documento.folio_fin)}).${abre ? ` Registra el movimiento (${(formulariosSeccion05[documento.formulario_datos] || '').toLowerCase()}) que acredita.` : ''}`)
     if (abre) setEnlazando({ tipoId: tipo.id, documentoId: documento.id })
   }
@@ -92,22 +112,24 @@ function Documentos({ usuario, data, tipos, sinLegajo, subiendo, setSubiendo }) 
     <h3 className="mb-1 text-base font-semibold text-slate-800">Documentos</h3>
     <p className="mb-4 text-xs text-slate-500">Cada documento se sube en PDF con sus metadatos y puede acreditar un movimiento registrado. Los folios son correlativos en toda la sección 05. Cada tipo admite varios documentos a lo largo del tiempo.{sinLegajo && puedeSubir ? ` ${sinLegajo}` : ''}</p>
     {aviso && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
-    <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">{tipos.filter(tipo => mostrarTipo(noAplica, tipo)).map(tipo => <li key={tipo.id} id={`tipo-${tipo.id}`} className="p-4">
+    <GruposTipos tipos={tipos} noAplica={noAplica} render={tipo => <li key={tipo.id} id={`tipo-${tipo.id}`} className="p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-slate-800">{tipo.literal && <span className="mr-1 text-slate-500">{tipo.literal})</span>}{tipo.nombre}</p>
           <p className="mt-1 text-xs text-slate-500">{tipo.descripcion}{tipo.formulario_datos ? ` Acredita: ${(formulariosSeccion05[tipo.formulario_datos] || tipo.formulario_datos).toLowerCase()}.` : ''}{tipo.codigo === 'S05_D_ROL_VACACIONES' ? ' Solo documento: está pendiente de confirmar si además requiere datos estructurados.' : ''}</p>
           {tipo.restringido ? <p className="mt-2 text-[11px] text-slate-400">Dato de salud: sus documentos requieren acceso a datos sensibles (Directiva, num. 6.2).</p>
-            : <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo, documento, data)} />}
+            : <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo, documento, data)}
+              onSubsanar={puedeSubir && !sinLegajo && !ocupado ? documento => { setAviso(''); setSubsanando({ tipoId: tipo.id, documento }) } : null} />}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           {!tipo.restringido && <Etiqueta clase={coloresEstadoDocumento[tipo.estado] || 'bg-slate-100 text-slate-700'}>{etiqueta(estadosDocumento, tipo.estado)}{tipo.documentos > 1 ? ` · ${tipo.documentos} documentos` : ''}</Etiqueta>}
           {puedeSubir && !tipo.restringido && ofrecerTipo(noAplica, tipo) && <button disabled={ocupado || !!sinLegajo} onClick={() => { setAviso(''); setSubiendo(tipo.id) }} className={`${enlace} inline-flex items-center gap-2`}><Icon name="paperclip" size={18} />Subir documento</button>}
         </div>
       </div>
-      {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={5} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo, data)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}
+      {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={5} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo, data)} precarga={id => precargaDe(tipo, data, id)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}
+      {subsanando?.tipoId === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={5} tipo={tipo} titular={data.titular} subsanar={subsanando.documento} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubsanando(null)} /></div>}
       {enlazando?.tipoId === tipo.id && <div className="mt-4"><FormularioEnlazado usuario={usuario} data={data} tipo={tipo} documentoId={enlazando.documentoId} onDone={enlazado} /></div>}
-    </li>)}</ul>
+    </li>} />
   </section>
 }
 
@@ -141,6 +163,7 @@ function ListaAnulados({ usuario, clave, titulo }) {
 function Licencias({ usuario, data, sinLegajo }) {
   return <>
     <Registros titulo="Licencias, permisos y suspensiones" agregar="Registrar movimiento" registros={data.licencias} bloqueo={sinLegajo}
+      adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={etiquetaLicencia(record.values)} sinLegajo={sinLegajo} />}
       vacio="No hay licencias, permisos, suspensiones ni descansos médicos registrados."
       tituloRegistro={record => nombreLicencia(record.values)} subtitulo={record => rango(record.values)}
       campos={[['Con goce de remuneraciones', v => movimientosLicencia[movimientoDe(v.tipo)]?.conGoce === false ? 'Sin definir (pendiente de validar con la universidad)' : texto(v.con_goce)], ['N.º de documento', v => texto(v.numero_documento)], ['Documento que lo acredita', v => documentoDe(data, v.documento_id)]]}
@@ -164,6 +187,7 @@ function Vacaciones({ usuario, data, sinLegajo, onRol }) {
       renderForm={props => <PeriodoVacacionalForm usuario={usuario} vinculos={data.vinculos} {...props} />} />
     <Anulados usuario={usuario} clave="periodos_vacacionales" nombre="períodos anulados" titulo={v => `Período ${v.periodo_anio}`} />
     <Registros titulo="Goces, adelantos y postergaciones" agregar="Registrar movimiento vacacional" registros={data.goces} bloqueo={sinLegajo}
+      adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={etiquetaGoce(record.values, data)} sinLegajo={sinLegajo} />}
       vacio="No hay goces, adelantos ni postergaciones registrados."
       tituloRegistro={record => etiqueta(tiposGoce, record.values.tipo)}
       subtitulo={record => <><Etiqueta clase={coloresGoce[record.values.tipo] || 'bg-slate-100 text-slate-700'}>{record.values.tipo === 'goce' ? 'b) Goce' : 'c) Adelanto o postergación'}</Etiqueta><span className="ml-2">{rango(record.values)}</span></>}

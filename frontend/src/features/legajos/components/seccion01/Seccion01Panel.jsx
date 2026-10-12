@@ -4,11 +4,14 @@ import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../../auth/session'
 import { anularRegistro } from '../../api/seccion01Api'
 import { useNoAplicables } from '../../api/useNoAplicables'
-import { mostrarTipo, ofrecerTipo } from '../../config/aplicacion'
+import { ofrecerTipo, tiposQueAcreditan } from '../../config/aplicacion'
+import { precargaDesdeRegistro } from '../../config/acreditacion'
 import { folios } from '../../config/documentos'
 import { etiqueta, formulariosDatos01, gruposSeccion01, parentescos, personasCertificado, resultadosDeclaracion, tiposDeclaracion, tiposDocIdentidad } from '../../config/seccion01'
 import { coloresEstadoDocumento, estadosDocumento } from '../../config/seccion02'
 import AbrirLegajo from '../AbrirLegajo'
+import AdjuntarDocumento from '../documentos/AdjuntarDocumento'
+import GruposTipos from '../documentos/GruposTipos'
 import ListaDocumentos from '../documentos/ListaDocumentos'
 import SubirDocumentoForm from '../documentos/SubirDocumentoForm'
 import Registros from '../seccion02/Registros'
@@ -57,6 +60,23 @@ function Resumen({ data }) {
 }
 
 // Registros que un documento puede acreditar: del parentesco o tipo de declaración que corresponde y sin documento aún.
+// Registros del formulario de datos del tipo (para precargar el documento con el registro elegido).
+function registrosDe(tipo, data) {
+  return { declaraciones_verificaciones: data.declaraciones, familiares: data.familiares, certificados_discapacidad: data.certificados }[tipo.formulario_datos] || []
+}
+
+// Datos del registro que corresponden al documento: fecha, número o, si es de un familiar, su titular.
+function precargaDe(tipo, data, registroId) {
+  return precargaDesdeRegistro(tipo, registrosDe(tipo, data).find(record => record.id === registroId)?.values, { familiares: data.familiares })
+}
+
+// «Adjuntar documento» en la tarjeta del registro, con los tipos que pueden acreditarlo.
+function Adjuntar({ usuario, data, record, etiqueta: texto, noAplica }) {
+  const tipos = tiposQueAcreditan(data.tipos, noAplica, tipo => enlacesDe(tipo, data), record.id)
+  return <AdjuntarDocumento usuario={usuario} seccion={1} record={record} etiqueta={texto} tipos={tipos} titular={data.titular}
+    relacion={tipo => relacionPorTipo[tipo.codigo]} precarga={(tipo, id) => precargaDe(tipo, data, id)} bloqueo={!data.legajo && 'La persona no tiene un legajo abierto.'} />
+}
+
 function enlacesDe(tipo, data) {
   const libres = lista => lista.filter(record => !record.values.documento_id)
   if (tipo.formulario_datos === 'declaraciones_verificaciones') return libres(data.declaraciones).filter(r => tipo.declaraciones?.includes(r.values.tipo)).map(r => ({ id: r.id, etiqueta: `${etiqueta(tiposDeclaracion, r.values.tipo)} · ${fecha(r.values.fecha)}` }))
@@ -92,16 +112,17 @@ function Documentos({ usuario, data, codigos }) {
   const noAplica = useNoAplicables(usuario)
   const [subiendo, setSubiendo] = useState(null)
   const [enlazando, setEnlazando] = useState(null)
+  const [subsanando, setSubsanando] = useState(null)
   const [aviso, setAviso] = useState('')
   const catalogo = codigos.map(codigo => data.tipos.find(tipo => tipo.codigo === codigo)).filter(Boolean)
-  // Solo los tipos que corresponden a la persona (o que ya tienen documentos).
-  const tipos = catalogo.filter(tipo => mostrarTipo(noAplica, tipo))
   if (!catalogo.length) return <Aviso>El catálogo de documentos de la sección 01 no está cargado en la base de datos (Seccion01CatalogoSeeder).</Aviso>
   const sinLegajo = !data.legajo
-  const ocupado = !!subiendo || !!enlazando
+  const ocupado = !!subiendo || !!enlazando || !!subsanando
   function subido(tipo, documento) {
     setSubiendo(null)
-    const abre = documento.formulario_datos && !documento.enlazado
+    setSubsanando(null)
+    // Una subsanación no crea otro registro: el anterior sigue acreditado por la cadena de subsanación.
+    const abre = documento.formulario_datos && !documento.enlazado && !documento.subsana_a_documento_id
     setAviso(`Documento cargado (folios ${folios(documento.folio_inicio, documento.folio_fin)}).${abre ? ` Registra los datos de ${formulariosDatos01[documento.formulario_datos].toLowerCase()} que acredita.` : ''}`)
     if (abre) setEnlazando({ tipoId: tipo.id, documentoId: documento.id })
   }
@@ -113,14 +134,16 @@ function Documentos({ usuario, data, codigos }) {
     <h3 className="mb-1 text-base font-semibold text-slate-800">Documentos</h3>
     <p className="mb-4 text-xs text-slate-500">Cada documento se sube en PDF con sus metadatos. Los folios son correlativos en toda la sección 01.{sinLegajo && puedeSubir ? ' La persona no tiene un legajo abierto: la carga está deshabilitada.' : ''}</p>
     {aviso && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
-    <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">{tipos.map(tipo => {
+    {/* Solo los tipos que corresponden a la persona (o que ya tienen documentos), agrupados. */}
+    <GruposTipos tipos={catalogo} noAplica={noAplica} render={tipo => {
       const [exigeTexto, exigeClase] = tipo.aplica ? exigencia[String(tipo.exigido)] : ['No aplica', 'bg-slate-100 text-slate-500']
       return <li key={tipo.id} className={`p-4 ${tipo.aplica ? '' : 'opacity-60'}`}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-slate-800">{tipo.literal && <span className="mr-1 text-slate-500">{tipo.literal})</span>}{tipo.nombre}</p>
             <p className={`mt-1 text-xs ${tipo.aplica && tipo.exigido === null ? 'text-amber-800' : 'text-slate-500'}`}>{tipo.motivo}{tipo.permite_multiples ? ' Admite varios documentos.' : ''}{tipo.formulario_datos ? ` Datos: ${formulariosDatos01[tipo.formulario_datos]}.` : ''}</p>
-            <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo, documento, data)} />
+            <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo, documento, data)}
+              onSubsanar={puedeSubir && !sinLegajo && !ocupado ? documento => { setAviso(''); setSubsanando({ tipoId: tipo.id, documento }) } : null} />
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {tipo.solo_anexo_05 && <Anexo05 />}
@@ -129,10 +152,11 @@ function Documentos({ usuario, data, codigos }) {
             {puedeSubir && ofrecerTipo(noAplica, tipo) && <button disabled={ocupado || sinLegajo} onClick={() => { setAviso(''); setSubiendo(tipo.id) }} className={`${enlace} inline-flex items-center gap-2`}><Icon name="paperclip" size={18} />{tipo.documento && !tipo.permite_multiples ? 'Subsanar documento' : 'Subir documento'}</button>}
           </div>
         </div>
-        {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={1} tipo={tipo} titular={data.titular} relacion={relacionPorTipo[tipo.codigo]} enlaces={enlacesDe(tipo, data)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}
+        {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={1} tipo={tipo} titular={data.titular} relacion={relacionPorTipo[tipo.codigo]} enlaces={enlacesDe(tipo, data)} precarga={id => precargaDe(tipo, data, id)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}
+        {subsanando?.tipoId === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={1} tipo={tipo} titular={data.titular} relacion={relacionPorTipo[tipo.codigo]} subsanar={subsanando.documento} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubsanando(null)} /></div>}
         {enlazando?.tipoId === tipo.id && <div className="mt-4"><FormularioEnlazado usuario={usuario} data={data} tipo={tipo} documentoId={enlazando.documentoId} onDone={enlazado} /></div>}
       </li>
-    })}</ul>
+    }} />
   </section>
 }
 
@@ -162,8 +186,10 @@ function Declaraciones({ usuario, data, codigos, titulo }) {
   const tipos = [...new Set(codigos.flatMap(codigo => data.tipos.find(tipo => tipo.codigo === codigo)?.declaraciones || []))]
   const registros = data.declaraciones.filter(r => tipos.includes(r.values.tipo))
   const tituloRegistro = record => etiqueta(tiposDeclaracion, record.values.tipo)
+  const noAplica = useNoAplicables(usuario)
   return <>
     <Registros titulo={titulo} agregar="Registrar" vacio="No hay registros." registros={registros}
+      adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={`${tituloRegistro(record)} · ${fecha(record.values.fecha)}`} noAplica={noAplica} />}
       tituloRegistro={record => <>{tituloRegistro(record)}{declaracionesAnexo05.includes(record.values.tipo) && <span className="ml-2 align-middle"><Anexo05 /></span>}</>}
       subtitulo={record => `${fecha(record.values.fecha)}${record.values.anio ? ` · Año ${record.values.anio}` : ''}`}
       campos={[['Resultado', v => etiqueta(resultadosDeclaracion, v.resultado)], ['Vigente hasta', v => v.vigente_hasta ? fecha(v.vigente_hasta) : 'Sin vencimiento registrado'], ['Observación', v => v.observacion || 'Sin observación'], ['Documento', v => v.documento_id ? 'Enlazado a un documento del legajo' : 'Sin documento enlazado']]}
@@ -177,8 +203,10 @@ function Declaraciones({ usuario, data, codigos, titulo }) {
 
 function Familia({ usuario, data }) {
   const titulo = record => record.values.apellidos_nombres
+  const noAplica = useNoAplicables(usuario)
   return <>
     <Registros titulo="Familiares y derechohabientes" agregar="Agregar familiar" vacio="No hay familiares registrados." registros={data.familiares}
+      adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={`${titulo(record)} · ${etiqueta(parentescos, record.values.parentesco)}`} noAplica={noAplica} />}
       tituloRegistro={titulo} subtitulo={record => etiqueta(parentescos, record.values.parentesco)}
       campos={[
         ['Documento', v => v.numero_doc_identidad ? `${etiqueta(tiposDocIdentidad, v.tipo_doc_identidad)} ${v.numero_doc_identidad}` : 'No registrado'],
@@ -202,9 +230,11 @@ function Familia({ usuario, data }) {
 
 function Discapacidad({ usuario, data, aplica }) {
   const titulo = record => `Certificado CONADIS ${record.values.numero_conadis}`
+  const noAplica = useNoAplicables(usuario)
   return <>
     {!aplica && <p className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">No aplica: la persona no figura con discapacidad. Se puede registrar el certificado de un familiar si corresponde.</p>}
     <Registros titulo="Certificados de discapacidad" agregar="Registrar certificado" vacio="No hay certificados de discapacidad registrados." registros={data.certificados}
+      adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={titulo(record)} noAplica={noAplica} />}
       tituloRegistro={titulo} subtitulo={record => record.values.persona === 'familiar' ? `De un familiar: ${record.familiar || 'no identificado'}` : etiqueta(personasCertificado, 'servidor')}
       campos={[['Fecha de emisión', v => fecha(v.fecha_emision)], ['Vigente hasta', v => v.vigente_hasta ? fecha(v.vigente_hasta) : 'Sin vencimiento registrado'], ['Documento', v => v.documento_id ? 'Enlazado a un documento del legajo' : 'Sin documento enlazado']]}
       corregir={{ etiqueta: 'Corregir', puede: () => true }}

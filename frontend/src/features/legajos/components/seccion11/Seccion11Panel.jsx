@@ -4,11 +4,14 @@ import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../../auth/session'
 import { anularDesvinculacion } from '../../api/seccion11Api'
 import { useNoAplicables } from '../../api/useNoAplicables'
-import { mostrarTipo, ofrecerTipo } from '../../config/aplicacion'
+import { ofrecerTipo, tiposQueAcreditan } from '../../config/aplicacion'
+import { precargaDesdeRegistro } from '../../config/acreditacion'
 import { bloquesDocumentos11, categoriasSeccion11, etiquetaVinculo11, motivosCese, permisosSeccion11 } from '../../config/seccion11'
 import { coloresEstadoDocumento, estadosDocumento, tipoVinculo } from '../../config/seccion02'
 import { etiqueta } from '../../config/seccion01'
 import { folios } from '../../config/documentos'
+import AdjuntarDocumento from '../documentos/AdjuntarDocumento'
+import GruposTipos from '../documentos/GruposTipos'
 import ListaDocumentos from '../documentos/ListaDocumentos'
 import SubirDocumentoForm from '../documentos/SubirDocumentoForm'
 import AbrirLegajo from '../AbrirLegajo'
@@ -92,6 +95,19 @@ function Anuladas({ usuario, data }) {
   </div>
 }
 
+// N.º de resolución de la desvinculación elegida: solo para los documentos del término (acreditan esa resolución).
+function precargaDe(tipo, data, registroId) {
+  return precargaDesdeRegistro(tipo, data.desvinculaciones.find(record => record.id === registroId)?.values)
+}
+
+// «Adjuntar documento» en la tarjeta de la desvinculación: los del término (si aún no tiene) y los complementarios.
+function Adjuntar({ usuario, data, record, sinLegajo }) {
+  const noAplica = useNoAplicables(usuario)
+  const tipos = tiposQueAcreditan(data.tipos.filter(tipo => !tipo.restringido), noAplica, tipo => enlacesDe(tipo, data), record.id)
+  return <AdjuntarDocumento usuario={usuario} seccion={11} record={record} etiqueta={etiquetaDesvinculacion(data, record)} tipos={tipos} titular={data.titular}
+    precarga={(tipo, id) => precargaDe(tipo, data, id)} bloqueo={sinLegajo} />
+}
+
 function Desvinculaciones({ usuario, data, sinLegajo, onNavigate }) {
   const libres = disponibles(data)
   const bloqueo = sinLegajo || (!libres.length && 'No hay vínculos con cese registrado pendientes de desvinculación (el cese se registra en la sección 02).')
@@ -99,6 +115,7 @@ function Desvinculaciones({ usuario, data, sinLegajo, onNavigate }) {
     <Vinculos data={data} onNavigate={onNavigate} />
     {data.desvinculaciones.some(d => !d.coincide_fecha_vinculo) && <Aviso>Hay desvinculaciones cuya fecha de cese ya no coincide con la del vínculo (se corrigió en la sección 02). Corrígelas para que coincidan.</Aviso>}
     <Registros titulo="Desvinculaciones" agregar="Registrar desvinculación" registros={data.desvinculaciones} bloqueo={bloqueo} permisos={permisosSeccion11}
+      adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} sinLegajo={sinLegajo} />}
       vacio="No hay desvinculaciones registradas. No todas las personas han cesado."
       tituloRegistro={d => etiqueta(motivosCese, d.values.motivo_cese)} subtitulo={d => `${vinculoDe(data, d.values.vinculo_laboral_id) ? etiquetaVinculo11(vinculoDe(data, d.values.vinculo_laboral_id)) : 'Vínculo no encontrado'} · cese ${fecha(d.values.fecha_cese)}`}
       campos={[
@@ -117,8 +134,11 @@ function Desvinculaciones({ usuario, data, sinLegajo, onNavigate }) {
 
 // Un tipo de documento: estado, lista (recepción y visor comunes) y carga con enlace a la desvinculación o al vínculo.
 function TipoDocumento({ usuario, data, tipo, sinLegajo, ofrecer }) {
-  const puedeSubir = usePuede('documento.subir') && ofrecer
+  // Cargar uno nuevo solo si el tipo se ofrece; subsanar uno existente también si ya no se ofrece (lo admite el backend).
+  const puedeCargar = usePuede('documento.subir')
+  const puedeSubir = puedeCargar && ofrecer
   const [subiendo, setSubiendo] = useState(false)
+  const [subsanando, setSubsanando] = useState(null)
   const [registrando, setRegistrando] = useState(null)
   const [aviso, setAviso] = useState('')
   const libres = disponibles(data).filter(v => !tipo.solo_plazo_determinado || v.values.regimen_laboral === 'plazo_determinado')
@@ -126,7 +146,9 @@ function TipoDocumento({ usuario, data, tipo, sinLegajo, ofrecer }) {
   const sinDefinir = tipo.solo_plazo_determinado && data.vinculos.some(v => v.values.fecha_cese && v.values.regimen_laboral === null)
   function subido(documento) {
     setSubiendo(false)
-    const abre = tipo.principal && !documento.enlazado
+    setSubsanando(null)
+    // Una subsanación no crea otra desvinculación: la anterior sigue acreditada por la cadena de subsanación.
+    const abre = tipo.principal && !documento.enlazado && !documento.subsana_a_documento_id
     setAviso(`Documento cargado (folios ${folios(documento.folio_inicio, documento.folio_fin)}).${documento.enlazado ? ' Quedó enlazado.' : abre ? ' Registra la desvinculación que acredita o cancela si es un documento adicional.' : tipo.formulario_datos ? ' Quedó sin vínculo: para agruparlo, súbelo eligiendo la desvinculación.' : ''}`)
     if (abre) setRegistrando(documento.id)
   }
@@ -137,7 +159,8 @@ function TipoDocumento({ usuario, data, tipo, sinLegajo, ofrecer }) {
         <p className="mt-1 text-xs text-slate-500">{tipo.descripcion ? `${tipo.descripcion} ` : ''}Opcional; admite varios documentos.{tipo.motivos ? ` Solo para el motivo: ${tipo.motivos.map(m => etiqueta(motivosCese, m).toLowerCase()).join(', ')}.` : ''}</p>
         {sinDefinir && <p role="note" className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">Hay vínculos con el tipo de vínculo sin definir y este documento solo corresponde a plazo determinado. Define el tipo de vínculo en la sección 02 (2.2: «Completar tipo» si el vínculo está cerrado).</p>}
         {tipo.restringido ? <p className="mt-2 text-[11px] text-slate-400">Documento con datos sensibles: requiere acceso a datos sensibles.</p>
-          : <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo, documento, data)} />}
+          : <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo, documento, data)}
+            onSubsanar={puedeCargar && !sinLegajo && !subiendo && !subsanando && !registrando ? documento => { setAviso(''); setSubsanando(documento) } : null} />}
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         {tipo.es_dato_sensible && <Etiqueta clase="bg-rose-50 text-rose-700">Dato sensible</Etiqueta>}
@@ -146,7 +169,8 @@ function TipoDocumento({ usuario, data, tipo, sinLegajo, ofrecer }) {
       </div>
     </div>
     {aviso && <p role="status" className="mt-3 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
-    {subiendo && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={11} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo, data)} onSaved={subido} onCancel={() => setSubiendo(false)} /></div>}
+    {subiendo && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={11} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo, data)} precarga={id => precargaDe(tipo, data, id)} onSaved={subido} onCancel={() => setSubiendo(false)} /></div>}
+    {subsanando && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={11} tipo={tipo} titular={data.titular} subsanar={subsanando} onSaved={subido} onCancel={() => setSubsanando(null)} /></div>}
     {registrando && (libres.length
       ? <div className="mt-4"><DesvinculacionForm usuario={usuario} vinculos={libres} motivos={tipo.motivos} documentoId={registrando} onSaved={() => { setRegistrando(null); setAviso('Desvinculación registrada y acreditada por el documento.') }} onCancel={() => { setRegistrando(null); setAviso('El documento quedó cargado sin desvinculación enlazada.') }} /></div>
       : <div className="mt-4"><Aviso accion={<button onClick={() => setRegistrando(null)} className={enlace}>Entendido</button>}>El documento quedó cargado, pero no hay vínculos con cese registrado pendientes de desvinculación{tipo.solo_plazo_determinado ? ' de plazo determinado' : ''}. Registra el cese en la sección 02.</Aviso></div>)}
@@ -158,7 +182,7 @@ function Documentos({ usuario, data, sinLegajo }) {
   if (!data.tipos.length) return <Aviso>El catálogo de documentos de la sección 11 no está cargado en la base de datos (Seccion11CatalogoSeeder).</Aviso>
   return Object.entries(bloquesDocumentos11).map(([bloque, titulo]) => <section key={bloque} aria-label={titulo} className="mb-8">
     <h3 className="mb-3 text-base font-semibold text-slate-800">{titulo}</h3>
-    <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">{data.tipos.filter(t => t.bloque === bloque && mostrarTipo(noAplica, t)).map(tipo => <TipoDocumento key={tipo.id} usuario={usuario} data={data} tipo={tipo} sinLegajo={sinLegajo} ofrecer={ofrecerTipo(noAplica, tipo)} />)}</ul>
+    <GruposTipos tipos={data.tipos.filter(t => t.bloque === bloque)} noAplica={noAplica} render={tipo => <TipoDocumento key={tipo.id} usuario={usuario} data={data} tipo={tipo} sinLegajo={sinLegajo} ofrecer={ofrecerTipo(noAplica, tipo)} />} />
   </section>)
 }
 

@@ -4,11 +4,13 @@ import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../../auth/session'
 import { anularSeccion09 } from '../../api/seccion09Api'
 import { useNoAplicables } from '../../api/useNoAplicables'
-import { mostrarTipo, ofrecerTipo } from '../../config/aplicacion'
+import { ofrecerTipo, tiposQueAcreditan } from '../../config/aplicacion'
 import { categoriasSeccion09, estadosControversia, instancias, permisosSeccion09, tipoControversiaDe } from '../../config/seccion09'
 import { coloresEstadoDocumento, estadosDocumento } from '../../config/seccion02'
 import { etiqueta } from '../../config/seccion01'
 import { folios } from '../../config/documentos'
+import AdjuntarDocumento from '../documentos/AdjuntarDocumento'
+import GruposTipos from '../documentos/GruposTipos'
 import ListaDocumentos from '../documentos/ListaDocumentos'
 import SubirDocumentoForm from '../documentos/SubirDocumentoForm'
 import AbrirLegajo from '../AbrirLegajo'
@@ -38,6 +40,14 @@ function enlacesDe(tipo, data) {
   return null
 }
 
+// «Adjuntar documento» en la tarjeta del registro (a, b o c según su tipo). Sin datos que proponer: los de la controversia
+// o la afiliación no son los del documento.
+function Adjuntar({ usuario, data, record, etiqueta: texto, sinLegajo }) {
+  const noAplica = useNoAplicables(usuario)
+  const tipos = tiposQueAcreditan(data.tipos, noAplica, tipo => enlacesDe(tipo, data), record.id)
+  return <AdjuntarDocumento usuario={usuario} seccion={9} record={record} etiqueta={texto} tipos={tipos} titular={data.titular} bloqueo={sinLegajo} />
+}
+
 // Registro que acredita un documento (el enlace lo guarda el backend al subir o al registrar el formulario).
 function enlazadoA(tipo, documento, data) {
   const lista = tipo.formulario_datos === 'controversias' ? data.controversias : tipo.formulario_datos === 'afiliaciones' ? data.afiliaciones : null
@@ -61,12 +71,15 @@ function Documentos({ usuario, data, tipos, sinLegajo }) {
   const noAplica = useNoAplicables(usuario)
   const [subiendo, setSubiendo] = useState(null)
   const [enlazando, setEnlazando] = useState(null)
+  const [subsanando, setSubsanando] = useState(null)
   const [aviso, setAviso] = useState('')
   if (!tipos.length) return <Aviso>El catálogo de documentos de este bloque no está cargado en la base de datos (Seccion09CatalogoSeeder).</Aviso>
-  const ocupado = !!subiendo || !!enlazando
+  const ocupado = !!subiendo || !!enlazando || !!subsanando
   function subido(tipo, documento) {
     setSubiendo(null)
-    const abre = documento.formulario_datos && !documento.enlazado
+    setSubsanando(null)
+    // Una subsanación no crea otro registro: el anterior sigue acreditado por la cadena de subsanación.
+    const abre = documento.formulario_datos && !documento.enlazado && !documento.subsana_a_documento_id
     setAviso(`Documento cargado (folios ${folios(documento.folio_inicio, documento.folio_fin)}).${abre ? ' Completa los datos que acredita o cancela si es un documento adicional de un registro existente.' : ''}`)
     if (abre) setEnlazando({ tipo, documentoId: documento.id })
   }
@@ -78,12 +91,13 @@ function Documentos({ usuario, data, tipos, sinLegajo }) {
     <h3 className="mb-1 text-base font-semibold text-slate-800">Documentos</h3>
     <p className="mb-4 text-xs text-slate-500">Cada documento se sube en PDF con sus metadatos. Los folios son correlativos en toda la sección. Ningún documento de esta sección es obligatorio: se incorpora solo si existe.{sinLegajo && puedeSubir ? ` ${sinLegajo}` : ''}</p>
     {aviso && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
-    <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">{tipos.filter(tipo => mostrarTipo(noAplica, tipo)).map(tipo => <li key={tipo.id} className="p-4">
+    <GruposTipos tipos={tipos} noAplica={noAplica} render={tipo => <li key={tipo.id} className="p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-slate-800">{tipo.literal && <span className="mr-1 text-slate-500">{tipo.literal})</span>}{tipo.nombre}</p>
           <p className="mt-1 text-xs text-slate-500">{tipo.descripcion ? `${tipo.descripcion} ` : ''}Admite varios documentos.{tipo.formulario_datos ? '' : ' Solo metadatos (sin formulario de datos).'}</p>
-          <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo, documento, data)} />
+          <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo, documento, data)}
+            onSubsanar={puedeSubir && !sinLegajo && !ocupado ? documento => { setAviso(''); setSubsanando({ tipoId: tipo.id, documento }) } : null} />
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <Etiqueta clase="bg-slate-100 text-slate-600">Opcional</Etiqueta>
@@ -92,8 +106,9 @@ function Documentos({ usuario, data, tipos, sinLegajo }) {
         </div>
       </div>
       {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={9} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo, data)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}
+      {subsanando?.tipoId === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={9} tipo={tipo} titular={data.titular} subsanar={subsanando.documento} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubsanando(null)} /></div>}
       {enlazando?.tipo.id === tipo.id && <div className="mt-4"><FormularioEnlazado usuario={usuario} tipo={enlazando.tipo} documentoId={enlazando.documentoId} onDone={enlazado} /></div>}
-    </li>)}</ul>
+    </li>} />
   </section>
 }
 
@@ -101,6 +116,7 @@ function Controversias({ usuario, data, bloque, sinLegajo }) {
   const tipo = tipoControversiaDe[bloque]
   const nombre = tipo === 'individual' ? 'individuales' : 'colectivas'
   return <Registros titulo={`Controversias ${nombre}`} agregar="Registrar controversia" registros={data.controversias.filter(c => c.values.tipo === tipo)} bloqueo={sinLegajo} permisos={permisosSeccion09}
+    adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={etiquetaControversia(record)} sinLegajo={sinLegajo} />}
     vacio={`No hay controversias ${nombre} registradas. No todas las personas las tienen.`}
     tituloRegistro={c => c.values.materia} subtitulo={c => `${etiqueta(instancias, c.values.instancia)} · desde ${fecha(c.values.fecha_inicio)}`}
     campos={[
@@ -114,6 +130,7 @@ function Controversias({ usuario, data, bloque, sinLegajo }) {
 
 function Afiliaciones({ usuario, data, sinLegajo }) {
   return <Registros titulo="Afiliación al sindicato" agregar="Registrar afiliación" registros={data.afiliaciones} bloqueo={sinLegajo} permisos={permisosSeccion09}
+    adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={etiquetaAfiliacion(record)} sinLegajo={sinLegajo} />}
     vacio="No hay afiliación sindical registrada. No todas las personas están afiliadas."
     tituloRegistro={a => a.values.entidad} subtitulo={a => `Desde ${fecha(a.values.fecha_inicio)}${a.values.fecha_fin ? ` hasta ${fecha(a.values.fecha_fin)}` : ''}`}
     campos={[['N.º de afiliación', v => texto(v.numero_afiliacion)]]}

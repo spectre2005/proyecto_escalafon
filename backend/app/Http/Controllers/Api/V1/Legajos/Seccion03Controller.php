@@ -37,7 +37,7 @@ class Seccion03Controller extends Controller
             $tipos->where('es_dato_sensible', false)->where('es_dato_salud', false);
         }
         $documentos = $legajo ? DocumentoUsuario::query()->where('legajo_id', $legajo->id)->where('seccion_legajo_id', 3)
-            ->with(['archivo', 'observacionesDocumentoPorDocumento', 'documentosUsuarioPorSubsanaADocumento'])->orderByDesc('fecha_emision')->orderByDesc('id')->get() : collect();
+            ->with(['archivo', 'observacionesDocumentoPorDocumento', 'documentosUsuarioPorSubsanaADocumento', 'formacionAcademica', 'colegiaturas', 'capacitaciones'])->orderByDesc('fecha_emision')->orderByDesc('id')->get() : collect();
         $items = $tipos->orderBy('orden')->get()->map(function (TipoDocumento $tipo) use ($perfil, $documentos, $request): array {
             $exigencia = $perfil->exigencia($tipo);
             if ($exigencia['exigido'] === true) {
@@ -133,6 +133,20 @@ class Seccion03Controller extends Controller
         return RevisionDocumento::cambiarEstado($request, $usuario, $documento, 3, 'formacion.documento');
     }
 
+    /** @return array<string, mixed> */
+    private function datosRegistro(DocumentoUsuario $doc): array
+    {
+        $formacion = $doc->formacionAcademica->first();
+        $colegiatura = $doc->colegiaturas->first();
+        $capacitacion = $doc->capacitaciones->first();
+
+        return array_filter([
+            'nivel' => $formacion?->nivel, 'numero_registro' => $formacion?->numero_registro_sunedu,
+            'numero_colegiatura' => $colegiatura?->numero_colegiatura, 'vigente_hasta' => $colegiatura?->vigente_hasta?->format('Y-m-d'),
+            'tipo_capacitacion' => $capacitacion?->tipo, 'horas' => $capacitacion?->horas,
+        ], fn (mixed $valor): bool => $valor !== null);
+    }
+
     private function registrarDatos(DocumentoUsuario $doc, array $datos, string $letra): void
     {
         $base = ['usuario_id' => $doc->usuario_id, 'documento_id' => $doc->id, 'registrado_por' => $doc->created_by];
@@ -163,6 +177,8 @@ class Seccion03Controller extends Controller
             'subsanado' => $doc->documentosUsuarioPorSubsanaADocumento->isNotEmpty(),
             'puede_revisar' => $doc->created_by !== $request->user()->getAuthIdentifier() && $doc->estado !== 'anulado' && $doc->documentosUsuarioPorSubsanaADocumento->isEmpty(),
             'archivo' => $doc->archivo?->only(['id', 'nombre_original', 'mime_type', 'estado_antivirus', 'tamano_bytes']),
+            // Datos del registro que creó el documento, con los nombres del formulario: la subsanación los propone.
+            'datos' => $this->datosRegistro($doc),
             'observaciones' => $doc->observacionesDocumentoPorDocumento->where('estado', 'abierta')->map(fn (ObservacionDocumento $obs): array => [
                 'descripcion' => $obs->descripcion, 'plazo_subsanacion' => $obs->plazo_subsanacion?->format('Y-m-d'),
             ])->values()->all(),

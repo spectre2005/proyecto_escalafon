@@ -13,8 +13,9 @@ const PERMISOS_07 = { registrar: ['seccion07.registrar'], anular: ['seccion07.re
  * Bloque de datos de una subsección o bloque de la ficha: registrar y corregir, y anular con motivo, según los permisos
  * indicados (todos los de la lista). Los registros llegan sin anulados desde el backend; el backend valida siempre.
  * bloqueo: texto que explica por qué no se puede registrar; deshabilita el botón y se muestra.
+ * adjuntar(record): «Adjuntar documento» del registro (AdjuntarDocumento), si puede acreditarse con algún tipo.
  */
-export default function Registros({ titulo, agregar, vacio, registros, bloqueo, tituloRegistro, subtitulo, campos, renderForm, onAnular, aviso, permisos = PERMISOS_07 }) {
+export default function Registros({ titulo, agregar, vacio, registros, bloqueo, tituloRegistro, subtitulo, campos, renderForm, onAnular, aviso, permisos = PERMISOS_07, adjuntar }) {
   const sesion = useSesion()
   const puedeRegistrar = permisos.registrar.every(permiso => puede(sesion, permiso))
   const puedeAnular = permisos.anular.every(permiso => puede(sesion, permiso))
@@ -64,6 +65,7 @@ export default function Registros({ titulo, agregar, vacio, registros, bloqueo, 
         {puedeAnular && <button disabled={ocupado} onClick={() => start(record, setAnulando)} className="text-sm font-semibold text-rose-700 disabled:opacity-50">Anular</button>}
         {puedeRegistrar && !puedeAnular && <Bloqueo>Anular es solo de administración.</Bloqueo>}
       </div>}
+      {adjuntar?.(record)}
       {anulando?.id === record.id && <AnularForm record={record} titulo={tituloRegistro} busy={busy} onCancel={() => setAnulando(null)} onConfirm={anular} />}
     </article>)}</div>
   </section>

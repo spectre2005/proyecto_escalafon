@@ -79,6 +79,8 @@ export default function Seccion06Panel({ usuario }) {
             {doc.observaciones.map((obs, indice) => <p key={indice} className="mt-3 break-words rounded-lg bg-rose-50 p-3 text-xs text-rose-800"><strong>Observación:</strong> {obs.descripcion} · Plazo: {fecha(obs.plazo_subsanacion)}</p>)}
             <div className="mt-3 flex flex-wrap gap-2">
               {doc.archivo && doc.archivo.estado_antivirus !== 'infectado' && <button className={boton} onClick={() => setVisor(visor?.id === doc.id ? null : doc)}>Ver PDF</button>}
+              {/* Subsanar un documento vigente también si su tipo ya no se ofrece (lo admite el backend); propone sus datos. */}
+              {puedeAgregar && data.legajo && item.aplica && !doc.subsanado && doc.estado !== 'anulado' && !formulario && <button id={`subsanar-${doc.id}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.id, subsana: doc.id, origen: `subsanar-${doc.id}` }) }}>Subsanar</button>}
               {puedeRevisar && doc.puede_revisar && doc.estado !== 'aceptado' && <button id={`aceptar-${doc.id}`} className={boton} onClick={() => setFormulario({ item: item.id, documento: doc.id, estado: 'aceptado', origen: `aceptar-${doc.id}` })}>Aceptar</button>}
               {puedeAnular && puedeRevisar && doc.puede_revisar && <button id={`anular-${doc.id}`} className={boton} onClick={() => setFormulario({ item: item.id, documento: doc.id, estado: 'anulado', origen: `anular-${doc.id}` })}>Anular documento</button>}
               {puedeRevisar && doc.puede_revisar && doc.estado !== 'observado' && <button id={`observar-${doc.id}`} className={boton} onClick={() => setFormulario({ item: item.id, documento: doc.id, estado: 'observado', origen: `observar-${doc.id}` })}>Observar</button>}
@@ -88,7 +90,7 @@ export default function Seccion06Panel({ usuario }) {
             {visor?.id === doc.id && <VisorPdf usuario={usuario} documento={doc} titulo={doc.nombre} onClose={() => setVisor(null)} />}
           </li>)}</ul>
           {puedeAgregar && data.legajo && item.aplica && <>
-            {formulario?.item === item.id && !formulario.documento ? <Documento06Form usuario={usuario} item={item} datos={data} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado. Queda en revisión de RR. HH.')} /> : ofrecerTipo(noAplica, item) && <button id={`agregar-${item.id}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.id, origen: `agregar-${item.id}` }) }}>{item.cantidad ? (item.permite_multiples ? 'Agregar otro documento' : 'Agregar documento que subsane al anterior') : 'Agregar documento'}</button>}
+            {formulario?.item === item.id && !formulario.documento ? <Documento06Form usuario={usuario} item={item} datos={data} subsana={formulario.subsana || ''} soloSubsanar={!ofrecerTipo(noAplica, item)} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado. Queda en revisión de RR. HH.')} /> : ofrecerTipo(noAplica, item) && <button id={`agregar-${item.id}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.id, origen: `agregar-${item.id}` }) }}>{item.cantidad ? (item.permite_multiples ? 'Agregar otro documento' : 'Agregar documento que subsane al anterior') : 'Agregar documento'}</button>}
           </>}
         </div>
       </details>)}

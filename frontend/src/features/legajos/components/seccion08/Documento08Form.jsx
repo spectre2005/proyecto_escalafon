@@ -6,14 +6,41 @@ import { useBorrador, useGuardar } from '../seccion01/useGuardar'
 import { agregarDocumento08 } from '../../api/seccion08Api'
 import { modalidadesPresentacion, folios } from '../../config/documentos'
 import { resultadoRecurso08, tipoSancion08 } from '../../config/seccion08'
+import { conValor, reemplazarPropuesta } from '../../config/acreditacion'
 
-export default function Documento08Form({ usuario, item, datos, onSaved, onCancel }) {
+// Datos del documento que se subsana y de su registro (reconocimiento, tiempo reconocido o sanción): se proponen para
+// corregir solo lo necesario. Folios y PDF son del documento nuevo.
+function datosDe(doc) {
+  if (!doc) return {}
+  const tiempo = doc.tiempo_servicio_reconocido
+  return conValor({
+    nombre: doc.nombre, emisor: doc.emisor, fecha_emision: doc.fecha_emision, num_resolucion: doc.num_resolucion, modalidad_presentacion: doc.modalidad_presentacion,
+    motivo: doc.motivo, tipo: doc.tipo_sancion,
+    ...(tiempo ? { anios: String(tiempo.anios ?? ''), meses: String(tiempo.meses ?? ''), dias: String(tiempo.dias ?? '') } : {}),
+    ...(doc.registro_sancion_id ? { dias_suspension: doc.dias_suspension === null ? '' : String(doc.dias_suspension), registrada_en_rnssc: doc.registrada_en_rnssc ? '1' : '0',
+      fecha_registro_rnssc: doc.fecha_registro_rnssc, referencia_rnssc: doc.referencia_rnssc, referencia_procedimiento: doc.referencia_procedimiento } : {}),
+  })
+}
+
+// subsana: documento que se subsana (desde «Subsanar»). soloSubsanar: el tipo ya no se ofrece a la persona; solo se
+// admite subsanar un documento existente (el backend rechaza una carga nueva).
+export default function Documento08Form({ usuario, item, datos, onSaved, onCancel, subsana = '', soloSubsanar = false }) {
   const primero = useRef(null)
   useEffect(() => { primero.current?.focus() }, [])
   const [pdf, setPdf] = useState(null)
   const [errorPdf, setErrorPdf] = useState('')
-  const [draft, set] = useBorrador({ nombre: '', emisor: '', fecha_emision: '', num_resolucion: '', motivo: '', anios: '', meses: '', dias: '', tipo: '', dias_suspension: '',
-    registrada_en_rnssc: '0', fecha_registro_rnssc: '', referencia_rnssc: '', referencia_procedimiento: '', sancion_id: '', resultado: '', folio_inicio: datos.folio_sugerido, folio_fin: datos.folio_sugerido, modalidad_presentacion: '', subsana_a_documento_id: '' })
+  const vacios = { nombre: '', emisor: '', fecha_emision: '', num_resolucion: '', motivo: '', anios: '', meses: '', dias: '', tipo: '', dias_suspension: '',
+    registrada_en_rnssc: '0', fecha_registro_rnssc: '', referencia_rnssc: '', referencia_procedimiento: '', sancion_id: '', resultado: '', modalidad_presentacion: '' }
+  const documento = id => item.documentos.find(doc => doc.id === id)
+  const [propuesta, setPropuesta] = useState(() => datosDe(documento(subsana)))
+  const [draft, set, poner] = useBorrador({ ...vacios, ...propuesta, folio_inicio: datos.folio_sugerido, folio_fin: datos.folio_sugerido, subsana_a_documento_id: subsana })
+  function elegirSubsana(event) {
+    const nueva = datosDe(documento(event.target.value))
+    const siguiente = reemplazarPropuesta(draft, propuesta, nueva, vacios)
+    setPropuesta(nueva)
+    poner('subsana_a_documento_id')(event.target.value)
+    for (const campo of Object.keys(vacios)) if (siguiente[campo] !== draft[campo]) poner(campo)(siguiente[campo])
+  }
   const { busy, error, errors, guardar } = useGuardar(values => agregarDocumento08(usuario, {
     tipo_documento_id: item.id, nombre: values.nombre, emisor: values.emisor, fecha_emision: values.fecha_emision,
     num_resolucion: values.num_resolucion, folio_inicio: values.folio_inicio, folio_fin: values.folio_fin,
@@ -27,7 +54,7 @@ export default function Documento08Form({ usuario, item, datos, onSaved, onCance
   const vigentes = item.documentos.filter(doc => !doc.subsanado && doc.estado !== 'anulado')
   const sanciones = (datos.grupos.sanciones || []).find(group => group.codigo === 'SAN_RESOLUCION_SANCION')?.documentos || []
   const esReconocimiento = item.codigo.startsWith('REC_')
-  return <Formulario modal titulo="Agregar documento" guardar="Guardar registro" busy={busy} error={error} onCancel={onCancel}
+  return <Formulario modal titulo={draft.subsana_a_documento_id ? 'Subsanar documento' : 'Agregar documento'} guardar="Guardar registro" busy={busy} error={error} onCancel={onCancel}
     onSubmit={() => { if (pdf && !errorPdf) guardar(draft) }} nota="Los documentos no se editan ni se borran. Si hay un error, agrega un documento nuevo que lo subsane. Quedará en revisión de RR. HH.">
     <FormSplit pdf={<PdfPreviewField label={`Adjuntar PDF (máximo ${datos.tamano_maximo_kb} KB)`} required maxMB={datos.tamano_maximo_kb / 1024} help="La vista previa se genera en tu navegador. El PDF se envía al guardar." error={errorPdf || errors.pdf} onChange={(file, message) => { setPdf(file); setErrorPdf(message) }} />}>
       <Campo label="Nombre del documento" required error={errors.nombre} className="sm:col-span-2"><input ref={primero} required maxLength={200} value={draft.nombre} onChange={set('nombre')} /></Campo>
@@ -60,7 +87,7 @@ export default function Documento08Form({ usuario, item, datos, onSaved, onCance
       <Campo label="Folio inicial sugerido"><input readOnly value={datos.folio_sugerido ?? 'No disponible'} /></Campo>
       <Campo label="Folio final" required error={errors.folio_fin}><input type="number" required min={datos.folio_sugerido || 1} value={draft.folio_fin} onChange={set('folio_fin')} /></Campo>
       <Campo label="Modalidad de presentación" required error={errors.modalidad_presentacion}><select required value={draft.modalidad_presentacion} onChange={set('modalidad_presentacion')}><Opciones lista={modalidadesPresentacion} vacio="Selecciona" /></select></Campo>
-      {vigentes.length > 0 && <Campo label="Documento que subsana" error={errors.subsana_a_documento_id} className="sm:col-span-2"><select value={draft.subsana_a_documento_id} onChange={set('subsana_a_documento_id')}><option value="">Es un documento adicional</option>{vigentes.map(doc => <option key={doc.id} value={doc.id}>{doc.nombre} · folios {folios(doc.folio_inicio, doc.folio_fin)}</option>)}</select></Campo>}
+      {vigentes.length > 0 && <Campo label="Documento que subsana" required={soloSubsanar} error={errors.subsana_a_documento_id} className="sm:col-span-2"><select required={soloSubsanar} value={draft.subsana_a_documento_id} onChange={elegirSubsana}><option value="">{soloSubsanar ? 'Selecciona el documento que subsana' : 'Es un documento adicional'}</option>{vigentes.map(doc => <option key={doc.id} value={doc.id}>{doc.nombre} · folios {folios(doc.folio_inicio, doc.folio_fin)}</option>)}</select></Campo>}
     </FormSplit>
   </Formulario>
 }

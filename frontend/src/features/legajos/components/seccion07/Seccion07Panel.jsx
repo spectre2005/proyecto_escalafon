@@ -4,11 +4,14 @@ import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../../auth/session'
 import { anularSeccion07 } from '../../api/seccion07Api'
 import { useNoAplicables } from '../../api/useNoAplicables'
-import { mostrarTipo, ofrecerTipo } from '../../config/aplicacion'
+import { ofrecerTipo, tiposQueAcreditan } from '../../config/aplicacion'
+import { precargaDesdeRegistro } from '../../config/acreditacion'
 import { categoriasDocente, columnasEvaluacion, formulariosDatos07, resultadosRatificacion, rutaFormulario, subseccionesSeccion07, tiposDesplazamiento, tiposRatificacion } from '../../config/seccion07'
 import { coloresEstadoDocumento, estadosDocumento, estadosSubseccion } from '../../config/seccion02'
 import { etiqueta } from '../../config/seccion01'
 import { folios } from '../../config/documentos'
+import AdjuntarDocumento from '../documentos/AdjuntarDocumento'
+import GruposTipos from '../documentos/GruposTipos'
 import ListaDocumentos from '../documentos/ListaDocumentos'
 import SubirDocumentoForm from '../documentos/SubirDocumentoForm'
 import AbrirLegajo from '../AbrirLegajo'
@@ -87,6 +90,23 @@ function enlacesDe(tipo, data) {
   return null
 }
 
+// Número (y, en la ratificación, la fecha de su resolución) del registro elegido, editables. 7.2 a) acredita una
+// progresión o una ratificación: cada una aporta sus propios datos.
+function precargaDe(tipo, data, registroId) {
+  const ratificacion = data.ratificaciones.find(record => record.id === registroId)
+  if (ratificacion) return precargaDesdeRegistro({ ...tipo, formulario_datos: 'ratificaciones_docentes' }, ratificacion.values)
+  const lista = { evaluaciones_desempeno: data.evaluaciones, progresiones_carrera: data.progresiones, desplazamientos: data.desplazamientos }[tipo.formulario_datos] || []
+  return precargaDesdeRegistro(tipo, lista.find(record => record.id === registroId)?.values)
+}
+
+// «Adjuntar documento» en la tarjeta del registro, con los tipos (de todas las subsecciones) que pueden acreditarlo.
+function Adjuntar({ usuario, data, record, etiqueta: texto, bloqueo }) {
+  const noAplica = useNoAplicables(usuario)
+  const tipos = tiposQueAcreditan(data.subsecciones.flatMap(subseccion => subseccion.tipos), noAplica, tipo => enlacesDe(tipo, data), record.id)
+  return <AdjuntarDocumento usuario={usuario} seccion={7} record={record} etiqueta={texto} tipos={tipos} titular={data.titular}
+    precarga={(tipo, id) => precargaDe(tipo, data, id)} bloqueo={bloqueo} />
+}
+
 // Registro que acredita un documento (el enlace lo guarda el backend al subir o al registrar el formulario).
 function enlazadoA(tipo, documento, data) {
   const buscar = (lista, nombre) => {
@@ -121,12 +141,15 @@ function Documentos({ usuario, data, subseccion, sinLegajo, aplica }) {
   const noAplica = useNoAplicables(usuario)
   const [subiendo, setSubiendo] = useState(null)
   const [enlazando, setEnlazando] = useState(null)
+  const [subsanando, setSubsanando] = useState(null)
   const [aviso, setAviso] = useState('')
   if (!subseccion) return <Aviso>El catálogo de documentos de esta subsección no está cargado en la base de datos (Seccion07CatalogoSeeder).</Aviso>
-  const ocupado = !!subiendo || !!enlazando
+  const ocupado = !!subiendo || !!enlazando || !!subsanando
   function subido(tipo, documento) {
     setSubiendo(null)
-    const abre = documento.formulario_datos && !documento.enlazado
+    setSubsanando(null)
+    // Una subsanación no crea otro registro: el anterior sigue acreditado por la cadena de subsanación.
+    const abre = documento.formulario_datos && !documento.enlazado && !documento.subsana_a_documento_id
     setAviso(`Documento cargado (folios ${folios(documento.folio_inicio, documento.folio_fin)}).${abre ? ' Completa los datos que acredita.' : ''}`)
     if (abre) setEnlazando({ tipo, documentoId: documento.id })
   }
@@ -138,7 +161,7 @@ function Documentos({ usuario, data, subseccion, sinLegajo, aplica }) {
     <h3 className="mb-1 text-base font-semibold text-slate-800">Documentos</h3>
     <p className="mb-4 text-xs text-slate-500">Cada documento se sube en PDF con sus metadatos. Los folios son correlativos en toda la sección.{sinLegajo && puedeSubir ? ` ${sinLegajo}` : ''}</p>
     {aviso && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
-    <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">{subseccion.tipos.filter(tipo => mostrarTipo(noAplica, tipo)).map(tipo => {
+    <GruposTipos tipos={subseccion.tipos} noAplica={noAplica} render={tipo => {
       const [exigeTexto, exigeClase] = exigencia[String(aplica ? tipo.exigido : false)]
       const datos = tipo.formulario_datos === 'progresiones_carrera' ? 'progresión (administrativos) o ratificación (docentes)' : formulariosDatos07[tipo.formulario_datos]?.toLowerCase()
       return <li key={tipo.id} className="p-4">
@@ -146,7 +169,8 @@ function Documentos({ usuario, data, subseccion, sinLegajo, aplica }) {
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-slate-800">{tipo.literal && <span className="mr-1 text-slate-500">{tipo.literal})</span>}{tipo.nombre}</p>
             <p className="mt-1 text-xs text-slate-500">{aplica ? tipo.motivo : 'No aplica a esta persona.'}{tipo.descripcion ? ` ${tipo.descripcion}` : ''}{tipo.permite_multiples ? ' Admite varios documentos.' : ''}{datos ? ` Datos: ${datos}.` : ' Solo metadatos (sin formulario de datos).'}</p>
-            <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo, documento, data)} />
+            <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo, documento, data)}
+              onSubsanar={puedeSubir && !sinLegajo && !ocupado ? documento => { setAviso(''); setSubsanando({ tipoId: tipo.id, documento }) } : null} />
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             <Etiqueta clase={exigeClase}>{exigeTexto}</Etiqueta>
@@ -154,10 +178,11 @@ function Documentos({ usuario, data, subseccion, sinLegajo, aplica }) {
             {puedeSubir && ofrecerTipo(noAplica, tipo) && <button disabled={ocupado || !!sinLegajo || !aplica} title={!aplica ? 'No aplica a esta persona.' : sinLegajo || undefined} onClick={() => { setAviso(''); setSubiendo(tipo.id) }} className={`${enlace} inline-flex items-center gap-2`}><Icon name="paperclip" size={18} />Subir documento</button>}
           </div>
         </div>
-        {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={7} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo, data)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}
+        {subsanando?.tipoId === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={7} tipo={tipo} titular={data.titular} subsanar={subsanando.documento} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubsanando(null)} /></div>}
+        {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={7} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo, data)} precarga={id => precargaDe(tipo, data, id)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}
         {enlazando?.tipo.id === tipo.id && <div className="mt-4"><FormularioEnlazado usuario={usuario} data={data} tipo={enlazando.tipo} documentoId={enlazando.documentoId} onDone={enlazado} /></div>}
       </li>
-    })}</ul>
+    }} />
   </section>
 }
 
@@ -165,6 +190,7 @@ const anular = (usuario, formulario) => (record, motivo) => anularSeccion07(usua
 
 function Desempeno({ usuario, data, bloqueo }) {
   return <Registros titulo="Evaluaciones de desempeño" agregar="Registrar evaluación" registros={data.evaluaciones} bloqueo={bloqueo}
+    adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={etiquetaEvaluacion(record)} bloqueo={bloqueo} />}
     vacio={bloqueo ? `No hay evaluaciones registradas. ${bloqueo}` : 'No hay evaluaciones registradas. Se registran al subir el formato de gestión del rendimiento (7.1 a) o con «Registrar evaluación».'}
     tituloRegistro={etiquetaEvaluacion} subtitulo={e => e.values.fecha_evaluacion ? `Evaluada el ${fecha(e.values.fecha_evaluacion)}` : 'Sin fecha de evaluación'}
     campos={columnasEvaluacion([
@@ -183,12 +209,14 @@ function Progresion({ usuario, data, bloqueo }) {
   const sinDocente = perfiles.length ? null : 'Sin perfil docente (datos del puesto en 2.2).'
   return <>
     <Registros titulo="Progresiones en la carrera (administrativos)" agregar="Registrar progresión" registros={data.progresiones} bloqueo={bloqueo || sinCarrera}
+      adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={etiquetaProgresion(record)} bloqueo={bloqueo} />}
       vacio="No hay progresiones registradas."
       tituloRegistro={etiquetaProgresion} subtitulo={p => `Fecha efectiva: ${fecha(p.values.fecha_efectiva)}`}
       campos={[['Vínculo laboral', v => vinculos.find(item => item.id === v.vinculo_laboral_id)?.etiqueta || 'Vínculo no vigente o no encontrado']]}
       onAnular={anular(usuario, 'progresiones_carrera')}
       renderForm={props => <ProgresionForm key={props.record?.id || 'nuevo'} usuario={usuario} vinculos={vinculos} {...props} />} />
     <Registros titulo="Ratificaciones y promociones docentes" agregar="Registrar ratificación" registros={data.ratificaciones} bloqueo={bloqueo || sinDocente}
+      adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={etiquetaRatificacion(record)} bloqueo={bloqueo} />}
       vacio="No hay ratificaciones ni promociones registradas."
       tituloRegistro={etiquetaRatificacion} subtitulo={r => `Resultado: ${etiqueta(resultadosRatificacion, r.values.resultado)}`}
       campos={[
@@ -205,6 +233,7 @@ function Desplazamiento({ usuario, data, bloqueo }) {
   const unidades = data.opciones.unidades
   const unidad = id => unidades.find(u => u.id === id)?.nombre
   return <Registros titulo="Desplazamientos" agregar="Registrar desplazamiento" registros={data.desplazamientos} bloqueo={bloqueo}
+    adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={etiquetaDesplazamiento(record)} bloqueo={bloqueo} />}
     vacio={bloqueo ? `No hay desplazamientos registrados. ${bloqueo}` : 'No hay desplazamientos registrados. Se registran al subir su documento (b a f) o con «Registrar desplazamiento».'}
     tituloRegistro={etiquetaDesplazamiento} subtitulo={d => d.values.fecha_fin ? `Hasta ${fecha(d.values.fecha_fin)}` : 'Sin fecha de fin'}
     campos={[
