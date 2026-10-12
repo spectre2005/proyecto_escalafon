@@ -3,6 +3,8 @@ import { saveDatosPuesto, saveSeccion02 } from '../../api/seccion02Api'
 import { categoriasDocente, condicionesDocente, dedicacionesDocente, etiquetaVinculo, funcionesPrevias, gruposOcupacionales, regimenesLaborales, resultadosPeriodo, subtiposExtraordinario, tiposInduccion, tiposPersonal } from '../../config/seccion02'
 import Campo, { Formulario, Opciones } from '../seccion01/Campo'
 import { hoy, useBorrador, useGuardar } from '../seccion01/useGuardar'
+import TresEstados from '../../../../components/ui/TresEstados'
+import { valorBandera } from '../../../../shared/banderas'
 
 // documentoId: documento recién subido que este registro acredita (el formulario se abre al subir el PDF).
 const conDocumento = (data, documentoId) => documentoId ? { ...data, documento_id: documentoId } : data
@@ -31,12 +33,13 @@ function OpcionesCatalogo({ lista, actual }) {
 export function VinculoForm({ usuario, record, documentoId, onSaved, onCancel }) {
   const v = record?.values || {}
   const opciones = useLiveQuery('/expediente-opciones').data?.data
-  const [draft, set] = useBorrador({
+  const [draft, set, poner] = useBorrador({
     tipo_personal: v.tipo_personal || '', regimen_laboral: v.regimen_laboral || '', regimen_normativo_id: v.regimen_normativo_id || '',
     unidad_organica_id: v.unidad_organica_id || '', nombre_puesto: v.nombre_puesto || '', numero_documento_vinculo: v.numero_documento_vinculo || '',
     fecha_inicio: v.fecha_inicio || '', fecha_fin_prevista: v.fecha_fin_prevista || '', fecha_cese: v.fecha_cese || '',
     proceso_seleccion: v.proceso_seleccion || '', fecha_resultado_seleccion: v.fecha_resultado_seleccion || '',
-    obligado_djbr: v.obligado_djbr ?? false, exige_colegiatura: v.exige_colegiatura ?? false, exige_estudios_basicos: v.exige_estudios_basicos ?? false, tiene_periodo_prueba: v.tiene_periodo_prueba ?? false,
+    // Condiciones del puesto: Sí / No / Sin responder (por defecto, nunca No).
+    obligado_djbr: valorBandera(v.obligado_djbr), exige_colegiatura: valorBandera(v.exige_colegiatura), exige_estudios_basicos: valorBandera(v.exige_estudios_basicos), tiene_periodo_prueba: valorBandera(v.tiene_periodo_prueba),
   })
   const { busy, error, errors, guardar } = useGuardar(data => saveSeccion02(usuario, 'vinculos-laborales', record?.id, conDocumento(data, documentoId)), onSaved)
   return <Formulario titulo={record ? 'Corregir vínculo laboral' : 'Registrar vínculo laboral'} guardar="Guardar vínculo" busy={busy} error={error} onSubmit={() => guardar(draft)} onCancel={onCancel}
@@ -53,8 +56,9 @@ export function VinculoForm({ usuario, record, documentoId, onSaved, onCancel })
     <Campo label="Proceso de selección" error={errors.proceso_seleccion}><input maxLength={100} placeholder="Ej.: concurso o proceso CAS" value={draft.proceso_seleccion} onChange={set('proceso_seleccion')} /></Campo>
     <Campo label="Fecha del resultado de selección" error={errors.fecha_resultado_seleccion}><input type="date" max={hoy()} value={draft.fecha_resultado_seleccion} onChange={set('fecha_resultado_seleccion')} /></Campo>
     <Campo label="Fecha de cese (solo si el vínculo ya terminó)" error={errors.fecha_cese}><input type="date" min={draft.fecha_inicio || undefined} max={hoy()} value={draft.fecha_cese} onChange={set('fecha_cese')} /></Campo>
-    <div className="col-span-full grid gap-2 text-sm text-slate-700">
-      {[['obligado_djbr', 'Obligado a presentar declaración jurada de bienes y rentas'], ['exige_colegiatura', 'El puesto exige colegiatura'], ['exige_estudios_basicos', 'El puesto exige estudios básicos'], ['tiene_periodo_prueba', 'Tiene período de prueba']].map(([key, text]) => <label key={key} className="flex items-center gap-2"><input type="checkbox" className="size-4 accent-teal-700" checked={draft[key]} onChange={set(key)} />{text}</label>)}
+    <div className="col-span-full grid gap-5 border-t border-slate-100 pt-4 sm:grid-cols-2">
+      {[['obligado_djbr', 'Obligado a presentar declaración jurada de bienes y rentas'], ['exige_colegiatura', 'El puesto exige colegiatura'], ['exige_estudios_basicos', 'El puesto exige estudios básicos'], ['tiene_periodo_prueba', 'Tiene período de prueba']]
+        .map(([key, text]) => <TresEstados key={key} name={`vinculo-${key}`} label={text} value={draft[key]} onChange={poner(key)} error={errors[key]} />)}
     </div>
   </Formulario>
 }

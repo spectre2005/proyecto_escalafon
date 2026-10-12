@@ -1,9 +1,30 @@
 import { Link } from 'react-router-dom'
 import Icon from '../../components/ui/Icon'
 import { useUsers } from '../users/hooks/useUsers'
+import { usePuede } from '../auth/session'
+import { useLiveQuery } from '../../shared/queries/useLiveQuery'
+
+const nombresBandera = {
+  tiene_derechohabientes: 'Tiene derechohabientes', con_discapacidad: 'Con discapacidad (servidor o hijos)',
+  obligado_djbr: 'Obligado a la DJBR', exige_colegiatura: 'Exige colegiatura', exige_estudios_basicos: 'Exige estudios básicos', tiene_periodo_prueba: 'Período de prueba',
+}
+
+// Personas con condiciones del perfil sin responder (backend: /personal/banderas-sin-responder, sistema.administrar).
+// Mientras estén sin responder, sus documentos quedan por determinar y no cuentan en la completitud.
+function BanderasSinResponder({ panel }) {
+  const consulta = useLiveQuery('/personal/banderas-sin-responder')
+  const datos = consulta.data?.data
+  return <section className={`${panel} lg:col-span-2`} aria-busy={!datos && !consulta.error}>
+    <div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-sm font-semibold text-slate-800">Condiciones del personal sin responder</h2><p className="mt-1 text-xs text-slate-500">Personas con alguna condición en «Sin responder»: sus documentos quedan por determinar. Las del puesto cuentan solo con vínculo vigente.</p></div>
+      <p className="text-3xl font-semibold tracking-tight text-amber-700">{consulta.error ? '—' : datos ? datos.total.toLocaleString('es') : '…'}<span className="ml-2 text-xs font-normal text-slate-500">persona(s)</span></p></div>
+    {consulta.error && <p role="alert" className="mt-4 text-xs text-rose-700">No se pudo consultar. <button type="button" onClick={consulta.retry} className="font-semibold underline">Reintentar</button></p>}
+    {datos && <dl className="mt-5 grid gap-3 min-[480px]:grid-cols-2 lg:grid-cols-3">{Object.entries(datos.por_bandera).map(([bandera, total]) => <div key={bandera} className="rounded-xl bg-slate-50 p-4"><dt className="text-xs text-slate-600">{nombresBandera[bandera] || bandera}</dt><dd className="mt-2 text-xl font-semibold text-slate-800">{total.toLocaleString('es')}</dd></div>)}</dl>}
+  </section>
+}
 
 export default function DashboardPage() {
   const { users, loading, loadError, refreshUsers } = useUsers()
+  const administra = usePuede('sistema.administrar')
   const active = users.filter(user => user.activo).length
   const withEmail = users.filter(user => user.email_institucional?.trim()).length
   const withPhone = users.filter(user => user.telefono?.trim()).length
@@ -52,6 +73,7 @@ export default function DashboardPage() {
         <h2 className="text-sm font-semibold text-slate-800">Regímenes laborales</h2><p className="mt-1 text-xs text-slate-500">Cantidad de personal por régimen registrado</p>
         <div className="mt-5 max-h-72 space-y-4 overflow-y-auto">{!ready ? <p className="text-sm text-slate-500">{loading ? 'Consultando registros…' : 'Datos no disponibles'}</p> : !regimes.length ? <p className="text-sm text-slate-500">Aún no hay regímenes registrados.</p> : regimes.map(([name, count]) => <div key={name}><div className="mb-2 flex justify-between gap-4 text-xs"><span className="text-slate-600">{name}</span><span className="shrink-0 font-semibold text-slate-700">{count} · {percent(count)}%</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100" aria-hidden="true"><div className="h-full rounded-full bg-violet-400" style={{ width: `${percent(count)}%` }} /></div></div>)}</div>
       </section>
+      {administra && <BanderasSinResponder panel={panel} />}
       <section className={`${panel} lg:col-span-2`} aria-busy={loading}>
         <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-sm font-semibold text-slate-800">Cobertura de contacto</h2><p className="mt-1 text-xs text-slate-500">Disponibilidad de información para contactar al personal</p></div><Link to="/personal" className="text-xs font-semibold text-teal-700 hover:underline">Consultar directorio →</Link></div>
         <div className="mt-5 grid gap-4 sm:grid-cols-3">

@@ -81,7 +81,7 @@ export function createPersonalPdf({ values = {}, families = [], blank = false, i
       ['tipo_personal', 'nombre_puesto', 'unidad_organica_id'],
       ['regimen_laboral', 'regimen_normativo_id', 'activo'],
       ['con_discapacidad', 'tiene_derechohabientes', 'exige_colegiatura'],
-      ['obligado_djbr', 'tiene_periodo_prueba'],
+      ['obligado_djbr', 'exige_estudios_basicos', 'tiene_periodo_prueba'],
       ['es_derechohabiente', 'anulado'],
       ['motivo_anulacion'],
       ['familiares'],
@@ -102,7 +102,7 @@ export function createPersonalPdf({ values = {}, families = [], blank = false, i
         const labels = pdf.splitTextToSize(label.toUpperCase(), cellWidth - 4)
         pdf.setFont('helvetica', 'normal')
         pdf.setFontSize(8.5)
-        return { labels, lines: pdf.splitTextToSize(reportValue(data[key], blank), cellWidth - 4) }
+        return { labels, lines: pdf.splitTextToSize(reportValue(data[key], blank, key), cellWidth - 4) }
       })
       const labelHeight = Math.max(...cells.map(cell => cell.labels.length)) * 3 + 2
       const count = Math.max(1, ...cells.map(cell => cell.lines.length))

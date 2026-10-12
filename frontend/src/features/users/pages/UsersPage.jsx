@@ -15,12 +15,17 @@ import {
 import { filterUsers } from '../utils/usuariosFiltering'
 import { updateUserDraft } from '../utils/usuariosEmail'
 import { regimenesPorTipo, regimenInicial } from '../utils/regimenesLaborales'
+import TresEstados from '../../../components/ui/TresEstados'
+import { usePuede } from '../../auth/session'
 
 const emptyUser = {
   ...Object.fromEntries(columns.map((key) => [key, ''])),
   tipo_personal: 'docente',
   regimen_laboral: regimenInicial('docente'),
 }
+// Banderas de la persona en el alta: Sí / No / Sin responder (por defecto, nunca No). Las del puesto se registran
+// en el vínculo laboral. con_discapacidad exige discapacidad.editar (el backend lo valida y audita).
+const condicionesVacias = { tiene_derechohabientes: null, con_discapacidad: null }
 const labels = {
   numero_doc_identidad: 'DNI',
   nombres: 'Nombres',
@@ -36,6 +41,8 @@ export default function UsersPage() {
   const [registrationOpen, setRegistrationOpen] = useState(false)
   const registrationDialog = useRef(null)
   const [draft, setDraft] = useState(emptyUser)
+  const [condiciones, setCondiciones] = useState(condicionesVacias)
+  const puedeDiscapacidad = usePuede('discapacidad.editar')
   const [location, setLocation] = useState({ region: '', provincia: '', distrito: '' })
   const [ubigeoId, setUbigeoId] = useState('')
   const [batch, setBatch] = useState([])
@@ -180,8 +187,10 @@ export default function UsersPage() {
       errors.push('Ya existe un usuario con ese DNI o correo.')
     if (errors.length)
       return setMessage({ error: true, text: errors.join(' ') })
-    if (await persistUsers([{ ...user, ubigeo_id: ubigeoId || null }])) {
+    const respuestas = { tiene_derechohabientes: condiciones.tiene_derechohabientes, con_discapacidad: puedeDiscapacidad ? condiciones.con_discapacidad : null }
+    if (await persistUsers([{ ...user, ubigeo_id: ubigeoId || null, ...respuestas }])) {
       setDraft(emptyUser)
+      setCondiciones(condicionesVacias)
       setLocation({ region: '', provincia: '', distrito: '' })
       setUbigeoId('')
       registrationDialog.current.close()
@@ -576,6 +585,14 @@ export default function UsersPage() {
                       </select>
                     </label>
                     <UbigeoFields value={location} onChange={(next, id) => { setLocation(next); setUbigeoId(id) }} disabled={saving} />
+                    <div className="col-span-full grid gap-4 border-t border-slate-100 pt-4 md:grid-cols-2">
+                      <TresEstados name="alta-tiene_derechohabientes" label="¿Tiene derechohabientes?" ayuda="Cónyuge, concubino/a o hijos."
+                        value={condiciones.tiene_derechohabientes} onChange={valor => setCondiciones(previas => ({ ...previas, tiene_derechohabientes: valor }))} />
+                      <TresEstados name="alta-con_discapacidad" label="¿Tiene discapacidad el servidor o alguno de sus hijos?"
+                        ayuda={puedeDiscapacidad ? 'Directiva, punto 1 k.' : 'Solo administración de la ORH puede registrarlo.'} disabled={!puedeDiscapacidad}
+                        value={condiciones.con_discapacidad} onChange={valor => setCondiciones(previas => ({ ...previas, con_discapacidad: valor }))} />
+                      <p className="text-xs text-slate-500 md:col-span-2">Si no lo sabes, deja «Sin responder». Las condiciones del puesto se registran en el vínculo laboral.</p>
+                    </div>
                     <div className="col-span-full flex items-center justify-between gap-2.5 [&_small]:text-[10px] [&_small]:text-[#8b9c91]">
                       <small>* Campos obligatorios</small>
                       <button

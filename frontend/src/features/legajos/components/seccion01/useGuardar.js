@@ -28,7 +28,9 @@ export function useGuardar(enviar, onSaved) {
 export function useBorrador(inicial) {
   const [draft, setDraft] = useState(inicial)
   const set = key => event => setDraft(previous => ({ ...previous, [key]: event.target.type === 'checkbox' ? event.target.checked : event.target.value }))
-  return [draft, set]
+  // Para controles que entregan el valor y no un evento (p. ej. TresEstados, que admite null).
+  const poner = key => valor => setDraft(previous => ({ ...previous, [key]: valor }))
+  return [draft, set, poner]
 }
 
 export const hoy = () => new Date().toISOString().slice(0, 10)

@@ -1,3 +1,5 @@
+import { esBandera, textoBandera } from '../../../shared/banderas.js'
+
 export const personalGroups = [
   ['Identificación personal', [
     ['nombres', 'Nombres'], ['apellido_paterno', 'Apellido paterno'], ['apellido_materno', 'Apellido materno'],
@@ -15,7 +17,7 @@ export const personalGroups = [
   ['Condiciones del personal', [
     ['con_discapacidad', 'Con discapacidad'], ['tiene_derechohabientes', 'Tiene derechohabientes'],
     ['obligado_djbr', 'Obligado a declarar bienes y rentas'], ['exige_colegiatura', 'Requiere colegiatura'],
-    ['tiene_periodo_prueba', 'Tiene período de prueba'],
+    ['exige_estudios_basicos', 'Exige estudios básicos'], ['tiene_periodo_prueba', 'Tiene período de prueba'],
   ]],
 ]
 
@@ -26,8 +28,11 @@ export const familyFields = [
   ['anulado', 'Registro anulado'], ['motivo_anulacion', 'Motivo de anulación'],
 ]
 
-export function reportValue(value, blank = false) {
+// key: con una bandera del perfil, null es «Sin responder» (no No). Un dato que no llegó (undefined, p. ej. oculto por
+// datos sensibles) sigue siendo «No registrado».
+export function reportValue(value, blank = false, key = null) {
   if (blank) return ''
+  if (esBandera(key) && value !== undefined) return textoBandera(value)
   if (value === null || value === undefined || value === '') return 'No registrado'
   if (typeof value === 'boolean') return value ? 'Sí' : 'No'
   if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return value.split('-').reverse().join('/')

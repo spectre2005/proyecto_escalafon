@@ -114,6 +114,11 @@ class BanderasTresEstadosTest extends TestCase
         $e = collect($data['tipos'])->firstWhere('codigo', self::DJBR);
         $this->assertSame([null, true], [$e['exigido'], $e['aplica']]);
         $this->assertNotContains('e', array_column($data['resumen']['detalle'], 'literal'));
+        // Sin responder no impide cargar e (DJBR) ni k (discapacidad): solo No lo impide.
+        $this->persona->update(['con_discapacidad' => null]);
+        $this->subirDjbr()->assertCreated();
+        $this->assertNull($this->aplicacion()->noAplica($this->tipo('S01_K_CERTIFICADO_DISCAPACIDAD')));
+        $this->assertNotNull($this->aplicacion()->porDefinir($this->tipo('S01_K_CERTIFICADO_DISCAPACIDAD')));
 
         // Sí: se exige y cuenta.
         $vinculo->update(['obligado_djbr' => true]);

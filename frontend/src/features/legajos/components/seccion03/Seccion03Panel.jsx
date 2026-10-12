@@ -59,7 +59,7 @@ export default function Seccion03Panel({ usuario }) {
       {data.items.filter(item => item.grupo === grupo && mostrarTipo(noAplica, item)).map(item => <details key={item.id} open={item.letra === 'b'} className="border-b border-slate-100 last:border-b-0">
         <summary id={`item-${item.id}`} className="grid cursor-pointer grid-cols-[28px_minmax(0,1fr)] items-start gap-3 p-4 focus-visible:outline-2 focus-visible:outline-teal-700 sm:grid-cols-[28px_minmax(0,1fr)_auto]">
           <span className="grid size-7 place-items-center rounded-lg bg-teal-50 text-sm font-bold text-teal-800">{item.letra}</span>
-          <span className="min-w-0"><span className="block break-words text-sm font-semibold text-slate-800">{item.nombre}</span><span className="mt-1 block text-xs text-slate-500">{item.motivo}{item.requiere_fedateo && ' Requiere fedateo.'}</span><span className="mt-1 block text-xs text-slate-500">{item.cantidad} documento(s) vigente(s)</span></span>
+          <span className="min-w-0"><span className="block break-words text-sm font-semibold text-slate-800">{item.nombre}</span><span className={`mt-1 block text-xs ${item.exigido === null ? 'text-amber-800' : 'text-slate-500'}`}>{item.motivo}{item.requiere_fedateo && ' Requiere fedateo.'}</span><span className="mt-1 block text-xs text-slate-500">{item.cantidad} documento(s) vigente(s)</span></span>
           <span className="col-start-2 sm:col-start-auto"><Estado estado={item.estado} /></span>
         </summary>
         <div className="space-y-4 px-4 pb-5 sm:pl-14">

@@ -15,6 +15,7 @@ import AbrirLegajo from '../AbrirLegajo'
 import { AnularForm } from '../seccion01/RegistrosPanel'
 import { AdendaForm, DatosPuestoForm, InduccionForm, PeriodoForm, SeleccionForm, VinculoForm } from './Formularios'
 import Registros, { Bloqueo } from './Registros'
+import { textoBandera } from '../../../../shared/banderas'
 
 const fecha = value => value ? value.split('-').reverse().join('/') : 'No registrada'
 const texto = value => value === null || value === undefined || value === '' ? 'No registrado' : typeof value === 'boolean' ? (value ? 'Sí' : 'No') : String(value).replaceAll('_', ' ')
@@ -47,7 +48,7 @@ function Resumen({ data, onNavigate }) {
       <div><p className="text-xs text-slate-500">Exigidos con documento cargado</p><p className="mt-1 text-2xl font-bold text-slate-800">{r.exigidos_cargados} <span className="text-sm font-normal text-slate-500">de {r.exigidos.length}</span></p></div>
       <div><p className="text-xs text-slate-500">Exigidos con recepción registrada</p><p className="mt-1 text-2xl font-bold text-slate-800">{r.exigidos_recepcionados} <span className="text-sm font-normal text-slate-500">de {r.exigidos.length}</span></p></div>
     </div>
-    <p className="mt-3 text-xs text-slate-500">{data.tiene_periodo_prueba ? '' : 'La subsección 2.4 no aplica y no se cuenta. '}Cargados y recepcionados se muestran por separado: el criterio de completitud del legajo está pendiente de definir. Sin recepción un documento no cuenta como aprobado.{r.por_determinar ? ` ${r.por_determinar} tipo(s) no se pueden evaluar porque el régimen laboral registrado no es carrera, plazo determinado ni designado.` : ''}</p>
+    <p className="mt-3 text-xs text-slate-500">{data.tiene_periodo_prueba === false ? 'La subsección 2.4 no aplica y no se cuenta. ' : data.tiene_periodo_prueba === null ? 'Falta definir si tiene período de prueba: los tipos de 2.4 quedan por determinar. ' : ''}Cargados y recepcionados se muestran por separado: el criterio de completitud del legajo está pendiente de definir. Sin recepción un documento no cuenta como aprobado.{r.por_determinar ? ` ${r.por_determinar} tipo(s) quedan por determinar (falta definir una condición del puesto, o el régimen laboral registrado no es carrera, plazo determinado ni designado); no se cuentan. Revisa el motivo de cada tipo.` : ''}</p>
     <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">{data.subsecciones.map(sub => {
       const [nombre, clase] = estadosSubseccion[sub.estado]
       return <button key={sub.codigo} onClick={() => onNavigate(categoriaDe[sub.codigo])} className={`rounded-xl border border-slate-200 p-3 text-left hover:bg-slate-50 ${sub.aplica ? '' : 'opacity-60'}`}>
@@ -135,7 +136,7 @@ function Documentos({ usuario, data, subseccion, sinLegajo, aplica = true }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-slate-800">{tipo.literal && <span className="mr-1 text-slate-500">{tipo.literal})</span>}{tipo.nombre}</p>
-            <p className="mt-1 text-xs text-slate-500">{aplica ? tipo.motivo : 'No aplica a esta persona.'}{tipo.permite_multiples ? ' Admite varios documentos.' : ''}{tipo.formulario_datos ? ` Datos: ${formulariosDatos[tipo.formulario_datos] || tipo.formulario_datos}.` : ''}</p>
+            <p className={`mt-1 text-xs ${aplica && tipo.exigido === null ? 'text-amber-800' : 'text-slate-500'}`}>{aplica ? tipo.motivo : 'No aplica a esta persona.'}{tipo.permite_multiples ? ' Admite varios documentos.' : ''}{tipo.formulario_datos ? ` Datos: ${formulariosDatos[tipo.formulario_datos] || tipo.formulario_datos}.` : ''}</p>
             <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo.formulario_datos, documento, data)} />
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -204,7 +205,7 @@ function VinculoCard({ vinculo, aviso, acciones, accionAdenda, destacado }) {
     <dl className="grid gap-3 text-sm sm:grid-cols-3">
       {[['Inicio', fecha(v.fecha_inicio)], ['Fin prevista', v.fecha_fin_prevista ? fecha(v.fecha_fin_prevista) : 'Sin fecha de fin'], ['Fin efectivo', vinculo.vencimiento.fin_efectivo ? `${fecha(vinculo.vencimiento.fin_efectivo)}${vinculo.vencimiento.por_adenda ? ' (por adenda)' : ''}` : 'Sin fecha de fin'],
         ['Fecha de cese', fecha(v.fecha_cese)], ['Régimen normativo', vinculo.regimen_normativo || 'No registrado'], ['Unidad orgánica', vinculo.unidad_organica || 'No registrada'],
-        ['Obligado a DJBR', texto(v.obligado_djbr)], ['Exige colegiatura', texto(v.exige_colegiatura)], ['Período de prueba', texto(v.tiene_periodo_prueba)],
+        ['Obligado a DJBR', textoBandera(v.obligado_djbr)], ['Exige colegiatura', textoBandera(v.exige_colegiatura)], ['Exige estudios básicos', textoBandera(v.exige_estudios_basicos)], ['Período de prueba', textoBandera(v.tiene_periodo_prueba)],
         ['Registrado por', vinculo.registrado_por || 'No registrado (registro anterior)'],
       ].map(([label, valor]) => <div key={label}><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 break-words text-slate-800">{valor}</dd></div>)}
     </dl>
@@ -312,16 +313,13 @@ function Induccion({ usuario, data, bloqueo }) {
 }
 
 function NoAplicaPrueba({ onNavigate }) {
+  // La bandera del puesto se registra en el vínculo laboral (2.2).
   const puedeVinculo = usePuede('legajo.editar')
-  const veSensibles = usePuede('datos_sensibles.ver')
-  // La bandera de la persona se edita en Información personal, que exige además datos sensibles.
-  const puedeFicha = puedeVinculo && veSensibles
   return <section className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-slate-500">
-    <p className="text-sm font-semibold">No aplica: esta persona no tiene período de prueba</p>
-    <p className="mt-2 text-xs">La subsección se activa con la bandera «tiene período de prueba» en los datos generales de la persona o en un vínculo vigente. Mientras no la tenga, no hay formularios ni documentos exigidos.</p>
-    {(puedeFicha || puedeVinculo) && <div className="mt-4 flex flex-wrap gap-4 text-xs font-semibold">
-      {puedeFicha && <button onClick={() => onNavigate('general')} className="text-teal-700 hover:underline">Revisar la bandera en Información personal</button>}
-      {puedeVinculo && <button onClick={() => onNavigate('s02-vinculo')} className="text-teal-700 hover:underline">Revisar la bandera del vínculo en 2.2</button>}
+    <p className="text-sm font-semibold">No aplica: «Tiene período de prueba» está en No</p>
+    <p className="mt-2 text-xs">La subsección se activa con «Tiene período de prueba» en Sí en un vínculo laboral (sin vínculo vigente, en los datos de la persona). Mientras esté en No, no hay formularios ni documentos exigidos.</p>
+    {puedeVinculo && <div className="mt-4 flex flex-wrap gap-4 text-xs font-semibold">
+      <button onClick={() => onNavigate('s02-vinculo')} className="text-teal-700 hover:underline">Revisar la bandera del vínculo en 2.2</button>
     </div>}
   </section>
 }
@@ -356,11 +354,13 @@ export default function Seccion02Panel({ usuario, categoria, onNavigate }) {
   const sinVinculo = !data.vinculos.some(v => !v.cerrado) && 'Primero registra un vínculo laboral en 2.2 (los cesados no reciben registros).'
   const bloqueo = sinLegajo || sinVinculo
   const irAVinculo = categoria !== 's02-vinculo' && <button onClick={() => onNavigate('s02-vinculo')} className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900">Ir a 2.2 Formalización del vínculo</button>
-  const noAplica = codigo === '2.4' && !data.tiene_periodo_prueba
+  // Solo No oculta la 2.4; Sin responder la muestra con sus tipos por determinar.
+  const noAplica = codigo === '2.4' && data.tiene_periodo_prueba === false
 
   return <section aria-label={titulo}>
     {error}
     <Resumen data={data} onNavigate={onNavigate} />
+    {(data.avisos_perfil || []).map(aviso => <Aviso key={aviso}>{aviso}</Aviso>)}
     <h2 className="mb-5 text-xl font-semibold text-slate-800">{titulo}</h2>
     {noAplica ? <NoAplicaPrueba onNavigate={onNavigate} /> : <>
       {sinLegajo ? <Aviso accion={<AbrirLegajo usuario={usuario} />}>{sinLegajo} Los formularios y la carga de documentos de la sección 02 están deshabilitados hasta abrirlo.</Aviso>

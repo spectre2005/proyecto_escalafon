@@ -36,6 +36,11 @@ test('exports classified personal data and preserves leading zeros without techn
   assert.ok(!output.includes('PRIVATE_PATH_SENTINEL'))
   assert.equal(personalGroups.length, 4)
   assert.equal(reportValue(false), 'No')
+  // Banderas del perfil: Sí / No / Sin responder; lo que no llegó sigue «No registrado».
+  assert.equal(reportValue(null, false, 'con_discapacidad'), 'Sin responder')
+  assert.equal(reportValue(false, false, 'con_discapacidad'), 'No')
+  assert.equal(reportValue(undefined, false, 'con_discapacidad'), 'No registrado')
+  assert.equal(reportValue(null, false, 'telefono'), 'No registrado')
   assert.equal(reportValue('2000-01-02'), '02/01/2000')
 })
 

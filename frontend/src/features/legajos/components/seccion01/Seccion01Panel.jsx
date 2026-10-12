@@ -119,7 +119,7 @@ function Documentos({ usuario, data, codigos }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-slate-800">{tipo.literal && <span className="mr-1 text-slate-500">{tipo.literal})</span>}{tipo.nombre}</p>
-            <p className="mt-1 text-xs text-slate-500">{tipo.motivo}{tipo.permite_multiples ? ' Admite varios documentos.' : ''}{tipo.formulario_datos ? ` Datos: ${formulariosDatos01[tipo.formulario_datos]}.` : ''}</p>
+            <p className={`mt-1 text-xs ${tipo.aplica && tipo.exigido === null ? 'text-amber-800' : 'text-slate-500'}`}>{tipo.motivo}{tipo.permite_multiples ? ' Admite varios documentos.' : ''}{tipo.formulario_datos ? ` Datos: ${formulariosDatos01[tipo.formulario_datos]}.` : ''}</p>
             <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo, documento, data)} />
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -230,7 +230,8 @@ export default function Seccion01Panel({ usuario, categoria }) {
   return <section aria-label={grupo.titulo} className={categoria === 'general' ? 'mt-6' : ''}>
     {error}
     <Resumen data={data} />
-    {data.avisos.map(aviso => <Aviso key={aviso}>{aviso} Revisa la bandera en Información personal o los registros.</Aviso>)}
+    {/* El aviso de las condiciones del puesto ya dice dónde corregirlas (vínculo laboral, sección 02). */}
+    {data.avisos.map(aviso => <Aviso key={aviso}>{aviso}{aviso.startsWith('No tiene un vínculo laboral vigente') ? '' : ' Revisa la bandera en Información personal o los registros.'}</Aviso>)}
     {!data.legajo && <Aviso accion={<AbrirLegajo usuario={usuario} />}>La persona no tiene un legajo abierto. La carga de documentos de la sección 01 está deshabilitada hasta abrirlo.</Aviso>}
     {categoria !== 'general' && <h2 className="mb-5 text-xl font-semibold text-slate-800">{grupo.titulo}</h2>}
     {categoria === 's01-antecedentes' && <Declaraciones usuario={usuario} data={data} codigos={grupo.codigos} titulo="Antecedentes e impedimentos registrados" />}
