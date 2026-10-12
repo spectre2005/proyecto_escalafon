@@ -5,7 +5,7 @@ import { usePuede } from '../../../auth/session'
 import { anularSeccion02 } from '../../api/seccion02Api'
 import { useNoAplicables } from '../../api/useNoAplicables'
 import { mostrarTipo, ofrecerTipo } from '../../config/aplicacion'
-import { camposDatosPuesto, coloresEstadoDocumento, estadosDocumento, estadosSubseccion, estadosVencimiento, etiquetaVinculo, formulariosDatos, regimenesLaborales, resultadosPeriodo, subseccionesSeccion02, tiposInduccion, tiposPersonal } from '../../config/seccion02'
+import { pruebaEnNoConDatos, pruebaNoAplica, camposDatosPuesto, coloresEstadoDocumento, estadosDocumento, estadosSubseccion, estadosVencimiento, etiquetaVinculo, formulariosDatos, regimenesLaborales, resultadosPeriodo, subseccionesSeccion02, tiposInduccion, tiposPersonal } from '../../config/seccion02'
 import { etiqueta } from '../../config/seccion01'
 import { folios } from '../../config/documentos'
 import ListaDocumentos from '../documentos/ListaDocumentos'
@@ -48,7 +48,7 @@ function Resumen({ data, onNavigate }) {
       <div><p className="text-xs text-slate-500">Exigidos con documento cargado</p><p className="mt-1 text-2xl font-bold text-slate-800">{r.exigidos_cargados} <span className="text-sm font-normal text-slate-500">de {r.exigidos.length}</span></p></div>
       <div><p className="text-xs text-slate-500">Exigidos con recepción registrada</p><p className="mt-1 text-2xl font-bold text-slate-800">{r.exigidos_recepcionados} <span className="text-sm font-normal text-slate-500">de {r.exigidos.length}</span></p></div>
     </div>
-    <p className="mt-3 text-xs text-slate-500">{data.tiene_periodo_prueba === false ? 'La subsección 2.4 no aplica y no se cuenta. ' : data.tiene_periodo_prueba === null ? 'Falta definir si tiene período de prueba: los tipos de 2.4 quedan por determinar. ' : ''}Cargados y recepcionados se muestran por separado: el criterio de completitud del legajo está pendiente de definir. Sin recepción un documento no cuenta como aprobado.{r.por_determinar ? ` ${r.por_determinar} tipo(s) quedan por determinar (falta definir una condición del puesto, o el régimen laboral registrado no es carrera, plazo determinado ni designado); no se cuentan. Revisa el motivo de cada tipo.` : ''}</p>
+    <p className="mt-3 text-xs text-slate-500">{pruebaNoAplica(data) ? 'La subsección 2.4 no aplica y no se cuenta. ' : pruebaEnNoConDatos(data) ? 'La subsección 2.4 tiene registros pero «Tiene período de prueba» está en No: se muestran y no se cuentan. ' : data.tiene_periodo_prueba === null ? 'Falta definir si tiene período de prueba: los tipos de 2.4 quedan por determinar. ' : ''}Cargados y recepcionados se muestran por separado: el criterio de completitud del legajo está pendiente de definir. Sin recepción un documento no cuenta como aprobado.{r.por_determinar ? ` ${r.por_determinar} tipo(s) quedan por determinar (falta definir una condición del puesto, o el régimen laboral registrado no es carrera, plazo determinado ni designado); no se cuentan. Revisa el motivo de cada tipo.` : ''}</p>
     <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">{data.subsecciones.map(sub => {
       const [nombre, clase] = estadosSubseccion[sub.estado]
       return <button key={sub.codigo} onClick={() => onNavigate(categoriaDe[sub.codigo])} className={`rounded-xl border border-slate-200 p-3 text-left hover:bg-slate-50 ${sub.aplica ? '' : 'opacity-60'}`}>
@@ -354,8 +354,9 @@ export default function Seccion02Panel({ usuario, categoria, onNavigate }) {
   const sinVinculo = !data.vinculos.some(v => !v.cerrado) && 'Primero registra un vínculo laboral en 2.2 (los cesados no reciben registros).'
   const bloqueo = sinLegajo || sinVinculo
   const irAVinculo = categoria !== 's02-vinculo' && <button onClick={() => onNavigate('s02-vinculo')} className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900">Ir a 2.2 Formalización del vínculo</button>
-  // Solo No oculta la 2.4; Sin responder la muestra con sus tipos por determinar.
-  const noAplica = codigo === '2.4' && data.tiene_periodo_prueba === false
+  // Solo No sin datos oculta la 2.4 (pruebaNoAplica); con datos se muestra con aviso; Sin responder, con sus tipos por determinar.
+  const noAplica = codigo === '2.4' && pruebaNoAplica(data)
+  const enNoConDatos = codigo === '2.4' && pruebaEnNoConDatos(data)
 
   return <section aria-label={titulo}>
     {error}
@@ -368,6 +369,7 @@ export default function Seccion02Panel({ usuario, categoria, onNavigate }) {
       {codigo === '2.1' && <Seleccion usuario={usuario} data={data} sinLegajo={sinLegajo} />}
       {codigo === '2.2' && <Formalizacion usuario={usuario} data={data} sinLegajo={sinLegajo} />}
       {codigo === '2.3' && <Induccion usuario={usuario} data={data} bloqueo={bloqueo} />}
+      {enNoConDatos && <Aviso accion={categoria !== 's02-vinculo' && <button onClick={() => onNavigate('s02-vinculo')} className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900">Revisar la bandera en 2.2</button>}>«Tiene período de prueba» está en No, pero hay períodos o documentos de período de prueba registrados: se muestran y se conservan, pero no se exigen ni se cuentan. Para registrar uno nuevo, cambia la bandera a Sí en el vínculo laboral.</Aviso>}
       {codigo === '2.4' && <Prueba usuario={usuario} data={data} bloqueo={bloqueo} />}
       <Documentos usuario={usuario} data={data} subseccion={subseccion} sinLegajo={sinLegajo} />
     </>}

@@ -234,6 +234,8 @@ class ExpedienteController extends Controller
             'nombre' => trim($person->nombres.' '.$person->apellido_paterno.' '.$person->apellido_materno),
             // 2.4: Sí, No o Sin responder (null); se ofrece si algún vínculo no anulado dice Sí.
             'tiene_periodo_prueba' => $aplicacion->bandera('tiene_periodo_prueba', paraOfrecer: true),
+            // Con la bandera en No, la 2.4 se sigue viendo si tiene períodos o documentos m (no se atenúa en el menú).
+            'prueba_con_datos' => $aplicacion->hayDatosPeriodoPrueba(),
             // Banderas del perfil (para exigir) y avisos, p. ej. condiciones del puesto sin vínculo vigente.
             // modulos_ocultos: módulos de la sección 01 que su bandera oculta (AplicacionDocumental::MODULOS). Sin
             // datos_sensibles.ver va vacío: ocultar la entrada revelaría que la bandera está en No.

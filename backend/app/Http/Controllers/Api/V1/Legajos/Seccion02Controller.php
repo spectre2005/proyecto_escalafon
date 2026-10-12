@@ -137,6 +137,8 @@ class Seccion02Controller extends Controller
             'dias_aviso_vencimiento' => $aviso,
             // Sí, No o Sin responder (null), como la 2.4: se ofrece si algún vínculo no anulado dice Sí.
             'tiene_periodo_prueba' => $perfil->aplicacion->bandera('tiene_periodo_prueba', paraOfrecer: true),
+            // Con la bandera en No y datos registrados, la 2.4 se muestra con aviso (no se exige ni se cuenta).
+            'prueba_con_datos' => $perfil->aplicacion->hayDatosPeriodoPrueba(),
             'perfil' => ['regimenes' => $perfil->regimenes, 'regimenes_clasificados' => $perfil->regimenesClasificados(), 'tipos_personal' => $perfil->tiposPersonal, 'banderas' => $perfil->banderas],
             'avisos_perfil' => $perfil->aplicacion->avisos(),
             'resumen' => ResumenSeccion02::total($subsecciones->all()),

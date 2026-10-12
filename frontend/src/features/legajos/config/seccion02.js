@@ -62,3 +62,13 @@ export function etiquetaVinculo(vinculo) {
   const desde = v.fecha_inicio ? v.fecha_inicio.split('-').reverse().join('/') : 'sin fecha'
   return `${v.nombre_puesto} · ${v.numero_documento_vinculo || 'sin N.º de documento'} · desde ${desde}`
 }
+
+// 2.4: con «Tiene período de prueba» en No solo «no aplica» (pantalla explicativa y entrada atenuada) si no hay períodos
+// ni documentos m. Con datos registrados se sigue viendo, con aviso: lo registrado no se esconde. data: ficha o sección 02.
+export function pruebaNoAplica(data) {
+  return data?.tiene_periodo_prueba === false && !data?.prueba_con_datos
+}
+
+export function pruebaEnNoConDatos(data) {
+  return data?.tiene_periodo_prueba === false && !!data?.prueba_con_datos
+}

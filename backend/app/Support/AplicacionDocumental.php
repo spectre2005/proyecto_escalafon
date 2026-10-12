@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\CertificadoDiscapacidad;
 use App\Models\DocumentoUsuario;
 use App\Models\Familiar;
+use App\Models\PeriodoPrueba;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
@@ -256,6 +257,17 @@ final class AplicacionDocumental
 
         return $registros || DocumentoUsuario::query()->where('usuario_id', $this->personaId)
             ->whereHas('tipoDocumento', fn ($tipo) => $tipo->where('seccion_legajo_id', 1)->whereIn('codigo', self::MODULOS[$clave][1]))->exists();
+    }
+
+    /**
+     * 2.4: ¿hay períodos de prueba no anulados o documentos m (en cualquier estado)? Con «Tiene período de prueba» en No,
+     * la subsección se sigue viendo si los hay (lo registrado no se esconde), aunque no se exige ni se cuenta.
+     */
+    public function hayDatosPeriodoPrueba(): bool
+    {
+        return PeriodoPrueba::query()->where('usuario_id', $this->personaId)->where('anulado', false)->exists()
+            || DocumentoUsuario::query()->where('usuario_id', $this->personaId)
+                ->whereHas('tipoDocumento', fn ($tipo) => $tipo->where('seccion_legajo_id', 2)->where('requiere_periodo_prueba', true))->exists();
     }
 
     /** Familiares vigentes (sin anulados): con alguno registrado, g, i y j se resuelven por familiar. */

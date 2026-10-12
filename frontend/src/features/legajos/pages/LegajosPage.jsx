@@ -16,7 +16,7 @@ import { categoriasSeccion09 } from '../config/seccion09'
 import Seccion10Panel from '../components/seccion10/Seccion10Panel'
 import Seccion11Panel from '../components/seccion11/Seccion11Panel'
 import { categoriasSeccion11 } from '../config/seccion11'
-import { subseccionesSeccion02 } from '../config/seccion02'
+import { pruebaNoAplica, subseccionesSeccion02 } from '../config/seccion02'
 import Seccion05Panel from '../components/seccion05/Seccion05Panel'
 import { categoriasSeccion05 } from '../config/seccion05'
 import { categoriasSensibles, gruposSeccion01 } from '../config/seccion01'
@@ -190,8 +190,8 @@ function Detail({ usuario }) {
   const categorias = item => [...item.categories, ...(item.sinDocumentos ? [] : [`documentos-${item.number}`])]
   // La categoría existe pero su funcionalidad o su sección está desactivada (no cuenta lo que oculta una bandera).
   const desactivada = !!group && !porFuncionalidad.some(item => categorias(item).includes(selected))
-  // 2.4 siempre está en el menú; atenuada solo con «Tiene período de prueba» en No (Sin responder no la atenúa).
-  const noAplica = key => key === 's02-prueba' && data?.tiene_periodo_prueba === false
+  // 2.4 siempre está en el menú; atenuada solo con «Tiene período de prueba» en No y sin datos (pruebaNoAplica).
+  const noAplica = key => key === 's02-prueba' && pruebaNoAplica(data)
   const isDocuments = selected.startsWith('documentos-')
   const section = group && data?.sections.find(item => item.key === (isDocuments ? 'documentos-usuario' : selected))
   const documentSection = group && data ? findDocumentSection(group, data.document_sections) : null
