@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import api, { mensajeInstitucion } from '../../axios'
 import AdminLayout from '../../layouts/AdminLayout'
+import CambiarPasswordObligatorio from './CambiarPasswordObligatorio'
 import { SessionContext } from './session'
 
 export default function RequireSession() {
@@ -19,5 +20,7 @@ export default function RequireSession() {
   if (session.loading) return <p role="status" className="p-8">Comprobando sesión…</p>
   if (session.error) return <div role="alert" className="p-8">No se pudo comprobar la sesión. <button onClick={() => { setSession({ loading: true }); setAttempt(attempt + 1) }}>Reintentar</button></div>
   if (!session.data) return <Navigate to="/login_principal" replace />
+  // Contraseña temporal: nada del sistema hasta cambiarla (el backend también lo exige).
+  if (session.data.debe_cambiar_password) return <CambiarPasswordObligatorio usuario={session.data.usuario} onCambiada={data => setSession({ data })} />
   return <SessionContext.Provider value={session.data}><AdminLayout user={session.data.usuario} /></SessionContext.Provider>
 }

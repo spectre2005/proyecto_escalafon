@@ -78,6 +78,7 @@ use App\Http\Controllers\Api\V1\UsuarioController;
 use App\Http\Controllers\Api\V1\UsuarioRolController;
 use App\Http\Controllers\Api\V1\VinculoAdendaController;
 use App\Http\Controllers\Api\V1\VinculoLaboralController;
+use App\Http\Middleware\ExigeCambioPassword;
 use App\Http\Middleware\FuncionalidadActiva;
 use App\Http\Middleware\LegajoSoloLectura;
 use App\Http\Middleware\LocalDevelopmentOnly;
@@ -87,10 +88,11 @@ Route::prefix('v1/auth')->middleware(LocalDevelopmentOnly::class)->group(functio
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:20,1');
     Route::get('me', [AuthController::class, 'me'])->middleware('auth:sanctum');
     Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
+    Route::put('password', [AuthController::class, 'cambiarPassword'])->middleware(['auth:sanctum', 'throttle:10,1']);
 });
 
 // FuncionalidadActiva: con una funcionalidad desactivada, sus rutas de creación y modificación responden 409.
-Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', FuncionalidadActiva::class, LegajoSoloLectura::class])->group(function (): void {
+Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', ExigeCambioPassword::class, FuncionalidadActiva::class, LegajoSoloLectura::class])->group(function (): void {
     Route::get('institucion', [InstitutionSettingsController::class, 'show']);
     // Qué ocultar en la navegación (cualquier sesión). Cambiar la configuración exige configuracion.modulos.
     Route::get('funcionalidades', [ConfiguracionFuncionalidadController::class, 'publico']);
@@ -288,7 +290,7 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', Fu
 // afiliaciones y controversias (sección 09, sensibles): solo lectura y con datos_sensibles.ver; se registran, corrigen y
 // anulan desde Legajos\Seccion09Controller.
 // desvinculaciones (sección 11): solo lectura; se registran, corrigen y anulan desde Legajos\Seccion11Controller.
-Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', 'can:sistema.administrar', FuncionalidadActiva::class])->group(function (): void {
+Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', ExigeCambioPassword::class, 'can:sistema.administrar', FuncionalidadActiva::class])->group(function (): void {
     Route::apiResource('afiliaciones', AfiliacionController::class)->parameters(['afiliaciones' => 'record'])->whereUuid('record')->names('api.v1.afiliaciones')->only(['index', 'show'])->middleware('can:datos_sensibles.ver');
     Route::apiResource('archivos-documento', ArchivoDocumentoController::class)->parameters(['archivos-documento' => 'record'])->whereUuid('record')->names('api.v1.archivos-documento')->only(['index', 'show']);
     Route::apiResource('auditoria-eventos', AuditoriaEventoController::class)->parameters(['auditoria-eventos' => 'record'])->whereUuid('record')->names('api.v1.auditoria-eventos');

@@ -73,6 +73,7 @@ class Usuario extends Authenticatable
             'tiene_derechohabientes' => 'boolean',
             'con_discapacidad' => 'boolean',
             'activo' => 'boolean',
+            'debe_cambiar_password' => 'boolean',
             'ultimo_acceso' => 'datetime',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',

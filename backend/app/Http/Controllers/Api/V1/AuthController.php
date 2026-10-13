@@ -7,7 +7,9 @@ use App\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -63,12 +65,38 @@ class AuthController extends Controller
         return response()->json(['message' => 'Sesión cerrada.']);
     }
 
+    /**
+     * Cambio de la propia contraseña, con la actual. Quita la marca de contraseña temporal (debe_cambiar_password), que
+     * bloquea el resto del sistema (ExigeCambioPassword). La nueva sigue Password::defaults() y no puede ser la misma.
+     */
+    public function cambiarPassword(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'password_actual' => 'required|string|max:255',
+            'password' => ['required', 'string', 'max:255', 'confirmed', Password::defaults()],
+        ], ['password.confirmed' => 'Las contraseñas nuevas no coinciden.']);
+        /** @var Usuario $usuario */
+        $usuario = $request->user();
+        if (! Hash::check($data['password_actual'], $usuario->password)) {
+            throw ValidationException::withMessages(['password_actual' => 'La contraseña actual no es correcta.']);
+        }
+        if (Hash::check($data['password'], $usuario->password)) {
+            throw ValidationException::withMessages(['password' => 'La nueva contraseña debe ser distinta de la actual.']);
+        }
+        $usuario->forceFill(['password' => $data['password'], 'debe_cambiar_password' => false])->save();
+        // La sesión sigue abierta con un identificador nuevo.
+        $request->session()->regenerate();
+
+        return $this->sesion($usuario);
+    }
+
     private function sesion(Usuario $usuario): JsonResponse
     {
         return response()->json(['data' => [
             'usuario' => $usuario->only(['id', 'nombres', 'apellido_paterno', 'apellido_materno', 'email_institucional']),
             'permisos' => $usuario->permisos(),
             've_datos_sensibles' => $usuario->veDatosSensibles(),
+            'debe_cambiar_password' => (bool) $usuario->debe_cambiar_password,
         ]]);
     }
 
