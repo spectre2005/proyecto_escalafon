@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { activarInstitucion, editarInstitucion, mensajeError, sesionTerminada, suspenderInstitucion, verInstitucion } from '../api'
-import { Aviso, EstadoInstitucion, SinAprovisionar } from '../componentes'
+import { activarInstitucion, aprovisionarInstitucion, editarInstitucion, mensajeError, sesionTerminada, suspenderInstitucion, verInstitucion } from '../api'
+import { Aviso, Credenciales, EstadoInstitucion, SinAprovisionar } from '../componentes'
+import AdministradoresInstitucion from './AdministradoresInstitucion'
 import { AVISO_SUSPENSION, accionesDisponibles, cambios, etiquetaAccion, fecha } from '../estado'
 import { useSesionPlataforma } from '../sesion'
 
@@ -43,6 +44,43 @@ function ConfirmarEstado({ accion, institucion, onConfirmar, onCerrar }) {
   </dialog>
 }
 
+/**
+ * Aprovisionar: pide el primer administrador (jefe de la ORH) y crea la base, los catálogos y la carpeta. Toma unos
+ * segundos; mientras tanto no se puede cerrar. Un 500 trae un mensaje propio (se retiró lo creado).
+ */
+function Aprovisionar({ institucion, onAprovisionada, onSesionTerminada, onCerrar }) {
+  const ref = useRef(null)
+  const [datos, setDatos] = useState({ nombres: '', apellido_paterno: '', email: '' })
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  useEffect(() => { ref.current?.showModal() }, [])
+  async function confirmar(event) {
+    event.preventDefault()
+    if (busy) return
+    setBusy(true)
+    setError('')
+    try {
+      onAprovisionada(await aprovisionarInstitucion(institucion.id, { ...datos, email: datos.email.trim() }))
+    } catch (failure) {
+      setError(failure.response?.status === 500 && failure.response.data?.message ? failure.response.data.message : mensajeError(failure))
+      setBusy(false)
+      if (sesionTerminada(failure)) onSesionTerminada()
+    }
+  }
+  const campo = (nombre, etiqueta, props = {}) => <label className="grid gap-2 text-xs font-medium text-slate-600">{etiqueta}<input value={datos[nombre]} onChange={event => setDatos({ ...datos, [nombre]: event.target.value })} disabled={busy} required className={entrada} {...props} /></label>
+  return <dialog ref={ref} onClose={onCerrar} onCancel={event => busy && event.preventDefault()} aria-labelledby="titulo-aprovisionar" className="m-auto w-full max-w-md rounded-2xl p-0 backdrop:bg-slate-900/40">
+    <form onSubmit={confirmar} aria-busy={busy} className="space-y-4 p-6">
+      <h2 id="titulo-aprovisionar" className="text-lg font-bold text-slate-900">Aprovisionar «{institucion.nombre}»</h2>
+      <p className="text-sm text-slate-600">Se crea la base <strong>{institucion.base_datos}</strong> con los catálogos (sin datos de ejemplo), la carpeta <strong>{institucion.almacenamiento}</strong> y su primer administrador. La institución no se activa todavía.</p>
+      <Aviso>{error}</Aviso>
+      {campo('nombres', 'Nombres del primer administrador *', { minLength: 2, maxLength: 100, autoComplete: 'off' })}
+      {campo('apellido_paterno', 'Apellido paterno *', { minLength: 2, maxLength: 100, autoComplete: 'off' })}
+      {campo('email', 'Correo de acceso *', { type: 'email', maxLength: 255, autoComplete: 'off' })}
+      <div className="flex justify-end gap-3"><button type="button" onClick={() => ref.current.close()} disabled={busy} className="rounded-xl border border-slate-200 px-4 py-2 text-sm">Cancelar</button><button type="submit" disabled={busy} className="rounded-xl bg-teal-700 px-4 py-2 text-sm font-semibold text-white">{busy ? 'Creando base y catálogos…' : 'Aprovisionar'}</button></div>
+    </form>
+  </dialog>
+}
+
 export default function InstitucionDetallePage() {
   const { id } = useParams()
   const { state } = useLocation()
@@ -54,6 +92,7 @@ export default function InstitucionDetallePage() {
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState(state?.aviso || '')
   const [confirmar, setConfirmar] = useState(null)
+  const [credenciales, setCredenciales] = useState(null)
   useEffect(() => {
     const controller = new AbortController()
     verInstitucion(id, controller.signal).then(data => { setEstado({ data }); document.title = `${data.nombre} · Plataforma` }).catch(failure => {
@@ -106,6 +145,7 @@ export default function InstitucionDetallePage() {
       <div><h1 id="titulo-institucion" className="text-2xl font-bold text-slate-900">{institucion.nombre}</h1><div className="mt-2 flex flex-wrap gap-2"><EstadoInstitucion estado={institucion.estado} /><SinAprovisionar institucion={institucion} /></div></div>
       <div className="grid justify-items-end gap-2">
         <div className="flex flex-wrap justify-end gap-2">
+          {acciones.aprovisionar && <button type="button" onClick={() => { setAviso(''); setConfirmar('aprovisionar') }} className="rounded-xl bg-teal-700 px-4 py-2 text-sm font-semibold text-white">Aprovisionar</button>}
           {!borrador && <button type="button" onClick={() => { setAviso(''); setError(''); setBorrador({ nombre: institucion.nombre, slug: institucion.slug, base_datos: institucion.base_datos, almacenamiento: institucion.almacenamiento }) }} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm">Editar datos</button>}
           <button type="button" disabled={!acciones.activar} title={institucion.motivo_no_activable || ''} onClick={() => { setAviso(''); setConfirmar('activar') }} className="rounded-xl bg-teal-700 px-4 py-2 text-sm font-semibold text-white">{acciones.textoActivar}</button>
           <button type="button" disabled={!acciones.suspender} title={institucion.motivo_no_suspendible || ''} onClick={() => { setAviso(''); setConfirmar('suspender') }} className="rounded-xl border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-700">Suspender</button>
@@ -115,7 +155,8 @@ export default function InstitucionDetallePage() {
     </div>
     <div className="mt-5 space-y-3">
       <Aviso tipo="exito">{aviso}</Aviso>
-      {!institucion.aprovisionada && <Aviso tipo="info">{institucion.motivo_no_activable} Se verifica con el comando de aprovisionamiento del servidor; este panel no crea bases ni carpetas.</Aviso>}
+      {credenciales && <Credenciales titulo="Primer administrador creado." credenciales={credenciales} onCerrar={() => setCredenciales(null)} />}
+      {!institucion.aprovisionada && <Aviso tipo="info">{institucion.motivo_no_activable} Usa «Aprovisionar» para crear su base, sus catálogos, su primer administrador y su carpeta.</Aviso>}
       {institucion.estado === 'suspendida' && <Aviso tipo="info">Suspendida {fecha(institucion.suspendida_en)}{institucion.motivo_suspension ? `: ${institucion.motivo_suspension}` : ''}. Sus datos y archivos se conservan.</Aviso>}
     </div>
     {borrador ? <form onSubmit={guardar} aria-busy={guardando} className="mt-6 space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
@@ -134,12 +175,19 @@ export default function InstitucionDetallePage() {
       <Dato etiqueta="Registrada">{fecha(institucion.created_at)}</Dato>
       <Dato etiqueta="Última modificación">{fecha(institucion.updated_at)}</Dato>
     </dl>}
+    {institucion.aprovisionada && <AdministradoresInstitucion institucion={institucion} onCambio={recargar} />}
     <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
       <h2 className="font-semibold text-slate-800">Auditoría</h2>
       {institucion.auditoria.length === 0 ? <p className="mt-3 text-sm text-slate-500">Sin operaciones registradas.</p> : <ol className="mt-3 divide-y divide-slate-100">
-        {institucion.auditoria.map(evento => <li key={evento.id} className="flex flex-wrap justify-between gap-2 py-3 text-sm"><span><strong className="text-slate-700">{etiquetaAccion(evento.accion)}</strong>{evento.motivo && <span className="text-slate-500"> — {evento.motivo}</span>}</span><span className="text-xs text-slate-500">{evento.administrador || 'Sistema'} · {fecha(evento.created_at)}</span></li>)}
+        {institucion.auditoria.map(evento => <li key={evento.id} className="flex flex-wrap justify-between gap-2 py-3 text-sm"><span><strong className="text-slate-700">{etiquetaAccion(evento.accion)}</strong>{evento.datos_despues?.email && <span className="text-slate-500"> ({evento.datos_despues.email})</span>}{evento.motivo && <span className="text-slate-500"> — {evento.motivo}</span>}</span><span className="text-xs text-slate-500">{evento.administrador || 'Sistema'} · {fecha(evento.created_at)}</span></li>)}
       </ol>}
     </div>
-    {confirmar && <ConfirmarEstado accion={confirmar} institucion={institucion} onConfirmar={cambiarEstado} onCerrar={() => setConfirmar(null)} />}
+    {confirmar === 'aprovisionar' && <Aprovisionar institucion={institucion} onCerrar={() => setConfirmar(null)} onSesionTerminada={terminada} onAprovisionada={data => {
+      setCredenciales(data.administrador_inicial)
+      setAviso('Institución aprovisionada. Ya se puede activar.')
+      setConfirmar(null)
+      recargar()
+    }} />}
+    {confirmar && confirmar !== 'aprovisionar' && <ConfirmarEstado accion={confirmar} institucion={institucion} onConfirmar={cambiarEstado} onCerrar={() => setConfirmar(null)} />}
   </section>
 }

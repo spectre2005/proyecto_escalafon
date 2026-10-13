@@ -4,18 +4,14 @@ namespace App\Console\Commands;
 
 use App\Models\Plataforma\Institucion;
 use App\Support\Plataforma\AuditoriaOperaciones;
+use App\Support\Plataforma\VerificacionAprovisionamiento;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-use Throwable;
 
 /**
  * Verifica (solo lectura) que la base de datos y el almacenamiento de una institución estén preparados y, si lo están,
  * la marca como aprovisionada para que el panel pueda activarla. No crea bases, no migra ni escribe en la base
- * institucional: el aprovisionamiento automático es una fase posterior.
- *
- * - Base: existe en el servidor PostgreSQL institucional y tiene el esquema migrado (migrations e institution_settings).
- * - Almacenamiento: la carpeta storage/app/private/{almacenamiento} existe y se puede escribir.
+ * institucional: es para una institución preparada a mano (la automática es plataforma:aprovisionar).
+ * Comprobaciones: VerificacionAprovisionamiento.
  */
 class VerificarAprovisionamiento extends Command
 {
@@ -36,7 +32,7 @@ class VerificarAprovisionamiento extends Command
 
             return self::SUCCESS;
         }
-        $comprobaciones = ['base_datos' => $this->baseLista($institucion->base_datos), 'almacenamiento' => $this->almacenamientoListo($institucion->almacenamiento)];
+        $comprobaciones = ['base_datos' => VerificacionAprovisionamiento::base($institucion->base_datos), 'almacenamiento' => VerificacionAprovisionamiento::almacenamiento($institucion->almacenamiento)];
         foreach ($comprobaciones as $nombre => [$ok, $detalle]) {
             $ok ? $this->info("{$nombre}: {$detalle}") : $this->error("{$nombre}: {$detalle}");
         }
@@ -51,33 +47,5 @@ class VerificarAprovisionamiento extends Command
         $this->info('Institución aprovisionada. Ya se puede activar desde el panel.');
 
         return self::SUCCESS;
-    }
-
-    /** @return array{bool, string} */
-    private function baseLista(string $base): array
-    {
-        // La conexión «pgsql» describe el servidor PostgreSQL institucional; solo cambia la base.
-        $plantilla = config('database.connections.pgsql');
-        if (! is_array($plantilla) || ($plantilla['driver'] ?? null) !== 'pgsql') {
-            return [false, 'solo se verifica contra el servidor PostgreSQL institucional.'];
-        }
-        config(['database.connections.verificacion_institucion' => [...$plantilla, 'database' => $base]]);
-        try {
-            $listo = Schema::connection('verificacion_institucion')->hasTable('migrations') && Schema::connection('verificacion_institucion')->hasTable('institution_settings');
-
-            return $listo ? [true, "la base {$base} existe y tiene el esquema institucional."] : [false, "la base {$base} existe pero no tiene el esquema institucional migrado."];
-        } catch (Throwable) {
-            return [false, "no se pudo conectar a la base {$base} (¿existe?)."];
-        } finally {
-            DB::purge('verificacion_institucion');
-        }
-    }
-
-    /** @return array{bool, string} */
-    private function almacenamientoListo(string $ruta): array
-    {
-        $carpeta = storage_path('app/private/'.$ruta);
-
-        return is_dir($carpeta) && is_writable($carpeta) ? [true, "la carpeta {$ruta} existe y se puede escribir."] : [false, "falta la carpeta {$ruta} o no se puede escribir."];
     }
 }

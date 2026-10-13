@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Plataforma;
 use App\Http\Controllers\Controller;
 use App\Models\Plataforma\AuditoriaPlataforma;
 use App\Models\Plataforma\Institucion;
+use App\Support\Plataforma\Aprovisionamiento;
+use App\Support\Plataforma\AprovisionamientoRechazado;
 use App\Support\Plataforma\AuditoriaOperaciones;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,20 +14,16 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * Instituciones de la plataforma: resumen por estado, listado, registro, edición de sus datos básicos, suspensión y
- * reactivación (con motivo y auditoría). Nada de esto toca la base ni los archivos de la institución: suspender solo
- * cambia su estado, y activar exige que ya esté aprovisionada. No hay rutas a legajos, documentos ni personas.
+ * reactivación (con motivo y auditoría) y aprovisionamiento automático, que crea su base y su carpeta (nunca borra ni
+ * cambia las existentes). Suspender solo cambia su estado, y activar exige que ya esté aprovisionada. No hay rutas a
+ * legajos, documentos ni personas.
  */
 class InstitucionController extends Controller
 {
-    private const SLUG = '/^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/';
-
-    private const BASE_DATOS = '/^[a-z][a-z0-9_]{2,62}$/';
-
-    private const ALMACENAMIENTO = '/^instituciones\/[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/';
-
     public function resumen(): JsonResponse
     {
         $conteo = Institucion::query()->select('estado', DB::raw('count(*) as total'))->groupBy('estado')->pluck('total', 'estado');
@@ -108,6 +106,33 @@ class InstitucionController extends Controller
             ['estado' => Institucion::SUSPENDIDA, 'suspendida_en' => now(), 'motivo_suspension' => $motivo], 'institucion.suspendida', $motivo);
     }
 
+    /**
+     * Aprovisionamiento automático (Aprovisionamiento): base, esquema, catálogos, primer administrador y carpeta. La
+     * contraseña temporal del administrador solo viaja en esta respuesta (no se guarda ni se audita).
+     */
+    public function aprovisionar(Request $request, string $institucion): JsonResponse
+    {
+        $this->sinCamposAjenos($request, ['nombres', 'apellido_paterno', 'email']);
+        $administrador = $request->validate([
+            'nombres' => 'required|string|min:2|max:100', 'apellido_paterno' => 'required|string|min:2|max:100', 'email' => 'required|email|max:255',
+        ]);
+        $registro = Institucion::query()->findOrFail($institucion);
+        // Migrar y cargar catálogos toma unos segundos.
+        set_time_limit(300);
+        try {
+            $clave = Aprovisionamiento::ejecutar($registro->id, $administrador, $request, Auth::guard('plataforma')->id());
+        } catch (AprovisionamientoRechazado $rechazo) {
+            abort(409, $rechazo->getMessage());
+        } catch (Throwable $error) {
+            report($error);
+            abort(500, 'No se pudo aprovisionar. Se retiró lo que se había creado; el detalle quedó en la auditoría.');
+        }
+
+        return response()->json(['data' => [...$registro->refresh()->datos(),
+            'administrador_inicial' => ['email' => mb_strtolower(trim($administrador['email'])), 'clave_temporal' => $clave]]])
+            ->header('Cache-Control', 'no-store');
+    }
+
     /** Activar por primera vez o reactivar: solo si está aprovisionada. */
     public function activar(Request $request, string $institucion): JsonResponse
     {
@@ -142,9 +167,9 @@ class InstitucionController extends Controller
 
         return [
             'nombre' => ['required', 'string', 'min:3', 'max:150'],
-            'slug' => ['required', 'string', 'regex:'.self::SLUG, Rule::notIn(Institucion::SLUGS_RESERVADOS), $unico('slug')],
-            'base_datos' => ['required', 'string', 'regex:'.self::BASE_DATOS, Rule::notIn([config('database.connections.plataforma.database'), 'postgres', 'template0', 'template1']), $unico('base_datos')],
-            'almacenamiento' => ['required', 'string', 'regex:'.self::ALMACENAMIENTO, $unico('almacenamiento')],
+            'slug' => ['required', 'string', 'regex:'.Institucion::PATRON_SLUG, Rule::notIn(Institucion::SLUGS_RESERVADOS), $unico('slug')],
+            'base_datos' => ['required', 'string', 'regex:'.Institucion::PATRON_BASE_DATOS, Rule::notIn([config('database.connections.plataforma.database'), 'postgres', 'template0', 'template1']), $unico('base_datos')],
+            'almacenamiento' => ['required', 'string', 'regex:'.Institucion::PATRON_ALMACENAMIENTO, $unico('almacenamiento')],
         ];
     }
 

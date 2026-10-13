@@ -25,6 +25,13 @@ class Institucion extends Model
 
     public const ESTADOS = [self::REGISTRADA, self::ACTIVA, self::SUSPENDIDA];
 
+    public const PATRON_SLUG = '/^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/';
+
+    /** Nombre de base válido para PostgreSQL sin comillas especiales (se usa al crearla). */
+    public const PATRON_BASE_DATOS = '/^[a-z][a-z0-9_]{2,62}$/';
+
+    public const PATRON_ALMACENAMIENTO = '/^instituciones\/[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/';
+
     /** Subdominios reservados para la plataforma. */
     public const SLUGS_RESERVADOS = ['admin', 'api', 'app', 'plataforma', 'www', 'soporte', 'static', 'assets', 'mail'];
 

@@ -4,12 +4,14 @@ import { AVISO_SUSPENSION, accionesDisponibles, cambios, etiquetaEstado, propone
 import { esEscritura, mensajeError } from './api.js'
 
 test('state actions follow what the backend allows', () => {
-  assert.deepEqual(accionesDisponibles({ estado: 'registrada', motivo_no_activable: 'Aún no está aprovisionada.', motivo_no_suspendible: 'No opera.' }),
-    { activar: false, suspender: false, textoActivar: 'Activar' })
-  assert.deepEqual(accionesDisponibles({ estado: 'activa', motivo_no_activable: 'Ya está activa.', motivo_no_suspendible: null }),
-    { activar: false, suspender: true, textoActivar: 'Activar' })
-  assert.deepEqual(accionesDisponibles({ estado: 'suspendida', motivo_no_activable: null, motivo_no_suspendible: 'Ya está suspendida.' }),
-    { activar: true, suspender: false, textoActivar: 'Reactivar' })
+  assert.deepEqual(accionesDisponibles({ estado: 'registrada', aprovisionada: false, motivo_no_activable: 'Aún no está aprovisionada.', motivo_no_suspendible: 'No opera.' }),
+    { aprovisionar: true, activar: false, suspender: false, textoActivar: 'Activar' })
+  assert.deepEqual(accionesDisponibles({ estado: 'registrada', aprovisionada: true, motivo_no_activable: null, motivo_no_suspendible: 'No opera.' }),
+    { aprovisionar: false, activar: true, suspender: false, textoActivar: 'Activar' })
+  assert.deepEqual(accionesDisponibles({ estado: 'activa', aprovisionada: true, motivo_no_activable: 'Ya está activa.', motivo_no_suspendible: null }),
+    { aprovisionar: false, activar: false, suspender: true, textoActivar: 'Activar' })
+  assert.deepEqual(accionesDisponibles({ estado: 'suspendida', aprovisionada: true, motivo_no_activable: null, motivo_no_suspendible: 'Ya está suspendida.' }),
+    { aprovisionar: false, activar: true, suspender: false, textoActivar: 'Reactivar' })
   assert.equal(accionesDisponibles(null).activar, false)
   assert.equal(etiquetaEstado('suspendida'), 'Suspendida')
   // Sin identificar la institución por subdominio, suspender no bloquea el acceso: se avisa junto al botón.

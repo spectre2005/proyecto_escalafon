@@ -45,6 +45,12 @@ export const registrarInstitucion = datos => plataforma.post('/instituciones', d
 export const editarInstitucion = (id, datos) => plataforma.patch(`/instituciones/${id}`, datos).then(r => r.data.data)
 export const suspenderInstitucion = (id, motivo) => plataforma.post(`/instituciones/${id}/suspender`, { motivo }).then(r => r.data.data)
 export const activarInstitucion = (id, motivo) => plataforma.post(`/instituciones/${id}/activar`, motivo ? { motivo } : {}).then(r => r.data.data)
+// Crear y migrar la base y cargar los catálogos toma unos segundos: más margen que el resto.
+export const aprovisionarInstitucion = (id, datos) => plataforma.post(`/instituciones/${id}/aprovisionar`, datos, { timeout: 300000 }).then(r => r.data.data)
+export const listarAdministradores = (id, signal) => plataforma.get(`/instituciones/${id}/administradores`, { signal }).then(r => r.data.data)
+export const agregarAdministrador = (id, datos) => plataforma.post(`/instituciones/${id}/administradores`, datos).then(r => r.data.data)
+export const restablecerAdministrador = (id, admin) => plataforma.post(`/instituciones/${id}/administradores/${admin}/restablecer`).then(r => r.data.data)
+export const cambiarActivoAdministrador = (id, admin, activo) => plataforma.post(`/instituciones/${id}/administradores/${admin}/${activo ? 'reactivar' : 'desactivar'}`).then(r => r.data.data)
 
 /** Mensaje legible de un error de la API de plataforma. */
 export function mensajeError(error) {
@@ -53,7 +59,7 @@ export function mensajeError(error) {
   if (errores) return Object.values(errores).flat().join(' ')
   if (status === 401 || status === 419) return 'La sesión terminó. Vuelve a iniciar sesión.'
   if (status === 403) return 'No tienes permiso para esta acción.'
-  if (status === 409 || status === 429) return error.response.data?.message || 'La operación no se puede realizar en el estado actual.'
+  if (status === 409 || status === 429 || status === 503) return error.response.data?.message || 'La operación no se puede realizar en el estado actual.'
   if (status === 404) return 'No se encontró el registro.'
   if (!error?.response) return 'No se pudo conectar con el servidor. Comprueba la conexión e inténtalo de nuevo.'
   return 'No se pudo completar la operación. Inténtalo nuevamente.'

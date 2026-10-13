@@ -10,10 +10,11 @@ export const AVISO_SUSPENSION = 'La suspensión queda registrada, pero aún no b
 
 export const etiquetaEstado = estado => ESTADOS[estado]?.etiqueta || estado || '—'
 
-/** Acciones de estado disponibles: activar solo si está aprovisionada; suspender solo si está activa. */
+/** Acciones disponibles: aprovisionar solo si está registrada y sin aprovisionar; activar solo si está aprovisionada; suspender solo si está activa. */
 export function accionesDisponibles(institucion) {
-  if (!institucion) return { activar: false, suspender: false, textoActivar: 'Activar' }
+  if (!institucion) return { aprovisionar: false, activar: false, suspender: false, textoActivar: 'Activar' }
   return {
+    aprovisionar: institucion.estado === 'registrada' && !institucion.aprovisionada,
     activar: !institucion.motivo_no_activable,
     suspender: !institucion.motivo_no_suspendible,
     textoActivar: institucion.estado === 'suspendida' ? 'Reactivar' : 'Activar',
@@ -44,7 +45,12 @@ const ACCIONES = {
   'institucion.editada': 'Editó sus datos',
   'institucion.suspendida': 'Suspendió la institución',
   'institucion.activada': 'Activó la institución',
-  'institucion.aprovisionada': 'Verificó el aprovisionamiento',
+  'institucion.aprovisionada': 'Quedó aprovisionada',
+  'institucion.aprovisionamiento_fallido': 'Falló el aprovisionamiento',
+  'administrador_institucion.creado': 'Agregó un administrador',
+  'administrador_institucion.clave_restablecida': 'Dio una contraseña temporal nueva a un administrador',
+  'administrador_institucion.desactivado': 'Desactivó a un administrador',
+  'administrador_institucion.reactivado': 'Reactivó a un administrador',
   'sesion.inicio': 'Inició sesión',
   'sesion.cierre': 'Cerró sesión',
   'administrador.creado': 'Se creó una cuenta de administración',
