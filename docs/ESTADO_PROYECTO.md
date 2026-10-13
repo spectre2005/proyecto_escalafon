@@ -91,7 +91,7 @@ Generales:
 3. Fórmula de completitud del legajo (¿cuenta cargados, recepcionados o solo verificados?). Hoy los resúmenes muestran cada número por separado.
 4. ¿El asistente ve datos sensibles?
 5. Portal del servidor: ¿ahora o después?
-6. Una base por cliente (recomendada) o compartida.
+6. ~~Una base por cliente (recomendada) o compartida.~~ Decidido el 13/10/2026: una base por cliente.
 7. Fedateo: ¿solo un check o se sube evidencia?
 
 Documentos y sección 02 (TODO en el código):
@@ -284,3 +284,85 @@ Sección 05:
   - Pregunta 20: ¿k aplica a los hijos con un certificado por persona?
   - Si una persona puede tener varios vínculos vigentes y qué criterio de vigencia se usa
     (un vínculo vencido sin cese sigue contando para las condiciones del puesto).
+
+## Instituciones por subdominio (13/10/2026, rama feature/panel-superadmin)
+- Con `PLATAFORMA_MODO=subdominio`, `{slug}.PLATAFORMA_DOMINIO` atiende con la base de datos,
+  la carpeta de PDF (`storage/app/private/{almacenamiento}`) y la carpeta de sesiones de esa
+  institución (`ResolverInstitucion`, `ConexionInstitucion`). Solo opera si está activa y
+  aprovisionada: la suspendida recibe 403 y la registrada o inexistente, 404. El panel de
+  plataforma solo responde en el dominio sin subdominio.
+- Archivos: todo disco local dentro de `storage/app/private` se reubica en
+  `storage/app/private/{almacenamiento}`, que es un espejo de esa carpeta (`documentos/`,
+  `fotos-personal/`, PDF anteriores del disco `local` y los discos que se agreguen).
+- Con `PLATAFORMA_MODO=unica` (por defecto) no cambia nada: localhost:5173 y la base `escalafon`.
+- El proxy de Vite ahora conserva el host del navegador (`changeOrigin: false`).
+- En desarrollo: `uno.localhost:5173` (los navegadores resuelven *.localhost sin tocar hosts).
+  Requiere `*.localhost:5173` en `SANCTUM_STATEFUL_DOMAINS` y `SESSION_DOMAIN=null`.
+- En cada despliegue (y al traer cambios): `php artisan migrate` (base del .env) y luego
+  `php artisan plataforma:migrar-instituciones` (base de la plataforma y la de cada institución
+  aprovisionada, también las suspendidas; sigue si una falla, termina con error y lo audita).
+  Nunca crea una base que falte. Ya está en `iniciar.ps1` y en el README.
+- Caché por institución: prefijo propio y, en archivos, carpeta propia
+  (`storage/framework/cache/instituciones/{slug}`); incluye el límite de intentos de login.
+- Colas (`ColasInstitucion`): con subdominio, los trabajos, lotes y fallos van a la base de la
+  plataforma; cada trabajo lleva su institución y el worker lo ejecuta con sus recursos. Si la
+  institución ya no está activa, falla sin ejecutarse. Hoy ningún código encola trabajos.
+- Ojo: en modo `unica`, `QUEUE_CONNECTION=database` no tiene tabla `jobs` en la base institucional
+  (ninguna migración la crea); no afecta mientras nada se encole.
+- El login muestra el motivo cuando la institución está suspendida o no existe (`codigo`
+  `institucion_suspendida` / `institucion_no_encontrada`). Los tests corren siempre en modo
+  `unica` (`phpunit.xml`), aunque el .env use subdominios.
+
+## Aprovisionamiento automático (13/10/2026, rama feature/panel-superadmin)
+- Botón «Aprovisionar» en el panel (institución registrada) o `php artisan plataforma:aprovisionar {slug}`.
+  Mismo servicio (`Aprovisionamiento`): crea la base, la migra, carga `CatalogosInstitucionSeeder`
+  (regímenes, ubigeo, secciones y tipos de documento; sin datos de ejemplo ni unidades orgánicas),
+  crea el primer administrador (rol ADMIN) con contraseña temporal mostrada una sola vez (no se
+  guarda ni se audita), guarda el nombre en `institution_settings`, crea la carpeta de PDF, verifica
+  todo y la marca aprovisionada. No la activa.
+- Nunca toca lo existente: si la base ya existe o la carpeta tiene archivos, se rechaza (409). Si
+  falla a mitad, retira solo lo creado en esa ejecución y audita `institucion.aprovisionamiento_fallido`.
+- `DatabaseSeeder` usa ahora `CatalogosInstitucionSeeder` (mismos seeders, mismo orden).
+- Contraseña temporal: el primer administrador queda con `usuarios.debe_cambiar_password`. Hasta
+  cambiarla (`PUT /api/v1/auth/password`, con la actual), toda la API responde 403
+  `cambio_password_requerido` (`ExigeCambioPassword`) y el frontend muestra solo la pantalla de
+  cambio. La marca no es asignable en masa: la pone el aprovisionamiento y la quita el cambio.
+- Pendiente: `RegimenNormativoSeeder`
+  y `UbigeoSeeder` solo corren en local/testing (en producción la base quedaría sin esos catálogos).
+
+## Primera institución vinculada (13/10/2026, entorno de Willian)
+- La institución que ya operaba (base `escalafon`) quedó registrada en la plataforma como `uniq`
+  (aprovisionamiento verificado con `plataforma:verificar-aprovisionamiento`; falta activarla).
+- Su carpeta `storage/app/private/instituciones/uniq` tiene enlaces simbólicos a `documentos`,
+  `fotos-personal` y `certificados-discapacidad`: no se movió ni copió nada, y el modo `unica`
+  sigue funcionando igual. En producción, esos archivos se moverían de verdad a su carpeta.
+- Solo es local: cada compañero que quiera probarlo hace lo mismo con su propia base.
+
+## Administradores de cada institución desde el panel (13/10/2026)
+- En el detalle de una institución aprovisionada: lista de sus administradores (solo cuentas con
+  `sistema.administrar` por un rol vigente: nombre, correo, estado y último acceso; nada de
+  personas ni legajos), agregar uno, darle una contraseña temporal nueva (olvido) y
+  desactivarlo o reactivarlo. Nunca deja a la institución sin un administrador activo.
+- Contraseñas temporales: se muestran una sola vez, no se guardan ni se auditan, y obligan a
+  cambiarlas al ingresar. Cada operación queda en la auditoría del panel con el correo afectado.
+- El primer administrador del aprovisionamiento usa el mismo servicio (`AdministradoresInstitucion`).
+- Al restablecer la contraseña o desactivar, la sesión abierta de esa persona termina (401):
+  `AuthenticateSession` de Sanctum y la falta de permisos. Comprobado con cookies reales.
+- Pendiente: agregar como administrador a una persona ya registrada (hoy se rechaza el correo
+  existente).
+
+## Tiempo de uso pagado (13/10/2026)
+- Cada pago es un periodo (`periodos_servicio` en la base de la plataforma): desde, hasta (ambos
+  incluidos), monto en S/ y comprobante opcionales. No se editan ni se borran; se anulan con motivo.
+  No se cruzan entre sí. Todo queda auditado.
+- Estado: vigente (periodos consecutivos se encadenan), en gracia (`dias_gracia` por institución,
+  0 a 90) o vencido. Vencido = bloqueo total por subdominio (403 `institucion_vencida`) y sus
+  trabajos en cola no se ejecutan. Al registrar un pago vuelve a operar sola.
+- Sin ningún pago registrado (ni anulado) no se controla: así siguen `uniq`, `uno` y `dos`. Desde
+  el primer pago el control queda activo; anular todos los pagos no la libera.
+- «Hoy» se calcula en `PLATAFORMA_ZONA_HORARIA` (America/Lima): el último día pagado dura hasta la
+  medianoche local, aunque la app corra en UTC.
+- Sus administradores (permiso `sistema.administrar`) ven un aviso desde 15 días antes
+  (`PLATAFORMA_AVISO_VENCIMIENTO_DIAS`) y durante la gracia; el resto del personal no.
+- Pendiente de confirmar con el cliente: moneda (hoy S/), si hay planes con distintas funciones o
+  solo tiempo, y quién en la institución recibe el aviso además de sus administradores.
