@@ -27,6 +27,8 @@ try {
     }
 
     Invoke-Docker @('compose', 'exec', '-T', 'app', 'php', 'artisan', 'migrate', '--no-interaction')
+    # Base de la plataforma y bases de cada institución aprovisionada (con una sola institución no hace nada).
+    Invoke-Docker @('compose', 'exec', '-T', 'app', 'php', 'artisan', 'plataforma:migrar-instituciones', '--no-interaction')
     Invoke-Docker @('compose', 'exec', '-T', 'app', 'php', 'artisan', 'optimize:clear', '--no-interaction')
     Invoke-Docker @('compose', 'up', '-d', '--build', '--force-recreate', 'frontend')
 

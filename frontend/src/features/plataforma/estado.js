@@ -47,6 +47,8 @@ const ACCIONES = {
   'institucion.activada': 'Activó la institución',
   'institucion.aprovisionada': 'Quedó aprovisionada',
   'institucion.aprovisionamiento_fallido': 'Falló el aprovisionamiento',
+  'institucion.migrada': 'Se migró su base',
+  'institucion.migracion_fallida': 'Falló la migración de su base',
   'administrador_institucion.creado': 'Agregó un administrador',
   'administrador_institucion.clave_restablecida': 'Dio una contraseña temporal nueva a un administrador',
   'administrador_institucion.desactivado': 'Desactivó a un administrador',
