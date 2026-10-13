@@ -21,7 +21,8 @@ class ResolverInstitucion
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (config('plataforma.modo') !== 'subdominio' || $request->is('up')) {
+        // /up (salud) e /interno/tls (permiso de certificados de Caddy) no son de ninguna institución.
+        if (config('plataforma.modo') !== 'subdominio' || $request->is('up', 'interno/tls')) {
             return $next($request);
         }
         $dominio = strtolower((string) config('plataforma.dominio'));

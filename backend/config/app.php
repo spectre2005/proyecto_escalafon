@@ -42,6 +42,15 @@ return [
     'debug' => (bool) env('APP_DEBUG', false),
 
     /*
+    | API fuera de local y pruebas: cerrada salvo que se habilite expresamente (App\Http\Middleware\ApiHabilitada).
+    | En producción, el contenedor no arranca si `php artisan produccion:verificar` falla.
+    */
+    'api_habilitada' => (bool) env('API_HABILITADA', false),
+
+    // CRUD genérico por tabla fuera de local y pruebas: solo lectura salvo que se abra expresamente (ApiHabilitada).
+    'crud_generico_escritura' => (bool) env('API_CRUD_GENERICO_ESCRITURA', false),
+
+    /*
     |--------------------------------------------------------------------------
     | Application URL
     |--------------------------------------------------------------------------

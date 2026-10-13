@@ -4,16 +4,16 @@ use App\Http\Controllers\Plataforma\AdministradorInstitucionController;
 use App\Http\Controllers\Plataforma\AuthController;
 use App\Http\Controllers\Plataforma\InstitucionController;
 use App\Http\Controllers\Plataforma\PeriodoServicioController;
-use App\Http\Middleware\LocalDevelopmentOnly;
+use App\Http\Middleware\ApiHabilitada;
 use Illuminate\Support\Facades\Route;
 
 /*
  * Panel de la plataforma SaaS (prefijo api/plataforma, grupo api con sesión y CSRF de Sanctum). Guard «plataforma»:
- * una sesión institucional no entra aquí y esta no entra en api/v1. Como el resto de la API, solo en local y testing
- * mientras no exista el despliegue. Instituciones, sus administradores y su auditoría: ninguna ruta a personas, legajos ni
- * documentos.
+ * una sesión institucional no entra aquí y esta no entra en api/v1. Como el resto de la API, fuera de local y pruebas
+ * solo responde con API_HABILITADA=true (ApiHabilitada). Instituciones, sus administradores y su auditoría: ninguna ruta
+ * a personas, legajos ni documentos.
  */
-Route::middleware(LocalDevelopmentOnly::class)->group(function (): void {
+Route::middleware(ApiHabilitada::class)->group(function (): void {
     Route::get('auth/csrf', [AuthController::class, 'csrf']);
     Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:20,1');
 

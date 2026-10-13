@@ -9,10 +9,7 @@ class RegimenNormativoSeeder extends Seeder
 {
     public function run(): void
     {
-        if (! app()->environment(['local', 'testing'])) {
-            return;
-        }
-
+        // Catálogo nacional e idempotente: también en producción (lo carga el aprovisionamiento de cada institución).
         foreach ([
             ['30220', 'Ley N° 30220 - Ley Universitaria', 'docente'],
             ['1057', 'Decreto Legislativo N° 1057 (CAS)', 'administrativo'],

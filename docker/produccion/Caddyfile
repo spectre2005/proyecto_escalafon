@@ -1,0 +1,65 @@
+# Frontal de producción. HTTPS automático por demanda: antes de pedir el certificado de un host, Caddy pregunta a la
+# aplicación (/interno/tls) si es el dominio de la plataforma o el subdominio de una institución registrada.
+{
+	email {$ACME_EMAIL}
+	on_demand_tls {
+		ask http://127.0.0.1:9090/interno/tls
+	}
+	# Para probar en una máquina sin dominio real: CADDY_GLOBAL_EXTRA=local_certs (certificados de una CA local).
+	{$CADDY_GLOBAL_EXTRA}
+}
+
+(seguridad) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+}
+
+(php) {
+	# El código de Laravel vive en el contenedor «app»; Caddy le pasa la petición por FastCGI (con el host y la IP real).
+	rewrite * /index.php?{query}
+	reverse_proxy app:9000 {
+		transport fastcgi {
+			root /var/www/html/public
+			split .php
+		}
+	}
+}
+
+https:// {
+	tls {
+		on_demand
+	}
+	import seguridad
+	encode zstd gzip
+	# Un PDF del legajo pesa hasta 2 MB; el resto de la petición, poco.
+	request_body {
+		max_size 4MB
+	}
+	@backend path /api/* /sanctum/* /up
+	handle @backend {
+		import php
+	}
+	handle {
+		root * /srv/frontend
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# Solo dentro del contenedor: la consulta de permiso de certificados (no se publica).
+http://127.0.0.1:9090 {
+	bind 127.0.0.1
+	@permiso path /interno/tls
+	handle @permiso {
+		import php
+	}
+	respond 404
+}

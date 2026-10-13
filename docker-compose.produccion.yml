@@ -1,0 +1,70 @@
+# Producción (o un servidor de pruebas igual a producción). Se usa siempre con su archivo de variables:
+#   docker compose --env-file .env.produccion -f docker-compose.produccion.yml up -d --build
+# Guía completa: docs/PRODUCCION.md. El docker-compose.yml normal es solo para desarrollo.
+name: escalafon
+
+services:
+  caddy:
+    build:
+      context: .
+      dockerfile: docker/produccion/caddy.Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${PUERTO_HTTP:-80}:80"
+      - "${PUERTO_HTTPS:-443}:443"
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?Falta ACME_EMAIL en .env.produccion}
+      CADDY_GLOBAL_EXTRA: ${CADDY_GLOBAL_EXTRA:-}
+    volumes:
+      - caddy_datos:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+  app:
+    build: &imagen_php
+      context: .
+      dockerfile: docker/produccion/php.Dockerfile
+    image: escalafon-php
+    restart: unless-stopped
+    env_file: .env.produccion
+    volumes:
+      - storage:/var/www/html/storage
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Trabajos en cola (ColasInstitucion): cada uno se ejecuta con la base y los archivos de su institución.
+  worker:
+    image: escalafon-php
+    restart: unless-stopped
+    env_file: .env.produccion
+    command: ["php", "artisan", "queue:work", "--tries=3", "--max-time=3600", "--sleep=3"]
+    volumes:
+      - storage:/var/www/html/storage
+    depends_on:
+      - app
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:?Falta DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME:?Falta DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD}
+      PLATAFORMA_DB_DATABASE: ${PLATAFORMA_DB_DATABASE:-escalafon_plataforma}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    # Sin puerto publicado: solo la aplicación llega a la base.
+    volumes:
+      - postgres:/var/lib/postgresql/data
+      - ./docker/produccion/initdb:/docker-entrypoint-initdb.d:ro
+
+volumes:
+  storage:
+  postgres:
+  caddy_datos:
+  caddy_config:

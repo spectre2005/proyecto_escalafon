@@ -75,7 +75,14 @@ class AuthController extends Controller
         $data = $request->validate([
             'password_actual' => 'required|string|max:255',
             'password' => ['required', 'string', 'max:255', 'confirmed', Password::defaults()],
-        ], ['password.confirmed' => 'Las contraseñas nuevas no coinciden.']);
+        ], [
+            'password.confirmed' => 'Las contraseñas nuevas no coinciden.',
+            // Política de Password::defaults() (en producción, más estricta): mensajes propios, no claves sin traducir.
+            'password.min' => 'La nueva contraseña debe tener al menos :min caracteres.',
+            'password.password.letters' => 'La nueva contraseña debe tener letras.',
+            'password.password.mixed' => 'La nueva contraseña debe tener mayúsculas y minúsculas.',
+            'password.password.numbers' => 'La nueva contraseña debe tener números.',
+        ]);
         /** @var Usuario $usuario */
         $usuario = $request->user();
         if (! Hash::check($data['password_actual'], $usuario->password)) {

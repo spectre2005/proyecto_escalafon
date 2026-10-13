@@ -32,7 +32,7 @@ La categoría `compensaciones-beneficios` permanece disponible como consulta gen
 
 ## API y permisos
 
-Prefijo `/api/v1`, con Sanctum y la restricción actual `LocalDevelopmentOnly`.
+Prefijo `/api/v1`, con Sanctum y la restricción `ApiHabilitada` (solo local y pruebas, salvo `API_HABILITADA=true`).
 
 | Método | Ruta | Permiso |
 |---|---|---|

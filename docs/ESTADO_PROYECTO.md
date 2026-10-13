@@ -366,3 +366,25 @@ Sección 05:
   (`PLATAFORMA_AVISO_VENCIMIENTO_DIAS`) y durante la gracia; el resto del personal no.
 - Pendiente de confirmar con el cliente: moneda (hoy S/), si hay planes con distintas funciones o
   solo tiempo, y quién en la institución recibe el aviso además de sus administradores.
+
+## Preparación para producción (13/10/2026)
+- `docker-compose.produccion.yml` con Caddy (HTTPS automático por subdominio, frontend compilado), app (php-fpm,
+  código en la imagen), worker (colas) y PostgreSQL sin puerto público. Guía: `docs/PRODUCCION.md`.
+- Caddy solo pide certificados para el dominio de la plataforma y los subdominios de instituciones registradas
+  (`/interno/tls`, que no se publica).
+- `LocalDevelopmentOnly` pasó a `ApiHabilitada`: fuera de local y pruebas la API solo responde con
+  `API_HABILITADA=true`, y el contenedor no arranca si `php artisan produccion:verificar` falla (APP_DEBUG, HTTPS,
+  cookies seguras, claves largas, dominio y Sanctum).
+- El CRUD genérico por tabla es de solo lectura fuera de local (su escritura salta las reglas de cada sección; el
+  frontend solo lo lee). Se abriría con `API_CRUD_GENERICO_ESCRITURA=true`: no sin auditar cada recurso.
+- `UbigeoSeeder` y `RegimenNormativoSeeder` corren también en producción (catálogos nacionales, idempotentes).
+- Scripts: `docker/produccion/desplegar.sh` (construye, migra todas las bases antes de reemplazar y arranca) y
+  `docker/produccion/respaldar.sh` (pg_dump de cada base y archivos privados, 14 días).
+- Probado de punta a punta en local con el entorno de producción (dominio de prueba y CA local): despliegue,
+  HTTPS por subdominio (un host inventado no obtiene certificado), cabeceras, panel, aprovisionamiento, cambio de
+  contraseña, CRUD genérico de solo lectura, actualización conservando datos, respaldo y restauración.
+- La política de contraseñas de producción (10 caracteres, mayúsculas, minúsculas y números) muestra sus mensajes en
+  español al cambiar la contraseña. Los mensajes genéricos de validación siguen en inglés: no hay `lang/es`.
+- Pendiente antes de datos reales: dónde se aloja (confirmar con el cliente), cifrado de PDF y antivirus (pend. 9),
+  usuario de PostgreSQL con permisos mínimos, copia de respaldos fuera del servidor y prueba de restauración,
+  avisos por correo.

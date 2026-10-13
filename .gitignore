@@ -1,1 +1,4 @@
 .env
+# Secretos y datos de producción: nunca al repositorio.
+.env.produccion
+respaldos/

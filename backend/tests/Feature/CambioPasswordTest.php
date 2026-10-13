@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Usuario;
 use Database\Seeders\AdministradorSeeder;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -83,5 +84,23 @@ class CambioPasswordTest extends TestCase
         $this->postJson('/api/v1/auth/login', ['email' => self::EMAIL, 'password' => self::TEMPORAL])->assertOk()
             ->assertJsonPath('data.debe_cambiar_password', false);
         $this->getJson('/api/v1/institucion')->assertOk();
+    }
+
+    public function test_the_production_password_policy_explains_what_is_missing(): void
+    {
+        $this->conTemporal();
+        $this->postJson('/api/v1/auth/login', ['email' => self::EMAIL, 'password' => self::TEMPORAL])->assertOk();
+        // En producción, Password::defaults() exige 10 caracteres, mayúsculas, minúsculas y números. Fuera de «testing»
+        // se activa el CSRF; aquí se prueban los mensajes (el CSRF tiene su propia prueba en AuthenticationTest).
+        $this->app->detectEnvironment(fn (): string => 'production');
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+        config(['app.api_habilitada' => true]);
+
+        $this->cambiar(['password_actual' => self::TEMPORAL, 'password' => 'abcdefgh', 'password_confirmation' => 'abcdefgh'])
+            ->assertUnprocessable()->assertJsonPath('errors.password', [
+                'La nueva contraseña debe tener al menos 10 caracteres.',
+                'La nueva contraseña debe tener mayúsculas y minúsculas.',
+                'La nueva contraseña debe tener números.',
+            ]);
     }
 }

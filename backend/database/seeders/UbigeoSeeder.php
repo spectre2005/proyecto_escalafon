@@ -16,10 +16,7 @@ class UbigeoSeeder extends Seeder
 
     public function run(): void
     {
-        if (! app()->environment(['local', 'testing'])) {
-            return;
-        }
-
+        // Catálogo nacional e idempotente: también en producción (lo carga el aprovisionamiento de cada institución).
         $catalog = $this->readCatalog();
         $locations = [];
         foreach (Ubigeo::query()->get(['region', 'provincia', 'distrito']) as $existing) {
