@@ -28,6 +28,8 @@
         <env name="DB_URL" value=""/>
         <env name="PLATAFORMA_DB_DRIVER" value="sqlite"/>
         <env name="PLATAFORMA_DB_DATABASE" value=":memory:"/>
+        <!-- Una sola institución aunque el .env use subdominios; ResolverInstitucionTest prueba el otro modo. -->
+        <env name="PLATAFORMA_MODO" value="unica"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

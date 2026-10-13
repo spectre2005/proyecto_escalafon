@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import api, { pedirCookieCsrf } from '../../axios'
+import api, { mensajeInstitucion, pedirCookieCsrf } from '../../axios'
 import '../../App.css'
 import { readInstitution } from '../../config/institution'
 
@@ -47,7 +47,7 @@ export default function LoginPrincipal() {
       navigate('/', { replace: true })
     } catch (failure) {
       const status = failure.response?.status
-      setError(status === 422 ? 'Correo o contrase\u00f1a incorrectos.' : status === 429 ? (failure.response?.data?.message || 'Demasiados intentos. Espera un momento.') : 'No se pudo iniciar sesi\u00f3n. Comprueba la conexi\u00f3n e intenta nuevamente.')
+      setError(mensajeInstitucion(failure) || (status === 422 ? 'Correo o contrase\u00f1a incorrectos.' : status === 429 ? (failure.response?.data?.message || 'Demasiados intentos. Espera un momento.') : 'No se pudo iniciar sesi\u00f3n. Comprueba la conexi\u00f3n e intenta nuevamente.'))
     } finally { setBusy(false) }
   }
 

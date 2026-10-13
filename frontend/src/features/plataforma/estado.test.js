@@ -12,7 +12,7 @@ test('state actions follow what the backend allows', () => {
     { activar: true, suspender: false, textoActivar: 'Reactivar' })
   assert.equal(accionesDisponibles(null).activar, false)
   assert.equal(etiquetaEstado('suspendida'), 'Suspendida')
-  // Hasta que exista el cambio de base por petición, suspender no bloquea el acceso: se avisa junto al botón.
+  // Sin identificar la institución por subdominio, suspender no bloquea el acceso: se avisa junto al botón.
   assert.equal(AVISO_SUSPENSION, 'La suspensión queda registrada, pero aún no bloquea el acceso de la institución.')
 })
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import api from '../../axios'
+import api, { mensajeInstitucion } from '../../axios'
 import AdminLayout from '../../layouts/AdminLayout'
 import { SessionContext } from './session'
 
@@ -11,7 +11,8 @@ export default function RequireSession() {
     const controller = new AbortController()
     api.get('/auth/me', { signal: controller.signal }).then(response => setSession({ data: response.data.data })).catch(error => {
       if (controller.signal.aborted) return
-      setSession([401, 403, 419].includes(error.response?.status) ? { data: null } : { error: true })
+      // Sin sesión o institución no disponible: al login, que muestra el motivo al intentar entrar.
+      setSession([401, 403, 419].includes(error.response?.status) || mensajeInstitucion(error) ? { data: null } : { error: true })
     })
     return () => controller.abort()
   }, [attempt])

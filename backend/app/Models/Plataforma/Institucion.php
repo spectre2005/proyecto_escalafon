@@ -81,6 +81,8 @@ class Institucion extends Model
             'ubicacion_editable' => $this->ubicacionEditable(),
             'motivo_no_activable' => $this->motivoNoActivable(),
             'motivo_no_suspendible' => $this->motivoNoSuspendible(),
+            // Solo identificando por subdominio (ResolverInstitucion) la suspensión bloquea el acceso.
+            'suspension_bloquea_acceso' => config('plataforma.modo') === 'subdominio',
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

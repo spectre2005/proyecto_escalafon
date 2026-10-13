@@ -5,7 +5,7 @@ export const ESTADOS = {
   suspendida: { etiqueta: 'Suspendida', clase: 'bg-rose-50 text-rose-700 ring-rose-200' },
 }
 
-/** Se quita cuando exista el cambio de base por petición (la suspensión pase a bloquear el acceso). */
+/** Solo se muestra si la institución no se identifica por subdominio (suspension_bloquea_acceso = false). */
 export const AVISO_SUSPENSION = 'La suspensión queda registrada, pero aún no bloquea el acceso de la institución.'
 
 export const etiquetaEstado = estado => ESTADOS[estado]?.etiqueta || estado || '—'

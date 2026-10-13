@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\LegajoSoloLectura;
 use App\Http\Middleware\RequireAdministrator;
+use App\Http\Middleware\ResolverInstitucion;
 use App\Http\Middleware\SesionPlataforma;
 use Illuminate\Auth\Middleware\Authorize;
 use Illuminate\Foundation\Application;
@@ -20,6 +21,8 @@ return Application::configure(basePath: dirname(__DIR__))
         then: fn () => Route::middleware([SesionPlataforma::class, 'api'])->prefix('api/plataforma')->group(base_path('routes/plataforma.php')),
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Antes que todo (también de la sesión): con PLATAFORMA_MODO=subdominio cambia a la base de la institución.
+        $middleware->prepend(ResolverInstitucion::class);
         $middleware->statefulApi();
         $middleware->appendToPriorityList(Authorize::class, LegajoSoloLectura::class);
         // Alias temporal: las rutas ya usan can:<permiso>.

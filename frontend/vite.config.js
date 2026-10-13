@@ -8,9 +8,11 @@ export default defineConfig({
   server: {
     host: true,
     watch: { usePolling: true },
+    // changeOrigin: false conserva el host del navegador (p. ej. unsa.localhost:5173): el backend identifica la
+    // institución por el subdominio (PLATAFORMA_MODO=subdominio).
     proxy: {
-      '/api': { target: 'http://nginx', changeOrigin: true },
-      '/sanctum': { target: 'http://nginx', changeOrigin: true },
+      '/api': { target: 'http://nginx', changeOrigin: false },
+      '/sanctum': { target: 'http://nginx', changeOrigin: false },
     },
   },
 })

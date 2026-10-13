@@ -31,7 +31,15 @@ export function pedirCookieCsrf() {
   return api.get(new URL('/sanctum/csrf-cookie', apiUrl).href)
 }
 
+/** Rechazo del backend por la institución del subdominio (no existe o está suspendida): su mensaje se muestra tal cual. */
+export function mensajeInstitucion(error) {
+  const data = error?.response?.data
+  return String(data?.codigo || '').startsWith('institucion_') ? data.message : null
+}
+
 export function apiErrorMessage(error) {
+  const institucion = mensajeInstitucion(error)
+  if (institucion) return institucion
   const errors = error.response?.data?.errors
   if (errors) {
     return Object.entries(errors)
