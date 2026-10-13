@@ -119,6 +119,49 @@ Sección 05:
 25. Días de un movimiento: ¿calendario o hábiles? Hoy se registran tal como dice el documento, sin superar el rango de fechas. ¿Los permisos por horas se registran con 0 días?
 26. ¿Algún documento de la 05 debe ser obligatorio (hoy ninguno)? ¿Hace falta controlar un saldo vacacional? Hoy solo se informan los días de goce y de adelanto por período.
 
+Accesos delegados (sugerencia del docente, 13/10/2026; pendiente de confirmar con el cliente):
+29. Que el jefe de la ORH dé cuenta y rol a su personal de apoyo (arts. 6.3 y 6.4) desde una pantalla «Usuarios y
+    accesos», con fecha de fin opcional y auditoría. Hoy no hay forma en producción (el CRUD genérico es de solo
+    lectura). Propuesta: roles fijos (`asistente_legajo` ya definido en config/permisos.php, sin crear en la base).
+    Preguntas: (a) confirmar la tabla «Límites del asistente»; (b) ¿ve datos sensibles? (pend. 4); (c) ¿quien sube
+    puede recepcionar? (pend. 8); (d) ¿el jefe puede crear otros administradores o solo ayudantes?; (e) ¿alcance por
+    tipo de personal o unidad orgánica?
+
+## Hoja de ruta del sistema institucional (por definir, analizado el 13/10/2026)
+
+Funcionalidades que faltan, con su base en la directiva. Orden propuesto, sin decidir:
+1. Verificar, observar o marcar falso documentos en todas las secciones, con bandeja de pendientes (hoy solo
+   «aceptar u observar» en 03, 04, 06, 08 y 10, cada una por su lado). Depende de pend. 3 y 10.
+2. Fiscalización posterior (art. 7, Anexos 03 y 04): iniciar, oficio, resultado y plazos (personal de confianza: inicia
+   a los 2 días hábiles de vinculado y termina en 15). El ítem del menú existe sin pantalla.
+3. Formatos imprimibles: carátula (Anexo 09), control de incorporaciones (06), matriz de legajos (08), referencia de
+   legajo pasivo (07).
+4. Inicio con alertas: requerimientos por vencer (5 días hábiles + 5 de prórroga), actualización (30 días hábiles),
+   documentos sin recepción, vínculos y fiscalizaciones por vencer, completitud (pend. 3). Verificar plazos en el PDF.
+5. Accesos y custodia (art. 6, Anexo 02): solicitudes, préstamo y devolución. El ítem del menú existe sin pantalla.
+6. Secciones 12 (pend. 1) y 13 (legajo pasivo), las únicas sin pantalla.
+7. Usuarios y accesos (pend. 29). 8. Auditoría visible para el jefe. 9. Notificaciones (tabla sin uso).
+- Mientras tanto: ocultar o marcar «Próximamente» Fiscalización y Accesos y custodia en el menú.
+- Recuadro «Un espacio para tu institución» del menú lateral (`layouts/Sidebar.jsx`): duplica el menú Configuración,
+  lo ven todos aunque solo sirve al administrador y no desaparece. Propuesta (por definir): mostrarlo solo a
+  administradores mientras la institución no se haya personalizado (`configured`), y separar el nombre legal del
+  contrato (panel de plataforma) de la identidad visible (configuración de la institución).
+
+## Hoja de ruta del panel de plataforma (superadmin) (por definir, analizado el 13/10/2026)
+
+Hoy tiene: resumen por estado y últimas 8 operaciones; listado, registro y detalle de instituciones (datos,
+aprovisionar, activar/suspender, tiempo de uso, administradores, auditoría). Por consola: superadmins, migraciones y
+verificación. Falta, en el orden propuesto (sin decidir):
+1. Datos del cliente y del contrato: razón social, RUC, contacto, N.º de contrato y fecha de inicio.
+2. Resumen útil: vencimientos en los próximos 30 días, en gracia o vencidas, ingresos del mes y del año.
+3. Seguridad del superadmin: gestionarlos desde el panel, cambiar la propia contraseña y verificación en dos pasos.
+4. Dar de baja una institución y exportar sus datos (base y PDF) al terminar el contrato; luego archivarla.
+5. Uso por institución (personas, legajos, documentos, espacio, último ingreso) y estado técnico (salud, cola fallida,
+   último respaldo, migraciones pendientes).
+6. Comprobante adjunto al pago, auditoría global con filtros y exportación, avisos a las instituciones.
+7. Planes y límites: pendiente del cliente.
+- No recomendado: «entrar como» una institución para soporte (vería datos personales y de salud).
+
 ## Siguientes pasos
 
 1. Revisar y hacer commit de la sección 01 (`feature/seccion-01-alinear`) y probarla en el navegador con la persona demo 99000101.
@@ -392,6 +435,13 @@ Sección 05:
   («fecha de emisión», «correo electrónico»).
 - `APP_LOCALE=es` y `APP_FALLBACK_LOCALE=en` (si faltara una traducción, se ve en inglés y no la clave). Cada
   compañero debe cambiar esas dos líneas en su `backend/.env`.
-- Pendiente antes de datos reales: dónde se aloja (confirmar con el cliente), cifrado de PDF y antivirus (pend. 9),
+- Alojamiento decidido (13/10/2026): SaaS en un servidor en la nube alquilado por nosotros. Falta el contrato con
+  cada universidad (aceptación del proveedor y, si está fuera del Perú, flujo transfronterizo, Ley 29733).
+- Pendiente (técnico, propuesto el 13/10/2026): usuarios de PostgreSQL con permisos mínimos. `escalafon_app` (solo
+  filas) para el día a día y `escalafon_dueno` (crea bases y migra) para migraciones y aprovisionamiento; el
+  superusuario fuera de la aplicación; `produccion:verificar` rechazaría un superusuario. Falta decidir si la
+  credencial de dueño vive en la app (A) o solo en el worker, con aprovisionamiento en cola (B); opcional: que la
+  base impida modificar o borrar auditoría, bitácora e historial.
+- Pendiente antes de datos reales: cifrado de PDF y antivirus (pend. 9),
   usuario de PostgreSQL con permisos mínimos, copia de respaldos fuera del servidor y prueba de restauración,
   avisos por correo.

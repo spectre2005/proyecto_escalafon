@@ -27,8 +27,10 @@ Los certificados HTTPS los pide Caddy a Let's Encrypt la primera vez que alguien
 pregunta a la aplicación si el host es el dominio de la plataforma o el de una institución registrada; si no lo es,
 no pide nada.
 
-**Pendiente de confirmar con el cliente:** si la entidad exige que los datos estén en sus propios servidores o en
-Perú. Eso decide dónde se instala.
+**Decidido (13/10/2026):** modelo SaaS en un servidor en la nube que alquilamos nosotros; todas las instituciones en
+el mismo servidor, cada una con su base y su carpeta. **Pendiente de confirmar en el contrato con cada universidad:**
+que acepta que sus datos personales estén en ese proveedor (si el servidor está fuera del Perú, es un flujo
+transfronterizo de datos personales según la Ley 29733) y quién es responsable de qué.
 
 ## Primera instalación
 
