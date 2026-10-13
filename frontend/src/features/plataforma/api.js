@@ -47,6 +47,9 @@ export const suspenderInstitucion = (id, motivo) => plataforma.post(`/institucio
 export const activarInstitucion = (id, motivo) => plataforma.post(`/instituciones/${id}/activar`, motivo ? { motivo } : {}).then(r => r.data.data)
 // Crear y migrar la base y cargar los catálogos toma unos segundos: más margen que el resto.
 export const aprovisionarInstitucion = (id, datos) => plataforma.post(`/instituciones/${id}/aprovisionar`, datos, { timeout: 300000 }).then(r => r.data.data)
+export const verPeriodos = (id, signal) => plataforma.get(`/instituciones/${id}/periodos`, { signal }).then(r => r.data.data)
+export const registrarPeriodo = (id, datos) => plataforma.post(`/instituciones/${id}/periodos`, datos).then(r => r.data.data)
+export const anularPeriodo = (id, periodo, motivo) => plataforma.post(`/instituciones/${id}/periodos/${periodo}/anular`, { motivo }).then(r => r.data.data)
 export const listarAdministradores = (id, signal) => plataforma.get(`/instituciones/${id}/administradores`, { signal }).then(r => r.data.data)
 export const agregarAdministrador = (id, datos) => plataforma.post(`/instituciones/${id}/administradores`, datos).then(r => r.data.data)
 export const restablecerAdministrador = (id, admin) => plataforma.post(`/instituciones/${id}/administradores/${admin}/restablecer`).then(r => r.data.data)

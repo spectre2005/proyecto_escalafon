@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { activarInstitucion, aprovisionarInstitucion, editarInstitucion, mensajeError, sesionTerminada, suspenderInstitucion, verInstitucion } from '../api'
-import { Aviso, Credenciales, EstadoInstitucion, SinAprovisionar } from '../componentes'
+import { Aviso, Credenciales, EstadoInstitucion, EstadoServicio, SinAprovisionar } from '../componentes'
 import AdministradoresInstitucion from './AdministradoresInstitucion'
+import ServicioInstitucion from './ServicioInstitucion'
 import { AVISO_SUSPENSION, accionesDisponibles, cambios, etiquetaAccion, fecha } from '../estado'
 import { useSesionPlataforma } from '../sesion'
 
@@ -142,7 +143,7 @@ export default function InstitucionDetallePage() {
   return <section aria-labelledby="titulo-institucion">
     <Link to="/plataforma/instituciones" className="text-sm text-teal-700 underline">Volver a instituciones</Link>
     <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
-      <div><h1 id="titulo-institucion" className="text-2xl font-bold text-slate-900">{institucion.nombre}</h1><div className="mt-2 flex flex-wrap gap-2"><EstadoInstitucion estado={institucion.estado} /><SinAprovisionar institucion={institucion} /></div></div>
+      <div><h1 id="titulo-institucion" className="text-2xl font-bold text-slate-900">{institucion.nombre}</h1><div className="mt-2 flex flex-wrap gap-2"><EstadoInstitucion estado={institucion.estado} /><EstadoServicio servicio={institucion.servicio} /><SinAprovisionar institucion={institucion} /></div></div>
       <div className="grid justify-items-end gap-2">
         <div className="flex flex-wrap justify-end gap-2">
           {acciones.aprovisionar && <button type="button" onClick={() => { setAviso(''); setConfirmar('aprovisionar') }} className="rounded-xl bg-teal-700 px-4 py-2 text-sm font-semibold text-white">Aprovisionar</button>}
@@ -175,6 +176,7 @@ export default function InstitucionDetallePage() {
       <Dato etiqueta="Registrada">{fecha(institucion.created_at)}</Dato>
       <Dato etiqueta="Última modificación">{fecha(institucion.updated_at)}</Dato>
     </dl>}
+    <ServicioInstitucion institucion={institucion} onCambio={recargar} />
     {institucion.aprovisionada && <AdministradoresInstitucion institucion={institucion} onCambio={recargar} />}
     <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
       <h2 className="font-semibold text-slate-800">Auditoría</h2>

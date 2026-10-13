@@ -10,6 +10,42 @@ export const AVISO_SUSPENSION = 'La suspensión queda registrada, pero aún no b
 
 export const etiquetaEstado = estado => ESTADOS[estado]?.etiqueta || estado || '—'
 
+/** Tiempo de uso pagado (servicio.estado del backend). Sin periodos: aún no se controla. */
+export const SERVICIO = {
+  sin_periodos: { etiqueta: 'Sin periodos registrados', clase: 'bg-slate-100 text-slate-600 ring-slate-200' },
+  vigente: { etiqueta: 'Al día', clase: 'bg-teal-50 text-teal-800 ring-teal-200' },
+  en_gracia: { etiqueta: 'Vencido, en días de gracia', clase: 'bg-amber-50 text-amber-800 ring-amber-200' },
+  vencido: { etiqueta: 'Vencido: sin acceso', clase: 'bg-rose-50 text-rose-700 ring-rose-200' },
+}
+
+/** Fecha del backend (AAAA-MM-DD) como DD/MM/AAAA, sin pasar por zonas horarias. */
+export const fechaCorta = valor => /^\d{4}-\d{2}-\d{2}/.test(valor || '') ? valor.slice(0, 10).split('-').reverse().join('/') : '—'
+
+/** Texto del estado del servicio: «Al día hasta el 31/12/2026 (15 días)», «Vencido el …», etc. */
+export function textoServicio(servicio) {
+  if (!servicio) return '—'
+  if (servicio.estado === 'vigente') return `Al día hasta el ${fechaCorta(servicio.vence_el)} (${servicio.dias_restantes === 0 ? 'vence hoy' : `${servicio.dias_restantes} día${servicio.dias_restantes === 1 ? '' : 's'}`})`
+  if (servicio.estado === 'en_gracia') return `Venció el ${fechaCorta(servicio.vence_el)}; funciona hasta el ${fechaCorta(servicio.gracia_hasta)} por días de gracia`
+  if (servicio.estado === 'vencido') return servicio.vence_el ? `Venció el ${fechaCorta(servicio.vence_el)}: la institución no tiene acceso` : `Sin periodo vigente${servicio.proximo_desde ? ` (el siguiente empieza el ${fechaCorta(servicio.proximo_desde)})` : ''}: la institución no tiene acceso`
+  return 'Aún no se registró ningún pago: el acceso no se controla por tiempo.'
+}
+
+/**
+ * Periodo propuesto para un pago nuevo: empieza el día siguiente al último periodo vigente (o hoy, si no hay ninguno
+ * o ya terminó) y dura un año. hoy: AAAA-MM-DD. El usuario puede cambiarlo.
+ */
+export function proponerPeriodo(periodos, hoy) {
+  const ultimo = (periodos || []).filter(periodo => !periodo.anulado).map(periodo => periodo.hasta).sort().at(-1)
+  const desde = ultimo && ultimo >= hoy ? sumarDias(ultimo, 1) : hoy
+  const [anio, mes, dia] = desde.split('-').map(Number)
+  return { desde, hasta: sumarDias(new Date(Date.UTC(anio + 1, mes - 1, dia)).toISOString().slice(0, 10), -1) }
+}
+
+function sumarDias(fecha, dias) {
+  const [anio, mes, dia] = fecha.split('-').map(Number)
+  return new Date(Date.UTC(anio, mes - 1, dia + dias)).toISOString().slice(0, 10)
+}
+
 /** Acciones disponibles: aprovisionar solo si está registrada y sin aprovisionar; activar solo si está aprovisionada; suspender solo si está activa. */
 export function accionesDisponibles(institucion) {
   if (!institucion) return { aprovisionar: false, activar: false, suspender: false, textoActivar: 'Activar' }
@@ -53,6 +89,8 @@ const ACCIONES = {
   'administrador_institucion.clave_restablecida': 'Dio una contraseña temporal nueva a un administrador',
   'administrador_institucion.desactivado': 'Desactivó a un administrador',
   'administrador_institucion.reactivado': 'Reactivó a un administrador',
+  'periodo.registrado': 'Registró un pago (periodo de uso)',
+  'periodo.anulado': 'Anuló un periodo de uso',
   'sesion.inicio': 'Inició sesión',
   'sesion.cierre': 'Cerró sesión',
   'administrador.creado': 'Se creó una cuenta de administración',

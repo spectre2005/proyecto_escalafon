@@ -38,7 +38,7 @@ class InstitucionController extends Controller
     public function index(Request $request): JsonResponse
     {
         $filtros = $request->validate(['q' => 'nullable|string|max:150', 'estado' => ['nullable', Rule::in(Institucion::ESTADOS)], 'page' => 'sometimes|integer|min:1']);
-        $consulta = Institucion::query()->orderBy('nombre')->orderBy('id');
+        $consulta = Institucion::query()->with('periodos')->orderBy('nombre')->orderBy('id');
         if (! empty($filtros['q'])) {
             $texto = '%'.mb_strtolower(trim($filtros['q'])).'%';
             $consulta->where(fn ($q) => $q->whereRaw('LOWER(nombre) LIKE ?', [$texto])->orWhereRaw('LOWER(slug) LIKE ?', [$texto]));
@@ -79,7 +79,7 @@ class InstitucionController extends Controller
     public function update(Request $request, string $institucion): JsonResponse
     {
         $registro = Institucion::query()->findOrFail($institucion);
-        $this->sinCamposAjenos($request, ['nombre', 'slug', 'base_datos', 'almacenamiento']);
+        $this->sinCamposAjenos($request, ['nombre', 'slug', 'base_datos', 'almacenamiento', 'dias_gracia']);
         $ubicacion = array_intersect(array_keys($request->all()), ['slug', 'base_datos', 'almacenamiento']);
         if ($ubicacion !== [] && ! $registro->ubicacionEditable()) {
             throw ValidationException::withMessages(array_fill_keys($ubicacion,
@@ -88,7 +88,9 @@ class InstitucionController extends Controller
         if ($request->has('slug')) {
             $request->merge(['slug' => mb_strtolower(trim((string) $request->input('slug')))]);
         }
-        $data = $request->validate(array_map(fn (array $reglas): array => ['sometimes', ...$reglas], $this->reglas($registro->id)));
+        $data = $request->validate([...array_map(fn (array $reglas): array => ['sometimes', ...$reglas], $this->reglas($registro->id)),
+            // Días que sigue funcionando (con aviso) después de vencer su tiempo de uso.
+            'dias_gracia' => ['sometimes', 'integer', 'min:0', 'max:90']]);
         $antes = $this->huella($registro);
         $registro->update(isset($data['nombre']) ? [...$data, 'nombre' => trim($data['nombre'])] : $data);
         AuditoriaOperaciones::registrar('institucion.editada', $request, Auth::guard('plataforma')->id(), $registro->id, $antes, $this->huella($registro));
@@ -184,7 +186,7 @@ class InstitucionController extends Controller
     /** @return array<string, mixed> */
     private function huella(Institucion $institucion): array
     {
-        return $institucion->only(['nombre', 'slug', 'estado', 'base_datos', 'almacenamiento', 'motivo_suspension']);
+        return $institucion->only(['nombre', 'slug', 'estado', 'base_datos', 'almacenamiento', 'motivo_suspension', 'dias_gracia']);
     }
 
     /** @return array<string, mixed> */

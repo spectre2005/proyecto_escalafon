@@ -22,5 +22,5 @@ export default function RequireSession() {
   if (!session.data) return <Navigate to="/login_principal" replace />
   // Contraseña temporal: nada del sistema hasta cambiarla (el backend también lo exige).
   if (session.data.debe_cambiar_password) return <CambiarPasswordObligatorio usuario={session.data.usuario} onCambiada={data => setSession({ data })} />
-  return <SessionContext.Provider value={session.data}><AdminLayout user={session.data.usuario} /></SessionContext.Provider>
+  return <SessionContext.Provider value={session.data}><AdminLayout user={session.data.usuario} avisoServicio={session.data.aviso_servicio} /></SessionContext.Provider>
 }

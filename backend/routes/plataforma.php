@@ -3,6 +3,7 @@
 use App\Http\Controllers\Plataforma\AdministradorInstitucionController;
 use App\Http\Controllers\Plataforma\AuthController;
 use App\Http\Controllers\Plataforma\InstitucionController;
+use App\Http\Controllers\Plataforma\PeriodoServicioController;
 use App\Http\Middleware\LocalDevelopmentOnly;
 use Illuminate\Support\Facades\Route;
 
@@ -27,6 +28,10 @@ Route::middleware(LocalDevelopmentOnly::class)->group(function (): void {
         Route::post('instituciones/{institucion}/suspender', [InstitucionController::class, 'suspender'])->whereUuid('institucion');
         Route::post('instituciones/{institucion}/activar', [InstitucionController::class, 'activar'])->whereUuid('institucion');
         Route::post('instituciones/{institucion}/aprovisionar', [InstitucionController::class, 'aprovisionar'])->whereUuid('institucion');
+        // Tiempo de uso pagado: periodos (no se editan; se anulan con motivo).
+        Route::get('instituciones/{institucion}/periodos', [PeriodoServicioController::class, 'index'])->whereUuid('institucion');
+        Route::post('instituciones/{institucion}/periodos', [PeriodoServicioController::class, 'store'])->whereUuid('institucion');
+        Route::post('instituciones/{institucion}/periodos/{periodo}/anular', [PeriodoServicioController::class, 'anular'])->whereUuid(['institucion', 'periodo']);
         // Administradores de cada institución: solo cuentas de administración, nunca personas ni legajos.
         Route::get('instituciones/{institucion}/administradores', [AdministradorInstitucionController::class, 'index'])->whereUuid('institucion');
         Route::post('instituciones/{institucion}/administradores', [AdministradorInstitucionController::class, 'store'])->whereUuid('institucion');

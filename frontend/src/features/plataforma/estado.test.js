@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { AVISO_SUSPENSION, accionesDisponibles, cambios, etiquetaEstado, proponerSlug, proponerUbicacion } from './estado.js'
+import { AVISO_SUSPENSION, accionesDisponibles, cambios, etiquetaEstado, fechaCorta, proponerPeriodo, proponerSlug, proponerUbicacion, textoServicio } from './estado.js'
 import { esEscritura, mensajeError } from './api.js'
 
 test('state actions follow what the backend allows', () => {
@@ -41,4 +41,23 @@ test('api errors become readable messages', () => {
 test('the platform CSRF token is only sent on writes', () => {
   assert.deepEqual(['get', 'GET', 'head', 'options', undefined].map(esEscritura), [false, false, false, false, false])
   assert.deepEqual(['post', 'patch', 'PUT', 'delete'].map(esEscritura), [true, true, true, true])
+})
+
+test('a new payment starts the day after the last valid period and lasts a year', () => {
+  const periodos = [{ hasta: '2026-12-31', anulado: false }, { hasta: '2027-12-31', anulado: true }]
+  assert.deepEqual(proponerPeriodo(periodos, '2026-06-15'), { desde: '2027-01-01', hasta: '2027-12-31' })
+  // Sin periodos, o si el último ya terminó: desde hoy.
+  assert.deepEqual(proponerPeriodo([], '2026-06-15'), { desde: '2026-06-15', hasta: '2027-06-14' })
+  assert.deepEqual(proponerPeriodo([{ hasta: '2026-03-31', anulado: false }], '2026-06-15'), { desde: '2026-06-15', hasta: '2027-06-14' })
+  assert.deepEqual(proponerPeriodo([], '2028-02-29'), { desde: '2028-02-29', hasta: '2029-02-28' })
+})
+
+test('the service state is described with local dates', () => {
+  assert.equal(fechaCorta('2026-12-31'), '31/12/2026')
+  assert.equal(fechaCorta(null), '—')
+  assert.equal(textoServicio({ estado: 'vigente', vence_el: '2026-12-31', dias_restantes: 1 }), 'Al día hasta el 31/12/2026 (1 día)')
+  assert.equal(textoServicio({ estado: 'vigente', vence_el: '2026-12-31', dias_restantes: 0 }), 'Al día hasta el 31/12/2026 (vence hoy)')
+  assert.match(textoServicio({ estado: 'en_gracia', vence_el: '2026-06-10', gracia_hasta: '2026-06-17' }), /funciona hasta el 17\/06\/2026/)
+  assert.match(textoServicio({ estado: 'vencido', vence_el: null, proximo_desde: '2026-07-01' }), /empieza el 01\/07\/2026/)
+  assert.match(textoServicio({ estado: 'sin_periodos' }), /no se controla/)
 })

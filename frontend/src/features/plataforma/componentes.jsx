@@ -1,8 +1,15 @@
 import { useState } from 'react'
-import { ESTADOS, etiquetaEstado } from './estado'
+import { ESTADOS, SERVICIO, etiquetaEstado } from './estado'
 
 export function EstadoInstitucion({ estado }) {
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${ESTADOS[estado]?.clase || 'bg-slate-50 text-slate-600 ring-slate-200'}`}>{etiquetaEstado(estado)}</span>
+}
+
+/** Estado del tiempo de uso pagado (servicio.estado). */
+export function EstadoServicio({ servicio }) {
+  const estado = SERVICIO[servicio?.estado]
+  if (!estado) return null
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${estado.clase}`}>{estado.etiqueta}</span>
 }
 
 export function SinAprovisionar({ institucion }) {

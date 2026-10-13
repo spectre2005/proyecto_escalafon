@@ -4,6 +4,8 @@ namespace App\Models\Plataforma;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * Institución cliente de la plataforma. Cada una tendrá su base de datos (base_datos) y su almacenamiento
@@ -39,12 +41,65 @@ class Institucion extends Model
 
     protected $table = 'instituciones';
 
-    protected $fillable = ['nombre', 'slug', 'estado', 'base_datos', 'almacenamiento', 'aprovisionada_en', 'suspendida_en', 'motivo_suspension'];
+    protected $fillable = ['nombre', 'slug', 'estado', 'base_datos', 'almacenamiento', 'aprovisionada_en', 'suspendida_en', 'motivo_suspension', 'dias_gracia'];
 
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['aprovisionada_en' => 'datetime', 'suspendida_en' => 'datetime'];
+        return ['aprovisionada_en' => 'datetime', 'suspendida_en' => 'datetime', 'dias_gracia' => 'integer'];
+    }
+
+    public function periodos(): HasMany
+    {
+        return $this->hasMany(PeriodoServicio::class, 'institucion_id');
+    }
+
+    /**
+     * Estado del tiempo de uso pagado, a la fecha de hoy en PLATAFORMA_ZONA_HORARIA (no en UTC: un servicio pagado
+     * hasta el 31/12 dura todo ese día en la hora local). Los periodos consecutivos o superpuestos se encadenan.
+     * - sin_periodos: nunca se registró un pago, ni siquiera anulado; no se controla (instituciones anteriores al
+     *   control de pagos). Desde el primer pago registrado, el control queda activo.
+     * - vigente: hoy está cubierto; vence_el es el fin de la cobertura continua.
+     * - en_gracia: venció hace no más de dias_gracia días; funciona, con aviso.
+     * - vencido: sin cobertura hoy (incluye pagos que aún no empiezan); la institución no opera.
+     *
+     * @return array{estado: string, vence_el: ?string, gracia_hasta: ?string, dias_restantes: ?int, proximo_desde: ?string}
+     */
+    public function servicio(): array
+    {
+        $hoy = Carbon::now((string) config('plataforma.zona_horaria'))->startOfDay();
+        $periodos = $this->periodos->where('anulado', false)->sortBy(fn (PeriodoServicio $p) => $p->desde->toDateString())
+            ->map(fn (PeriodoServicio $p): array => [Carbon::parse($p->desde->toDateString(), $hoy->tz), Carbon::parse($p->hasta->toDateString(), $hoy->tz)])->values();
+        $resultado = ['estado' => 'sin_periodos', 'vence_el' => null, 'gracia_hasta' => null, 'dias_restantes' => null,
+            'proximo_desde' => ($periodos->first(fn (array $p): bool => $p[0]->gt($hoy))[0] ?? null)?->toDateString()];
+        // Nunca se registró un pago (ni anulado): sin control. Anular todos los pagos no libera a la institución.
+        if ($this->periodos->isEmpty()) {
+            return $resultado;
+        }
+        $fin = $periodos->first(fn (array $p): bool => $p[0]->lte($hoy) && $p[1]->gte($hoy))[1] ?? null;
+        if ($fin !== null) {
+            // Cobertura continua: se encadenan los que empiezan a más tardar el día siguiente al fin.
+            do {
+                $extendido = $periodos->first(fn (array $p): bool => $p[0]->lte($fin->copy()->addDay()) && $p[1]->gt($fin));
+                $fin = $extendido[1] ?? $fin;
+            } while ($extendido !== null);
+
+            return [...$resultado, 'estado' => 'vigente', 'vence_el' => $fin->toDateString(), 'dias_restantes' => (int) $hoy->diffInDays($fin)];
+        }
+        $ultimo = $periodos->filter(fn (array $p): bool => $p[1]->lt($hoy))->max(fn (array $p) => $p[1]->toDateString());
+        if ($ultimo === null) {
+            return [...$resultado, 'estado' => 'vencido'];
+        }
+        $gracia = Carbon::parse($ultimo, $hoy->tz)->addDays($this->dias_gracia ?? 0);
+
+        return [...$resultado, 'estado' => $hoy->lte($gracia) ? 'en_gracia' : 'vencido', 'vence_el' => $ultimo,
+            'gracia_hasta' => ($this->dias_gracia ?? 0) > 0 ? $gracia->toDateString() : null];
+    }
+
+    /** Opera (atiende peticiones y trabajos en cola): activa y con el servicio no vencido. */
+    public function operativa(): bool
+    {
+        return $this->estado === self::ACTIVA && $this->servicio()['estado'] !== 'vencido';
     }
 
     public function aprovisionada(): bool
@@ -88,6 +143,8 @@ class Institucion extends Model
             'ubicacion_editable' => $this->ubicacionEditable(),
             'motivo_no_activable' => $this->motivoNoActivable(),
             'motivo_no_suspendible' => $this->motivoNoSuspendible(),
+            'dias_gracia' => $this->dias_gracia ?? 0,
+            'servicio' => $this->servicio(),
             // Solo identificando por subdominio (ResolverInstitucion) la suspensión bloquea el acceso.
             'suspension_bloquea_acceso' => config('plataforma.modo') === 'subdominio',
             'created_at' => $this->created_at?->toIso8601String(),

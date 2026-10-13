@@ -6,12 +6,14 @@ use App\Models\Plataforma\Institucion;
 use App\Support\Plataforma\ConexionInstitucion;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Con PLATAFORMA_MODO=subdominio, identifica la institución por el subdominio ({slug}.{PLATAFORMA_DOMINIO}) y atiende la
  * petición con su base, su almacenamiento y sus sesiones (ConexionInstitucion). Es global y va primero, antes de que se
- * abra la sesión. Solo opera una institución activa: la registrada responde como inexistente y la suspendida, 403.
+ * abra la sesión. Solo opera una institución activa y con su tiempo de uso al día: la registrada responde como
+ * inexistente; la suspendida y la vencida (pasados sus días de gracia), 403.
  * El panel (api/plataforma) solo responde en el dominio base, sin subdominio.
  * Con PLATAFORMA_MODO=unica (por defecto) no hace nada: una sola institución con la base del .env.
  */
@@ -37,6 +39,12 @@ class ResolverInstitucion
         }
         if ($institucion->estado === Institucion::SUSPENDIDA) {
             return self::rechazo(403, 'institucion_suspendida', 'El acceso de esta institución está suspendido. Comunícate con el soporte de la plataforma.');
+        }
+        $servicio = $institucion->servicio();
+        if ($servicio['estado'] === 'vencido') {
+            $fecha = $servicio['vence_el'] ? ' el '.Carbon::parse($servicio['vence_el'])->format('d/m/Y') : '';
+
+            return self::rechazo(403, 'institucion_vencida', "El tiempo de uso de esta institución venció{$fecha}. Comunícate con el soporte de la plataforma para renovarlo.");
         }
 
         return ConexionInstitucion::usar($institucion, fn (): Response => $next($request));

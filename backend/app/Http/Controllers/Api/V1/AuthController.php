@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\Plataforma\Institucion;
 use App\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -97,7 +98,28 @@ class AuthController extends Controller
             'permisos' => $usuario->permisos(),
             've_datos_sensibles' => $usuario->veDatosSensibles(),
             'debe_cambiar_password' => (bool) $usuario->debe_cambiar_password,
+            'aviso_servicio' => $this->avisoServicio($usuario),
         ]]);
+    }
+
+    /**
+     * Aviso del tiempo de uso, solo para quien administra la institución (por subdominio): por vencer (desde
+     * plataforma.aviso_vencimiento_dias antes) o vencido en días de gracia. El resto del personal no lo ve.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function avisoServicio(Usuario $usuario): ?array
+    {
+        if (! app()->bound(Institucion::class) || ! $usuario->tienePermiso('sistema.administrar')) {
+            return null;
+        }
+        $servicio = app(Institucion::class)->servicio();
+
+        return match (true) {
+            $servicio['estado'] === 'en_gracia' => ['tipo' => 'en_gracia', 'vence_el' => $servicio['vence_el'], 'gracia_hasta' => $servicio['gracia_hasta']],
+            $servicio['estado'] === 'vigente' && $servicio['dias_restantes'] <= (int) config('plataforma.aviso_vencimiento_dias') => ['tipo' => 'por_vencer', 'vence_el' => $servicio['vence_el'], 'dias_restantes' => $servicio['dias_restantes']],
+            default => null,
+        };
     }
 
     private function cerrar(Request $request): void

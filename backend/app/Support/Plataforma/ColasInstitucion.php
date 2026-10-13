@@ -10,7 +10,8 @@ use RuntimeException;
 /**
  * Colas con varias instituciones (PLATAFORMA_MODO=subdominio). Un trabajo encolado durante una petición institucional
  * lleva el id de su institución, y el worker lo ejecuta con la base, los archivos y la caché de esa institución
- * (ConexionInstitucion). Si al procesarlo la institución ya no está activa, el trabajo falla sin ejecutarse.
+ * (ConexionInstitucion). Si al procesarlo la institución ya no opera (no activa o vencida), el trabajo falla sin
+ * ejecutarse.
  *
  * Los trabajos y sus fallos se guardan en la base de la plataforma (database/migrations/plataforma), no en la de la
  * institución: un solo worker los ve todos.
@@ -44,9 +45,9 @@ final class ColasInstitucion
             return;
         }
         $institucion = Institucion::query()->find($id);
-        if (! $institucion || $institucion->estado !== Institucion::ACTIVA) {
+        if (! $institucion || ! $institucion->operativa()) {
             // fail() lo marca como fallido y lo borra: el worker ya no lo ejecuta.
-            $trabajo->fail(new RuntimeException('La institución del trabajo no está activa: no se ejecuta.'));
+            $trabajo->fail(new RuntimeException('La institución del trabajo no está activa o su tiempo de uso venció: no se ejecuta.'));
 
             return;
         }
