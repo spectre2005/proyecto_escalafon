@@ -119,6 +119,12 @@ Sección 05:
 25. Días de un movimiento: ¿calendario o hábiles? Hoy se registran tal como dice el documento, sin superar el rango de fechas. ¿Los permisos por horas se registran con 0 días?
 26. ¿Algún documento de la 05 debe ser obligatorio (hoy ninguno)? ¿Hace falta controlar un saldo vacacional? Hoy solo se informan los días de goce y de adelanto por período.
 
+Asistente con IA (idea, sin implementar):
+27. ¿La universidad acepta que los PDF se procesen en un servicio de IA externo (nube), o la información no puede salir de sus servidores (modelo local)? Hay datos personales y de salud (Ley 29733). De esto depende todo el diseño. Propuesta: usar un modelo existente, sin entrenar uno propio. La IA solo propone (metadatos del PDF, tipo de documento, avisos de páginas en blanco o titular distinto) y el personal de la ORH confirma. Nunca guarda, recepciona ni verifica. Se activa por entidad en `parametros_sistema` y queda registrado lo que propuso y lo que se confirmó. Piloto sugerido: precarga de metadatos en las secciones 02, 03, 04 y 07.
+
+Folios automáticos (idea, sin implementar):
+28. ¿Un folio es una página del PDF o una hoja física? ¿Escanean a doble cara y cuentan las páginas en blanco? La directiva (art. 9.3) solo dice "foliados por sección de forma correlativa". Si folio = página, el sistema puede asignar los folios solo, a partir del número de páginas (hoy ya lo hace con el DNI: `CargaDocumento`, `foliosAutomaticos`). Antes hay que contar las páginas con una herramienta fiable (`qpdf` o `pdfinfo`), porque `ArchivoPdf::paginas()` usa expresiones regulares y puede equivocarse. Si folio = hoja, hace falta un ajuste manual con motivo.
+
 ## Siguientes pasos
 
 1. Revisar y hacer commit de la sección 01 (`feature/seccion-01-alinear`) y probarla en el navegador con la persona demo 99000101.
