@@ -384,7 +384,14 @@ Sección 05:
   HTTPS por subdominio (un host inventado no obtiene certificado), cabeceras, panel, aprovisionamiento, cambio de
   contraseña, CRUD genérico de solo lectura, actualización conservando datos, respaldo y restauración.
 - La política de contraseñas de producción (10 caracteres, mayúsculas, minúsculas y números) muestra sus mensajes en
-  español al cambiar la contraseña. Los mensajes genéricos de validación siguen en inglés: no hay `lang/es`.
+  español al cambiar la contraseña.
+
+## Mensajes en español (13/10/2026)
+- `backend/lang/es` (validación, autenticación, contraseñas, paginación) con las mismas claves que Laravel en inglés;
+  un test avisa si una actualización de Laravel agrega una regla sin traducir. Nombres de campo legibles y con tildes
+  («fecha de emisión», «correo electrónico»).
+- `APP_LOCALE=es` y `APP_FALLBACK_LOCALE=en` (si faltara una traducción, se ve en inglés y no la clave). Cada
+  compañero debe cambiar esas dos líneas en su `backend/.env`.
 - Pendiente antes de datos reales: dónde se aloja (confirmar con el cliente), cifrado de PDF y antivirus (pend. 9),
   usuario de PostgreSQL con permisos mínimos, copia de respaldos fuera del servidor y prueba de restauración,
   avisos por correo.
