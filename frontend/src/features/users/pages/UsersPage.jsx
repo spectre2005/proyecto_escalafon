@@ -4,6 +4,7 @@ import api, { apiErrorMessage } from '../../../axios'
 import { downloadUsersTemplate, parseUsersFile, resolveUsersLocations } from '../utils/usuariosExcel'
 import { saveUserWithLink, saveUsers } from '../api/usuariosApi'
 import RegistroManual from '../components/RegistroManual'
+import ResultadoRegistro from '../components/ResultadoRegistro'
 import { useUsers } from '../hooks/useUsers'
 import Icon from '../../../components/ui/Icon'
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom'
@@ -27,6 +28,9 @@ export default function UsersPage() {
   // Registrar con vínculo abre el legajo y crea el vínculo: exige también esos permisos (el backend los valida).
   const puedeAbrir = usePuede('legajo.abrir')
   const puedeVincular = usePuede('legajo.editar')
+  const puedeVerFicha = usePuede('legajo.ver')
+  // Resultado del registro manual ({ usuario, legajo }): se muestra en la ventana con el siguiente paso.
+  const [registrado, setRegistrado] = useState(null)
   // Al registrar, el asistente se vuelve a montar vacío.
   const [registroKey, setRegistroKey] = useState(0)
   const [batch, setBatch] = useState([])
@@ -68,6 +72,7 @@ export default function UsersPage() {
 
   function openRegistration() {
     setMessage(null)
+    setRegistrado(null)
     setRegistrationOpen(true)
     registrationDialog.current.showModal()
   }
@@ -91,7 +96,8 @@ export default function UsersPage() {
       return { ok: true }
     } catch (error) {
       setMessage({ error: true, text: apiErrorMessage(error) })
-      return { ok: false, errors: error.response?.data?.errors || {} }
+      // persona_existente: DNI ya registrado (solo con legajo.ver); el asistente ofrece abrir su ficha.
+      return { ok: false, errors: error.response?.data?.errors || {}, existente: error.response?.data?.persona_existente || null }
     } finally {
       savingRef.current = false
       setSaving(false)
@@ -164,14 +170,16 @@ export default function UsersPage() {
   }
 
   // Registro manual (asistente de tres pasos): una sola operación transaccional con la persona y su primer vínculo.
+  // Al registrar, la ventana muestra el resultado con el siguiente paso (ResultadoRegistro) y el asistente queda vacío.
   async function registrarManual(payload) {
+    let creado = null
     const resultado = await persist(async () => {
-      const { usuario, legajo } = await saveUserWithLink(payload)
-      return { saved: [usuario], text: `Persona registrada con su primer vínculo laboral. Se abrió su legajo ${legajo.numero_legajo}.` }
+      creado = await saveUserWithLink(payload)
+      return { saved: [creado.usuario], text: `Persona registrada con su primer vínculo laboral. Se abrió su legajo ${creado.legajo.numero_legajo}.` }
     })
     if (resultado.ok) {
       setRegistroKey(key => key + 1)
-      registrationDialog.current.close()
+      setRegistrado(creado)
     }
     return resultado
   }
@@ -362,7 +370,7 @@ export default function UsersPage() {
             aria-busy={saving || busy}
             className={`fixed inset-0 m-auto max-h-[92dvh] w-[calc(100%_-_1.5rem)] overflow-hidden rounded-2xl border-0 bg-[#f6f8fa] p-0 text-[#243f43] shadow-2xl backdrop:bg-slate-900/50 open:flex open:flex-col ${tab === 'manual' ? 'max-w-5xl md:h-[min(760px,92dvh)]' : 'max-w-3xl'}`}
             onCancel={event => { if (savingRef.current || busy) event.preventDefault() }}
-            onClose={() => setRegistrationOpen(false)}
+            onClose={() => { setRegistrationOpen(false); setRegistrado(null) }}
           >
             {loading && <p role="status" className="px-6 pt-4 text-xs text-[#4f6d63]">Cargando usuarios para comprobar duplicados…</p>}
             {loadError && <p role="alert" className="px-6 pt-4 text-xs text-red-700">{loadError}</p>}
@@ -583,8 +591,9 @@ export default function UsersPage() {
               </div>
             )}
             {/* El asistente sigue montado al cambiar de método: no se pierde lo ya escrito. */}
-            <div className={tab === 'manual' ? 'contents' : 'hidden'}>
-              <RegistroManual key={registroKey} usuarios={users} opciones={opciones} dominioCorreo={dominioCorreo} puedeDiscapacidad={puedeDiscapacidad} puedeRegistrar={puedeAbrir && puedeVincular}
+            {tab === 'manual' && registrado && <ResultadoRegistro registro={registrado} puedeVerFicha={puedeVerFicha} onOtra={() => { setMessage(null); setRegistrado(null) }} onCerrar={closeRegistration} />}
+            <div className={tab === 'manual' && !registrado ? 'contents' : 'hidden'}>
+              <RegistroManual key={registroKey} usuarios={users} opciones={opciones} dominioCorreo={dominioCorreo} puedeDiscapacidad={puedeDiscapacidad} puedeRegistrar={puedeAbrir && puedeVincular} puedeVerFicha={puedeVerFicha}
                 saving={saving} bloqueado={loading || !!loadError} mensaje={message} onGuardar={registrarManual} onCancel={closeRegistration} />
             </div>
           </dialog>

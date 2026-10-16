@@ -1,16 +1,17 @@
 import { useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import Icon from '../../../components/ui/Icon'
 import TresEstados from '../../../components/ui/TresEstados'
 import UbigeoFields from '../../../components/ui/UbigeoFields'
 import { advanceOnEnter } from '../../../shared/forms/advanceOnEnter'
-import { CamposDatosPuesto, CamposDocumentoIngreso, CamposVinculoBasicos, CondicionesPuesto } from '../../legajos/components/seccion02/CamposVinculo'
+import { CampoTipoVinculo, CamposDatosPuesto, CamposDocumentoIngreso, CamposVinculoBasicos, CondicionesPuesto } from '../../legajos/components/seccion02/CamposVinculo'
 import { datosPuestoInicial, vinculoInicial } from '../../legajos/components/seccion02/borradoresVinculo'
 import { completarDesdePuesto, equivalenciaPuesto } from '../../legajos/config/puestosSugeridos'
 import { categoriasDocente, condicionesDocente } from '../../legajos/config/seccion02'
 import { leyesDelTipo, leyInicial } from '../utils/leyes'
 import { columns } from '../utils/usuariosCsv'
 import { updateUserDraft } from '../utils/usuariosEmail'
-import { armarRegistro, erroresDe, erroresPersona, PASOS, personaDelPaso, primerPasoConError } from '../utils/registroPasos'
+import { armarRegistro, erroresDe, erroresPersona, PASOS, personaDelPaso, personaExistente, primerPasoConError, rutaFicha, sugerenciaTipoVinculo } from '../utils/registroPasos'
 
 // Registro manual en tres pasos dentro de la ventana «Agregar personal»: persona, primer vínculo laboral y datos del
 // puesto. Los valores se conservan al avanzar y retroceder; cada paso se valida antes de continuar y todo se envía en una
@@ -53,7 +54,16 @@ function Progreso({ paso, onIr, disabled }) {
   </ol>
 }
 
-export default function RegistroManual({ usuarios, opciones, dominioCorreo = '', puedeDiscapacidad, puedeRegistrar, saving, bloqueado, mensaje, onGuardar, onCancel }) {
+// Persona ya registrada con ese DNI: no se crea otra. Con permiso para ver legajos, se ofrece abrir su ficha (el registro de
+// otro vínculo para un reingreso o una renovación sigue pendiente de confirmar con la universidad).
+function PersonaRegistrada({ persona, puedeVerFicha }) {
+  return <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#f1d9a6] bg-[#fff8e8] px-4 py-3 text-xs leading-relaxed text-[#7a5a17]">
+    <span><strong>{persona.nombre || 'Esta persona'}</strong> ya está registrada con ese DNI. No se creará otro registro.{puedeVerFicha ? ' Revisa su ficha para continuar con su legajo.' : ''}</span>
+    {puedeVerFicha && <Link to={rutaFicha(persona.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-[#e3c47f] bg-white px-3 py-1.5 font-semibold text-[#7a5a17] hover:bg-[#fff1cf]">Ir a su ficha <Icon name="arrow" size={14} /></Link>}
+  </div>
+}
+
+export default function RegistroManual({ usuarios, opciones, dominioCorreo = '', puedeDiscapacidad, puedeRegistrar, puedeVerFicha = false, saving, bloqueado, mensaje, onGuardar, onCancel }) {
   const formRef = useRef(null)
   const contenidoRef = useRef(null)
   const [paso, setPaso] = useState(1)
@@ -66,10 +76,14 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   const [avisos, setAvisos] = useState([])
   const [errores, setErrores] = useState({})
   const [notaPuesto, setNotaPuesto] = useState('')
+  // Persona existente informada por el backend al guardar (la lista local puede no estar al día).
+  const [existenteBackend, setExistenteBackend] = useState(null)
   const catalogo = opciones.data?.data.regimenes
   const tipo = draft.tipo_personal
   const leyElegida = draft.regimen_normativo_id || leyInicial(catalogo, tipo)
   const erroresPersonaCampo = erroresDe(errores, 'usuarios.0')
+  const existente = personaExistente(draft, usuarios) || (existenteBackend?.dni === draft.numero_doc_identidad.trim() ? existenteBackend.persona : null)
+  const sugerencia = tipo ? sugerenciaTipoVinculo({ tipoPersonal: tipo, datosPuesto: puestos[tipo], codigoLey: (catalogo || []).find(ley => ley.id === leyElegida)?.codigo }) : null
 
   const ponerVinculo = key => valor => {
     setVinculo(previo => ({ ...previo, [key]: valor }))
@@ -118,6 +132,7 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
     setErrores({})
     const resultado = await onGuardar(armarRegistro({ persona, catalogo, ubigeoId, condiciones, puedeDiscapacidad, vinculo, puestos }))
     if (!resultado.ok) {
+      setExistenteBackend(resultado.existente ? { dni: persona.numero_doc_identidad, persona: resultado.existente } : null)
       setErrores(resultado.errors || {})
       const destino = primerPasoConError(resultado.errors)
       if (destino) irA(destino)
@@ -139,7 +154,8 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
     </label>
   }
 
-  const general = [...avisos, ...[].concat(errores.usuarios || [])]
+  // El DNI repetido se muestra con su enlace (PersonaRegistrada), no en la lista general.
+  const general = [...avisos, ...[].concat(errores.usuarios || [])].filter(texto => !(existente && /ya está registrada con ese DNI/.test(texto)))
   return <form ref={formRef} onSubmit={enviar} onKeyDown={advanceOnEnter} aria-busy={saving} aria-labelledby="registro-paso-titulo"
     className="flex min-h-0 flex-1 flex-col bg-white [&_label]:flex [&_label]:min-w-0 [&_label]:flex-col [&_label]:gap-1.5 [&_label]:text-[11px] [&_label]:text-[#557566] [&_input:not([type=file]):not([type=checkbox])]:py-2.5 [&_select]:py-2.5">
     <div className="shrink-0 border-b border-[#e9efec] px-4 py-3 md:px-6">
@@ -148,12 +164,13 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
     <div ref={contenidoRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6">
       <h3 id="registro-paso-titulo" className="sr-only">Paso {paso} de {PASOS.length}: {PASOS[paso - 1].titulo}</h3>
       {mensaje?.error && <p role="alert" className="mb-4 rounded-lg bg-[#fff0ed] px-4 py-3 text-xs leading-relaxed text-[#ac4d3a]">{mensaje.text}</p>}
+      {paso === 1 && existente && <PersonaRegistrada persona={existente} puedeVerFicha={puedeVerFicha} />}
       {general.length > 0 && <ul role="alert" className="mb-4 list-disc rounded-lg bg-[#fff0ed] px-8 py-3 text-xs leading-relaxed text-[#ac4d3a]">{general.map(texto => <li key={texto}>{texto}</li>)}</ul>}
       {!puedeRegistrar && <p role="alert" className="mb-4 rounded-lg bg-[#fff0ed] px-4 py-3 text-xs text-[#ac4d3a]">Tu rol no puede abrir legajos o registrar vínculos: no puedes registrar personal manualmente. La importación sigue disponible.</p>}
       <fieldset disabled={saving || bloqueado} className="grid min-w-0 gap-5">
         {paso === 1 && <>
           <Grupo titulo="Identificación y contacto">{camposPersona.map(([key, label, requerido]) => campo(key, label, requerido))}</Grupo>
-          <Grupo titulo="Clasificación" ayuda="El tipo de vínculo (carrera, plazo determinado o designado) se indica en el paso 2.">
+          <Grupo titulo="Clasificación" ayuda="El tipo de vínculo (carrera, plazo determinado o designado) se indica en el paso 3, con una sugerencia.">
             <label>Tipo de personal *
               <select name="tipo_personal" required value={tipo} aria-invalid={erroresPersonaCampo.tipo_personal ? true : undefined}
                 onChange={event => setDraft({ ...draft, tipo_personal: event.target.value, regimen_normativo_id: '' })}>
@@ -186,7 +203,7 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
         {paso === 2 && <>
           <p className="text-[11px] text-[#7b9181]">Resolución o contrato con el que la persona está vinculada. Se registra junto con ella y abre su legajo. Tipo de personal: <strong>{tiposPersonal[tipo]}</strong>; la ley es la del paso 1.</p>
           <Grupo titulo="A. Información del vínculo" ayuda="Las sugerencias de puesto son provisionales.">
-            <CamposVinculoBasicos draft={vinculo} set={setCampoVinculo} poner={ponerVinculo} errors={erroresDe(errores, 'vinculo')} opciones={opciones.data?.data} tipoPersonal={tipo} nombre="alta-vinculo" />
+            <CamposVinculoBasicos draft={vinculo} set={setCampoVinculo} poner={ponerVinculo} errors={erroresDe(errores, 'vinculo')} opciones={opciones.data?.data} tipoPersonal={tipo} conTipo={false} nombre="alta-vinculo" />
             {notaPuesto && <p role="status" className="col-span-full rounded-lg bg-[#eaf4ee] px-3 py-2 text-[11px] text-[#2c7650]">{notaPuesto}</p>}
           </Grupo>
           <Grupo titulo="B. Documento de ingreso">
@@ -197,6 +214,9 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
           <Grupo titulo={`Datos del puesto · ${tiposPersonal[tipo]?.toLowerCase() || ''}`} ayuda={`Puesto: ${vinculo.nombre_puesto || 'sin indicar'}. Se pueden corregir después en la sección 02 mientras el vínculo esté abierto.`}>
             <CamposDatosPuesto docente={tipo === 'docente'} draft={puestos[tipo]} set={setCampoPuesto} errors={erroresDe(errores, 'datos_puesto')} />
             {notaPuesto && tipo === 'docente' && <p role="status" className="col-span-full rounded-lg bg-[#eaf4ee] px-3 py-2 text-[11px] text-[#2c7650]">{notaPuesto}</p>}
+          </Grupo>
+          <Grupo titulo="Tipo de vínculo" ayuda="Carrera, plazo determinado o designado. La sugerencia sale de los datos anteriores; puedes elegir otro.">
+            <CampoTipoVinculo draft={vinculo} set={setCampoVinculo} poner={ponerVinculo} errors={erroresDe(errores, 'vinculo')} sugerencia={sugerencia} nombre="alta-vinculo" />
           </Grupo>
           <Grupo titulo="Condiciones del puesto" ayuda="Si no lo sabes, deja «Sin responder».">
             <CondicionesPuesto draft={vinculo} poner={ponerVinculo} errors={erroresDe(errores, 'vinculo')} nombre="alta-vinculo" />

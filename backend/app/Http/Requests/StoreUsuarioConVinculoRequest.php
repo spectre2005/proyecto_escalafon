@@ -2,7 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Usuario;
 use App\Support\ReglasVinculo;
+use Illuminate\Contracts\Validation\Validator as ValidatorContract;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\Validator as Validacion;
 use Illuminate\Validation\Validator;
 
@@ -78,6 +81,29 @@ class StoreUsuarioConVinculoRequest extends StoreUsuariosRequest
 
     public function messages(): array
     {
-        return [...parent::messages(), 'usuarios.size' => 'El registro manual da de alta una sola persona.'];
+        return [...parent::messages(), 'usuarios.size' => 'El registro manual da de alta una sola persona.',
+            'usuarios.0.numero_doc_identidad.unique' => 'Esta persona ya está registrada con ese DNI.'];
+    }
+
+    /**
+     * DNI ya registrado: además de los errores, identifica a la persona existente para ir a su ficha en vez de buscarla.
+     * Solo con legajo.ver (quien no puede ver fichas no recibe nada más) y solo su id y nombre: sin otros datos personales.
+     * No se crea nada ni se ofrece registrar otro vínculo (reingreso y renovación pendientes de confirmar con el cliente).
+     */
+    protected function failedValidation(ValidatorContract $validator): void
+    {
+        $dni = $this->input('usuarios.0.numero_doc_identidad');
+        $existente = $validator->errors()->has('usuarios.0.numero_doc_identidad') && is_string($dni) && $this->user()?->can('legajo.ver')
+            ? Usuario::query()->where('numero_doc_identidad', $dni)->first(['id', 'nombres', 'apellido_paterno', 'apellido_materno'])
+            : null;
+        if (! $existente) {
+            parent::failedValidation($validator);
+        }
+
+        throw new HttpResponseException(response()->json([
+            'message' => $validator->errors()->first(),
+            'errors' => $validator->errors()->messages(),
+            'persona_existente' => ['id' => $existente->id, 'nombre' => trim($existente->nombres.' '.$existente->apellido_paterno.' '.$existente->apellido_materno)],
+        ], 422));
     }
 }

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { datosPuestoInicial, vinculoInicial } from '../../legajos/components/seccion02/borradoresVinculo.js'
-import { armarRegistro, erroresDe, erroresPersona, PASOS, pasoDeError, personaDelPaso, primerPasoConError } from './registroPasos.js'
+import { armarRegistro, erroresDe, erroresPersona, PASOS, pasoDeError, personaDelPaso, personaExistente, primerPasoConError, rutaDocumentosIngreso, rutaFicha, sugerenciaTipoVinculo } from './registroPasos.js'
 
 const catalogo = [
   { id: 'ley-30220', codigo: '30220', nombre: 'Ley N° 30220 - Ley Universitaria', aplica_a: 'docente', activo: true },
@@ -19,6 +19,8 @@ test('backend errors lead to the step that holds the field', () => {
   assert.equal(pasoDeError('vinculo.nombre_puesto'), 2)
   assert.equal(pasoDeError('vinculo.numero_documento_vinculo'), 2)
   assert.equal(pasoDeError('vinculo.tiene_periodo_prueba'), 3)
+  // El tipo de vínculo se elige en el paso 3, con los datos del puesto.
+  assert.equal(pasoDeError('vinculo.regimen_laboral'), 3)
   assert.equal(pasoDeError('datos_puesto.categoria'), 3)
   assert.equal(pasoDeError('otro'), null)
   assert.equal(primerPasoConError({ 'datos_puesto.categoria': ['x'], 'vinculo.fecha_inicio': ['x'] }), 2)
@@ -37,7 +39,37 @@ test('step 1 uses the same person rules as the registration', () => {
   assert.match(erroresPersona({ ...lista, tipo_personal: '' }, { catalogo }).join(' '), /tipo debe ser docente o administrativo/)
   assert.match(erroresPersona(personaDelPaso({ ...persona, tipo_personal: 'administrativo' }, 'ley-30220'), { catalogo }).join(' '), /corresponde al personal docente/)
   assert.match(erroresPersona(lista, { catalogo, ubicacion: { region: 'Cusco' }, ubigeoId: '' }).join(' '), /región, provincia y distrito/)
-  assert.match(erroresPersona(lista, { catalogo, usuarios: [{ numero_doc_identidad: '71000001', email_institucional: 'otra@example.test' }] }).join(' '), /Ya existe/)
+  assert.match(erroresPersona(lista, { catalogo, usuarios: [{ numero_doc_identidad: '71000001', email_institucional: 'otra@example.test' }] }).join(' '), /ya está registrada con ese DNI/)
+  assert.match(erroresPersona(lista, { catalogo, usuarios: [{ numero_doc_identidad: '71000009', email_institucional: 'ROSA.alta@example.test' }] }).join(' '), /Ya existe un usuario con ese correo/)
+})
+
+test('an existing DNI identifies the person instead of creating a duplicate', () => {
+  const usuarios = [{ id: 'u-1', numero_doc_identidad: '71000001', nombres: 'Rosa', apellido_paterno: 'Previa', apellido_materno: '' }]
+  assert.deepEqual(personaExistente({ numero_doc_identidad: ' 71000001 ' }, usuarios), { id: 'u-1', nombre: 'Rosa Previa' })
+  assert.equal(personaExistente({ numero_doc_identidad: '71000002' }, usuarios), null)
+  assert.equal(personaExistente({ numero_doc_identidad: '' }, usuarios), null)
+})
+
+test('the result links straight to the file and to the 2.2 documents', () => {
+  assert.equal(rutaFicha('u-1'), '/legajos/u-1')
+  const url = new URL(rutaDocumentosIngreso('u-1'), 'http://localhost')
+  assert.equal(url.pathname, '/legajos/u-1')
+  assert.equal(url.searchParams.get('categoria'), 's02-vinculo')
+  assert.equal(url.searchParams.get('ir'), 'documentos')
+})
+
+test('the link type suggestion follows the backend rule and only proposes', () => {
+  const sugerir = (tipoPersonal, datosPuesto, codigoLey) => sugerenciaTipoVinculo({ tipoPersonal, datosPuesto, codigoLey }).valor
+  assert.equal(sugerir('docente', { condicion_docente: 'ordinario' }, '30220'), 'carrera')
+  assert.equal(sugerir('docente', { condicion_docente: 'contratado' }, '30220'), 'plazo_determinado')
+  // Extraordinario: los datos no alcanzan.
+  assert.equal(sugerir('docente', { condicion_docente: 'extraordinario' }, '30220'), null)
+  assert.equal(sugerir('administrativo', { es_cargo_confianza: true }, '1057'), 'designado')
+  assert.equal(sugerir('administrativo', { es_cargo_confianza: false }, '1057'), 'plazo_determinado')
+  // D.L. 276 admite carrera o designado: no se sugiere ninguno, aunque sea de confianza.
+  assert.equal(sugerir('administrativo', { es_cargo_confianza: true }, '276'), null)
+  assert.equal(sugerir('administrativo', {}, ''), null)
+  assert.match(sugerenciaTipoVinculo({ tipoPersonal: 'administrativo', datosPuesto: {}, codigoLey: '' }).motivo, /elige/)
 })
 
 test('the final call carries every step and only the job data of the person type', () => {

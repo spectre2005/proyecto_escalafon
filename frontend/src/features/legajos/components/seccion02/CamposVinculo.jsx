@@ -41,11 +41,24 @@ export function CampoPuesto({ valor, tipoPersonal, onChange, error, nombre = 'vi
 
 const condicionesPuesto = [['obligado_djbr', 'Obligado a la declaración jurada de bienes y rentas'], ['exige_colegiatura', 'El puesto exige colegiatura'], ['exige_estudios_basicos', 'El puesto exige estudios básicos'], ['tiene_periodo_prueba', 'Tiene período de prueba']]
 
-// A. Información del vínculo. children: campos tras el tipo de vínculo (en 2.2, la ley y la sugerencia). conCese: solo
-// en 2.2 (el primer vínculo del registro es el vigente).
-export function CamposVinculoBasicos({ draft, set, poner, errors, opciones, tipoPersonal, conCese = false, nombre = 'vinculo', children }) {
+// Tipo de vínculo con la sugerencia que se deduce de los datos ({ valor, motivo }, opcional). La sugerencia solo se aplica
+// con su botón y el usuario puede elegir otro tipo: no es una validación.
+export function CampoTipoVinculo({ draft, set, poner, errors, sugerencia = null, nombre = 'vinculo' }) {
   return <>
     <Campo label="Tipo de vínculo" required error={errors.regimen_laboral}><select name={`${nombre}-tipo`} required value={draft.regimen_laboral} onChange={set('regimen_laboral')}><Opciones lista={regimenesLaborales} actual={draft.regimen_laboral} vacio="Seleccionar tipo de vínculo" /></select></Campo>
+    {sugerencia && <div role="note" className="flex flex-wrap items-center justify-between gap-2 self-end rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900 sm:col-span-1 lg:col-span-2">
+      <span>{sugerencia.valor ? <>Sugerencia: <strong>{regimenesLaborales[sugerencia.valor]}</strong> ({sugerencia.motivo}) Revísala: puedes elegir otro tipo.</> : sugerencia.motivo}</span>
+      {sugerencia.valor && draft.regimen_laboral !== sugerencia.valor && <button type="button" onClick={() => poner('regimen_laboral')(sugerencia.valor)} className="font-semibold underline">Usar sugerencia</button>}
+    </div>}
+  </>
+}
+
+// A. Información del vínculo. children: campos tras el tipo de vínculo (en 2.2, la ley y la sugerencia). conCese: solo
+// en 2.2 (el primer vínculo del registro es el vigente). conTipo: el registro manual pide el tipo en el paso 3
+// (CampoTipoVinculo), después de los datos del puesto que permiten sugerirlo.
+export function CamposVinculoBasicos({ draft, set, poner, errors, opciones, tipoPersonal, conCese = false, conTipo = true, nombre = 'vinculo', children }) {
+  return <>
+    {conTipo && <Campo label="Tipo de vínculo" required error={errors.regimen_laboral}><select name={`${nombre}-tipo`} required value={draft.regimen_laboral} onChange={set('regimen_laboral')}><Opciones lista={regimenesLaborales} actual={draft.regimen_laboral} vacio="Seleccionar tipo de vínculo" /></select></Campo>}
     {children}
     <CampoPuesto valor={draft.nombre_puesto} tipoPersonal={tipoPersonal} onChange={poner('nombre_puesto')} error={errors.nombre_puesto} nombre={nombre} />
     <Campo label="Unidad orgánica" error={errors.unidad_organica_id}><select name={`${nombre}-unidad`} value={draft.unidad_organica_id} onChange={set('unidad_organica_id')} disabled={!opciones}><OpcionesCatalogo lista={opciones?.unidades} actual={draft.unidad_organica_id} vacio={opciones ? 'Seleccionar unidad orgánica' : 'Cargando unidades…'} /></select></Campo>

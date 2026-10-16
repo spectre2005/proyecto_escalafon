@@ -208,4 +208,42 @@ class RegistroConVinculoTest extends TestCase
             ->assertJsonPath('data.usuario.values.nombre_puesto', 'Puesto anterior');
         $this->assertSame(['Puesto anterior', $unidad->id], [$persona->refresh()->nombre_puesto, $persona->unidad_organica_id]);
     }
+
+    public function test_an_existing_dni_points_to_that_person_and_creates_nothing(): void
+    {
+        $this->actuarComo();
+        $existente = Usuario::factory()->create(['numero_doc_identidad' => '71000001', 'nombres' => 'Rosa', 'apellido_paterno' => 'Previa', 'apellido_materno' => 'Registro']);
+        $usuarios = Usuario::query()->count();
+
+        $this->postJson(self::URL, $this->datos(persona: ['email_institucional' => 'otra.rosa@example.test']))->assertUnprocessable()
+            ->assertJsonValidationErrors('usuarios.0.numero_doc_identidad')
+            ->assertJsonPath('persona_existente', ['id' => $existente->id, 'nombre' => 'Rosa Previa Registro']);
+        // Sin duplicados ni nada a medias: ni persona, ni legajo, ni vínculo, ni datos del puesto.
+        $this->assertSame($usuarios, Usuario::query()->count());
+        $this->assertSame(1, Usuario::query()->where('numero_doc_identidad', '71000001')->count());
+        $this->assertSame([0, 0, 0, 0], [Legajo::query()->count(), VinculoLaboral::query()->count(), PerfilDocente::query()->count(), PerfilAdministrativo::query()->count()]);
+
+        // Otros errores no identifican a nadie.
+        $this->postJson(self::URL, $this->datos(persona: ['numero_doc_identidad' => '71000002', 'email_institucional' => 'no-es-correo']))->assertUnprocessable()
+            ->assertJsonMissingPath('persona_existente');
+    }
+
+    public function test_the_existing_person_is_only_identified_to_whom_can_see_files(): void
+    {
+        config()->set('permisos.roles.registro_sin_fichas', ['usuarios.gestionar', 'legajo.abrir', 'legajo.editar']);
+        $this->actuarComo(null, 'registro_sin_fichas');
+        Usuario::factory()->create(['numero_doc_identidad' => '71000001']);
+
+        $this->postJson(self::URL, $this->datos(persona: ['email_institucional' => 'otra.rosa@example.test']))->assertUnprocessable()
+            ->assertJsonValidationErrors('usuarios.0.numero_doc_identidad')->assertJsonMissingPath('persona_existente');
+        $this->assertSame(1, Usuario::query()->where('numero_doc_identidad', '71000001')->count());
+    }
+
+    public function test_the_result_carries_the_file_number_and_the_labor_situation(): void
+    {
+        $this->actuarComo();
+        $this->postJson(self::URL, $this->datos())->assertCreated()
+            ->assertJsonPath('data.usuario.situacion', 'vinculo_vigente')->assertJsonPath('data.usuario.activo', false)
+            ->assertJsonStructure(['data' => ['usuario' => ['id'], 'legajo' => ['id', 'numero_legajo', 'estado_legajo']]]);
+    }
 }

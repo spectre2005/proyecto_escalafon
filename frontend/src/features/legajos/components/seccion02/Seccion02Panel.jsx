@@ -1,5 +1,6 @@
 import Icon from '../../../../components/ui/Icon'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../../auth/session'
 import { anularSeccion02, completarTipoVinculo } from '../../api/seccion02Api'
@@ -474,6 +475,21 @@ function Prueba({ usuario, data, bloqueo }) {
 export default function Seccion02Panel({ usuario, categoria, onNavigate }) {
   const request = useLiveQuery(`/expedientes/${usuario}/seccion-02`)
   const data = request.data?.data
+  // ?ir=documentos (resultado del registro manual): al cargar, lleva a la lista de documentos de la subsección y se quita
+  // de la dirección para no repetirlo al navegar.
+  const [params, setParams] = useSearchParams()
+  const documentosRef = useRef(null)
+  const irADocumentos = params.get('ir') === 'documentos' && !!data
+  useEffect(() => {
+    if (!irADocumentos) return
+    documentosRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    documentosRef.current?.focus({ preventScroll: true })
+    setParams(previos => {
+      const next = new URLSearchParams(previos)
+      next.delete('ir')
+      return next
+    }, { replace: true })
+  }, [irADocumentos, setParams])
   const { codigo, titulo } = subseccionesSeccion02[categoria]
   const error = request.error && <p role="alert" className="mb-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{request.error.response?.status === 403 ? 'No tienes permiso para ver esta sección.' : 'No se pudo actualizar la sección. Lo que ves puede no estar al día.'} <button onClick={request.retry} className="font-semibold underline">Reintentar</button></p>
   if (!data) return error || <p role="status" className="rounded-xl bg-slate-100 p-6 text-sm text-slate-500">Cargando…</p>
@@ -500,7 +516,7 @@ export default function Seccion02Panel({ usuario, categoria, onNavigate }) {
       {codigo === '2.3' && <Induccion usuario={usuario} data={data} bloqueo={bloqueo} />}
       {enNoConDatos && <Aviso accion={categoria !== 's02-vinculo' && <button onClick={() => onNavigate('s02-vinculo')} className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900">Revisar la bandera en 2.2</button>}>«Tiene período de prueba» está en No, pero hay períodos o documentos de período de prueba registrados: se muestran y se conservan, pero no se exigen ni se cuentan. Para registrar uno nuevo, cambia la bandera a Sí en el vínculo laboral.</Aviso>}
       {codigo === '2.4' && <Prueba usuario={usuario} data={data} bloqueo={bloqueo} />}
-      <Documentos usuario={usuario} data={data} subseccion={subseccion} sinLegajo={sinLegajo} />
+      <div ref={documentosRef} tabIndex={-1} className="scroll-mt-6 outline-none"><Documentos usuario={usuario} data={data} subseccion={subseccion} sinLegajo={sinLegajo} /></div>
     </>}
   </section>
 }
