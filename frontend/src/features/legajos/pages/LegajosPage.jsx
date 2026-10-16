@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from '../../../shared/queries/useLiveQuery'
 import { conModulosOcultos, primeraCategoria, seccionesVisibles } from '../../../shared/funcionalidadesEstado'
 import { useFuncionalidades } from '../../../shared/useFuncionalidades'
+import CompletaPerfil from '../components/CompletaPerfil'
 import Seccion01Panel from '../components/seccion01/Seccion01Panel'
 import Seccion02Panel from '../components/seccion02/Seccion02Panel'
 import Seccion03Panel from '../components/seccion03/Seccion03Panel'
@@ -219,6 +220,7 @@ function Detail({ usuario }) {
     <Feedback {...request} />
     {data && <>
       <PersonalHeader data={data} usuario={usuario} />
+      {!readOnly && <CompletaPerfil usuario={usuario} pendientes={data.condiciones?.pendientes} legajoActivo={hasActiveLegajo} />}
       {avisoOculto && <p role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{avisoOculto}</p>}
       {readOnly && <p role="status" className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">Legajo cerrado. Puedes consultar las secciones y visualizar o descargar sus documentos.</p>}
       {(hasActiveLegajo || data.legajos.length > 0) ? <div className="grid items-start gap-6 lg:grid-cols-[280px_minmax(0,1fr)]"><nav aria-label="Secciones del legajo" className={`${panel} p-3`}>{secciones.map(item => <details key={item.number} open={group?.number === item.number} className="border-b border-slate-100 py-2 last:border-b-0"><summary className="cursor-pointer px-3 py-2 text-xs font-semibold leading-relaxed text-slate-700">{item.title}</summary><div className="mt-1 space-y-1">{categorias(item).map(key => <button key={key} aria-current={selected === key ? 'page' : undefined} onClick={() => change('categoria', key)} className={`w-full rounded-lg px-3 py-2.5 text-left text-xs ${selected === key ? 'bg-teal-50 font-semibold text-teal-800' : 'text-slate-500 hover:bg-slate-50'}`}>{subseccionesSeccion10[key] ? subseccionesSeccion10[key].titulo : key === 'seccion-06' ? 'Documentos de compensaciones' : key === 'seccion-04' ? 'Documentos y tiempo de experiencia' : key === 'seccion-03' ? 'Documentos y avance de formación' : key === "reconocimientos" ? "Reconocimientos" : key === "sanciones" ? "Sanciones disciplinarias" : gruposSeccion01[key] ? gruposSeccion01[key].titulo : subseccionesSeccion02[key] ? <>{subseccionesSeccion02[key].titulo}</> : categoriasSeccion05[key] ? categoriasSeccion05[key].titulo : subseccionesSeccion07[key] ? subseccionesSeccion07[key].titulo : categoriasSeccion09[key] ? categoriasSeccion09[key].titulo : categoriasSeccion11[key] ? categoriasSeccion11[key].titulo : key.startsWith('documentos-') ? 'Documentos de la sección' : data.sections.find(category => category.key === key)?.label}</button>)}</div></details>)}</nav>

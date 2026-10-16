@@ -21,6 +21,16 @@ function BanderasSinResponder({ panel }) {
       <p className="text-3xl font-semibold tracking-tight text-amber-700">{consulta.error ? '—' : datos ? datos.total.toLocaleString('es') : '…'}<span className="ml-2 text-xs font-normal text-slate-500">persona(s)</span></p></div>
     {consulta.error && <p role="alert" className="mt-4 text-xs text-rose-700">No se pudo consultar. <button type="button" onClick={consulta.retry} className="font-semibold underline">Reintentar</button></p>}
     {datos && <dl className="mt-5 grid gap-3 min-[480px]:grid-cols-2 lg:grid-cols-3">{Object.entries(datos.por_bandera).map(([bandera, total]) => <div key={bandera} className="rounded-xl bg-slate-50 p-4"><dt className="text-xs text-slate-600">{nombresBandera[bandera] || bandera}</dt><dd className="mt-2 text-xl font-semibold text-slate-800">{total.toLocaleString('es')}</dd></div>)}</dl>}
+    {/* Quiénes son: cada persona abre su ficha, donde «Completa el perfil» permite responder sin buscar cada campo. */}
+    {datos?.personas?.length > 0 && <details className="mt-5 rounded-xl border border-slate-100">
+      <summary className="cursor-pointer px-4 py-3 text-xs font-semibold text-teal-700">Ver personas con condiciones pendientes ({datos.total.toLocaleString('es')})</summary>
+      <ul className="max-h-80 divide-y divide-slate-100 overflow-y-auto border-t border-slate-100">{datos.personas.map(persona => <li key={persona.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
+        <div className="min-w-0"><Link to={`/legajos/${persona.id}`} className="text-sm font-semibold text-teal-800 hover:underline">{persona.nombre}</Link>
+          <p className="mt-0.5 text-[11px] text-slate-500">Falta: {persona.pendientes.map(bandera => nombresBandera[bandera] || bandera).join(' · ')}</p></div>
+        <Link to={`/legajos/${persona.id}`} className="shrink-0 text-xs font-semibold text-teal-700 hover:underline">Completar perfil →</Link>
+      </li>)}</ul>
+      {datos.total > datos.personas_mostradas && <p className="border-t border-slate-100 px-4 py-2.5 text-[11px] text-slate-500">Se muestran {datos.personas_mostradas} de {datos.total.toLocaleString('es')}, por apellido.</p>}
+    </details>}
   </section>
 }
 

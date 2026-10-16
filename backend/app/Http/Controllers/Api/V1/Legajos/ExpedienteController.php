@@ -58,6 +58,7 @@ use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
 use App\Support\AplicacionDocumental;
 use App\Support\CambioDiscapacidad;
+use App\Support\PerfilPendiente;
 use App\Support\PuestoActual;
 use App\Support\RegimenesLaborales;
 use App\Support\Seccion05;
@@ -250,8 +251,11 @@ class ExpedienteController extends Controller
             // modulos_ocultos: entradas del menú que su condición oculta (No y sin datos). Las de la sección 01
             // (AplicacionDocumental::MODULOS) solo con datos_sensibles.ver: ocultarlas revelaría la bandera; las del
             // puesto (2.4 y colegiaturas, modulosOcultosPuesto) no son sensibles.
+            // pendientes: condiciones Sin responder para «Completa el perfil» (PerfilPendiente; las de la persona, solo con
+            // datos_sensibles.ver).
             'condiciones' => ['banderas' => $banderas, 'sin_vinculo_vigente' => $aplicacion->sinVinculoVigente, 'avisos' => $aplicacion->avisos(),
-                'modulos_ocultos' => [...($veSensibles ? $aplicacion->modulosOcultos() : []), ...$aplicacion->modulosOcultosPuesto()]],
+                'modulos_ocultos' => [...($veSensibles ? $aplicacion->modulosOcultos() : []), ...$aplicacion->modulosOcultosPuesto()],
+                'pendientes' => PerfilPendiente::de($person, $aplicacion, $veSensibles)],
             'document_sections' => SeccionLegajo::query()->orderBy('orden')->get(['id', 'nombre']),
             'document_states' => DocumentoUsuario::query()->where('usuario_id', $usuario)->whereHas('legajo', fn (Builder $query): Builder => $query->where('usuario_id', $usuario))
                 ->when(! $veSensibles, fn (Builder $query): Builder => $query->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES))
