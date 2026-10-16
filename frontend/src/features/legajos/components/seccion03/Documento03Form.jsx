@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import Campo, { Formulario, Opciones } from '../seccion01/Campo'
 import { hoy, useBorrador, useGuardar } from '../seccion01/useGuardar'
 import { agregarDocumento03 } from '../../api/seccion03Api'
-import { modalidadesPresentacion, folios } from '../../config/documentos'
+import { modalidadesPresentacion, folios, modalidadRecordada, recordarModalidad } from '../../config/documentos'
+import { SugerenciaFolio } from '../documentos/AyudasCarga'
 import { niveles03, capacitaciones03 } from '../../config/seccion03'
 import { conValor, reemplazarPropuesta } from '../../config/acreditacion'
 
@@ -39,6 +40,7 @@ export default function Documento03Form({
 
   const [pdf, setPdf] = useState(null)
   const [errorPdf, setErrorPdf] = useState('')
+  const [paginas, setPaginas] = useState(null)
 
   const vigentes = item.documentos.filter(
     doc => !doc.subsanado && doc.estado !== 'anulado'
@@ -48,7 +50,8 @@ export default function Documento03Form({
     nombre: '',
     emisor: '',
     fecha_emision: '',
-    modalidad_presentacion: '',
+    // Última modalidad usada en este navegador (se puede cambiar).
+    modalidad_presentacion: modalidadRecordada(),
     numero_registro: '',
     nivel: '',
     numero_colegiatura: '',
@@ -110,7 +113,7 @@ export default function Documento03Form({
       },
       pdf
     )
-  }, onSaved)
+  }, () => { recordarModalidad(draft.modalidad_presentacion); onSaved() })
 
   return (
     <Formulario
@@ -137,6 +140,7 @@ export default function Documento03Form({
             }
             help="Selecciona el PDF para ver su contenido antes de guardarlo."
             error={errorPdf || errors.pdf}
+            onPages={setPaginas}
             onChange={(file, message) => {
               setPdf(file)
               setErrorPdf(message)
@@ -314,6 +318,7 @@ export default function Documento03Form({
             className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
         </Campo>
+        <SugerenciaFolio inicio={draft.folio_inicio} paginas={paginas} valor={draft.folio_fin} onUsar={poner('folio_fin')} />
 
         <Campo
           label="Modalidad de presentación"

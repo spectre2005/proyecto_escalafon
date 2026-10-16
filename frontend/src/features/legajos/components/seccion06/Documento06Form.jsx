@@ -4,7 +4,8 @@ import PdfPreviewField from '../../../../components/pdf/PdfPreviewField'
 import Campo, { Formulario, Opciones } from '../seccion01/Campo'
 import { useBorrador, useGuardar } from '../seccion01/useGuardar'
 import { agregarDocumento06 } from '../../api/seccion06Api'
-import { modalidadesPresentacion, folios } from '../../config/documentos'
+import { modalidadesPresentacion, folios, modalidadRecordada, recordarModalidad } from '../../config/documentos'
+import { SugerenciaFolio } from '../documentos/AyudasCarga'
 import { conValor, reemplazarPropuesta } from '../../config/acreditacion'
 
 // Datos del documento que se subsana y de su registro (tiempo reconocido o compensación): se proponen para corregir
@@ -27,7 +28,8 @@ export default function Documento06Form({ usuario, item, datos, onSaved, onCance
   useEffect(() => { primero.current?.focus() }, [])
   const [pdf, setPdf] = useState(null)
   const [errorPdf, setErrorPdf] = useState('')
-  const vacios = { nombre: '', emisor: '', fecha_emision: '', num_resolucion: '', anios: '', meses: '', dias: '', tipo: '', concepto: '', fecha: '', numero_documento: '', modalidad_presentacion: '' }
+  const [paginas, setPaginas] = useState(null)
+  const vacios = { nombre: '', emisor: '', fecha_emision: '', num_resolucion: '', anios: '', meses: '', dias: '', tipo: '', concepto: '', fecha: '', numero_documento: '', modalidad_presentacion: modalidadRecordada() }
   const documento = id => item.documentos.find(doc => doc.id === id)
   const [propuesta, setPropuesta] = useState(() => datosDe(documento(subsana)))
   const [draft, set, poner] = useBorrador({ ...vacios, ...propuesta, folio_inicio: datos.folio_sugerido, folio_fin: datos.folio_sugerido, subsana_a_documento_id: subsana })
@@ -43,11 +45,11 @@ export default function Documento06Form({ usuario, item, datos, onSaved, onCance
     const propios = item.letra === 'a' ? ['anios', 'meses', 'dias'] : item.letra === 'b' ? ['tipo', 'concepto', 'fecha', 'numero_documento'] : []
     if (item.requiere_num_resolucion || item.letra === 'a') propios.push('num_resolucion')
     return agregarDocumento06(usuario, { ...Object.fromEntries([...comunes, ...propios].map(key => [key, values[key]])), tipo_documento_id: item.id }, pdf)
-  }, onSaved)
+  }, () => { recordarModalidad(draft.modalidad_presentacion); onSaved() })
   const vigentes = item.documentos.filter(doc => !doc.subsanado && doc.estado !== 'anulado')
   return <Formulario modal titulo={draft.subsana_a_documento_id ? 'Subsanar documento de compensaciones' : 'Agregar documento de compensaciones'} guardar="Guardar registro" busy={busy} error={error} onCancel={onCancel}
     onSubmit={() => { if (pdf && !errorPdf) guardar(draft) }} nota="Lo registrado no se edita ni se borra. Si hay un error, agrega un documento nuevo que subsane al anterior. Quedará en revisión de RR. HH.">
-    <FormSplit pdf={<PdfPreviewField label={`Adjuntar PDF (máximo ${datos.tamano_maximo_kb} KB)`} required maxMB={datos.tamano_maximo_kb / 1024} help="La vista previa se genera en tu navegador. El PDF se envía al guardar el registro." error={errorPdf || errors.pdf} onChange={(file, message) => { setPdf(file); setErrorPdf(message) }} />}>
+    <FormSplit pdf={<PdfPreviewField onPages={setPaginas} label={`Adjuntar PDF (máximo ${datos.tamano_maximo_kb} KB)`} required maxMB={datos.tamano_maximo_kb / 1024} help="La vista previa se genera en tu navegador. El PDF se envía al guardar el registro." error={errorPdf || errors.pdf} onChange={(file, message) => { setPdf(file); setErrorPdf(message) }} />}>
       <Campo label="Nombre del documento" required error={errors.nombre} className="sm:col-span-2"><input ref={primero} required maxLength={200} value={draft.nombre} onChange={set('nombre')} /></Campo>
       <Campo label="Entidad emisora" required error={errors.emisor}><input required maxLength={200} value={draft.emisor} onChange={set('emisor')} /></Campo>
       <Campo label={item.letra === 'a' ? 'Fecha de resolución / emisión' : 'Fecha de emisión'} required error={errors.fecha_emision}><input type="date" required max={datos.fecha_actual} value={draft.fecha_emision} onChange={set('fecha_emision')} /></Campo>
@@ -67,6 +69,7 @@ export default function Documento06Form({ usuario, item, datos, onSaved, onCance
       <Campo label="Titular" className="sm:col-span-2"><input readOnly value={[datos.persona.nombres, datos.persona.apellido_paterno, datos.persona.apellido_materno].filter(Boolean).join(' ') + (datos.persona.numero_doc_identidad ? ` · ${datos.persona.numero_doc_identidad}` : '')} /></Campo>
       <Campo label="Folio inicial sugerido" required error={errors.folio_inicio}><input type="number" required min="1" value={draft.folio_inicio} onChange={set('folio_inicio')} /></Campo>
       <Campo label="Folio final" required error={errors.folio_fin}><input type="number" required min={draft.folio_inicio || 1} value={draft.folio_fin} onChange={set('folio_fin')} /></Campo>
+      <SugerenciaFolio inicio={draft.folio_inicio} paginas={paginas} valor={draft.folio_fin} onUsar={poner('folio_fin')} />
       <Campo label="Modalidad de presentación" required error={errors.modalidad_presentacion}><select required value={draft.modalidad_presentacion} onChange={set('modalidad_presentacion')}><Opciones lista={modalidadesPresentacion} vacio="Selecciona" /></select></Campo>
       {vigentes.length > 0 && <Campo label="Documento que subsana" required={soloSubsanar} error={errors.subsana_a_documento_id} className="sm:col-span-2"><select required={soloSubsanar} value={draft.subsana_a_documento_id} onChange={elegirSubsana}><option value="">{soloSubsanar ? 'Selecciona el documento que subsana' : 'Es un documento adicional'}</option>{vigentes.map(doc => <option key={doc.id} value={doc.id}>{doc.nombre} · folios {folios(doc.folio_inicio, doc.folio_fin)}</option>)}</select></Campo>}
       {['tipo_documento_id'].map(key => errors[key] && <p key={key} role="alert" className="col-span-full text-sm text-rose-700">{errors[key].join(' ')}</p>)}

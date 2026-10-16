@@ -4,7 +4,8 @@ import PdfPreviewField from '../../../../components/pdf/PdfPreviewField'
 import Campo, { Formulario, Opciones } from '../seccion01/Campo'
 import { useBorrador, useGuardar } from '../seccion01/useGuardar'
 import { agregarDocumento08 } from '../../api/seccion08Api'
-import { modalidadesPresentacion, folios } from '../../config/documentos'
+import { modalidadesPresentacion, folios, modalidadRecordada, recordarModalidad } from '../../config/documentos'
+import { SugerenciaFolio } from '../documentos/AyudasCarga'
 import { resultadoRecurso08, tipoSancion08 } from '../../config/seccion08'
 import { conValor, reemplazarPropuesta } from '../../config/acreditacion'
 
@@ -29,8 +30,9 @@ export default function Documento08Form({ usuario, item, datos, onSaved, onCance
   useEffect(() => { primero.current?.focus() }, [])
   const [pdf, setPdf] = useState(null)
   const [errorPdf, setErrorPdf] = useState('')
+  const [paginas, setPaginas] = useState(null)
   const vacios = { nombre: '', emisor: '', fecha_emision: '', num_resolucion: '', motivo: '', anios: '', meses: '', dias: '', tipo: '', dias_suspension: '',
-    registrada_en_rnssc: '0', fecha_registro_rnssc: '', referencia_rnssc: '', referencia_procedimiento: '', sancion_id: '', resultado: '', modalidad_presentacion: '' }
+    registrada_en_rnssc: '0', fecha_registro_rnssc: '', referencia_rnssc: '', referencia_procedimiento: '', sancion_id: '', resultado: '', modalidad_presentacion: modalidadRecordada() }
   const documento = id => item.documentos.find(doc => doc.id === id)
   const [propuesta, setPropuesta] = useState(() => datosDe(documento(subsana)))
   const [draft, set, poner] = useBorrador({ ...vacios, ...propuesta, folio_inicio: datos.folio_sugerido, folio_fin: datos.folio_sugerido, subsana_a_documento_id: subsana })
@@ -50,13 +52,13 @@ export default function Documento08Form({ usuario, item, datos, onSaved, onCance
     ...(item.codigo === 'SAN_RESOLUCION_SANCION' ? { tipo: values.tipo, dias_suspension: values.dias_suspension, registrada_en_rnssc: values.registrada_en_rnssc,
       fecha_registro_rnssc: values.fecha_registro_rnssc, referencia_rnssc: values.referencia_rnssc, referencia_procedimiento: values.referencia_procedimiento } : {}),
     ...(item.codigo === 'SAN_RESOLUCION_RECURSO' ? { sancion_id: values.sancion_id, resultado: values.resultado } : {}),
-  }, pdf), onSaved)
+  }, pdf), () => { recordarModalidad(draft.modalidad_presentacion); onSaved() })
   const vigentes = item.documentos.filter(doc => !doc.subsanado && doc.estado !== 'anulado')
   const sanciones = (datos.grupos.sanciones || []).find(group => group.codigo === 'SAN_RESOLUCION_SANCION')?.documentos || []
   const esReconocimiento = item.codigo.startsWith('REC_')
   return <Formulario modal titulo={draft.subsana_a_documento_id ? 'Subsanar documento' : 'Agregar documento'} guardar="Guardar registro" busy={busy} error={error} onCancel={onCancel}
     onSubmit={() => { if (pdf && !errorPdf) guardar(draft) }} nota="Los documentos no se editan ni se borran. Si hay un error, agrega un documento nuevo que lo subsane. Quedará en revisión de RR. HH.">
-    <FormSplit pdf={<PdfPreviewField label={`Adjuntar PDF (máximo ${datos.tamano_maximo_kb} KB)`} required maxMB={datos.tamano_maximo_kb / 1024} help="La vista previa se genera en tu navegador. El PDF se envía al guardar." error={errorPdf || errors.pdf} onChange={(file, message) => { setPdf(file); setErrorPdf(message) }} />}>
+    <FormSplit pdf={<PdfPreviewField onPages={setPaginas} label={`Adjuntar PDF (máximo ${datos.tamano_maximo_kb} KB)`} required maxMB={datos.tamano_maximo_kb / 1024} help="La vista previa se genera en tu navegador. El PDF se envía al guardar." error={errorPdf || errors.pdf} onChange={(file, message) => { setPdf(file); setErrorPdf(message) }} />}>
       <Campo label="Nombre del documento" required error={errors.nombre} className="sm:col-span-2"><input ref={primero} required maxLength={200} value={draft.nombre} onChange={set('nombre')} /></Campo>
       <Campo label="Entidad emisora" required error={errors.emisor}><input required maxLength={200} value={draft.emisor} onChange={set('emisor')} /></Campo>
       <Campo label={esReconocimiento ? 'Fecha de emisión' : 'Fecha del documento'} required error={errors.fecha_emision}><input type="date" required max={datos.fecha_actual} value={draft.fecha_emision} onChange={set('fecha_emision')} /></Campo>
@@ -86,6 +88,7 @@ export default function Documento08Form({ usuario, item, datos, onSaved, onCance
       <Campo label="Fecha de incorporación"><input type="date" readOnly value={datos.fecha_actual} /></Campo>
       <Campo label="Folio inicial sugerido"><input readOnly value={datos.folio_sugerido ?? 'No disponible'} /></Campo>
       <Campo label="Folio final" required error={errors.folio_fin}><input type="number" required min={datos.folio_sugerido || 1} value={draft.folio_fin} onChange={set('folio_fin')} /></Campo>
+      <SugerenciaFolio inicio={draft.folio_inicio} paginas={paginas} valor={draft.folio_fin} onUsar={poner('folio_fin')} />
       <Campo label="Modalidad de presentación" required error={errors.modalidad_presentacion}><select required value={draft.modalidad_presentacion} onChange={set('modalidad_presentacion')}><Opciones lista={modalidadesPresentacion} vacio="Selecciona" /></select></Campo>
       {vigentes.length > 0 && <Campo label="Documento que subsana" required={soloSubsanar} error={errors.subsana_a_documento_id} className="sm:col-span-2"><select required={soloSubsanar} value={draft.subsana_a_documento_id} onChange={elegirSubsana}><option value="">{soloSubsanar ? 'Selecciona el documento que subsana' : 'Es un documento adicional'}</option>{vigentes.map(doc => <option key={doc.id} value={doc.id}>{doc.nombre} · folios {folios(doc.folio_inicio, doc.folio_fin)}</option>)}</select></Campo>}
     </FormSplit>

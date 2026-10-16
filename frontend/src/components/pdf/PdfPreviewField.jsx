@@ -6,7 +6,8 @@ import { validatePdf } from './pdfValidation'
 
 const button = 'rounded-lg border border-slate-200 px-3 py-2 text-xs text-teal-800 focus-visible:outline-2 focus-visible:outline-teal-600 disabled:opacity-40'
 
-export default function PdfPreviewField({ name, id, label, help, maxMB = 2, currentUrl, currentName, required, error, onChange }) {
+// onPages(n): páginas del PDF elegido (null sin archivo nuevo o si no se pudo leer), para sugerir el folio final.
+export default function PdfPreviewField({ name, id, label, help, maxMB = 2, currentUrl, currentName, required, error, onChange, onPages }) {
   const generatedId = useId()
   const helpId = `${generatedId}-help`
   const input = useRef(null)
@@ -22,6 +23,9 @@ export default function PdfPreviewField({ name, id, label, help, maxMB = 2, curr
   const [hidden, setHidden] = useState(false)
   const [currentSize, setCurrentSize] = useState(0)
   const active = Boolean(file || (currentUrl && !hidden))
+  const onPagesRef = useRef(onPages)
+  useEffect(() => { onPagesRef.current = onPages })
+  useEffect(() => { onPagesRef.current?.(file && pdf ? pdf.numPages : null) }, [file, pdf])
 
   useEffect(() => {
     let timer
