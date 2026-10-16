@@ -1,13 +1,16 @@
 import { useState } from 'react'
 import { apiErrorMessage } from '../../../../axios'
-import { Link } from 'react-router-dom'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../../auth/session'
 import { useNoAplicables } from '../../api/useNoAplicables'
-import { mostrarTipo, ofrecerTipo } from '../../config/aplicacion'
+import { ofrecerTipo } from '../../config/aplicacion'
 import { estados03, antivirus03 } from '../../config/seccion03'
 import { folios } from '../../config/documentos'
 import AbrirLegajo from '../AbrirLegajo'
+import EspacioSeccion from '../documentos/EspacioSeccion'
+import VistasDocumentales from '../documentos/VistasDocumentales'
+import { tituloSeccion } from '../../config/espacioSeccion'
+import { vistaDeItem } from '../../config/vistasDocumentales'
 import VisorPdf from '../documentos/VisorPdf'
 import Documento04Form from './Documento04Form'
 import LineaTiempoExperiencia from './LineaTiempoExperiencia'
@@ -41,13 +44,8 @@ export default function Seccion04Panel({ usuario }) {
   const error = request.error && <p role="alert" className="mb-4 rounded-xl bg-rose-50 p-4 text-sm text-rose-800">{request.error.response?.status === 403 ? 'No tienes permiso para ver esta sección.' : apiErrorMessage(request.error)} <button className="font-semibold underline" onClick={request.retry}>Reintentar</button></p>
   if (!data) return error || <p role="status" className="p-6 text-sm text-slate-500">Cargando experiencia laboral…</p>
   const resumen = data.resumen
-  const atencion = data.items.filter(item => ['falta', 'observado', 'por_determinar'].includes(item.estado))
-  return <section aria-label="Experiencia laboral" className="min-w-0 space-y-5">
-    {error}
-    <nav aria-label="Ruta de la sección" className="flex flex-wrap gap-1 text-xs text-slate-500"><Link to="/legajos" className="text-teal-700 underline">Legajos</Link><span>› {data.legajo?.numero_legajo || 'Sin legajo abierto'} › Sección 04</span></nav>
-    <div><h2 className="text-xl font-semibold text-slate-800">Experiencia laboral</h2><p className="mt-2 text-sm text-slate-500">Experiencia declarada durante la selección, con sus periodos y documentos de respaldo.</p></div>
-    {!data.legajo && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p className="mb-3">Primero abre el legajo para agregar documentos.</p><AbrirLegajo usuario={usuario} /></div>}
-    {aviso && <p role="status" className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">{aviso}</p>}
+  return <EspacioSeccion seccion={tituloSeccion('04')} subseccion="Documentos y tiempo de experiencia" cifras={`Exigidos aceptados: ${resumen.aceptados} de ${resumen.exigidos} · ${resumen.pendientes} en revisión · ${resumen.observados} observado(s).`} etiquetaResumen="Ver resumen"
+    resumen={<div className="space-y-3"><p className="text-slate-500">Experiencia declarada durante la selección, con sus periodos y documentos de respaldo.</p>
     <div className="grid gap-5 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-2">
       <div><p className="text-xs text-slate-500">Documentos exigidos aceptados</p><p className="mt-2 text-2xl font-bold text-slate-800">{resumen.aceptados} de {resumen.exigidos}</p>
         <div role="progressbar" aria-label="Avance de documentos exigidos aceptados" aria-valuenow={resumen.porcentaje} aria-valuemin={0} aria-valuemax={100} className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-teal-700" style={{ width: `${resumen.porcentaje}%` }} /></div>
@@ -56,16 +54,16 @@ export default function Seccion04Panel({ usuario }) {
         <span className="rounded-full bg-amber-50 px-3 py-1.5 text-amber-900">{resumen.pendientes} en revisión</span><span className="rounded-full bg-rose-50 px-3 py-1.5 text-rose-800">{resumen.observados} observado(s)</span><span className="rounded-full bg-rose-50 px-3 py-1.5 text-rose-800">{resumen.faltantes} faltante(s)</span>
       </div>
     </div>
-    <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-3">
-      {[['Experiencia total', data.tiempo.total], ['Sector público', data.tiempo.publico], ['Sector privado', data.tiempo.privado]].map(([label, t]) => <div key={label}><p className="text-xs text-slate-500">{label}</p><p className="mt-2 text-lg font-semibold text-slate-800">{t.anios} años, {t.meses} meses y {t.dias} días</p><p className="mt-1 text-xs text-slate-500">{t.dias_totales} días calendario · {t.anios_decimal.toFixed(2)} años</p></div>)}
-      <p className="col-span-full text-xs text-slate-500">Corte: {fecha(data.tiempo.fecha_corte)}. Mes de {data.tiempo.configuracion.dias_por_mes} días y año de {data.tiempo.configuracion.dias_por_anio} días. {data.tiempo.configuracion.incluir_pendientes ? 'Incluye documentos aceptados y en revisión.' : 'Solo cuenta documentos aceptados.'} Los subtotales por sector pueden sumar más que el total si hay periodos simultáneos.</p>
-    </div>
-    <LineaTiempoExperiencia tiempo={data.tiempo} />
-    {atencion.length > 0 && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><strong>Necesita atención:</strong><ul className="mt-2 list-disc space-y-1 pl-5">{atencion.map(item => <li key={item.id}>{item.nombre}: {estados03[item.estado][0].toLowerCase()}.</li>)}</ul></div>}
+    </div>}>
+    <div className="min-w-0 space-y-5">
+    {error}
+    {!data.legajo && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p className="mb-3">Primero abre el legajo para agregar documentos.</p><AbrirLegajo usuario={usuario} /></div>}
+    {aviso && <p role="status" className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">{aviso}</p>}
     {data.items.length === 0 && <p className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600">No hay tipos documentales disponibles para tu perfil. Solicita a administración revisar el catálogo de la Sección 04.</p>}
-    {[['Documentos de experiencia laboral', 'Certificados, asignación de funciones y documentos que requiera la entidad.']].map(([titulo, descripcion], grupo) => <section key={titulo} aria-label={titulo} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    {/* Documentos por vista: Pendientes · Con documentos · Opcionales · No corresponde (cada ítem conserva su formulario). */}
+    <VistasDocumentales elementos={data.items} clasificar={item => vistaDeItem(item, ofrecerTipo(noAplica, item))} nombreDe={item => `${item.letra}) ${item.nombre}`}>{(lista, vista) => <div className="space-y-4">{[['Documentos de experiencia laboral', 'Certificados, asignación de funciones y documentos que requiera la entidad.']].map(([titulo, descripcion], grupo) => lista.some(item => item.grupo === grupo) && <section key={titulo} aria-label={titulo} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <header className="border-b border-slate-100 p-5"><h3 className="font-semibold text-slate-800">{titulo}</h3><p className="mt-1 text-xs text-slate-500">{descripcion}</p></header>
-      {data.items.filter(item => item.grupo === grupo && mostrarTipo(noAplica, item)).map(item => <details key={item.id} open={item.letra === 'a'} className="border-b border-slate-100 last:border-b-0">
+      {lista.filter(item => item.grupo === grupo).map(item => <details key={item.id} open={vista === 'pendientes' || item.letra === 'a'} className="border-b border-slate-100 last:border-b-0">
         <summary id={`item-${item.id}`} className="grid cursor-pointer grid-cols-[28px_minmax(0,1fr)] items-start gap-3 p-4 focus-visible:outline-2 focus-visible:outline-teal-700 sm:grid-cols-[28px_minmax(0,1fr)_auto]">
           <span className="grid size-7 place-items-center rounded-lg bg-teal-50 text-sm font-bold text-teal-800">{item.letra}</span>
           <span className="min-w-0"><span className="block break-words text-sm font-semibold text-slate-800">{item.nombre}</span><span className="mt-1 block text-xs text-slate-500">{item.motivo}{item.requiere_fedateo && ' Requiere fedateo.'}</span><span className="mt-1 block text-xs text-slate-500">{item.cantidad} documento(s) vigente(s)</span></span>
@@ -98,8 +96,14 @@ export default function Seccion04Panel({ usuario }) {
           </>}
         </div>
       </details>)}
-    </section>)}
+    </section>)}</div>}</VistasDocumentales>
+    <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-3">
+      {[['Experiencia total', data.tiempo.total], ['Sector público', data.tiempo.publico], ['Sector privado', data.tiempo.privado]].map(([label, t]) => <div key={label}><p className="text-xs text-slate-500">{label}</p><p className="mt-2 text-lg font-semibold text-slate-800">{t.anios} años, {t.meses} meses y {t.dias} días</p><p className="mt-1 text-xs text-slate-500">{t.dias_totales} días calendario · {t.anios_decimal.toFixed(2)} años</p></div>)}
+      <p className="col-span-full text-xs text-slate-500">Corte: {fecha(data.tiempo.fecha_corte)}. Mes de {data.tiempo.configuracion.dias_por_mes} días y año de {data.tiempo.configuracion.dias_por_anio} días. {data.tiempo.configuracion.incluir_pendientes ? 'Incluye documentos aceptados y en revisión.' : 'Solo cuenta documentos aceptados.'} Los subtotales por sector pueden sumar más que el total si hay periodos simultáneos.</p>
+    </div>
+    <LineaTiempoExperiencia tiempo={data.tiempo} />
     <p className="text-sm font-semibold text-slate-800">Número de folios: {data.numero_folios}</p>
-    <p className="rounded-xl border border-slate-200 bg-white p-4 text-xs leading-relaxed text-slate-500">Los documentos se conservan sin editar ni eliminar. Los folios son correlativos por sección. La aceptación de RR. HH., el fedateo, la fiscalización posterior y el análisis antivirus se muestran por separado.</p>
-  </section>
+    <details className="rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-500"><summary className="cursor-pointer font-semibold text-slate-600">Cómo se conservan los documentos</summary><p className="mt-2 leading-relaxed">Los documentos se conservan sin editar ni eliminar. Los folios son correlativos por sección. La aceptación de RR. HH., el fedateo, la fiscalización posterior y el análisis antivirus se muestran por separado.</p></details>
+    </div>
+  </EspacioSeccion>
 }

@@ -29,7 +29,7 @@ function Chip({ activo, children, onClick }) {
  * aplica, activa, onIr }] para cambiar sin volver al menú. cifras: texto corto. resumen: el resumen completo (plegado).
  * atajos: [{ id, texto }] a los bloques de la página.
  */
-export default function EspacioSeccion({ seccion, subseccion, subsecciones = [], cifras, resumen, atajos = [], children }) {
+export default function EspacioSeccion({ seccion, subseccion, subsecciones = [], cifras, resumen, etiquetaResumen = 'Ver resumen de la sección', atajos = [], children }) {
   const [zona, setZona] = useState(null)
   return <Contexto.Provider value={{ zona, contexto: subseccion ? `${seccion} › ${subseccion}` : seccion }}>
     <section aria-label={subseccion || seccion}>
@@ -44,7 +44,7 @@ export default function EspacioSeccion({ seccion, subseccion, subsecciones = [],
           </Chip>
         })}</nav>}
         {(cifras || resumen) && <details className="mt-3 text-xs text-slate-600">
-          <summary className="cursor-pointer"><span>{cifras}</span>{resumen && <span className="ml-2 font-semibold text-teal-700">Ver resumen de la sección</span>}</summary>
+          <summary className="cursor-pointer"><span>{cifras}</span>{resumen && <span className={`${cifras ? 'ml-2 ' : ''}font-semibold text-teal-700`}>{etiquetaResumen}</span>}</summary>
           {resumen && <div className="mt-3">{resumen}</div>}
         </details>}
         {atajos.length > 0 && <nav aria-label="En esta página" className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-100 pt-3 text-xs">

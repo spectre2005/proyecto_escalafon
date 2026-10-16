@@ -1,14 +1,17 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { apiErrorMessage } from '../../../../axios'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../../auth/session'
 import AbrirLegajo from '../AbrirLegajo'
+import EspacioSeccion from '../documentos/EspacioSeccion'
+import VistasDocumentales from '../documentos/VistasDocumentales'
+import { tituloSeccion } from '../../config/espacioSeccion'
+import { vistaDeItem } from '../../config/vistasDocumentales'
 import VisorPdf from '../documentos/VisorPdf'
 import Revision03Form from '../seccion03/Revision03Form'
 import { revisarDocumento08 } from '../../api/seccion08Api'
 import { useNoAplicables } from '../../api/useNoAplicables'
-import { mostrarTipo, ofrecerTipo } from '../../config/aplicacion'
+import { ofrecerTipo } from '../../config/aplicacion'
 import { folios } from '../../config/documentos'
 import { estados08, resultadoRecurso08, tipoSancion08 } from '../../config/seccion08'
 import Documento08Form from './Documento08Form'
@@ -60,14 +63,9 @@ export default function Seccion08Panel({ usuario, categoria }) {
     pendientes: documentosVigentes.filter(doc => doc.estado === 'pendiente').length,
     observados: documentosVigentes.filter(doc => doc.estado === 'observado').length,
   }
-  const atencion = resumen.pendientes + resumen.observados
-  return <section aria-label={titulo} className="min-w-0 space-y-5">
-    {error}
-    <nav aria-label="Ruta del legajo" className="flex flex-wrap gap-1 text-xs text-slate-500"><Link to="/legajos" className="text-teal-700 underline">Legajos</Link><span>› {data.legajo?.numero_legajo || 'Sin legajo abierto'}</span></nav>
-    <div><h2 className="text-xl font-semibold text-slate-800">{titulo}</h2><p className="mt-2 text-sm text-slate-500">{grupoActual === 'sanciones' ? 'Documentos de sanciones disciplinarias y recursos impugnatorios, incluido el dato disponible sobre el RNSSC.' : 'Documentos que acreditan reconocimientos al mérito y por tiempo de servicios.'}</p></div>
-    {!data.legajo && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p className="mb-3">Primero abre el legajo para agregar documentos.</p><AbrirLegajo usuario={usuario} /></div>}
-    {aviso && <p role="status" className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">{aviso}</p>}
-    {items === null ? <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">No tienes permiso para ver la documentación de sanciones disciplinarias.</div> : <>
+  return <EspacioSeccion seccion={tituloSeccion('08')} subseccion={titulo} etiquetaResumen="Ver resumen"
+    cifras={items === null ? undefined : `${resumen.registrados} registrado(s) · ${resumen.pendientes} en revisión · ${resumen.observados} observado(s).`}
+    resumen={<div className="space-y-3"><p className="text-slate-500">{grupoActual === 'sanciones' ? 'Documentos de sanciones disciplinarias y recursos impugnatorios, incluido el dato disponible sobre el RNSSC.' : 'Documentos que acreditan reconocimientos al mérito y por tiempo de servicios.'}</p>{items !== null && <>
       <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-2 xl:grid-cols-4">
         <div><p className="text-xs text-slate-500">{grupoActual === 'sanciones' ? 'Sanciones registradas' : 'Reconocimientos registrados'}</p><p className="mt-1 text-2xl font-bold text-slate-800">{resumen.registrados}</p></div>
         {grupoActual === 'sanciones' && data.puede_ver_sanciones && <div><p className="text-xs text-slate-500">Vigentes / dejadas sin efecto</p><p className="mt-1 text-2xl font-bold text-slate-800">{resumen.vigentes} / {resumen.dejadasSinEfecto}</p></div>}
@@ -75,13 +73,15 @@ export default function Seccion08Panel({ usuario, categoria }) {
         <div><p className="text-xs text-slate-500">Observados</p><p className="mt-1 text-2xl font-bold text-slate-800">{resumen.observados}</p></div>
         <div className="flex flex-wrap content-center gap-2 text-xs sm:col-span-2 xl:col-span-4">{data.perfil.tipos_personal.map(tipo => <span key={tipo} className="rounded-full bg-slate-100 px-3 py-1.5">{tipo === 'docente' ? 'Docente' : 'Administrativo'}</span>)}{(data.perfil.puestos.length ? data.perfil.puestos : ['Puesto no registrado']).map(puesto => <span key={puesto} className="max-w-full break-words rounded-full bg-slate-100 px-3 py-1.5">{puesto}</span>)}</div>
       </div>
-      {atencion > 0 && <p role="status" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">Hay {resumen.pendientes} documento(s) en revisión y {resumen.observados} observado(s) que requieren atención.</p>}
-      <section className="rounded-2xl border border-slate-200 bg-white p-5" aria-label={`Línea de tiempo de ${titulo.toLowerCase()}`}>
-        <h3 className="font-semibold text-slate-800">Línea de tiempo</h3>
-        {listaTiempo.length === 0 ? <p className="mt-2 text-sm text-slate-500">Todavía no hay documentos registrados.</p> : <ol className="mt-4 space-y-3">{[...listaTiempo].reverse().map(doc => <li key={doc.id} className="flex min-w-0 gap-3 border-l-2 border-teal-200 pl-4"><span aria-hidden="true" className={`mt-1 size-2.5 shrink-0 rounded-full ${doc.grupo === 'sanciones' ? 'bg-rose-600' : 'bg-teal-700'}`} /><div className="min-w-0"><p className="break-words text-sm font-medium text-slate-800">{doc.nombre}</p><p className="mt-1 text-xs text-slate-500">{fechaEvento(doc)} · {doc.grupo === 'sanciones' ? 'Sanción disciplinaria' : 'Reconocimiento'} · Folios {folios(doc.folio_inicio, doc.folio_fin)}</p></div></li>)}</ol>}
-      </section>
+    </>}</div>}>
+    <div className="min-w-0 space-y-5">
+    {error}
+    {!data.legajo && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p className="mb-3">Primero abre el legajo para agregar documentos.</p><AbrirLegajo usuario={usuario} /></div>}
+    {aviso && <p role="status" className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">{aviso}</p>}
+    {items === null ? <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">No tienes permiso para ver la documentación de sanciones disciplinarias.</div> : <>
       <section className="space-y-3" aria-label={titulo}>
-        {items?.filter(item => mostrarTipo(noAplica, item)).map(item => <details key={item.codigo} className="group overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        {/* Documentos por vista: Pendientes · Con documentos · Opcionales · No corresponde (cada ítem conserva su formulario). */}
+        <VistasDocumentales elementos={items} idDe={item => item.codigo} clasificar={item => vistaDeItem(item, ofrecerTipo(noAplica, item))}>{(lista, vista) => <div className="space-y-3">{lista.map(item => <details key={item.codigo} open={vista === 'pendientes'} className="group overflow-hidden rounded-2xl border border-slate-200 bg-white">
           <summary id={`item-${item.codigo}`} className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 p-5 focus-visible:outline-2 focus-visible:outline-teal-600">
             <div className="min-w-0"><h4 className="break-words text-sm font-semibold text-slate-800">{item.nombre}</h4><p className="mt-1 text-xs text-slate-500">{item.motivo} · {item.cantidad} documento(s)</p></div><Estado estado={item.estado} />
           </summary>
@@ -114,10 +114,15 @@ export default function Seccion08Panel({ usuario, categoria }) {
               {formulario?.item === item.codigo && !formulario.documento ? <Documento08Form usuario={usuario} item={item} datos={data} subsana={formulario.subsana || ''} soloSubsanar={!ofrecerTipo(noAplica, item)} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado. Queda en revisión de RR. HH.')} /> : ofrecerTipo(noAplica, item) && <button id={`agregar-${item.codigo}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.codigo, origen: `agregar-${item.codigo}` }) }}>{item.cantidad ? 'Agregar otro documento' : 'Agregar documento'}</button>}
             </>}
           </div>
-        </details>)}
+        </details>)}</div>}</VistasDocumentales>
+      </section>
+      <section className="rounded-2xl border border-slate-200 bg-white p-5" aria-label={`Línea de tiempo de ${titulo.toLowerCase()}`}>
+        <h3 className="font-semibold text-slate-800">Línea de tiempo</h3>
+        {listaTiempo.length === 0 ? <p className="mt-2 text-sm text-slate-500">Todavía no hay documentos registrados.</p> : <ol className="mt-4 space-y-3">{[...listaTiempo].reverse().map(doc => <li key={doc.id} className="flex min-w-0 gap-3 border-l-2 border-teal-200 pl-4"><span aria-hidden="true" className={`mt-1 size-2.5 shrink-0 rounded-full ${doc.grupo === 'sanciones' ? 'bg-rose-600' : 'bg-teal-700'}`} /><div className="min-w-0"><p className="break-words text-sm font-medium text-slate-800">{doc.nombre}</p><p className="mt-1 text-xs text-slate-500">{fechaEvento(doc)} · {doc.grupo === 'sanciones' ? 'Sanción disciplinaria' : 'Reconocimiento'} · Folios {folios(doc.folio_inicio, doc.folio_fin)}</p></div></li>)}</ol>}
       </section>
       <p className="text-sm font-semibold text-slate-800">Número de folios: {data.numero_folios}</p>
-      <p className="rounded-xl border border-slate-200 bg-white p-4 text-xs leading-relaxed text-slate-500">Los folios se asignan correlativamente. Los documentos registrados se conservan sin editar ni eliminar.</p>
+      <details className="rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-500"><summary className="cursor-pointer font-semibold text-slate-600">Cómo se conservan los documentos</summary><p className="mt-2 leading-relaxed">Los folios se asignan correlativamente. Los documentos registrados se conservan sin editar ni eliminar.</p></details>
     </>}
-  </section>
+    </div>
+  </EspacioSeccion>
 }

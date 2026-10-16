@@ -181,10 +181,10 @@ function Documentos({ usuario, data, subseccion, sinLegajo, aplica = true }) {
   const enlazar = puedeSubir && !sinLegajo && !ocupado ? (tipo, documento) => { setAviso(''); setRecuperando({ tipoId: tipo.id, documento }) } : null
   return <section id={idBloque.documentos} aria-label="Documentos de la subsección" className={`scroll-mt-4 ${aplica ? '' : 'opacity-60'}`}>
     <h3 className="mb-1 text-base font-semibold text-slate-800">Documentos</h3>
-    <p className="mb-4 text-xs text-slate-500">Cada documento se sube en PDF con sus metadatos. Los folios son correlativos en toda la sección.{sinLegajo && puedeSubir ? ` ${sinLegajo}` : ''}</p>
+    <p className="mb-4 text-xs text-slate-500">Sube cada documento desde su tipo. Si acredita un registro, también puedes adjuntarlo desde la tarjeta del registro.{sinLegajo && puedeSubir ? ` ${sinLegajo}` : ''}</p>
     {aviso && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
     <SinAsociar tipos={subseccion.tipos} onEnlazar={enlazar} />
-    <GruposTipos tipos={subseccion.tipos} noAplica={noAplica} render={tipo => {
+    <GruposTipos tipos={subseccion.tipos} noAplica={noAplica} aplica={aplica} render={tipo => {
       const [exigeTexto, exigeClase] = exigencia[String(aplica ? tipo.exigido : false)]
       return <li key={tipo.id} id={idTipo(tipo.id)} className="scroll-mt-4 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -538,14 +538,15 @@ export default function Seccion02Panel({ usuario, categoria, onNavigate }) {
     {noAplica ? <NoAplicaPrueba onNavigate={onNavigate} /> : <>
       {sinLegajo ? <Aviso accion={<AbrirLegajo usuario={usuario} />}>{sinLegajo} Los formularios y la carga de documentos de la sección 02 están deshabilitados hasta abrirlo.</Aviso>
         : sinVinculo && categoria !== 's02-vinculo' && <Aviso accion={irAVinculo}>La persona no tiene un vínculo laboral abierto. Los formularios de esta subsección dependen del vínculo.</Aviso>}
-      <div id={idBloque.registros} className="scroll-mt-4">
+      {/* Primero los documentos (qué falta, qué hay, qué es opcional); después los registros que acreditan. */}
+      <div ref={documentosRef} tabIndex={-1} className="scroll-mt-6 outline-none"><Documentos usuario={usuario} data={data} subseccion={subseccion} sinLegajo={sinLegajo} /></div>
+      <div id={idBloque.registros} className="mt-8 scroll-mt-4">
       {codigo === '2.1' && <Seleccion usuario={usuario} data={data} sinLegajo={sinLegajo} />}
       {codigo === '2.2' && <Formalizacion usuario={usuario} data={data} sinLegajo={sinLegajo} />}
       {codigo === '2.3' && <Induccion usuario={usuario} data={data} bloqueo={bloqueo} />}
       {enNoConDatos && <Aviso accion={categoria !== 's02-vinculo' && <button onClick={() => onNavigate('s02-vinculo')} className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900">Revisar la bandera en 2.2</button>}>«Tiene período de prueba» está en No, pero hay períodos o documentos de período de prueba registrados: se muestran y se conservan, pero no se exigen ni se cuentan. Para registrar uno nuevo, cambia la bandera a Sí en el vínculo laboral.</Aviso>}
       {codigo === '2.4' && <Prueba usuario={usuario} data={data} bloqueo={bloqueo} />}
       </div>
-      <div ref={documentosRef} tabIndex={-1} className="scroll-mt-6 outline-none"><Documentos usuario={usuario} data={data} subseccion={subseccion} sinLegajo={sinLegajo} /></div>
     </>}
   </EspacioSeccion>
 }

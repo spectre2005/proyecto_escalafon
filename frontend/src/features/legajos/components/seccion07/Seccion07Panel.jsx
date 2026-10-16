@@ -166,10 +166,10 @@ function Documentos({ usuario, data, subseccion, sinLegajo, aplica }) {
   const enlazar = puedeSubir && !sinLegajo ? (tipo, documento) => { setAviso(''); setRecuperando({ tipoId: tipo.id, documento }) } : null
   return <section id={idBloque.documentos} aria-label="Documentos de la subsección" className={`scroll-mt-4 ${aplica ? '' : 'opacity-60'}`}>
     <h3 className="mb-1 text-base font-semibold text-slate-800">Documentos</h3>
-    <p className="mb-4 text-xs text-slate-500">Cada documento se sube en PDF con sus metadatos. Los folios son correlativos en toda la sección.{sinLegajo && puedeSubir ? ` ${sinLegajo}` : ''}</p>
+    <p className="mb-4 text-xs text-slate-500">Sube cada documento desde su tipo. Si acredita un registro, también puedes adjuntarlo desde la tarjeta del registro.{sinLegajo && puedeSubir ? ` ${sinLegajo}` : ''}</p>
     {aviso && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
     <SinAsociar tipos={subseccion.tipos} onEnlazar={ocupado ? null : enlazar} />
-    <GruposTipos tipos={subseccion.tipos} noAplica={noAplica} render={tipo => {
+    <GruposTipos tipos={subseccion.tipos} noAplica={noAplica} aplica={aplica} render={tipo => {
       const [exigeTexto, exigeClase] = exigencia[String(aplica ? tipo.exigido : false)]
       const datos = tipo.formulario_datos === 'progresiones_carrera' ? 'progresión (administrativos) o ratificación (docentes)' : formulariosDatos07[tipo.formulario_datos]?.toLowerCase()
       return <li key={tipo.id} id={idTipo(tipo.id)} className="scroll-mt-4 p-4">
@@ -288,11 +288,12 @@ export default function Seccion07Panel({ usuario, categoria, onNavigate }) {
       <button onClick={() => onNavigate('s02-vinculo')} className="mt-4 text-xs font-semibold text-teal-700 hover:underline">Revisar los vínculos en 2.2</button>
     </section>}
     <Avisos data={data} codigo={codigo} />
-    <div id={idBloque.registros} className={`scroll-mt-4 ${aplica ? '' : 'opacity-60'}`}>
+    {/* Primero los documentos (qué falta, qué hay, qué es opcional); después los registros que acreditan. */}
+    <Documentos usuario={usuario} data={data} subseccion={subseccion} sinLegajo={sinLegajo} aplica={aplica} />
+    <div id={idBloque.registros} className={`mt-8 scroll-mt-4 ${aplica ? '' : 'opacity-60'}`}>
       {codigo === '7.1' && <Desempeno usuario={usuario} data={data} bloqueo={bloqueo} />}
       {codigo === '7.2' && <Progresion usuario={usuario} data={data} bloqueo={bloqueo} />}
       {codigo === '7.3' && <Desplazamiento usuario={usuario} data={data} bloqueo={bloqueo} />}
     </div>
-    <Documentos usuario={usuario} data={data} subseccion={subseccion} sinLegajo={sinLegajo} aplica={aplica} />
   </EspacioSeccion>
 }

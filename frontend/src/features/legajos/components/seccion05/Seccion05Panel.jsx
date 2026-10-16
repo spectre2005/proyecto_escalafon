@@ -106,7 +106,7 @@ function Documentos({ usuario, data, tipos, sinLegajo, subiendo, setSubiendo }) 
   const enlazar = puedeSubir && !sinLegajo && !ocupado ? (tipo, documento) => { setAviso(''); setRecuperando({ tipoId: tipo.id, documento }) } : null
   return <section id={idBloque.documentos} aria-label="Documentos" className="scroll-mt-4 mb-8">
     <h3 className="mb-1 text-base font-semibold text-slate-800">Documentos</h3>
-    <p className="mb-4 text-xs text-slate-500">Cada documento se sube en PDF con sus metadatos y puede acreditar un movimiento registrado. Los folios son correlativos en toda la sección 05. Cada tipo admite varios documentos a lo largo del tiempo.{sinLegajo && puedeSubir ? ` ${sinLegajo}` : ''}</p>
+    <p className="mb-4 text-xs text-slate-500">Sube cada documento desde su tipo. Si acredita un registro, también puedes adjuntarlo desde la tarjeta del registro.{sinLegajo && puedeSubir ? ` ${sinLegajo}` : ''}</p>
     {aviso && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
     <SinAsociar tipos={tipos} onEnlazar={enlazar} />
     <GruposTipos tipos={tipos} noAplica={noAplica} render={tipo => <li key={tipo.id} id={idTipo(tipo.id)} className="scroll-mt-4 p-4">
@@ -217,14 +217,15 @@ export default function Seccion05Panel({ usuario, categoria }) {
 
   const tipos = data.tipos.filter(tipo => tipo.bloque === bloque)
   const registros = { licencias: data.licencias.length, vacaciones: data.periodos.length + data.goces.length }[bloque]
-  return <EspacioSeccion seccion={tituloSeccion('05')} subseccion={titulo} atajos={atajosDe({ registros, tipos })}>
+  return <EspacioSeccion seccion={tituloSeccion('05')} subseccion={titulo} atajos={atajosDe({ registros, tipos })} etiquetaResumen="Acerca de esta sección"
+    resumen={<p className="text-slate-500">Sección 05 · Movimientos del personal{literales ? ` · Anexo 01, literales ${literales}` : ' · otros documentos requeridos por la universidad'}. Un trabajador puede tener varios movimientos y documentos; ninguno se elimina.</p>}>
     {error}
-    <p className="mb-5 text-xs text-slate-500">Sección 05 · Movimientos del personal{literales ? ` · Anexo 01, literales ${literales}` : ' · otros documentos requeridos por la universidad'}. Un trabajador puede tener varios movimientos y documentos; ninguno se elimina.</p>
     {sinLegajo && <Aviso accion={<AbrirLegajo usuario={usuario} />}>{sinLegajo} Los registros y la carga de documentos de la sección 05 están deshabilitados hasta abrirlo.</Aviso>}
+    {/* Primero los documentos (qué falta, qué hay, qué es opcional); después los registros que acreditan. */}
+    <Documentos usuario={usuario} data={data} tipos={tipos} sinLegajo={sinLegajo} subiendo={subiendo} setSubiendo={setSubiendo} />
     {registros !== undefined && <div id={idBloque.registros} className="scroll-mt-4">
       {bloque === 'licencias' && <Licencias usuario={usuario} data={data} sinLegajo={sinLegajo} />}
       {bloque === 'vacaciones' && <Vacaciones usuario={usuario} data={data} sinLegajo={sinLegajo} onRol={abrirRol} />}
     </div>}
-    <Documentos usuario={usuario} data={data} tipos={tipos} sinLegajo={sinLegajo} subiendo={subiendo} setSubiendo={setSubiendo} />
   </EspacioSeccion>
 }

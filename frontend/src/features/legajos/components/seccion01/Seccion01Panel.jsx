@@ -137,9 +137,9 @@ function Documentos({ usuario, data, codigos }) {
     setAviso(guardado ? 'Datos guardados y enlazados al documento.' : 'El documento quedó cargado sin registro de datos enlazado.')
   }
   const enlazar = puedeSubir && !sinLegajo && !ocupado ? (tipo, documento) => { setAviso(''); setRecuperando({ tipoId: tipo.id, documento }) } : null
-  return <section id={idBloque.documentos} aria-label="Documentos" className="scroll-mt-4 mt-8">
+  return <section id={idBloque.documentos} aria-label="Documentos" className="scroll-mt-4">
     <h3 className="mb-1 text-base font-semibold text-slate-800">Documentos</h3>
-    <p className="mb-4 text-xs text-slate-500">Cada documento se sube en PDF con sus metadatos. Los folios son correlativos en toda la sección 01.{sinLegajo && puedeSubir ? ' La persona no tiene un legajo abierto: la carga está deshabilitada.' : ''}</p>
+    <p className="mb-4 text-xs text-slate-500">Sube cada documento desde su tipo. Si acredita un registro, también puedes adjuntarlo desde la tarjeta del registro.{sinLegajo && puedeSubir ? ' La persona no tiene un legajo abierto: la carga está deshabilitada.' : ''}</p>
     {aviso && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
     <SinAsociar tipos={catalogo} onEnlazar={enlazar} />
     {/* Solo los tipos que corresponden a la persona (o que ya tienen documentos), agrupados. */}
@@ -283,15 +283,17 @@ export default function Seccion01Panel({ usuario, categoria }) {
   const contenido = <>
     {error}
     {/* El aviso de las condiciones del puesto ya dice dónde corregirlas (vínculo laboral, sección 02). */}
-    {data.avisos.map(aviso => <Aviso key={aviso}>{aviso}{aviso.startsWith('No tiene un vínculo laboral vigente') ? '' : ' Revisa la bandera en Información personal o los registros.'}</Aviso>)}
+    {/* «Falta definir…» ya lo pregunta «Completa el perfil» (arriba, en la ficha): aquí solo los demás avisos. */}
+    {data.avisos.filter(aviso => !aviso.startsWith('Falta definir')).map(aviso => <Aviso key={aviso}>{aviso}{aviso.startsWith('No tiene un vínculo laboral vigente') ? '' : ' Revisa la bandera en Información personal o los registros.'}</Aviso>)}
     {!data.legajo && <Aviso accion={<AbrirLegajo usuario={usuario} />}>La persona no tiene un legajo abierto. La carga de documentos de la sección 01 está deshabilitada hasta abrirlo.</Aviso>}
-    <div id={idBloque.registros} className="scroll-mt-4">
+    {/* Primero los documentos (qué falta, qué hay, qué es opcional); después los registros que acreditan. */}
+    <Documentos usuario={usuario} data={data} codigos={grupo.codigos} />
+    <div id={idBloque.registros} className="mt-8 scroll-mt-4">
     {categoria === 's01-antecedentes' && <Declaraciones usuario={usuario} data={data} codigos={grupo.codigos} titulo="Antecedentes e impedimentos registrados" />}
     {categoria === 's01-declaraciones' && <Declaraciones usuario={usuario} data={data} codigos={grupo.codigos} titulo="Declaraciones juradas registradas" />}
     {categoria === 's01-familia' && <Familia usuario={usuario} data={data} />}
     {categoria === 's01-discapacidad' && <Discapacidad usuario={usuario} data={data} aplica={discapacidad?.aplica !== false} />}
     </div>
-    <Documentos usuario={usuario} data={data} codigos={grupo.codigos} />
   </>
   // «Datos personales e identidad» va bajo la información personal de la ficha: sin cabecera propia.
   if (categoria === 'general') return <section aria-label={grupo.titulo} className="mt-6"><Resumen data={data} />{contenido}</section>
