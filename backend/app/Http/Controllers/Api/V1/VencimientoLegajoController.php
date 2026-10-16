@@ -15,6 +15,7 @@ use App\Models\RenovacionLegajo;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Support\AvisosVencimiento;
+use App\Support\Documentos\Antivirus;
 use App\Support\Documentos\ArchivoPdf;
 use App\Support\Documentos\AuditoriaDocumento;
 use App\Support\Documentos\EstadoDocumento;
@@ -230,6 +231,7 @@ class VencimientoLegajoController extends Controller
         $this->exigirTipo($request, $r->tipoDocumento, $ciclo->legajo);
         $disco = Storage::disk(config('legajo.disco_documentos'));
         abort_unless($disco->exists($p->storage_path), 404);
+        app(Antivirus::class)->exigir(config('legajo.disco_documentos'), $p->storage_path);
         BitacoraAccesoLegajo::query()->create(['legajo_id' => $ciclo->legajo_id, 'usuario_id' => $request->user()->id, 'accion' => 'descargar',
             'ip_origen' => $request->ip(), 'fecha_acceso' => now()]);
 

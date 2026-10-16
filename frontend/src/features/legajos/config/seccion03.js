@@ -17,6 +17,7 @@ export const estados03 = {
 
 export const antivirus03 = {
   pendiente: 'Análisis antivirus pendiente', limpio: 'Archivo verificado por antivirus', infectado: 'Archivo bloqueado',
+  error: 'No se pudo completar el análisis antivirus',
 }
 
 export const niveles03 = {

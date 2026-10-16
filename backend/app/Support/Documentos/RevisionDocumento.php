@@ -65,7 +65,8 @@ final class RevisionDocumento
                 if (! ($datos['recepcion_confirmada'] ?? false)) {
                     throw ValidationException::withMessages(['recepcion_confirmada' => 'Confirma que verificaste la recepción, el sello y los folios.']);
                 }
-                if (! $doc->archivo || $doc->archivo->estado_antivirus === 'infectado') {
+                if (! $doc->archivo || $doc->archivo->estado_antivirus === 'infectado'
+                    || (config('antivirus.enforce') && $doc->archivo->estado_antivirus !== 'limpio')) {
                     throw ValidationException::withMessages(['estado' => 'El documento no tiene un archivo disponible o el archivo está bloqueado. Registra una subsanación.']);
                 }
                 if (in_array($seccion, [6, 10], true) && ($doc->archivo->almacenamiento !== config('legajo.disco_documentos')

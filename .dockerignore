@@ -1,0 +1,14 @@
+.git
+.aws
+.codex
+.agents
+**/.env*
+**/node_modules
+**/vendor
+**/dist
+backend/storage
+backend/bootstrap/cache/*.php
+backend/public/storage
+frontend/test-results
+frontend/playwright-report
+docs

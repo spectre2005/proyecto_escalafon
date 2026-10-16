@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\RegistroInmutable;
 use Database\Factories\HistorialEstadoDocumentoFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,6 +15,7 @@ class HistorialEstadoDocumento extends Model
     use HasFactory;
 
     use HasUuids;
+    use RegistroInmutable;
 
     protected $table = 'historial_estados_documento';
 

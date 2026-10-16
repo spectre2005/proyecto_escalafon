@@ -1,17 +1,25 @@
 import { apiErrorMessage } from '../../../axios'
-import { createQueryStore } from '../../../shared/queries/queryStore'
 import { useLiveQuery } from '../../../shared/queries/useLiveQuery'
-import { listUsers } from '../api/usuariosApi'
 
-const usersStore = createQueryStore((_url, signal) => listUsers(signal))
-
-export function useUsers() {
-  const query = useLiveQuery('/usuarios', usersStore)
+export function useUsers({ page = 1, perPage = 10, query = '', tipoPersonal = 'todos', estado = 'todos' } = {}) {
+  const params = new URLSearchParams({ page: String(page), per_page: String(perPage), q: query, tipo_personal: tipoPersonal, estado })
+  const request = useLiveQuery(`/usuarios?${params}`)
   return {
-    users: query.data || [],
-    setUsers: updater => query.setData(previous => typeof updater === 'function' ? updater(previous || []) : updater),
-    loading: query.loading,
-    loadError: query.error ? apiErrorMessage(query.error) : '',
-    refreshUsers: query.retry,
+    users: request.data?.data || [],
+    meta: request.data?.meta,
+    summary: request.data?.resumen,
+    loading: request.loading,
+    loadError: request.error ? apiErrorMessage(request.error) : '',
+    refreshUsers: request.retry,
+  }
+}
+
+export function useUsersSummary() {
+  const request = useLiveQuery('/usuarios/resumen')
+  return {
+    summary: request.data?.data,
+    loading: request.loading,
+    loadError: request.error ? apiErrorMessage(request.error) : '',
+    refreshUsers: request.retry,
   }
 }

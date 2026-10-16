@@ -12,6 +12,7 @@ use App\Models\SeccionLegajo;
 use App\Models\Usuario;
 use App\Models\UsuarioRol;
 use App\Models\VinculoLaboral;
+use App\Support\Documentos\Antivirus;
 use App\Support\Documentos\ArchivoPdf;
 use App\Support\NumeroLegajo;
 use App\Support\RegimenesLaborales;
@@ -231,6 +232,7 @@ class IncorporacionController extends Controller
         abort_if(empty($d['versiones']), 404);
         $v = end($d['versiones']);
         abort_unless(Storage::disk('local')->exists($v['path']), 404);
+        app(Antivirus::class)->exigir('local', $v['path']);
 
         return Storage::disk('local')->response($v['path'], $v['nombre'], ['Content-Type' => 'application/pdf', 'Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff']);
     }

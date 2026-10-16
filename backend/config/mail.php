@@ -37,6 +37,18 @@ return [
 
     'mailers' => [
 
+        'ses_smtp' => [
+            'transport' => 'smtp',
+            'scheme' => 'smtp',
+            'host' => env('SES_SMTP_HOST', 'email-smtp.us-east-1.amazonaws.com'),
+            'port' => 587,
+            'username' => env('SES_SMTP_USERNAME'),
+            'password' => env('SES_SMTP_PASSWORD'),
+            'auto_tls' => true,
+            'require_tls' => true,
+            'timeout' => (int) env('MAIL_TIMEOUT', 15),
+        ],
+
         'smtp' => [
             'transport' => 'smtp',
             'scheme' => env('MAIL_SCHEME'),

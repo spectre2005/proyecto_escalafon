@@ -1,0 +1,62 @@
+name: Calidad
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preparar entorno aislado
+        run: cp backend/.env.example backend/.env
+      - name: Construir PHP
+        run: docker compose -p escalafon_ci -f docker-compose.ci.yml build backend
+      - name: Instalar dependencias bloqueadas
+        run: docker compose -p escalafon_ci -f docker-compose.ci.yml run --rm backend composer install --no-interaction --prefer-dist
+      - name: Pruebas
+        run: docker compose -p escalafon_ci -f docker-compose.ci.yml run --rm backend php artisan test --compact
+      - name: PostgreSQL aislado
+        run: docker compose -p escalafon_ci -f docker-compose.ci.yml up -d --wait testdb
+      - name: Integración y concurrencia PostgreSQL
+        run: docker compose -p escalafon_ci -f docker-compose.ci.yml run --rm backend vendor/bin/phpunit -c phpunit.pgsql.xml
+      - name: Comprobar contrato API
+        run: docker compose -p escalafon_ci -f docker-compose.ci.yml run --rm backend php artisan api:contrato --check=/var/www/docs/api-contract.json
+      - name: Ensayo de restauración PostgreSQL
+        run: |
+          docker compose -p escalafon_ci -f docker-compose.ci.yml run --rm -e DB_CONNECTION=pgsql -e DB_DATABASE=escalafon_test backend php artisan db:seed --class=Seccion02DemoSeeder --no-interaction
+          docker compose -p escalafon_ci -f docker-compose.ci.yml exec -T testdb sh -s < docker/operations/restore-smoke.sh
+      - name: Limpiar entorno
+        if: always()
+        run: docker compose -p escalafon_ci -f docker-compose.ci.yml down -v
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar dependencias bloqueadas
+        run: docker compose -p escalafon_ci -f docker-compose.ci.yml run --rm frontend pnpm install --frozen-lockfile
+      - name: Pruebas
+        run: docker compose -p escalafon_ci -f docker-compose.ci.yml run --rm frontend pnpm test
+      - name: Lint
+        run: docker compose -p escalafon_ci -f docker-compose.ci.yml run --rm frontend pnpm lint
+      - name: Build
+        run: docker compose -p escalafon_ci -f docker-compose.ci.yml run --rm frontend pnpm build
+
+  accessibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Navegador aislado con API simulada
+        run: docker compose -p escalafon_ci -f docker-compose.ci.yml run --build --rm e2e

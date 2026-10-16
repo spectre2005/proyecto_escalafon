@@ -20,9 +20,41 @@ use Illuminate\Validation\ValidationException;
 
 class UsuarioController extends Controller
 {
-    public function index(): AnonymousResourceCollection
+    public function index(Request $request): AnonymousResourceCollection
     {
-        return UsuarioResource::collection(Usuario::query()->orderBy('id')->paginate(100));
+        $datos = $request->validate([
+            'q' => 'sometimes|nullable|string|max:255',
+            'tipo_personal' => 'sometimes|in:todos,docente,administrativo',
+            'estado' => 'sometimes|in:todos,activo,inactivo',
+            'per_page' => 'sometimes|integer|between:1,100',
+            'page' => 'sometimes|integer|min:1',
+        ]);
+        $query = Usuario::query();
+        if (($datos['q'] ?? '') !== '') {
+            $texto = mb_strtolower(trim($datos['q']));
+            $query->whereRaw("LOWER(COALESCE(nombres, '') || ' ' || COALESCE(apellido_paterno, '') || ' ' || COALESCE(apellido_materno, '') || ' ' || numero_doc_identidad || ' ' || email_institucional) LIKE ? ESCAPE '!'", ['%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $texto).'%']);
+        }
+        if (($datos['tipo_personal'] ?? 'todos') !== 'todos') {
+            $query->where('tipo_personal', $datos['tipo_personal']);
+        }
+        if (($datos['estado'] ?? 'todos') !== 'todos') {
+            $query->where('activo', $datos['estado'] === 'activo');
+        }
+
+        return UsuarioResource::collection($query->orderBy('id')->paginate((int) ($datos['per_page'] ?? 100)))->additional(['resumen' => $this->resumenDatos()]);
+    }
+
+    public function resumen(): JsonResponse
+    {
+        return response()->json(['data' => $this->resumenDatos()]);
+    }
+
+    private function resumenDatos(): array
+    {
+        $fila = Usuario::query()->selectRaw("COUNT(*) AS total, SUM(CASE WHEN activo THEN 1 ELSE 0 END) AS activos, SUM(CASE WHEN tipo_personal = 'docente' THEN 1 ELSE 0 END) AS docentes, SUM(CASE WHEN tipo_personal = 'administrativo' THEN 1 ELSE 0 END) AS administrativos, SUM(CASE WHEN email_institucional IS NOT NULL AND email_institucional <> '' THEN 1 ELSE 0 END) AS con_correo")->first()->getAttributes();
+        $resumen = array_map('intval', $fila);
+
+        return [...$resumen, 'inactivos' => $resumen['total'] - $resumen['activos']];
     }
 
     public function show(string $record): UsuarioResource

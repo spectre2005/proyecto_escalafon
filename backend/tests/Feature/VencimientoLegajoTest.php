@@ -18,8 +18,11 @@ use App\Support\AvisosVencimiento;
 use App\Support\VigenciaLegajo;
 use Carbon\Carbon;
 use Database\Seeders\SeccionesLegajoCatalogoSeeder;
+use Illuminate\Cache\ArrayStore;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -257,15 +260,17 @@ class VencimientoLegajoTest extends TestCase
 
     public function test_mail_test_transport_is_not_reported_as_delivered_and_archived_cycles_cancel_pending_mail(): void
     {
+        $this->assertInstanceOf(ArrayStore::class, Cache::getStore());
         [$legajo, $perfil, $base] = $this->docente();
         $ciclo = VigenciaLegajo::inicializar($legajo, $perfil, $base, $this->admin->id);
         AvisosVencimiento::crear($ciclo);
-        $this->artisan('legajos:enviar-avisos')->assertSuccessful();
+        $this->assertSame(0, $this->withoutMockingConsoleOutput()->artisan('legajos:enviar-avisos'));
+        $this->assertStringContainsString('"simulados":1', Artisan::output());
         $this->assertDatabaseHas('envios_vencimiento', ['estado' => 'simulado', 'enviado_en' => null]);
         $this->assertSame(0, EnvioVencimiento::query()->where('estado', 'enviado')->count());
         EnvioVencimiento::query()->update(['estado' => 'pendiente']);
         $legajo->update(['estado_legajo' => 'pasivo']);
-        $this->artisan('legajos:enviar-avisos')->assertSuccessful();
+        $this->assertSame(0, $this->withoutMockingConsoleOutput()->artisan('legajos:enviar-avisos'));
         $this->assertDatabaseHas('envios_vencimiento', ['estado' => 'cancelado']);
     }
 
@@ -371,6 +376,67 @@ class VencimientoLegajoTest extends TestCase
         $this->assertSame('pendiente', $envio->estado);
         $this->assertNotNull($envio->proximo_intento_en);
         $this->assertNull($envio->enviado_en);
+    }
+
+    public function test_mail_retries_at_one_five_and_fifteen_minutes_then_fails(): void
+    {
+        [$legajo, $perfil, $base] = $this->docente();
+        $ciclo = VigenciaLegajo::inicializar($legajo, $perfil, $base, $this->admin->id);
+        AvisosVencimiento::crear($ciclo);
+        config(['mail.default' => 'smtp']);
+        Mail::shouldReceive('raw')->times(4)->andThrow(new \RuntimeException('Fallo de conexión de prueba'));
+        foreach ([1, 5, 15] as $intento => $espera) {
+            AvisosVencimiento::procesar();
+            $envio = EnvioVencimiento::query()->sole();
+            $this->assertSame($intento + 1, $envio->intentos);
+            $this->assertSame('pendiente', $envio->estado);
+            $this->assertTrue(now()->addMinutes($espera)->equalTo($envio->proximo_intento_en));
+            AvisosVencimiento::procesar();
+            $this->assertSame($intento + 1, $envio->refresh()->intentos);
+            $this->travel($espera)->minutes();
+        }
+        AvisosVencimiento::procesar();
+        $envio = EnvioVencimiento::query()->sole();
+        $this->assertSame(4, $envio->intentos);
+        $this->assertSame('fallido', $envio->estado);
+        $this->assertNull($envio->proximo_intento_en);
+        AvisosVencimiento::procesar();
+        $this->assertSame(4, $envio->refresh()->intentos);
+    }
+
+    public function test_mail_timeout_requires_reconciliation_without_automatic_resend(): void
+    {
+        [$legajo, $perfil, $base] = $this->docente();
+        $ciclo = VigenciaLegajo::inicializar($legajo, $perfil, $base, $this->admin->id);
+        AvisosVencimiento::crear($ciclo);
+        config(['mail.default' => 'ses_smtp']);
+        $this->assertTrue(config('mail.mailers.ses_smtp.require_tls'));
+        $this->assertSame(587, config('mail.mailers.ses_smtp.port'));
+        Mail::shouldReceive('raw')->once()->andThrow(new \RuntimeException('SMTP timed out'));
+        AvisosVencimiento::procesar();
+        $this->assertDatabaseHas('envios_vencimiento', ['estado' => 'incierto', 'intentos' => 1, 'proximo_intento_en' => null]);
+        AvisosVencimiento::procesar();
+        $this->postJson('/api/v1/vencimientos/ciclos/'.$ciclo->id.'/notificar')->assertConflict();
+    }
+
+    public function test_notice_recipient_role_queries_are_bounded_per_chunk(): void
+    {
+        [$legajo, $perfil, $base] = $this->docente();
+        $ciclo = VigenciaLegajo::inicializar($legajo, $perfil, $base, $this->admin->id);
+        $gestor = $this->asignarRol(Usuario::factory()->create());
+        $expirado = $this->asignarRol(Usuario::factory()->create(), 'ADMIN', ['vigente_hasta' => today()->subDay()->toDateString()]);
+        Usuario::factory()->count(25)->create();
+        $consultasRoles = 0;
+        DB::listen(function ($query) use (&$consultasRoles): void {
+            if (str_contains($query->sql, 'from "roles"') || str_contains($query->sql, 'from "usuario_roles"')) {
+                $consultasRoles++;
+            }
+        });
+        $aviso = AvisosVencimiento::crear($ciclo);
+        $this->assertLessThanOrEqual(3, $consultasRoles);
+        $this->assertDatabaseHas('notificaciones_usuario', ['aviso_vencimiento_id' => $aviso->id, 'usuario_id' => $gestor->id]);
+        $this->assertDatabaseMissing('notificaciones_usuario', ['aviso_vencimiento_id' => $aviso->id, 'usuario_id' => $expirado->id]);
+        $this->assertDatabaseHas('notificaciones_usuario', ['aviso_vencimiento_id' => $aviso->id, 'usuario_id' => $legajo->usuario_id]);
     }
 
     private function docente(string $categoria = 'auxiliar', string $fecha = '2023-10-16'): array

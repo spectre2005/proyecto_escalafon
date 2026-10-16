@@ -1,3 +1,4 @@
+import { trapDialogFocus } from '../../../components/ui/dialogFocus'
 import DownloadPersonalReport from '../../reportes/components/DownloadPersonalReport'
 import { useEffect, useRef, useState } from 'react'
 import { apiErrorMessage } from '../../../axios'
@@ -12,7 +13,6 @@ import {
   parseUsersCsv,
   validateUser,
 } from '../utils/usuariosCsv'
-import { filterUsers } from '../utils/usuariosFiltering'
 import { updateUserDraft } from '../utils/usuariosEmail'
 import { regimenesPorTipo, regimenInicial } from '../utils/regimenesLaborales'
 
@@ -31,7 +31,6 @@ const labels = {
 }
 
 export default function UsersPage() {
-  const { users, setUsers, loading, loadError, refreshUsers: refreshData } = useUsers()
   const [tab, setTab] = useState('manual')
   const [registrationOpen, setRegistrationOpen] = useState(false)
   const registrationDialog = useRef(null)
@@ -50,6 +49,13 @@ export default function UsersPage() {
   const [filter, setFilter] = useState('todos')
   const [statusFilter, setStatusFilter] = useState('todos')
   const [pageSize, setPageSize] = useState(10)
+  const requestedPage = Number(searchParams.get('page'))
+  const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
+  const { users, meta, summary, loading, loadError, refreshUsers: refreshData } = useUsers({
+    page, perPage: pageSize, query, tipoPersonal: filter, estado: statusFilter,
+  })
+  const totalUsers = summary?.total ?? 0
+
   function changePage(page) {
     const next = new URLSearchParams(searchParams)
     if (page > 1) next.set('page', String(page))
@@ -87,11 +93,11 @@ export default function UsersPage() {
     setSaving(true)
     setMessage(null)
     try {
-      const saved = await saveUsers(records)
-      setUsers((previous) => [...saved, ...previous.filter(user => !saved.some(record => record.id === user.id))])
+      await saveUsers(records)
+      refreshData()
       changePage(1)
       setMessage({
-        text: `${saved.length} registro(s) guardado(s) en la base de datos.`,
+        text: `${records.length} registro(s) guardado(s) en la base de datos.`,
       })
       return true
     } catch (error) {
@@ -123,17 +129,12 @@ export default function UsersPage() {
     return { user, errors }
   })
   const invalid = checked.filter((item) => item.errors.length).length
-  const visible = filterUsers(users, {
-    query,
-    tipoPersonal: filter,
-    estado: statusFilter,
-  })
-  const totalPages = Math.max(1, Math.ceil(visible.length / pageSize))
-  const requestedPage = Number(searchParams.get('page'))
-  const currentPage = Number.isInteger(requestedPage) && requestedPage > 0
-    ? Math.min(requestedPage, totalPages) : 1
+  const visible = users
+  const filteredTotal = meta?.total ?? 0
+  const totalPages = meta?.last_page ?? 1
+  const currentPage = meta?.current_page ?? page
   const firstIndex = (currentPage - 1) * pageSize
-  const pageUsers = visible.slice(firstIndex, firstIndex + pageSize)
+  const pageUsers = users
 
   async function readFile(file) {
     if (!file || busy || savingRef.current) return
@@ -208,24 +209,22 @@ export default function UsersPage() {
           <div className="mb-6 rounded-lg border border-[#e4dfc7] bg-[#faf8ef] px-4 py-3 text-[11px] leading-relaxed text-[#827347]">
             <strong>Desarrollo local.</strong> Los registros se guardan en la
             base de datos. El acceso requiere una cuenta administradora.
-            Los nuevos usuarios quedan inactivos hasta implementar su
-            activación.
+            Los nuevos usuarios quedan inactivos hasta completar su incorporación.
           </div>
           <section
             className="mb-7 grid grid-cols-3 gap-2 md:gap-4.5 [&_article]:rounded-xl [&_article]:border [&_article]:border-[#e4ebe8] [&_article]:bg-white [&_article]:p-3 md:[&_article]:flex md:[&_article]:items-center md:[&_article]:gap-4 md:[&_article]:p-5 [&_p]:mb-1.5 [&_p]:min-h-7 [&_p]:text-[10px] [&_p]:text-[#7f928b] md:[&_p]:min-h-0 md:[&_p]:text-[11px] [&_strong]:font-['Manrope',sans-serif] [&_strong]:text-2xl md:[&_strong]:text-[26px] [&_article:nth-child(2)>span]:bg-[#eff3fa] [&_article:nth-child(2)>span]:text-[#6384ad] [&_article:nth-child(3)>span]:bg-[#faf5e8] [&_article:nth-child(3)>span]:text-[#b3995e]"
             aria-label="Resumen de usuarios"
           >
             {[
-              ['Usuarios registrados', users.length, 'users'],
+              ['Usuarios registrados', totalUsers, 'users'],
               [
                 'Personal docente',
-                users.filter((user) => user.tipo_personal === 'docente').length,
+                summary?.docentes ?? 0,
                 'file',
               ],
               [
                 'Personal administrativo',
-                users.filter((user) => user.tipo_personal === 'administrativo')
-                  .length,
+                summary?.administrativos ?? 0,
                 'check',
               ],
             ].map(([label, count, icon]) => (
@@ -276,7 +275,7 @@ export default function UsersPage() {
                 <h2>
                   Usuarios registrados{' '}
                   <span className="ml-1 inline-block rounded-md bg-[#edf5ef] px-2 py-1 align-middle text-[10px] text-[#60856d]">
-                    {users.length}
+                    {totalUsers}
                   </span>
                 </h2>
                 <p>Consulta los registros guardados en la base de datos.</p>
@@ -368,12 +367,12 @@ export default function UsersPage() {
               <div className="px-5 py-9 text-center text-[#9ab3a3] [&>svg]:mx-auto [&_h3]:mt-3 [&_h3]:mb-2 [&_h3]:text-[13px] [&_h3]:font-medium [&_h3]:text-[#657f6e] [&_p]:text-[11px] [&_p]:text-[#96a69b]">
                 <Icon name="users" size={32} />
                 <h3>
-                  {users.length
+                  {totalUsers
                     ? 'No se encontraron usuarios'
                     : 'Tu lista de usuarios empieza aquí'}
                 </h3>
                 <p>
-                  {users.length
+                  {totalUsers
                     ? 'Prueba con otro nombre o cambia el filtro.'
                     : 'Importa un archivo CSV o agrega tu primer usuario manualmente.'}
                 </p>
@@ -388,19 +387,20 @@ export default function UsersPage() {
                   </select>
                 </label>
                 <span aria-live="polite">
-                  {visible.length ? firstIndex + 1 : 0}–{firstIndex + pageUsers.length} de {visible.length} usuarios
-                  {visible.length !== users.length && ` (${users.length} en total)`}
+                  {visible.length ? firstIndex + 1 : 0}–{firstIndex + pageUsers.length} de {filteredTotal} usuarios
+                  {visible.length !== users.length && ` (${totalUsers} en total)`}
                 </span>
               </div>
               <nav aria-label="Paginación de usuarios" className="flex items-center gap-3">
-                <button type="button" onClick={() => changePage(currentPage - 1)} disabled={currentPage === 1} className="rounded-lg border border-[#dbe6e1] bg-white px-3 py-2 text-[#4f6d63] hover:bg-[#edf6f2]">Anterior</button>
+                <button type="button" onClick={() => changePage(currentPage - 1)} disabled={loading || currentPage <= 1} className="rounded-lg border border-[#dbe6e1] bg-white px-3 py-2 text-[#4f6d63] hover:bg-[#edf6f2]">Anterior</button>
                 <span>Página {currentPage} de {totalPages}</span>
-                <button type="button" onClick={() => changePage(currentPage + 1)} disabled={currentPage === totalPages} className="rounded-lg border border-[#dbe6e1] bg-white px-3 py-2 text-[#4f6d63] hover:bg-[#edf6f2]">Siguiente</button>
+                <button type="button" onClick={() => changePage(currentPage + 1)} disabled={loading || currentPage >= totalPages} className="rounded-lg border border-[#dbe6e1] bg-white px-3 py-2 text-[#4f6d63] hover:bg-[#edf6f2]">Siguiente</button>
               </nav>
             </footer>
           </section>
 
           <dialog
+            onKeyDown={trapDialogFocus}
             ref={registrationDialog}
             aria-labelledby="registration-title"
             aria-busy={saving || busy}

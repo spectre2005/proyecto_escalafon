@@ -369,10 +369,10 @@ class Seccion10ApiTest extends TestCase
         $this->deleteJson('/api/v1/registros-sst-bienestar/'.$registro->id)->assertStatus(405);
         $this->assertDatabaseHas('registros_sst_bienestar', ['id' => $registro->id, 'usuario_id' => $this->persona->id]);
         $evento = AuditoriaEvento::query()->where('entidad_id', $id)->firstOrFail();
-        $this->deleteJson('/api/v1/auditoria-eventos/'.$evento->id)->assertConflict();
-        $this->patchJson('/api/v1/auditoria-eventos/'.$evento->id, ['accion' => 'ALTERADO'])->assertConflict();
+        $this->deleteJson('/api/v1/auditoria-eventos/'.$evento->id)->assertStatus(405);
+        $this->patchJson('/api/v1/auditoria-eventos/'.$evento->id, ['accion' => 'ALTERADO'])->assertStatus(405);
         $historial = DocumentoUsuario::query()->findOrFail($id)->historialEstadosDocumento()->firstOrFail();
-        $this->deleteJson('/api/v1/historial-estados-documento/'.$historial->id)->assertConflict();
+        $this->deleteJson('/api/v1/historial-estados-documento/'.$historial->id)->assertStatus(405);
         Rol::query()->where('codigo', 'ADMIN')->update(['ve_datos_sensibles' => false]);
         Sanctum::actingAs($this->autor->fresh());
         $this->getJson('/api/v1/auditoria-eventos/'.$evento->id)->assertNotFound();

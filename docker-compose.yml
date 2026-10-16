@@ -1,6 +1,9 @@
 services:
   app:
-    build: ./docker/php
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      target: runtime
     user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     environment:
       SESSION_DRIVER: file
@@ -25,7 +28,10 @@ services:
       - app
 
   scheduler:
-    build: ./docker/php
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      target: runtime
     user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     environment:
       CACHE_STORE: file

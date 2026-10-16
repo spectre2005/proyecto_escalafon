@@ -68,6 +68,7 @@ final class VigenciaLegajo
 
         return EstadoDocumento::aprobado($documento, $documento->tipoDocumento)
             && $archivo && $archivo->estado_antivirus !== 'infectado'
+            && (! config('antivirus.enforce') || $archivo->estado_antivirus === 'limpio')
             && $archivo->almacenamiento === config('legajo.disco_documentos')
             && Storage::disk($archivo->almacenamiento)->exists($archivo->storage_path);
     }

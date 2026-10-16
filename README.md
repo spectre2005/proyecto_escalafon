@@ -414,7 +414,7 @@ Para un 502, revisa `docker compose logs --tail=100 app nginx`: Nginx depende de
 - Los documentos y fotos están en `backend/storage/app/private/`. Un respaldo completo necesita **base de datos y archivos privados**, además de conservar de forma segura la configuración y `APP_KEY`.
 - `docker compose down -v` elimina los volúmenes de Compose, incluida la base de datos. `php artisan migrate:fresh` elimina y recrea las tablas. No los uses para actualizar una instalación con datos que deban conservarse.
 - El catálogo de ubigeos tiene una procedencia y limitaciones documentadas en [backend/database/data/README.md](backend/database/data/README.md).
-- Esta configuración es de **desarrollo local**. `LocalDevelopmentOnly` bloquea la API fuera de `local` y `testing`; cambiar `APP_ENV` a `production` no constituye un despliegue. Publicar el sistema requiere revisar autenticación, HTTPS, secretos, correo, respaldos y ejecución del frontend.
+- Esta configuración es de **desarrollo local**. `LocalDevelopmentOnly` mantiene cerrado el CRUD interno fuera de `local` y `testing`. La API funcional usa `ApiDisponible` y exige habilitación y configuración segura en producción; cambiar `APP_ENV` no constituye un despliegue. Publicar el sistema requiere revisar autenticación, HTTPS, secretos, correo, respaldos y ejecución del frontend.
 
 ## 10. Mantenimiento e incremento actual
 
@@ -423,3 +423,17 @@ Repositorio del equipo: [spectre2005/proyecto_escalafon](https://github.com/spec
 El código incluye gestión de personal y legajos, las 11 secciones documentales, configuración institucional, acceso a secciones e incorporación de personal. Los cambios recientes incorporan **control de vencimientos y renovación de legajos**. Este estado describe funcionalidades presentes en el repositorio, no una certificación de que todos los flujos estén terminados.
 
 Para continuar un incremento, acuerda el alcance con el equipo, revisa las pruebas del módulo y entrega cambios de código, migraciones y datos iniciales necesarios juntos. Actualiza esta guía si cambian el arranque, las variables o los requisitos.
+
+
+## Endurecimiento y operación
+
+- [Ejecución y estado del backlog](docs/ejecucion-backlog.md).
+- [Contrato API y comprobación de divergencias](docs/api.md).
+- [Operación, SES y recuperación](docs/operacion-y-recuperacion.md).
+- [Transición de permisos y preparación de producción](docs/produccion-y-permisos.md).
+- [Código completo y diffs de este incremento](docs/codigo-backlog.md).
+
+La suite SQLite corre en Docker; `backend/phpunit.pgsql.xml` añade integración y
+concurrencia con PostgreSQL efímero en el proyecto `escalafon_ci`. CI separa su
+almacenamiento del local. Playwright ejecuta los recorridos de teclado con API
+simulada mediante el servicio `e2e` de `docker-compose.ci.yml`.

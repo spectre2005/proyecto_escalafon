@@ -85,7 +85,7 @@ export default function LoginPrincipal() {
               <label htmlFor="email">Correo institucional</label>
               <div className="input-wrap"><Icon name="mail" /><input id="email" name="email" type="email" placeholder="nombre@institucion.edu.pe" autoComplete="username" required value={email} onChange={event => setEmail(event.target.value)} disabled={busy} /></div>
               <label htmlFor="password">Contraseña</label>
-              <div className="input-wrap"><Icon name="lock" /><input id="password" name="password" type={visible ? 'text' : 'password'} placeholder="Ingresa tu contraseña" autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} disabled={busy} /><button type="button" className="password-decoration" aria-label="Mostrar u ocultar contraseña" onClick={() => setVisible(!visible)}><Icon name="eye" /></button></div>
+              <div className="input-wrap"><Icon name="lock" /><input id="password" name="password" type={visible ? 'text' : 'password'} placeholder="Ingresa tu contraseña" autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} disabled={busy} /><button type="button" className="password-decoration" aria-label="Mostrar u ocultar contraseña" aria-pressed={visible} onClick={() => setVisible(!visible)}><Icon name="eye" /></button></div>
               {error && <p role="alert" className="mb-4 text-sm text-rose-700">{error}</p>}
               <button className="login-button" type="submit" disabled={busy}>{busy ? 'Ingresando…' : 'Ingresar al sistema'} <Icon name="arrow" /></button>
             </form>

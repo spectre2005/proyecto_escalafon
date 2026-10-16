@@ -14,6 +14,7 @@ use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
 use App\Support\Catalogos;
+use App\Support\Documentos\Antivirus;
 use App\Support\Documentos\EstadoDocumento;
 use App\Support\Documentos\FormulariosDatos;
 use App\Support\ExigenciasSeccion01;
@@ -169,6 +170,7 @@ class Seccion01Controller extends Controller
     {
         $disk = Storage::disk('local');
         abort_unless($record->pdf_path && $disk->exists($record->pdf_path), 404, 'Este registro no tiene un PDF disponible.');
+        app(Antivirus::class)->exigir('local', $record->pdf_path);
         $legajo = Legajo::query()->where('usuario_id', $usuario)
             ->orderByRaw("CASE WHEN estado_legajo = 'activo' THEN 0 ELSE 1 END")->orderByDesc('fecha_apertura')->value('id');
         abort_unless($legajo, 409, 'La persona no tiene legajo: no se puede registrar el acceso al PDF en la bitácora.');

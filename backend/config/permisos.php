@@ -12,6 +12,7 @@
 */
 
 return [
+    'fuente' => env('PERMISOS_FUENTE', in_array(env('APP_ENV'), ['local', 'testing'], true) ? 'legacy' : 'database'),
 
     // Catálogo cerrado: un permiso que no esté aquí no existe.
     'catalogo' => [

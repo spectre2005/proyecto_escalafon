@@ -8,6 +8,7 @@ use App\Models\DocumentoUsuario;
 use App\Models\Legajo;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
+use App\Support\Documentos\Antivirus;
 use App\Support\Documentos\ArchivoPdf;
 use App\Support\Documentos\AuditoriaDocumento;
 use App\Support\Documentos\CargaDocumento;
@@ -147,10 +148,9 @@ class DocumentoLegajoController extends Controller
         $accion = $request->validate(['accion' => 'sometimes|in:ver,descargar'])['accion'] ?? 'ver';
         $registro = $this->documentoDe($request, $usuario, $documento);
         $archivo = $registro->archivo;
-        abort_if(in_array($registro->seccion_legajo_id, [3, 4, 6, 10], true) && $archivo?->estado_antivirus === 'infectado', 423,
-            'El archivo está bloqueado por el antivirus. Registra un documento nuevo que lo subsane.');
         $disco = (string) config('legajo.disco_documentos');
         abort_unless($archivo && $archivo->almacenamiento === $disco && Storage::disk($disco)->exists($archivo->storage_path), 404, 'El documento no tiene un archivo disponible.');
+        app(Antivirus::class)->exigir($disco, $archivo->storage_path, $archivo);
 
         BitacoraAccesoLegajo::query()->create([
             'legajo_id' => $registro->legajo_id, 'documento_id' => $registro->id, 'usuario_id' => $request->user()->getAuthIdentifier(),

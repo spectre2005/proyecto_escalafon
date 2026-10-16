@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Afiliacion;
 use App\Models\ArchivoDocumento;
+use App\Models\AuditoriaEvento;
 use App\Models\AvisoVencimiento;
+use App\Models\BitacoraAccesoLegajo;
 use App\Models\CicloVigencia;
 use App\Models\Controversia;
 use App\Models\Desplazamiento;
@@ -14,6 +16,7 @@ use App\Models\EnvioVencimiento;
 use App\Models\EvaluacionDesempeno;
 use App\Models\Familiar;
 use App\Models\GoceVacacional;
+use App\Models\HistorialEstadoDocumento;
 use App\Models\Induccion;
 use App\Models\Legajo;
 use App\Models\LegajoSeccion;
@@ -173,7 +176,7 @@ class ResourceApiTest extends TestCase
             unset($payload['registrado_por']);
         }
         $uri = '/api/v1/'.str_replace('_', '-', $model->getTable());
-        $soloLectura = $model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento || in_array($class, [...self::SECCION_02, ...self::SECCION_05, ...self::SECCION_07, ...self::SECCION_08, ...self::SECCION_09, ...self::SECCION_10, ...self::SECCION_11], true);
+        $soloLectura = in_array($class, [AuditoriaEvento::class, BitacoraAccesoLegajo::class, HistorialEstadoDocumento::class], true) || $model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento || in_array($class, [...self::SECCION_02, ...self::SECCION_05, ...self::SECCION_07, ...self::SECCION_08, ...self::SECCION_09, ...self::SECCION_10, ...self::SECCION_11], true);
         if ($soloLectura) {
             // Documentos y archivos se crean únicamente por la carga del legajo (folios, hash y bitácora); los registros de
             // las secciones 02 y 05, solo desde Seccion02Controller y Seccion05Controller.

@@ -10,6 +10,13 @@ use Laravel\Sanctum\Sanctum;
 
 abstract class TestCase extends BaseTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Docker define estas variables en $_SERVER; su precedencia puede superar phpunit.xml.
+        config(['cache.default' => 'array', 'session.driver' => 'array']);
+    }
+
     /** Asigna un rol vigente al usuario (lo crea si no existe el rol). */
     protected function asignarRol(Usuario $usuario, string $codigo = 'ADMIN', array $asignacion = [], array $rol = []): Usuario
     {

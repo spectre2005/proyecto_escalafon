@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\DocumentoUsuario;
+use App\Models\SeccionLegajo;
 use App\Models\Ubigeo;
 use App\Models\UnidadOrganica;
 use App\Models\Usuario;
+use Database\Seeders\SeccionesLegajoCatalogoSeeder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -72,6 +74,20 @@ class ModelPersistenceTest extends TestCase
         $this->assertSame('', $usuario->getRememberTokenName());
         $this->assertTrue($usuario->activo);
         $this->assertSame(Usuario::class, config('auth.providers.users.model'));
+    }
+
+    public function test_section_factory_can_create_fixtures_after_the_fixed_catalog_is_seeded(): void
+    {
+        $this->seed(SeccionesLegajoCatalogoSeeder::class);
+        fake()->unique(true);
+        fake()->seed(584);
+        try {
+            $seccion = SeccionLegajo::factory()->create();
+            $this->assertModelExists($seccion);
+            $this->assertSame('Información personal y familiar', SeccionLegajo::findOrFail(1)->nombre);
+        } finally {
+            fake()->seed();
+        }
     }
 
     public function test_ubigeo_and_self_references_can_be_traversed_in_both_directions(): void

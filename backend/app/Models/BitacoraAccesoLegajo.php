@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\RegistroInmutable;
 use Database\Factories\BitacoraAccesoLegajoFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,6 +15,7 @@ class BitacoraAccesoLegajo extends Model
     use HasFactory;
 
     use HasUuids;
+    use RegistroInmutable;
 
     protected $table = 'bitacora_accesos_legajo';
 

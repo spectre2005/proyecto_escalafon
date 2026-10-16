@@ -79,17 +79,18 @@ use App\Http\Controllers\Api\V1\VencimientoLegajoController;
 use App\Http\Controllers\Api\V1\VinculoAdendaController;
 use App\Http\Controllers\Api\V1\VinculoLaboralController;
 use App\Http\Middleware\AccesoSecciones;
+use App\Http\Middleware\ApiDisponible;
 use App\Http\Middleware\ExigirVigenciaLegajo;
 use App\Http\Middleware\LocalDevelopmentOnly;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('v1/auth')->middleware(LocalDevelopmentOnly::class)->group(function (): void {
+Route::prefix('v1/auth')->middleware(ApiDisponible::class)->group(function (): void {
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:20,1');
     Route::get('me', [AuthController::class, 'me'])->middleware('auth:sanctum');
     Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 });
 
-Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', AccesoSecciones::class, ExigirVigenciaLegajo::class])->group(function (): void {
+Route::prefix('v1')->middleware([ApiDisponible::class, 'auth:sanctum', AccesoSecciones::class, ExigirVigenciaLegajo::class])->group(function (): void {
     Route::prefix('vencimientos')->controller(VencimientoLegajoController::class)->group(function (): void {
         Route::get('/', 'index');
         Route::get('/opciones', 'opciones');
@@ -119,6 +120,7 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', Ac
         Route::post('/{incorporacion}/documentos/{documento}', 'subir')->whereUuid(['incorporacion', 'documento']);
         Route::get('/{incorporacion}/documentos/{documento}', 'archivo')->whereUuid(['incorporacion', 'documento']);
     });
+    Route::apiResource('requerimientos-documentos', RequerimientoDocumentoController::class)->parameters(['requerimientos-documentos' => 'record'])->whereUuid('record')->only(['index', 'show'])->middleware('can:sistema.administrar');
     Route::get('institucion', [InstitutionSettingsController::class, 'show']);
     Route::put('institucion', [InstitutionSettingsController::class, 'update'])->middleware('can:sistema.administrar');
     Route::middleware('can:datos_sensibles.ver')->group(function (): void {
@@ -270,6 +272,7 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', Ac
     });
 
     Route::middleware('can:personal.ver')->group(function (): void {
+        Route::get('usuarios/resumen', [UsuarioController::class, 'resumen']);
         Route::get('usuarios', [UsuarioController::class, 'index'])->name('api.v1.usuarios.index');
         Route::get('usuarios/{record}', [UsuarioController::class, 'show'])->whereUuid('record')->name('api.v1.usuarios.show');
     });
@@ -281,8 +284,7 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', Ac
     });
 });
 
-// CRUD genérico por tabla: solo para sistema.administrar. LocalDevelopmentOnly sigue en todas las
-// rutas hasta decidir qué se abre en producción; aquí no se quita hasta que cada recurso esté protegido.
+// CRUD genérico por tabla: solo para sistema.administrar. LocalDevelopmentOnly sigue en este grupo; aquí no se quita hasta que cada recurso esté protegido.
 // documentos-usuario y archivos-documento no tienen update ni destroy (Directiva, arts. 2.3 y 5.3:
 // un documento no se elimina ni se altera). familiares, declaraciones-verificaciones y
 // certificados-discapacidad (sección 01) exigen además datos_sensibles.ver; su destroy responde 405.
@@ -297,8 +299,8 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', Ac
 Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', 'can:sistema.administrar', AccesoSecciones::class])->group(function (): void {
     Route::apiResource('afiliaciones', AfiliacionController::class)->parameters(['afiliaciones' => 'record'])->whereUuid('record')->names('api.v1.afiliaciones')->only(['index', 'show'])->middleware('can:datos_sensibles.ver');
     Route::apiResource('archivos-documento', ArchivoDocumentoController::class)->parameters(['archivos-documento' => 'record'])->whereUuid('record')->names('api.v1.archivos-documento')->only(['index', 'show']);
-    Route::apiResource('auditoria-eventos', AuditoriaEventoController::class)->parameters(['auditoria-eventos' => 'record'])->whereUuid('record')->names('api.v1.auditoria-eventos');
-    Route::apiResource('bitacora-accesos-legajo', BitacoraAccesoLegajoController::class)->parameters(['bitacora-accesos-legajo' => 'record'])->whereUuid('record')->names('api.v1.bitacora-accesos-legajo');
+    Route::apiResource('auditoria-eventos', AuditoriaEventoController::class)->parameters(['auditoria-eventos' => 'record'])->whereUuid('record')->names('api.v1.auditoria-eventos')->only(['index', 'show']);
+    Route::apiResource('bitacora-accesos-legajo', BitacoraAccesoLegajoController::class)->parameters(['bitacora-accesos-legajo' => 'record'])->whereUuid('record')->names('api.v1.bitacora-accesos-legajo')->only(['index', 'show']);
     Route::apiResource('capacitaciones', CapacitacionController::class)->parameters(['capacitaciones' => 'record'])->whereUuid('record')->names('api.v1.capacitaciones');
     Route::apiResource('certificados-discapacidad', CertificadoDiscapacidadController::class)->parameters(['certificados-discapacidad' => 'record'])->whereUuid('record')->names('api.v1.certificados-discapacidad')->middleware('can:datos_sensibles.ver');
     Route::apiResource('colegiaturas', ColegiaturaController::class)->parameters(['colegiaturas' => 'record'])->whereUuid('record')->names('api.v1.colegiaturas');
@@ -316,7 +318,7 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', 'c
     Route::apiResource('feriados', FeriadoController::class)->parameters(['feriados' => 'record'])->whereUuid('record')->names('api.v1.feriados');
     Route::apiResource('formacion-academica', FormacionAcademicaController::class)->parameters(['formacion-academica' => 'record'])->whereUuid('record')->names('api.v1.formacion-academica');
     Route::apiResource('goces-vacacionales', GoceVacacionalController::class)->parameters(['goces-vacacionales' => 'record'])->whereUuid('record')->names('api.v1.goces-vacacionales')->only(['index', 'show']);
-    Route::apiResource('historial-estados-documento', HistorialEstadoDocumentoController::class)->parameters(['historial-estados-documento' => 'record'])->whereUuid('record')->names('api.v1.historial-estados-documento');
+    Route::apiResource('historial-estados-documento', HistorialEstadoDocumentoController::class)->parameters(['historial-estados-documento' => 'record'])->whereUuid('record')->names('api.v1.historial-estados-documento')->only(['index', 'show']);
     Route::apiResource('inducciones', InduccionController::class)->parameters(['inducciones' => 'record'])->whereUuid('record')->names('api.v1.inducciones')->only(['index', 'show']);
     Route::apiResource('legajos', LegajoController::class)->parameters(['legajos' => 'record'])->whereUuid('record')->names('api.v1.legajos');
     Route::apiResource('legajo-secciones', LegajoSeccionController::class)->parameters(['legajo-secciones' => 'record'])->whereUuid('record')->names('api.v1.legajo-secciones');
@@ -336,7 +338,7 @@ Route::prefix('v1')->middleware([LocalDevelopmentOnly::class, 'auth:sanctum', 'c
     Route::apiResource('referencias-legajo-pasivo', ReferenciaLegajoPasivoController::class)->parameters(['referencias-legajo-pasivo' => 'record'])->whereUuid('record')->names('api.v1.referencias-legajo-pasivo');
     Route::apiResource('regimenes-normativos', RegimenNormativoController::class)->parameters(['regimenes-normativos' => 'record'])->whereUuid('record')->names('api.v1.regimenes-normativos');
     Route::apiResource('registros-sst-bienestar', RegistroSstBienestarController::class)->parameters(['registros-sst-bienestar' => 'record'])->whereUuid('record')->names('api.v1.registros-sst-bienestar')->middleware('can:datos_sensibles.ver')->only(['index', 'show']);
-    Route::apiResource('requerimientos-documentos', RequerimientoDocumentoController::class)->parameters(['requerimientos-documentos' => 'record'])->whereUuid('record')->names('api.v1.requerimientos-documentos');
+    Route::apiResource('requerimientos-documentos', RequerimientoDocumentoController::class)->parameters(['requerimientos-documentos' => 'record'])->whereUuid('record')->names('api.v1.requerimientos-documentos')->only(['store', 'update', 'destroy']);
     Route::apiResource('roles', RolController::class)->parameters(['roles' => 'record'])->whereUuid('record')->names('api.v1.roles');
     Route::apiResource('sanciones', SancionController::class)->parameters(['sanciones' => 'record'])->whereUuid('record')->names('api.v1.sanciones')->only(['index', 'show'])->middleware('can:seccion08.sanciones.ver');
     Route::apiResource('secciones-legajo', SeccionLegajoController::class)->parameters(['secciones-legajo' => 'record'])->whereNumber('record')->names('api.v1.secciones-legajo');

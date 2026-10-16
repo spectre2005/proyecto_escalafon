@@ -18,7 +18,7 @@ export default function VisorPdf({ usuario, documento, titulo, onClose }) {
     if (pedido.current?.id !== documento.id) pedido.current = { id: documento.id, promesa: archivoDocumento(usuario, documento.id, 'ver') }
     pedido.current.promesa
       .then(response => { if (vigente) { creado = URL.createObjectURL(response.data); setUrl(creado) } })
-      .catch(failure => { if (vigente) setError(failure.response?.status === 403 ? 'No tienes permiso para ver este documento.' : 'No se pudo abrir el PDF.') })
+      .catch(failure => { if (vigente) setError(failure.response?.status === 403 ? 'No tienes permiso para ver este documento.' : failure.response?.status === 423 ? 'El archivo está en cuarentena hasta completar un análisis antivirus limpio.' : 'No se pudo abrir el PDF.') })
     return () => { vigente = false; if (creado) URL.revokeObjectURL(creado) }
   }, [usuario, documento.id])
 
@@ -35,8 +35,8 @@ export default function VisorPdf({ usuario, documento, titulo, onClose }) {
       link.click()
       link.remove()
       setTimeout(() => URL.revokeObjectURL(enlace), 1000)
-    } catch {
-      setError('No se pudo descargar el PDF. Inténtalo nuevamente.')
+    } catch (failure) {
+      setError(failure.response?.status === 423 ? 'El archivo está en cuarentena hasta completar un análisis antivirus limpio.' : 'No se pudo descargar el PDF. Inténtalo nuevamente.')
     } finally {
       setDescargando(false)
     }

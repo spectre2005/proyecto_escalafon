@@ -37,9 +37,8 @@ final class CargaDocumento
             'almacenamiento' => $disco, 'storage_path' => $ruta, 'nombre_original' => mb_substr($pdf->getClientOriginalName(), 0, 255),
             'mime_type' => 'application/pdf', 'tamano_bytes' => $pdf->getSize(), 'hash_sha256' => ArchivoPdf::hash($pdf),
             'num_paginas' => ArchivoPdf::paginas($pdf),
-            // TODO pendiente de confirmar con el cliente: cifrado en reposo. Hoy el archivo no se cifra.
+            // LUKS corresponde a DevOps; el archivo no lleva cifrado adicional de aplicación.
             'cifrado' => false,
-            // TODO: sin antivirus integrado todavía; queda pendiente de revisión.
             'estado_antivirus' => 'pendiente',
             'subido_por' => $autor,
         ];
@@ -48,6 +47,8 @@ final class CargaDocumento
         }
 
         try {
+            $archivo['estado_antivirus'] = app(Antivirus::class)->archivo($disco, $ruta);
+
             return DB::transaction(function () use ($legajo, $tipo, $metadatos, $autor, $ip, $subsanaA, $enlaceId, $archivo, $estadoInicial, $completar): DocumentoUsuario {
                 Folios::reservar($legajo, $tipo->seccion_legajo_id, $metadatos['folio_inicio'], $metadatos['folio_fin']);
                 self::validarSubsanacion($legajo, $tipo, $subsanaA);

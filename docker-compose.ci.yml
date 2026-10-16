@@ -1,0 +1,60 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      target: runtime
+    working_dir: /var/www/html
+    environment:
+      APP_ENV: testing
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      LOG_CHANNEL: stderr
+      MAIL_MAILER: array
+      MAIL_FROM_ADDRESS: pruebas@example.test
+      SESSION_DRIVER: array
+      CACHE_STORE: array
+      DB_HOST: testdb
+      DB_PORT: 5432
+      DB_USERNAME: escalafon_test
+      DB_PASSWORD: ci-only-password
+    volumes:
+      - ./backend:/var/www/html
+      - ci_vendor:/var/www/html/vendor
+      - ci_storage:/var/www/html/storage
+      - ./docs:/var/www/docs:ro
+
+  testdb:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: escalafon_test
+      POSTGRES_USER: escalafon_test
+      POSTGRES_PASSWORD: ci-only-password
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U escalafon_test -d escalafon_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  frontend:
+    build: ./docker/node
+    working_dir: /app
+    environment:
+      CI: "true"
+    volumes:
+      - ./frontend:/app
+      - ci_node_modules:/app/node_modules
+
+  e2e:
+    build: ./docker/e2e
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - ci_node_modules:/app/node_modules
+    command: sh -c "pnpm install --frozen-lockfile && pnpm test:e2e"
+
+volumes:
+  ci_vendor:
+  ci_storage:
+  ci_node_modules:

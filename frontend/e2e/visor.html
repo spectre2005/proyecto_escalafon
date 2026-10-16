@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>Prueba aislada del visor</title></head>
+<body><div id="root"></div>
+<script type="module">
+import React from 'react'
+import { createRoot } from 'react-dom/client'
+import VisorPdf from '/src/features/legajos/components/documentos/VisorPdf.jsx'
+const root = createRoot(document.getElementById('root'))
+root.render(React.createElement(VisorPdf, {
+  usuario: 'test-person',
+  documento: { id: 'test-document', archivo: { nombre_original: 'prueba.pdf' } },
+  titulo: 'Documento de prueba',
+  onClose: () => root.render(React.createElement('p', { role: 'status' }, 'Visor cerrado')),
+}))
+</script>
+</body>
+</html>

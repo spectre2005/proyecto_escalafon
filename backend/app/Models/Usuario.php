@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\PoliticaPermisos;
 use Database\Factories\UsuarioFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Laravel\Sanctum\HasApiTokens;
 
 class Usuario extends Authenticatable
@@ -93,6 +95,14 @@ class Usuario extends Authenticatable
         }
         $hoy = today()->toDateString();
 
+        if ($this->relationLoaded('usuarioRolesPorUsuario')) {
+            return $this->rolesVigentesCalculados = $this->usuarioRolesPorUsuario
+                ->filter(fn (UsuarioRol $asignacion): bool => $asignacion->vigente_desde->toDateString() <= $hoy
+                    && ($asignacion->vigente_hasta === null || $asignacion->vigente_hasta->toDateString() >= $hoy))
+                ->map(fn (UsuarioRol $asignacion): ?Rol => $asignacion->rol)
+                ->filter(fn (?Rol $rol): bool => $rol !== null && $rol->activo)->unique('id')->values();
+        }
+
         return $this->rolesVigentesCalculados = Rol::query()
             ->where('activo', true)
             ->whereIn('id', $this->usuarioRolesPorUsuario()
@@ -111,6 +121,13 @@ class Usuario extends Authenticatable
         if (! $this->activo) {
             return $this->permisosCalculados = [];
         }
+        $fuente = config('permisos.fuente');
+        if (! in_array($fuente, ['legacy', 'dual', 'database'], true)) {
+            return $this->permisosCalculados = [];
+        }
+        if ($fuente === 'database') {
+            return $this->permisosCalculados = PoliticaPermisos::resolver($this->rolesVigentes());
+        }
         $catalogo = array_keys(config('permisos.catalogo'));
         $derivados = config('permisos.derivados');
         $asignables = array_diff($catalogo, array_keys($derivados), config('permisos.pendientes'));
@@ -125,7 +142,18 @@ class Usuario extends Authenticatable
             }
         }
 
-        return $this->permisosCalculados = array_values(array_unique($permisos));
+        $legacy = array_values(array_unique($permisos));
+        if ($fuente === 'dual') {
+            $baseDatos = PoliticaPermisos::resolver($this->rolesVigentes());
+            if (array_diff($legacy, $baseDatos) !== [] || array_diff($baseDatos, $legacy) !== []) {
+                Log::notice('permisos.divergencia', ['usuario_id' => $this->id,
+                    'solo_legacy' => array_values(array_diff($legacy, $baseDatos)), 'solo_bd' => array_values(array_diff($baseDatos, $legacy))]);
+            }
+
+            return $this->permisosCalculados = $baseDatos;
+        }
+
+        return $this->permisosCalculados = $legacy;
     }
 
     public function tienePermiso(string $permiso): bool

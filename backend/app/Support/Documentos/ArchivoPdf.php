@@ -10,6 +10,12 @@ use Illuminate\Http\UploadedFile;
  */
 final class ArchivoPdf
 {
+    private const MAX_BYTES = 8 * 1024 * 1024;
+
+    private const MAX_BYTES_EXPANDIDOS = 8 * 1024 * 1024;
+
+    private const MAX_STREAMS = 64;
+
     /** El contenido empieza por la firma %PDF- (se toleran bytes previos, como permite la norma) y finfo lo reconoce como PDF. */
     public static function esPdf(UploadedFile $archivo): bool
     {
@@ -34,11 +40,28 @@ final class ArchivoPdf
      */
     public static function paginas(UploadedFile $archivo): ?int
     {
-        $contenido = (string) file_get_contents($archivo->getRealPath());
+        $ruta = $archivo->getRealPath();
+        if ($ruta === false || ! is_readable($ruta) || $archivo->getSize() > self::MAX_BYTES) {
+            return null;
+        }
+        $contenido = file_get_contents($ruta, false, null, 0, self::MAX_BYTES + 1);
+        if ($contenido === false || strlen($contenido) > self::MAX_BYTES) {
+            return null;
+        }
         $paginas = self::contar($contenido);
-        if ($paginas === null && preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $contenido, $streams)) {
-            foreach ($streams[1] as $stream) {
-                $plano = @gzuncompress($stream);
+        if ($paginas === null) {
+            $offset = 0;
+            $expandidos = 0;
+            $cantidad = 0;
+            while (preg_match('/stream\r?\n(.*?)\r?\nendstream/s', $contenido, $stream, PREG_OFFSET_CAPTURE, $offset) === 1) {
+                if (++$cantidad > self::MAX_STREAMS || $expandidos >= self::MAX_BYTES_EXPANDIDOS) {
+                    return null;
+                }
+                $offset = $stream[0][1] + strlen($stream[0][0]);
+                $plano = @gzuncompress($stream[1][0], self::MAX_BYTES_EXPANDIDOS - $expandidos);
+                if ($plano !== false) {
+                    $expandidos += strlen($plano);
+                }
                 if ($plano !== false && ($n = self::contar($plano)) !== null) {
                     $paginas = max($paginas ?? 0, $n);
                 }

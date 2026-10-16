@@ -30,7 +30,10 @@ final class AvisosVencimiento
             ]);
             $usuario = $ciclo->legajo->usuario;
             $mensaje = trim($usuario->nombres.' '.$usuario->apellido_paterno).' · '.$ciclo->categoria.' · vence '.$ciclo->fecha_vencimiento->format('d/m/Y').'. Consulta los requisitos de renovación.';
-            Usuario::query()->where('activo', true)->chunkById(100, function ($usuarios) use ($aviso, $mensaje, $usuario): void {
+            Usuario::query()->where('activo', true)->with('usuarioRolesPorUsuario.rol')->chunkById(100, function ($usuarios) use ($aviso, $mensaje, $usuario): void {
+                if (config('permisos.fuente') !== 'legacy') {
+                    PoliticaPermisos::precargar($usuarios->flatMap(fn (Usuario $destinatario) => $destinatario->rolesVigentes())->unique('id')->values());
+                }
                 foreach ($usuarios as $destinatario) {
                     if ($destinatario->id === $usuario->id || $destinatario->tienePermiso('vencimientos.gestionar')) {
                         NotificacionUsuario::query()->firstOrCreate(['aviso_vencimiento_id' => $aviso->id, 'usuario_id' => $destinatario->id], [
@@ -113,18 +116,24 @@ final class AvisosVencimiento
                     }
                     $texto .= "\nAcceda al sistema: ".rtrim((string) config('vencimientos.frontend_url'), '/').'/vencimientos';
                     try {
+                        $transporte = config('mail.mailers.'.config('mail.default').'.transport');
+                        if (! in_array($transporte, ['smtp', 'ses', 'ses-v2', 'sendmail', 'mailgun', 'postmark', 'resend', 'log', 'array'], true)) {
+                            throw new \RuntimeException('Transporte sin confirmación individual de entrega.');
+                        }
                         Mail::raw($texto, function ($mensaje) use ($destino, $envio): void {
                             $mensaje->to($destino)->subject('Vencimiento del legajo docente');
                             $mensaje->getSymfonyMessage()->getHeaders()->addTextHeader('X-Vencimiento-Envio', $envio->id);
                         });
-                        $simulado = in_array(config('mail.default'), ['log', 'array'], true);
+                        $simulado = in_array($transporte, ['log', 'array'], true);
                         $envio->update(['estado' => $simulado ? 'simulado' : 'enviado', 'enviado_en' => $simulado ? null : now(), 'error' => $simulado ? 'Correo de prueba: configura SMTP para entrega real.' : null]);
                         $resultado[$simulado ? 'simulados' : 'enviados']++;
                     } catch (\Throwable $exception) {
                         report($exception);
                         $incierto = str_contains(strtolower($exception->getMessage()), 'timeout') || str_contains(strtolower($exception->getMessage()), 'timed out');
-                        $estado = $incierto ? 'incierto' : ($envio->intentos >= 5 ? 'fallido' : 'pendiente');
-                        $envio->update(['estado' => $estado, 'proximo_intento_en' => now()->addMinutes(5 * $envio->intentos), 'error' => $incierto ? 'Tiempo de espera agotado; verificar entrega con el proveedor.' : 'No se pudo entregar el correo. Revisa la configuración del servicio.']);
+                        $esperas = config('vencimientos.reintentos_minutos');
+                        $minutos = $esperas[$envio->intentos - 1] ?? null;
+                        $estado = $incierto ? 'incierto' : ($minutos === null ? 'fallido' : 'pendiente');
+                        $envio->update(['estado' => $estado, 'proximo_intento_en' => $estado === 'pendiente' ? now()->addMinutes($minutos) : null, 'error' => $incierto ? 'Tiempo de espera agotado; verificar entrega con el proveedor.' : 'No se pudo entregar el correo. Revisa la configuración del servicio.']);
                         $resultado['fallidos']++;
                     }
                 }

@@ -14,7 +14,7 @@ class SeccionLegajoFactory extends Factory
     public function definition(): array
     {
         return [
-            'id' => fake()->unique()->numberBetween(1, 32767),
+            'id' => fake()->unique()->numberBetween(14, 32767),
             'nombre' => substr(fake()->word(), 0, 150),
             'orden' => 1,
         ];
