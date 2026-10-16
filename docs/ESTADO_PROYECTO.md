@@ -164,6 +164,7 @@ verificación. Falta, en el orden propuesto (sin decidir):
 
 ## Siguientes pasos
 
+0. Pendiente para la próxima sesión (16/10/2026, rama `feature/correcciones-vinculo`): revisar y mejorar la experiencia de usuario de las secciones de carga de documentos del legajo. Evaluar el flujo de carga, la distribución de los formularios y documentos y la facilidad para registrar y consultar información. No implementar cambios hasta revisar el problema en la próxima sesión.
 1. Revisar y hacer commit de la sección 01 (`feature/seccion-01-alinear`) y probarla en el navegador con la persona demo 99000101.
 2. Bandeja de requerimientos y observaciones.
 3. Verificación y fiscalización de documentos (art. 7), cuando el cliente defina el flujo.
