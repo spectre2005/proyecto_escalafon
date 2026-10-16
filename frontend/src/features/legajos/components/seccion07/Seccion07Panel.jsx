@@ -4,7 +4,7 @@ import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../../auth/session'
 import { anularSeccion07 } from '../../api/seccion07Api'
 import { useNoAplicables } from '../../api/useNoAplicables'
-import { ofrecerTipo, tiposQueAcreditan } from '../../config/aplicacion'
+import { motivoVisible, ofrecerTipo, tiposQueAcreditan } from '../../config/aplicacion'
 import { precargaDesdeRegistro } from '../../config/acreditacion'
 import { categoriasDocente, columnasEvaluacion, formulariosDatos07, resultadosRatificacion, rutaFormulario, subseccionesSeccion07, tiposDesplazamiento, tiposRatificacion } from '../../config/seccion07'
 import { coloresEstadoDocumento, estadosDocumento, estadosSubseccion } from '../../config/seccion02'
@@ -171,7 +171,7 @@ function Documentos({ usuario, data, subseccion, sinLegajo, aplica }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-slate-800">{tipo.literal && <span className="mr-1 text-slate-500">{tipo.literal})</span>}{tipo.nombre}</p>
-            <p className="mt-1 text-xs text-slate-500">{aplica ? tipo.motivo : 'No aplica a esta persona.'}{tipo.descripcion ? ` ${tipo.descripcion}` : ''}{tipo.permite_multiples ? ' Admite varios documentos.' : ''}{datos ? ` Datos: ${datos}.` : ' Solo metadatos (sin formulario de datos).'}</p>
+            <p className="mt-1 text-xs text-slate-500">{aplica ? motivoVisible(tipo) : 'No aplica a esta persona.'}{tipo.descripcion ? ` ${tipo.descripcion}` : ''}{tipo.permite_multiples ? ' Admite varios documentos.' : ''}{datos ? ` Datos: ${datos}.` : ' Solo metadatos (sin formulario de datos).'}</p>
             <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo, documento, data)}
               onSubsanar={puedeSubir && !sinLegajo && !ocupado ? documento => { setAviso(''); setSubsanando({ tipoId: tipo.id, documento }) } : null}
               onEnlazar={puedeSubir && !sinLegajo && !ocupado && ofrecerTipo(noAplica, tipo) ? documento => { setAviso(''); setRecuperando({ tipoId: tipo.id, documento }) } : null} />

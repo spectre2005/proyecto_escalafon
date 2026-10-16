@@ -27,3 +27,13 @@ export function findDocumentSection(group, sections) {
   const normalize = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
   return sections.find(section => Number(section.id) === Number(group.number)) || sections.find(section => normalize(section.nombre) === normalize(group.title))
 }
+
+// Listados genéricos de registros (solo lectura) de 03, 04, 06 y 08 y «Todos los documentos» de cada sección: repiten lo
+// que muestra el panel de la sección, pero pueden tener registros sin documento que el panel no lista. No se quitan: van
+// al final de la sección, bajo «Listados de consulta», para que la entrada principal sea la del panel.
+export const categoriasConsulta = ['formacion-academica', 'capacitaciones', 'colegiaturas', 'experiencia-laboral', 'compensaciones-beneficios']
+
+export function separarMenu(categorias) {
+  const consulta = key => categoriasConsulta.includes(key) || key.startsWith('documentos-')
+  return { principales: categorias.filter(key => !consulta(key)), consultas: categorias.filter(consulta) }
+}

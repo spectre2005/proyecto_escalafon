@@ -13,6 +13,8 @@ const kb = bytes => bytes ? `${Math.max(1, Math.round(bytes / 1024))} KB` : ''
 
 /**
  * Documentos de un tipo, del más reciente al más antiguo, con metadatos, folios, estado y los datos que acreditan.
+ * A la vista: folios, estado, emisión, emisor, recepción y lo que acredita; el resto de metadatos (titular, modalidad,
+ * resolución, quién lo subió…) en «Ver detalle», sin quitar ninguno. La copia de DNI muestra todo (son pocos datos).
  * Acciones: ver el PDF (legajo.ver) y registrar la recepción (documento.recepcionar). No hay editar ni eliminar:
  * un documento subsanado se muestra atenuado junto al que lo corrige.
  * enlazado(documento): texto con el registro de datos que acredita (vínculo, adenda, inducción…) o null.
@@ -24,6 +26,7 @@ export default function ListaDocumentos({ usuario, tipo, enlazado, onSubsanar, o
   const puedeVer = usePuede('legajo.ver')
   const puedeRecepcionar = usePuede('documento.recepcionar')
   const [visor, setVisor] = useState(null)
+  const [detalle, setDetalle] = useState(null)
   const [confirmando, setConfirmando] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -61,22 +64,32 @@ export default function ListaDocumentos({ usuario, tipo, enlazado, onSubsanar, o
             <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${coloresEstadoDocumento[documento.estado_visible] || 'bg-slate-100 text-slate-700'}`}>{etiqueta(estadosDocumento, documento.estado_visible)}</span>
           </div>
         </div>
-        <dl className="mt-2 grid gap-x-4 gap-y-1 text-[11px] text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
-          {(tipo.codigo === 'S01_B_DOCUMENTO_IDENTIDAD' ? [
+        {(() => {
+          const dni = tipo.codigo === 'S01_B_DOCUMENTO_IDENTIDAD'
+          const principales = dni ? [
             ['Nombre', v.titular_nombre || 'No registrado'], ['DNI', v.titular_documento || 'No registrado'],
             ['Incorporado', fecha(v.fecha_incorporacion)], ['Emitido', fecha(v.fecha_emision)], ['Caducidad', fecha(v.fecha_caducidad)],
-          ] : [['Emisor', v.emisor || 'No registrado'], ['Emitido', fecha(v.fecha_emision)], ['Incorporado', fecha(v.fecha_incorporacion)],
+          ] : [['Emitido', fecha(v.fecha_emision)], ['Emisor', v.emisor || 'No registrado'],
+            ['Recepción', v.fecha_recepcion ? `${fecha(v.fecha_recepcion)} · ${documento.recepcionado_por || ''}` : 'Sin recepción registrada'],
+            ...(datos ? [['Acredita', datos]] : []),
+            ...(subsana ? [['Subsana a', `documento de folios ${folios(subsana.values.folio_inicio, subsana.values.folio_fin)}`]] : []),
+          ]
+          const detalles = dni ? [] : [
             ...(tipo.requiere_num_resolucion || v.num_resolucion ? [['N.º resolución', v.num_resolucion || 'No registrado']] : []),
             ['Titular', `${v.titular_nombre || 'No registrado'} ${v.titular_documento || ''} (${etiqueta(relacionesTitular, v.relacion_titular).toLowerCase()})`],
             ['Modalidad', v.modalidad_presentacion ? etiqueta(modalidadesPresentacion, v.modalidad_presentacion) : 'No registrada'],
+            ['Incorporado', fecha(v.fecha_incorporacion)],
             ['Subido por', `${documento.subido_por || 'No registrado'} · ${v.created_at || ''}`],
-            ['Recepción', v.fecha_recepcion ? `${fecha(v.fecha_recepcion)} · ${documento.recepcionado_por || ''}` : 'Sin recepción registrada'],
-            ...(subsana ? [['Subsana a', `documento de folios ${folios(subsana.values.folio_inicio, subsana.values.folio_fin)}`]] : []),
-            ...(datos ? [['Acredita', datos]] : []),
-          ]).map(([label, valor]) => <div key={label} className="min-w-0"><dt className="inline text-slate-400">{label}: </dt><dd className="inline break-words">{valor}</dd></div>)}
-        </dl>
+          ]
+          const fila = ([label, valor]) => <div key={label} className="min-w-0"><dt className="inline text-slate-400">{label}: </dt><dd className="inline break-words">{valor}</dd></div>
+          return <dl className="mt-2 grid gap-x-4 gap-y-1 text-[11px] text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
+            {principales.map(fila)}
+            {detalle === documento.id && detalles.map(fila)}
+          </dl>
+        })()}
         <div className="mt-2 flex flex-wrap items-center gap-4">
           {puedeVer && documento.archivo && <button type="button" onClick={() => setVisor(visor === documento.id ? null : documento.id)} className="text-xs font-semibold text-teal-700">{visor === documento.id ? 'Ocultar PDF' : 'Ver PDF'}</button>}
+          {tipo.codigo !== 'S01_B_DOCUMENTO_IDENTIDAD' && <button type="button" aria-expanded={detalle === documento.id} onClick={() => setDetalle(detalle === documento.id ? null : documento.id)} className="text-xs font-semibold text-slate-500 hover:text-slate-700">{detalle === documento.id ? 'Menos datos' : 'Ver detalle'}</button>}
           {onEnlazar && puedeEnlazar(documento) && <button type="button" onClick={() => onEnlazar(documento)} className="text-xs font-semibold text-teal-700">Enlazar ahora</button>}
           {onSubsanar && !subsanado && tipo.codigo !== 'S01_B_DOCUMENTO_IDENTIDAD' && <button type="button" onClick={() => onSubsanar(documento)} className="text-xs font-semibold text-amber-800">Subsanar</button>}
           {puedeRecepcionar && !v.fecha_recepcion && !subsanado && confirmando !== documento.id && <button type="button" onClick={() => { setError(''); setConfirmando(documento.id) }} className="text-xs font-semibold text-teal-700">Recepcionar</button>}

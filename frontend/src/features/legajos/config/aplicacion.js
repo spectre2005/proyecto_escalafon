@@ -55,3 +55,11 @@ export function agruparTipos(tipos, indice) {
 export function tiposQueAcreditan(tipos, indice, enlacesDe, registroId) {
   return (tipos || []).filter(tipo => ofrecerTipo(indice, tipo) && (enlacesDe(tipo) || []).some(enlace => enlace.id === registroId))
 }
+
+// Motivo de exigencia que se muestra bajo el tipo. «Se exige según su régimen y banderas.» repite la etiqueta «Se exige»
+// y no se escribe; los demás (por determinar, no corresponde, opcional, desactivado…) explican algo y se muestran.
+export const MOTIVO_EXIGIDO = 'Se exige según su régimen y banderas.'
+
+export function motivoVisible(tipo) {
+  return tipo?.exigido === true && tipo.motivo === MOTIVO_EXIGIDO ? '' : (tipo?.motivo || '')
+}

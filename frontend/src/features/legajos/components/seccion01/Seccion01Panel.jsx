@@ -4,7 +4,7 @@ import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../../auth/session'
 import { anularRegistro } from '../../api/seccion01Api'
 import { useNoAplicables } from '../../api/useNoAplicables'
-import { motivoNoAplica, ofrecerTipo, tiposQueAcreditan } from '../../config/aplicacion'
+import { motivoNoAplica, motivoVisible, ofrecerTipo, tiposQueAcreditan } from '../../config/aplicacion'
 import { precargaDesdeRegistro } from '../../config/acreditacion'
 import { folios, textoSubirTipo } from '../../config/documentos'
 import { etiqueta, formulariosDatos01, gruposSeccion01, parentescos, personasCertificado, resultadosDeclaracion, tiposDeclaracion, tiposDocIdentidad } from '../../config/seccion01'
@@ -144,7 +144,7 @@ function Documentos({ usuario, data, codigos }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-slate-800">{tipo.literal && <span className="mr-1 text-slate-500">{tipo.literal})</span>}{tipo.nombre}</p>
-            <p className={`mt-1 text-xs ${tipo.aplica && tipo.exigido === null ? 'text-amber-800' : 'text-slate-500'}`}>{tipo.motivo}{tipo.permite_multiples ? ' Admite varios documentos.' : ''}{tipo.formulario_datos ? ` Datos: ${formulariosDatos01[tipo.formulario_datos]}.` : ''}</p>
+            <p className={`mt-1 text-xs ${tipo.aplica && tipo.exigido === null ? 'text-amber-800' : 'text-slate-500'}`}>{motivoVisible(tipo)}{tipo.permite_multiples ? ' Admite varios documentos.' : ''}{tipo.formulario_datos ? ` Datos: ${formulariosDatos01[tipo.formulario_datos]}.` : ''}</p>
             <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo, documento, data)}
               onSubsanar={puedeSubir && !sinLegajo && !ocupado ? documento => { setAviso(''); setSubsanando({ tipoId: tipo.id, documento }) } : null}
               onEnlazar={puedeSubir && !sinLegajo && !ocupado && ofrecerTipo(noAplica, tipo) ? documento => { setAviso(''); setRecuperando({ tipoId: tipo.id, documento }) } : null} />

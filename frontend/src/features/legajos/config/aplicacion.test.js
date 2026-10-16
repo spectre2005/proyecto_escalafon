@@ -24,3 +24,11 @@ test('without an answer from the backend everything is offered', () => {
   assert.equal(ofrecerTipo(vacio, { id: 'u-1' }), true)
   assert.equal(mostrarTipo(undefined, { id: 'u-1' }), true)
 })
+
+test('the requirement reason is only written when it explains something', async () => {
+  const { motivoVisible, MOTIVO_EXIGIDO } = await import('./aplicacion.js')
+  assert.equal(motivoVisible({ exigido: true, motivo: MOTIVO_EXIGIDO }), '')
+  assert.match(motivoVisible({ exigido: null, motivo: 'Falta definir si corresponde: …' }), /Falta definir/)
+  assert.match(motivoVisible({ exigido: false, motivo: 'Opcional: se incorpora solo si existe.' }), /Opcional/)
+  assert.equal(motivoVisible({ exigido: true }), '')
+})

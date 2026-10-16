@@ -5,7 +5,7 @@ import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../../auth/session'
 import { anularSeccion02, completarTipoVinculo } from '../../api/seccion02Api'
 import { useNoAplicables } from '../../api/useNoAplicables'
-import { ofrecerTipo, tiposQueAcreditan } from '../../config/aplicacion'
+import { motivoVisible, ofrecerTipo, tiposQueAcreditan } from '../../config/aplicacion'
 import { precargaDesdeRegistro } from '../../config/acreditacion'
 import { pruebaEnNoConDatos, pruebaNoAplica, camposDatosPuesto, coloresEstadoDocumento, estadosDocumento, estadosSubseccion, estadosVencimiento, etiquetaVinculo, formulariosDatos, regimenesLaborales, resultadosPeriodo, subseccionesSeccion02, tiposInduccion, tiposPersonal, tipoVinculo } from '../../config/seccion02'
 import { etiqueta } from '../../config/seccion01'
@@ -53,7 +53,18 @@ function Resumen({ data, onNavigate }) {
       <div><p className="text-xs text-slate-500">Exigidos con documento cargado</p><p className="mt-1 text-2xl font-bold text-slate-800">{r.exigidos_cargados} <span className="text-sm font-normal text-slate-500">de {r.exigidos.length}</span></p></div>
       <div><p className="text-xs text-slate-500">Exigidos con recepción registrada</p><p className="mt-1 text-2xl font-bold text-slate-800">{r.exigidos_recepcionados} <span className="text-sm font-normal text-slate-500">de {r.exigidos.length}</span></p></div>
     </div>
-    <p className="mt-3 text-xs text-slate-500">{pruebaNoAplica(data) ? 'La subsección 2.4 no aplica y no se cuenta. ' : pruebaEnNoConDatos(data) ? 'La subsección 2.4 tiene registros pero «Tiene período de prueba» está en No: se muestran y no se cuentan. ' : data.tiene_periodo_prueba === null ? 'Falta definir si tiene período de prueba: los tipos de 2.4 quedan por determinar. ' : ''}Cargados y recepcionados se muestran por separado: el criterio de completitud del legajo está pendiente de definir. Sin recepción un documento no cuenta como aprobado.{r.por_determinar ? ` ${r.por_determinar} tipo(s) quedan por determinar (falta definir una condición del puesto, o el régimen laboral registrado no es carrera, plazo determinado ni designado); no se cuentan. Revisa el motivo de cada tipo.` : ''}</p>
+    {/* A la vista solo lo que cambia según la persona (2.4 y tipos por determinar); el método, al desplegar. */}
+    {(() => {
+      const avisos = [
+        pruebaNoAplica(data) ? 'La subsección 2.4 no aplica y no se cuenta.' : pruebaEnNoConDatos(data) ? 'La subsección 2.4 tiene registros pero «Tiene período de prueba» está en No: se muestran y no se cuentan.' : data.tiene_periodo_prueba === null ? 'Falta definir si tiene período de prueba: los tipos de 2.4 quedan por determinar.' : '',
+        r.por_determinar ? `${r.por_determinar} tipo(s) quedan por determinar y no se cuentan: revisa el motivo de cada tipo.` : '',
+      ].filter(Boolean)
+      return avisos.length > 0 && <p className="mt-3 text-xs text-amber-800">{avisos.join(' ')}</p>
+    })()}
+    <details className="mt-2 text-xs text-slate-500">
+      <summary className="cursor-pointer font-semibold text-slate-600">¿Cómo se cuenta?</summary>
+      <p className="mt-2">Cargados y recepcionados se muestran por separado: el criterio de completitud del legajo está pendiente de definir. Sin recepción un documento no cuenta como aprobado. Un tipo queda por determinar cuando falta definir una condición del puesto o el régimen laboral registrado no es carrera, plazo determinado ni designado.</p>
+    </details>
     <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">{data.subsecciones.map(sub => {
       const [nombre, clase] = estadosSubseccion[sub.estado]
       return <button key={sub.codigo} onClick={() => onNavigate(categoriaDe[sub.codigo])} className={`rounded-xl border border-slate-200 p-3 text-left hover:bg-slate-50 ${sub.aplica ? '' : 'opacity-60'}`}>
@@ -174,7 +185,7 @@ function Documentos({ usuario, data, subseccion, sinLegajo, aplica = true }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-slate-800">{tipo.literal && <span className="mr-1 text-slate-500">{tipo.literal})</span>}{tipo.nombre}</p>
-            <p className={`mt-1 text-xs ${aplica && tipo.exigido === null ? 'text-amber-800' : 'text-slate-500'}`}>{aplica ? tipo.motivo : 'No aplica a esta persona.'}{tipo.permite_multiples ? ' Admite varios documentos.' : ''}{tipo.formulario_datos ? ` Datos: ${formulariosDatos[tipo.formulario_datos] || tipo.formulario_datos}.` : ''}</p>
+            <p className={`mt-1 text-xs ${aplica && tipo.exigido === null ? 'text-amber-800' : 'text-slate-500'}`}>{aplica ? motivoVisible(tipo) : 'No aplica a esta persona.'}{tipo.permite_multiples ? ' Admite varios documentos.' : ''}{tipo.formulario_datos ? ` Datos: ${formulariosDatos[tipo.formulario_datos] || tipo.formulario_datos}.` : ''}</p>
             <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo.formulario_datos, documento, data)}
               onSubsanar={puedeSubir && !sinLegajo && !ocupado ? documento => { setAviso(''); setSubsanando({ tipoId: tipo.id, documento }) } : null}
               onEnlazar={puedeSubir && !sinLegajo && !ocupado && ofrecerTipo(noAplica, tipo) ? documento => { setAviso(''); setRecuperando({ tipoId: tipo.id, documento }) } : null} />
