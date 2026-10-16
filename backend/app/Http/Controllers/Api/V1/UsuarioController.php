@@ -12,6 +12,7 @@ use App\Support\AperturaLegajo;
 use App\Support\CambioDiscapacidad;
 use App\Support\ConfiguracionFuncionalidades;
 use App\Support\RegimenesLaborales;
+use App\Support\SituacionLaboral;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -28,12 +29,12 @@ class UsuarioController extends Controller
 {
     public function index(): AnonymousResourceCollection
     {
-        return UsuarioResource::collection(Usuario::query()->with('regimenNormativo')->orderBy('id')->paginate(100));
+        return UsuarioResource::collection(SituacionLaboral::cargar(Usuario::query()->with('regimenNormativo'))->orderBy('id')->paginate(100));
     }
 
     public function show(string $record): UsuarioResource
     {
-        return new UsuarioResource(Usuario::query()->with('regimenNormativo')->findOrFail($record));
+        return new UsuarioResource(SituacionLaboral::cargar(Usuario::query()->with('regimenNormativo'))->findOrFail($record));
     }
 
     public function update(Request $request, string $record): UsuarioResource
@@ -84,7 +85,7 @@ class UsuarioController extends Controller
             throw ValidationException::withMessages(['usuario' => 'Un DNI o correo ya está registrado.']);
         }
 
-        return new UsuarioResource($usuario->refresh()->load('regimenNormativo'));
+        return new UsuarioResource(SituacionLaboral::cargar(Usuario::query()->with('regimenNormativo'))->findOrFail($usuario->getKey()));
     }
 
     /**
@@ -121,7 +122,7 @@ class UsuarioController extends Controller
         $this->insertar($records, $request);
 
         return UsuarioResource::collection(
-            Usuario::query()->with('regimenNormativo')->whereIn('id', array_column($records, 'id'))->orderBy('id')->get(),
+            SituacionLaboral::cargar(Usuario::query()->with('regimenNormativo'))->whereIn('id', array_column($records, 'id'))->orderBy('id')->get(),
         )->response()->setStatusCode(201);
     }
 
@@ -152,7 +153,7 @@ class UsuarioController extends Controller
         });
 
         return response()->json(['data' => [
-            'usuario' => new UsuarioResource(Usuario::query()->with('regimenNormativo')->findOrFail($registro['id'])),
+            'usuario' => new UsuarioResource(SituacionLaboral::cargar(Usuario::query()->with('regimenNormativo'))->findOrFail($registro['id'])),
             'legajo' => $legajo->only(['id', 'numero_legajo', 'estado_legajo']),
             'vinculo' => $vinculo->only(['id', 'regimen_laboral', 'nombre_puesto']),
         ]], 201);

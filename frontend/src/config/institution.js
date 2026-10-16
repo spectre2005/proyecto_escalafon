@@ -1,9 +1,11 @@
 export const defaultInstitution = {
   name: 'Mi instituci\u00f3n', area: 'Gesti\u00f3n de personas', initials: 'MI',
-  logo: '', ruc: '', address: '', email: '', phone: '', website: '',
+  logo: '', ruc: '', address: '', email: '', phone: '', website: '', emailDomain: '',
   reportTitle: 'Ficha de datos personales', reportFooter: 'Documento de uso institucional.',
   reportColor: '#0f766e', showLogo: true, showEmissionDate: true, showPageNumbers: true,
 }
+
+const dominioValido = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/
 
 export function normalizeInstitution(value = {}) {
   const source = value && typeof value === 'object' ? value : {}
@@ -16,6 +18,11 @@ export function normalizeInstitution(value = {}) {
     if (!result[key]) result[key] = defaultInstitution[key]
   }
   if (typeof source.logo === 'string' && source.logo.length <= 750000 && /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(source.logo)) result.logo = source.logo
+  // Dominio del correo del personal (sin @): solo si tiene forma de dominio; si no, vacío (no se sugieren correos).
+  if (typeof source.emailDomain === 'string') {
+    const dominio = source.emailDomain.trim().toLowerCase()
+    result.emailDomain = dominio.length <= 100 && dominioValido.test(dominio) ? dominio : ''
+  }
   if (typeof source.reportColor === 'string' && /^#[0-9a-f]{6}$/i.test(source.reportColor)) result.reportColor = source.reportColor
   for (const key of ['showLogo', 'showEmissionDate', 'showPageNumbers']) {
     if (typeof source[key] === 'boolean') result[key] = source[key]

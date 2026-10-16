@@ -53,7 +53,7 @@ function Progreso({ paso, onIr, disabled }) {
   </ol>
 }
 
-export default function RegistroManual({ usuarios, opciones, puedeDiscapacidad, puedeRegistrar, saving, bloqueado, mensaje, onGuardar, onCancel }) {
+export default function RegistroManual({ usuarios, opciones, dominioCorreo = '', puedeDiscapacidad, puedeRegistrar, saving, bloqueado, mensaje, onGuardar, onCancel }) {
   const formRef = useRef(null)
   const contenidoRef = useRef(null)
   const [paso, setPaso] = useState(1)
@@ -129,12 +129,12 @@ export default function RegistroManual({ usuarios, opciones, puedeDiscapacidad, 
     return <label key={key} className={key === 'email_institucional' ? 'sm:col-span-2 lg:col-span-1' : undefined}>
       {label}{requerido && ' *'}
       <input name={key} value={draft[key]} type={key === 'email_institucional' ? 'email' : 'text'} inputMode={numerico ? 'numeric' : undefined}
-        placeholder={key === 'email_institucional' ? 'nombre-apellido@uniq.edu.pe' : undefined} maxLength={largo[key] || 80} required={requerido}
+        placeholder={key === 'email_institucional' ? (dominioCorreo ? `nombre-apellido@${dominioCorreo}` : 'correo@dominio') : undefined} maxLength={largo[key] || 80} required={requerido}
         pattern={key === 'numero_doc_identidad' ? '[0-9]{8}' : key === 'telefono' ? '[0-9]{9}' : undefined}
         title={key === 'numero_doc_identidad' ? 'El DNI debe contener 8 dígitos.' : key === 'telefono' ? 'El teléfono debe contener 9 dígitos.' : undefined}
         aria-invalid={erroresPersonaCampo[key] ? true : undefined}
-        onChange={event => setDraft(updateUserDraft(draft, key, numerico ? event.target.value.replace(/\D/g, '').slice(0, largo[key]) : event.target.value))} />
-      {key === 'email_institucional' && <small className="text-[10px] text-[#8b9c91]">Se completa con el primer nombre y el apellido paterno. Puedes editarlo.</small>}
+        onChange={event => setDraft(updateUserDraft(draft, key, numerico ? event.target.value.replace(/\D/g, '').slice(0, largo[key]) : event.target.value, dominioCorreo))} />
+      {key === 'email_institucional' && <small className="text-[10px] text-[#8b9c91]">{dominioCorreo ? 'Se completa con el primer nombre y el apellido paterno. Puedes editarlo.' : 'Escríbelo completo. Para sugerirlo, configura el dominio del correo del personal en Configuración.'}</small>}
       {erroresPersonaCampo[key] && <span className="text-rose-700">{[].concat(erroresPersonaCampo[key]).join(' ')}</span>}
     </label>
   }

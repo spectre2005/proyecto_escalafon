@@ -47,7 +47,7 @@ const titles = {
   puesto_persona: 'Puesto registrado en la persona', unidad_persona: 'Unidad orgánica registrada en la persona',
   fecha_nacimiento: 'Fecha de nacimiento', direccion: 'Dirección', telefono: 'Teléfono',
   ubicacion: 'Ubicación', calificacion: 'Calificación', descripcion: 'Descripción',
-  anulado: 'Registro anulado', activo: 'Activo', numero_legajo: 'Número de legajo',
+  anulado: 'Registro anulado', activo: 'Activo', legajo_activo: 'Legajo activo', numero_legajo: 'Número de legajo',
   fecha_apertura: 'Fecha de apertura', nombre_puesto: 'Puesto', ultimo_folio: 'Último folio',
   tamano_bytes: 'Tamaño en bytes', mime_type: 'Tipo de archivo', num_paginas: 'Páginas',
   es_dato_sensible: 'Dato sensible', es_dato_salud: 'Dato de salud',
@@ -74,7 +74,7 @@ function valoresGenerales(data) {
   const regimen = textoRegimen(data.regimen)
   return Object.fromEntries([...['nombres', 'apellido_paterno', 'apellido_materno'].map(key => [key, values[key]]),
     ...Object.entries(values).filter(([key]) => !['nombres', 'apellido_paterno', 'apellido_materno', 'foto_path', 'regimen_laboral', 'regimen_normativo_id'].includes(key))
-      .map(([key, value]) => [{ nombre_puesto: 'puesto_persona', unidad_organica_id: 'unidad_persona' }[key] || key, value]),
+      .map(([key, value]) => [{ nombre_puesto: 'puesto_persona', unidad_organica_id: 'unidad_persona', activo: 'legajo_activo' }[key] || key, value]),
     ['ley', regimen.ley], ['tipo_vinculo', regimen.tipo],
     // El puesto y la unidad guardados en la persona (nombre_puesto, unidad_organica_id) siguen arriba como dato histórico.
     ...(data.puesto_actual?.origen === 'vinculo' ? [['puesto_actual', puestoActual(data.puesto_actual).puesto], ['unidad_actual', puestoActual(data.puesto_actual).unidad]] : [])])

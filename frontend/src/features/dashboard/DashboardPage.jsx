@@ -4,6 +4,7 @@ import { useUsers } from '../users/hooks/useUsers'
 import { usePuede } from '../auth/session'
 import { useLiveQuery } from '../../shared/queries/useLiveQuery'
 import { nombreLey, SIN_DEFINIR } from '../users/utils/leyes'
+import { situaciones } from '../users/utils/situacion'
 
 const nombresBandera = {
   tiene_derechohabientes: 'Tiene derechohabientes', con_discapacidad: 'Con discapacidad (servidor o hijos)',
@@ -26,7 +27,9 @@ function BanderasSinResponder({ panel }) {
 export default function DashboardPage() {
   const { users, loading, loadError, refreshUsers } = useUsers()
   const administra = usePuede('sistema.administrar')
-  const active = users.filter(user => user.activo).length
+  // Acceso al sistema (cuenta) y situación laboral se cuentan por separado: sin cuenta no significa sin vínculo.
+  const conAcceso = users.filter(user => user.activo).length
+  const conVinculo = users.filter(user => user.situacion === 'vinculo_vigente').length
   const withEmail = users.filter(user => user.email_institucional?.trim()).length
   const withPhone = users.filter(user => user.telefono?.trim()).length
   const ready = !loading && !loadError
@@ -35,10 +38,12 @@ export default function DashboardPage() {
   const date = new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Lima' }).format(new Date())
   const stats = [
     { label: 'Personal registrado', value: users.length, detail: 'Ver directorio completo', icon: 'users', color: 'bg-teal-50 text-teal-700', to: '/personal' },
-    { label: 'Usuarios activos', value: active, detail: 'Consultar personal activo', icon: 'check', color: 'bg-sky-50 text-sky-700', to: '/personal?estado=activo' },
-    { label: 'Usuarios inactivos', value: users.length - active, detail: 'Consultar personal inactivo', icon: 'clock', color: 'bg-amber-50 text-amber-700', to: '/personal?estado=inactivo' },
+    { label: 'Con vínculo vigente', value: conVinculo, detail: 'Consultar situación laboral', icon: 'check', color: 'bg-sky-50 text-sky-700', to: '/personal?situacion=vinculo_vigente' },
+    { label: 'Con acceso al sistema', value: conAcceso, detail: 'Cuentas que pueden iniciar sesión', icon: 'clock', color: 'bg-amber-50 text-amber-700', to: '/personal?estado=activo' },
     { label: 'Con correo registrado', value: withEmail, detail: 'Ver personal con correo', icon: 'file', color: 'bg-violet-50 text-violet-700', to: '/personal?correo=con' },
   ]
+  const situacionesPersonal = Object.entries(situaciones).map(([valor, { texto }]) => ({ label: texto, count: users.filter(user => user.situacion === valor).length, to: `/personal?situacion=${valor}`,
+    color: { vinculo_vigente: 'bg-teal-500', sin_vinculo_vigente: 'bg-amber-400', sin_legajo: 'bg-slate-400' }[valor] }))
   const types = [
     { label: 'Docentes', count: users.filter(user => user.tipo_personal === 'docente').length, to: '/personal?tipo=docente', color: 'bg-teal-500' },
     { label: 'Administrativos', count: users.filter(user => user.tipo_personal === 'administrativo').length, to: '/personal?tipo=administrativo', color: 'bg-sky-500' },
@@ -65,8 +70,8 @@ export default function DashboardPage() {
     </section>
     <div className="grid gap-6 lg:grid-cols-2">
       <section className={panel} aria-busy={loading}>
-        <h2 className="text-sm font-semibold text-slate-800">Composición del personal</h2><p className="mt-1 text-xs text-slate-500">Distribución por función en la institución</p>
-        <div className="mt-6 space-y-5">{types.map(item => <div key={item.label}>
+        <h2 className="text-sm font-semibold text-slate-800">Composición del personal</h2><p className="mt-1 text-xs text-slate-500">Distribución por función y por situación laboral (vínculo vigente y legajo)</p>
+        <div className="mt-6 space-y-5">{[...types, ...situacionesPersonal].map(item => <div key={item.label}>
           <div className="mb-2 flex justify-between text-xs">{item.to ? <Link to={item.to} className="font-medium text-slate-600 hover:text-teal-700 hover:underline">{item.label}</Link> : <span className="text-slate-600">{item.label}</span>}<span className="font-semibold text-slate-700">{show(item.count)} · {ready ? `${percent(item.count)}%` : '—'}</span></div>
           <div className="h-3 overflow-hidden rounded-full bg-slate-100" aria-hidden="true"><div className={`h-full rounded-full ${item.color}`} style={{ width: `${percent(item.count)}%` }} /></div>
         </div>)}</div>

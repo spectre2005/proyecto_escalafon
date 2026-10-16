@@ -71,11 +71,22 @@ class InstitutionSettingsTest extends TestCase
             ['logo' => 'data:image/png;base64,'.base64_encode('not an image')],
             ['logo' => 'data:image/png;base64,'.base64_encode($largeImage->get())],
             ['ruc' => '123'], ['email' => 'invalid'], ['website' => 'javascript:alert(1)'], ['reportColor' => 'blue'], ['unknown' => 'value'],
+            ['emailDomain' => '@institucion.edu.pe'], ['emailDomain' => 'persona@institucion.edu.pe'], ['emailDomain' => 'sin-punto'],
         ] as $invalid) {
             $this->putJson('/api/v1/institucion', [...$snapshot['data'], ...$invalid], ['If-Match' => $snapshot['version']])
                 ->assertUnprocessable()->assertJsonValidationErrors(array_keys($invalid));
         }
         $this->assertDatabaseCount('institution_settings', 0);
+    }
+
+    public function test_email_domain_is_optional_per_institution_and_saved_in_lowercase(): void
+    {
+        $this->actuarComo();
+        $snapshot = $this->getJson('/api/v1/institucion')->assertOk()->assertJsonPath('data.emailDomain', '')->json();
+        $saved = $this->putJson('/api/v1/institucion', [...$snapshot['data'], 'emailDomain' => ' Institucion.Example.Test '], ['If-Match' => $snapshot['version']])
+            ->assertOk()->assertJsonPath('data.emailDomain', 'institucion.example.test')->json();
+        $this->putJson('/api/v1/institucion', [...$saved['data'], 'emailDomain' => ''], ['If-Match' => $saved['version']])
+            ->assertOk()->assertJsonPath('data.emailDomain', '');
     }
 
     public function test_logo_can_be_removed_and_unversioned_saves_are_rejected(): void

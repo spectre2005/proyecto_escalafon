@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\SituacionLaboral;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -29,7 +30,10 @@ class UsuarioResource extends JsonResource
             // Ley para listados y reportes; null = Sin definir (nunca se lee regimen_laboral como si fuera la ley).
             'ley' => $this->whenLoaded('regimenNormativo', fn () => $this->regimenNormativo?->only(['id', 'codigo', 'nombre'])),
             'telefono' => $this->telefono ?? '',
+            // Acceso al sistema (cuenta): no dice si la persona trabaja en la institución.
             'activo' => $this->activo,
+            // Situación laboral (SituacionLaboral): vinculo_vigente, sin_vinculo_vigente o sin_legajo; solo en listados que la cargan.
+            'situacion' => $this->when(SituacionLaboral::de($this->resource) !== null, fn () => SituacionLaboral::de($this->resource)),
         ];
     }
 }

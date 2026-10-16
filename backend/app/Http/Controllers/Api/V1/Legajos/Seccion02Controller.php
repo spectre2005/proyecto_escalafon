@@ -142,6 +142,7 @@ class Seccion02Controller extends Controller
     {
         $this->exigirLegajo($usuario);
         $data = $this->validar($request, [...self::REGLAS_VINCULO, 'documento_id' => 'nullable|uuid']);
+        $this->exigirLeyDelTipo($data);
         $documento = $this->documento($usuario, $data, 'vinculos_laborales');
 
         // vinculos_laborales no tiene documento_id: el documento (c a f) apunta al vínculo.
@@ -163,9 +164,53 @@ class Seccion02Controller extends Controller
         if ($registro->anulado || $registro->fecha_cese !== null) {
             return response()->json(['message' => $registro->anulado ? 'El vínculo está anulado: no se corrige.' : 'El vínculo tiene fecha de cese: es un registro cerrado y no se corrige.'], 409);
         }
-        $registro->update($this->validarCambios($request, $registro, self::REGLAS_VINCULO));
+        $cambios = $this->validarCambios($request, $registro, self::REGLAS_VINCULO);
+        $this->exigirLeyDelTipo($cambios, $registro);
+        DB::transaction(function () use ($registro, $cambios): void {
+            // Bloqueo del vínculo: los datos del puesto no se registran a la vez que se cambia su tipo de personal.
+            $actual = VinculoLaboral::query()->whereKey($registro->id)->lockForUpdate()->firstOrFail();
+            $this->exigirTipoSinDatosPuesto($actual, $cambios);
+            $actual->update($cambios);
+        });
 
         return new JsonResource($registro->refresh());
+    }
+
+    /**
+     * La ley del vínculo corresponde a su tipo de personal, con la misma regla del alta (RegimenesLaborales::error). Al
+     * corregir solo se comprueba si cambian la ley o el tipo: un vínculo anterior con una ley ya inactiva se sigue
+     * corrigiendo en lo demás. Con la misma ley y otro tipo, solo cuenta que la ley sea de ese tipo.
+     */
+    private function exigirLeyDelTipo(array $data, ?VinculoLaboral $actual = null): void
+    {
+        if ($actual && ! array_key_exists('tipo_personal', $data) && ! array_key_exists('regimen_normativo_id', $data)) {
+            return;
+        }
+        $tipo = $data['tipo_personal'] ?? $actual?->tipo_personal;
+        $ley = RegimenesLaborales::ley((string) ($data['regimen_normativo_id'] ?? $actual?->regimen_normativo_id));
+        $leyNueva = ! $actual || (string) ($data['regimen_normativo_id'] ?? $actual->regimen_normativo_id) !== (string) $actual->regimen_normativo_id;
+        $error = $leyNueva ? RegimenesLaborales::error($ley, $tipo)
+            : ($ley && $ley->aplica_a !== $tipo ? "La ley {$ley->nombre} corresponde al personal {$ley->aplica_a}, no al {$tipo}." : null);
+        if ($error !== null) {
+            throw ValidationException::withMessages(['regimen_normativo_id' => $error]);
+        }
+    }
+
+    /**
+     * Con datos del puesto registrados (perfil_docente o perfil_administrativo), el tipo de personal del vínculo no se
+     * cambia: el perfil quedaría sin relación válida. No se borra ni se reescribe el perfil.
+     * TODO pendiente de confirmar con el cliente: si cambiar de tipo exige registrar un vínculo nuevo.
+     */
+    private function exigirTipoSinDatosPuesto(VinculoLaboral $vinculo, array $cambios): void
+    {
+        if (! array_key_exists('tipo_personal', $cambios) || $cambios['tipo_personal'] === $vinculo->tipo_personal) {
+            return;
+        }
+        $docente = $vinculo->perfilDocente()->exists();
+        if ($docente || $vinculo->perfilAdministrativo()->exists()) {
+            throw ValidationException::withMessages(['tipo_personal' => 'El vínculo ya tiene datos del puesto '.($docente ? 'docente' : 'administrativo')
+                .': su tipo de personal no se cambia. Si se registró con el tipo equivocado, anúlalo con motivo y registra el vínculo correcto.']);
+        }
     }
 
     /**

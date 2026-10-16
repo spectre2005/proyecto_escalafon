@@ -27,3 +27,15 @@ test('combines status, personnel type, and search filters', () => {
   assert.deepEqual(filterUsers(records, { correo: 'sin', estado: 'inactivo' }).map(user => user.numero_doc_identidad), ['99000003'])
   assert.equal(filterUsers(records, { correo: 'sin', estado: 'activo' }).length, 0)
 })
+
+test('labor situation is independent from system access', () => {
+  const records = [
+    { ...users[0], numero_doc_identidad: '99000011', activo: false, situacion: 'vinculo_vigente' },
+    { ...users[0], numero_doc_identidad: '99000012', activo: true, situacion: 'sin_legajo' },
+    { ...users[1], numero_doc_identidad: '99000013', activo: false, situacion: 'sin_vinculo_vigente' },
+  ]
+  assert.deepEqual(filterUsers(records, { situacion: 'vinculo_vigente' }).map(user => user.numero_doc_identidad), ['99000011'])
+  // Sin acceso al sistema no significa sin vínculo.
+  assert.deepEqual(filterUsers(records, { estado: 'inactivo', situacion: 'vinculo_vigente' }).map(user => user.numero_doc_identidad), ['99000011'])
+  assert.deepEqual(filterUsers(records, { estado: 'activo', situacion: 'vinculo_vigente' }), [])
+})

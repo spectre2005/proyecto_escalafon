@@ -6,6 +6,7 @@ use App\Models\Legajo;
 use App\Models\LegajoSeccion;
 use App\Models\PerfilAdministrativo;
 use App\Models\PerfilDocente;
+use App\Models\RegimenNormativo;
 use App\Models\SeccionLegajo;
 use App\Models\Usuario;
 use App\Models\VinculoAdenda;
@@ -54,7 +55,7 @@ class Seccion02CierreTest extends TestCase
         $persona = $this->personaDemo();
 
         $id = $this->postJson($this->url($persona, 'vinculos-laborales'), ['tipo_personal' => 'administrativo', 'regimen_laboral' => 'designado',
-            'regimen_normativo_id' => $this->vinculoVigente($persona)->regimen_normativo_id, 'nombre_puesto' => 'Jefe de oficina', 'fecha_inicio' => today()->toDateString()])
+            'regimen_normativo_id' => RegimenNormativo::factory()->create(['aplica_a' => 'administrativo'])->id, 'nombre_puesto' => 'Jefe de oficina', 'fecha_inicio' => today()->toDateString()])
             ->assertCreated()->assertJsonPath('data.registrado_por', $autor->id)->json('data.id');
         $fila = collect($this->getJson($this->url($persona, 'seccion-02'))->json('data.vinculos'))->firstWhere('id', $id);
         $this->assertSame(trim($autor->nombres.' '.$autor->apellido_paterno.' '.$autor->apellido_materno), $fila['registrado_por']);

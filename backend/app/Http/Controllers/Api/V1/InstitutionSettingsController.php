@@ -15,6 +15,9 @@ class InstitutionSettingsController extends Controller
     private const DEFAULTS = [
         'name' => 'Mi institución', 'initials' => 'MI', 'area' => 'Gestión de personas',
         'logo' => '', 'ruc' => '', 'address' => '', 'email' => '', 'phone' => '', 'website' => '',
+        // Dominio del correo institucional del personal (p. ej. institucion.edu.pe), propio de cada institución. Vacío:
+        // el registro no sugiere correos (no se inventa un dominio).
+        'emailDomain' => '',
         'reportTitle' => 'Ficha de datos personales', 'reportFooter' => 'Documento de uso institucional.',
         'reportColor' => '#0f766e', 'showLogo' => true, 'showEmissionDate' => true, 'showPageNumbers' => true,
     ];
@@ -36,10 +39,12 @@ class InstitutionSettingsController extends Controller
             'logo' => ['nullable', 'string', 'max:750000', $this->validLogo(...)],
             'ruc' => 'nullable|string|regex:/^[0-9]{11}$/', 'address' => 'nullable|string|max:250',
             'email' => 'nullable|email:rfc|max:255', 'phone' => 'nullable|string|regex:/^[+0-9()\s-]{6,20}$/',
-            'website' => 'nullable|url:http,https|max:255', 'reportTitle' => 'required|string|max:100',
+            'website' => 'nullable|url:http,https|max:255',
+            'emailDomain' => ['nullable', 'string', 'max:100', 'regex:/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i'],
+            'reportTitle' => 'required|string|max:100',
             'reportFooter' => 'nullable|string|max:180', 'reportColor' => 'required|string|regex:/^#[0-9a-fA-F]{6}$/',
             'showLogo' => 'sometimes|boolean', 'showEmissionDate' => 'sometimes|boolean', 'showPageNumbers' => 'sometimes|boolean',
-        ]);
+        ], ['emailDomain.regex' => 'Escribe solo el dominio, sin @ (por ejemplo, institucion.edu.pe).']);
         DB::transaction(function () use ($request, $data): void {
             if (DB::getDriverName() === 'pgsql') {
                 DB::select('select pg_advisory_xact_lock(?)', [crc32('institution_settings')]);
@@ -52,6 +57,7 @@ class InstitutionSettingsController extends Controller
             foreach (self::DEFAULTS as $key => $default) {
                 $settings[$key] = is_bool($default) ? (bool) $settings[$key] : trim($settings[$key] ?? '');
             }
+            $settings['emailDomain'] = mb_strtolower($settings['emailDomain']);
             $row = ['settings' => json_encode($settings, JSON_THROW_ON_ERROR), 'updated_by' => $request->user()->getAuthIdentifier(), 'updated_at' => now()];
             if ($current['configured']) {
                 DB::table('institution_settings')->where('id', 1)->update($row);

@@ -10,6 +10,13 @@ test('keeps existing identity when upgrading legacy browser settings', () => {
   assert.equal(settings.logo, '')
 })
 
+test('keeps a valid staff email domain and drops anything else', () => {
+  assert.equal(normalizeInstitution({}).emailDomain, '')
+  assert.equal(normalizeInstitution({ emailDomain: ' Institucion.Example.Test ' }).emailDomain, 'institucion.example.test')
+  assert.equal(normalizeInstitution({ emailDomain: 'persona@institucion.example.test' }).emailDomain, '')
+  assert.equal(normalizeInstitution({ emailDomain: 'sin-punto' }).emailDomain, '')
+})
+
 test('preserves disabled report options and rejects unsafe logo URLs', () => {
   const settings = normalizeInstitution({ logo: 'javascript:alert(1)', reportColor: 'invalid', showLogo: false, showEmissionDate: false, showPageNumbers: false })
   assert.equal(settings.logo, '')

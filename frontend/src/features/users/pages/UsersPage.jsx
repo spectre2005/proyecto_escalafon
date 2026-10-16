@@ -6,9 +6,10 @@ import { saveUserWithLink, saveUsers } from '../api/usuariosApi'
 import RegistroManual from '../components/RegistroManual'
 import { useUsers } from '../hooks/useUsers'
 import Icon from '../../../components/ui/Icon'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useOutletContext, useSearchParams } from 'react-router-dom'
 import { validateUser } from '../utils/usuariosCsv'
 import { filterUsers } from '../utils/usuariosFiltering'
+import { situacionDe, situaciones, textoAcceso } from '../utils/situacion'
 import { conLey, leyDelRegistro, nombreLey } from '../utils/leyes'
 import { useLiveQuery } from '../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../auth/session'
@@ -19,6 +20,8 @@ export default function UsersPage() {
   const [registrationOpen, setRegistrationOpen] = useState(false)
   const registrationDialog = useRef(null)
   const puedeDiscapacidad = usePuede('discapacidad.editar')
+  // Dominio del correo del personal configurado por la institución (vacío: no se sugiere correo).
+  const dominioCorreo = useOutletContext()?.institution?.emailDomain || ''
   const opciones = useLiveQuery('/expediente-opciones')
   const catalogo = opciones.data?.data.regimenes
   // Registrar con vínculo abre el legajo y crea el vínculo: exige también esos permisos (el backend los valida).
@@ -41,7 +44,9 @@ export default function UsersPage() {
   }
   function setQuery(value) { updateFilter('q', value) }
   const filter = ['docente', 'administrativo'].includes(searchParams.get('tipo')) ? searchParams.get('tipo') : 'todos'
+  // estado: acceso al sistema (cuenta); situacion: situación laboral (vínculo vigente, sin vínculo o sin legajo).
   const statusFilter = ['activo', 'inactivo'].includes(searchParams.get('estado')) ? searchParams.get('estado') : 'todos'
+  const situationFilter = searchParams.get('situacion') in situaciones ? searchParams.get('situacion') : 'todos'
   const contactFilter = ['con', 'sin'].includes(searchParams.get('correo')) ? searchParams.get('correo') : 'todos'
   const [pageSize, setPageSize] = useState(10)
   function changePage(page) {
@@ -125,6 +130,7 @@ export default function UsersPage() {
     query,
     tipoPersonal: filter,
     estado: statusFilter,
+    situacion: situationFilter,
     correo: contactFilter,
   })
   const totalPages = Math.max(1, Math.ceil(visible.length / pageSize))
@@ -250,14 +256,18 @@ export default function UsersPage() {
                 <option value="docente">Docentes</option>
                 <option value="administrativo">Administrativos</option>
               </select>
+              <select aria-label="Filtrar por situación laboral" value={situationFilter} onChange={event => updateFilter('situacion', event.target.value)}>
+                <option value="todos">Toda situación</option>
+                {Object.entries(situaciones).map(([valor, { texto }]) => <option key={valor} value={valor}>{texto}</option>)}
+              </select>
               <select
-                aria-label="Filtrar por estado"
+                aria-label="Filtrar por acceso al sistema"
                 value={statusFilter}
                 onChange={(event) => { updateFilter('estado', event.target.value) }}
               >
-                <option value="todos">Todo estado</option>
-                <option value="activo">Activos</option>
-                <option value="inactivo">Inactivos</option>
+                <option value="todos">Todo acceso</option>
+                <option value="activo">Con acceso al sistema</option>
+                <option value="inactivo">Sin acceso al sistema</option>
               </select>
               <select aria-label="Filtrar por correo" value={contactFilter} onChange={event => updateFilter('correo', event.target.value)}>
                 <option value="todos">Todo contacto</option>
@@ -274,7 +284,8 @@ export default function UsersPage() {
                     <th>Correo institucional</th>
                     <th>Tipo de personal</th>
                     <th>Ley</th>
-                    <th>Estado</th>
+                    <th>Situación</th>
+                    <th title="Cuenta para iniciar sesión en el sistema; no indica la situación laboral.">Acceso al sistema</th>
                     <th>Reportes</th>
                   </tr>
                 </thead>
@@ -300,12 +311,9 @@ export default function UsersPage() {
                       </td>
                       <td className={user.ley ? '' : 'text-[#9b7a37]'}>{nombreLey(user)}</td>
                       <td>
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-[10px] ${user.activo ? 'bg-[#eaf4ee] text-[#3d8060]' : 'bg-[#faf3e5] text-[#9b7a37]'}`}
-                        >
-                          {user.activo ? 'Activo' : 'Inactivo'}
-                        </span>
+                        <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] ${situacionDe(user).clase}`}>{situacionDe(user).texto}</span>
                       </td>
+                      <td className="whitespace-nowrap text-[11px] text-[#60796c]">{textoAcceso(user.activo)}</td>
                     <td><DownloadPersonalReport usuario={user.id} className="whitespace-nowrap rounded-lg border border-teal-200 px-3 py-2 text-xs font-semibold text-teal-800 hover:bg-teal-50" /></td>
                     </tr>
                   ))}
@@ -576,7 +584,7 @@ export default function UsersPage() {
             )}
             {/* El asistente sigue montado al cambiar de método: no se pierde lo ya escrito. */}
             <div className={tab === 'manual' ? 'contents' : 'hidden'}>
-              <RegistroManual key={registroKey} usuarios={users} opciones={opciones} puedeDiscapacidad={puedeDiscapacidad} puedeRegistrar={puedeAbrir && puedeVincular}
+              <RegistroManual key={registroKey} usuarios={users} opciones={opciones} dominioCorreo={dominioCorreo} puedeDiscapacidad={puedeDiscapacidad} puedeRegistrar={puedeAbrir && puedeVincular}
                 saving={saving} bloqueado={loading || !!loadError} mensaje={message} onGuardar={registrarManual} onCancel={closeRegistration} />
             </div>
           </dialog>

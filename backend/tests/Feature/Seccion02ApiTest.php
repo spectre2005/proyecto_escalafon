@@ -28,7 +28,7 @@ class Seccion02ApiTest extends TestCase
     {
         return [...[
             'tipo_personal' => 'administrativo', 'regimen_laboral' => 'plazo_determinado',
-            'regimen_normativo_id' => RegimenNormativo::factory()->create()->id, 'nombre_puesto' => 'Especialista',
+            'regimen_normativo_id' => RegimenNormativo::factory()->create(['aplica_a' => 'administrativo'])->id, 'nombre_puesto' => 'Especialista',
             'tiene_periodo_prueba' => true, 'proceso_seleccion' => 'CAS 001-2025', 'fecha_resultado_seleccion' => '2025-01-20',
             'numero_documento_vinculo' => 'CONTRATO 010-2025', 'fecha_inicio' => '2025-02-01', 'fecha_fin_prevista' => '2025-12-31',
         ], ...$cambios];

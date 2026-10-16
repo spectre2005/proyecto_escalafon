@@ -30,6 +30,8 @@ export function VinculoForm({ usuario, record, documentoId, onSaved, onCancel })
   const opciones = useLiveQuery('/expediente-opciones').data?.data
   const persona = useLiveQuery(`/expedientes/${usuario}`).data?.data
   const sugerencia = record?.tipo_sugerido
+  // Con datos del puesto registrados el tipo de personal no cambia (el backend lo rechaza; el perfil no se borra).
+  const tipoFijo = (record?.datos_puesto?.length || 0) > 0
   const [draft, set, poner] = useBorrador({
     ...vinculoInicial(v),
     tipo_personal: v.tipo_personal || (record ? '' : persona?.usuario?.values?.tipo_personal) || '',
@@ -46,7 +48,8 @@ export function VinculoForm({ usuario, record, documentoId, onSaved, onCancel })
   return <Formulario titulo={record ? 'Corregir vínculo laboral' : 'Registrar vínculo laboral'} guardar="Guardar vínculo" busy={busy} error={error} onSubmit={() => guardar(draft)} onCancel={onCancel}
     nota="Datos de la resolución o contrato. Con fecha de cese el vínculo queda cerrado y ya no se corrige.">
     <NotaDocumento documentoId={documentoId} />
-    <Campo label="Tipo de personal" required error={errors.tipo_personal}><select required value={draft.tipo_personal} onChange={cambiarTipoPersonal}><Opciones lista={tiposPersonal} actual={draft.tipo_personal} vacio="Selecciona" /></select></Campo>
+    <Campo label="Tipo de personal" required error={errors.tipo_personal}><select required value={draft.tipo_personal} onChange={cambiarTipoPersonal} disabled={tipoFijo}><Opciones lista={tiposPersonal} actual={draft.tipo_personal} vacio="Selecciona" /></select></Campo>
+    {tipoFijo && <p className="self-end text-[11px] text-slate-500">El tipo de personal no se cambia: el vínculo ya tiene datos del puesto. Si es otro, anula el vínculo y registra el correcto.</p>}
     <CamposVinculo draft={draft} set={set} poner={poner} errors={errors} opciones={opciones} tipoPersonal={draft.tipo_personal} conCese>
       <Campo label="Ley / régimen normativo" required error={errors.regimen_normativo_id}><select required value={draft.regimen_normativo_id} onChange={set('regimen_normativo_id')} disabled={!opciones}><OpcionesCatalogo lista={(opciones?.regimenes || []).filter(ley => !draft.tipo_personal || ley.aplica_a === draft.tipo_personal || ley.id === draft.regimen_normativo_id)} actual={draft.regimen_normativo_id} /></select></Campo>
       {sugerencia && <div role="note" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 sm:col-span-2">
