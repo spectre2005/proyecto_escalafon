@@ -7,7 +7,8 @@ import { clavePendiente, lugarPendiente, motivoSinRespuesta, preguntasPerfil, so
 // backend), con Sí y No para responderlas aquí mismo. Cada respuesta va a su registro con los endpoints de siempre; al
 // guardarse, la ficha se actualiza sola (las escrituras invalidan las consultas) y la condición sale del bloque. Quien no
 // sabe la respuesta la deja como está: Sin responder sigue siendo válido.
-export default function CompletaPerfil({ usuario, pendientes, legajoActivo }) {
+// plegado: dentro de una sección del legajo se muestra en una línea y se despliega al pedirlo (no empuja la sección).
+export default function CompletaPerfil({ usuario, pendientes, legajoActivo, plegado = false }) {
   const permisos = { editar: usePuede('legajo.editar'), sensibles: usePuede('datos_sensibles.ver'), discapacidad: usePuede('discapacidad.editar'), legajoActivo }
   const [guardando, setGuardando] = useState(null)
   const [errores, setErrores] = useState({})
@@ -31,7 +32,7 @@ export default function CompletaPerfil({ usuario, pendientes, legajoActivo }) {
     }
   }
 
-  return <section aria-labelledby="completa-perfil-titulo" className="mb-6 rounded-2xl border border-amber-200 bg-white p-5">
+  const contenido = <>
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h2 id="completa-perfil-titulo" className="text-sm font-semibold text-slate-800">Completa el perfil <span className="ml-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">{pendientes.length} sin responder</span></h2>
@@ -57,5 +58,10 @@ export default function CompletaPerfil({ usuario, pendientes, legajoActivo }) {
         </li>
       })}
     </ul>
-  </section>
+  </>
+  if (plegado) return <details className="mb-4 rounded-2xl border border-amber-200 bg-white px-5 py-3">
+    <summary className="cursor-pointer text-sm text-slate-700"><strong className="font-semibold text-slate-800">Completa el perfil</strong> <span className="ml-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">{pendientes.length} sin responder</span> <span className="ml-2 text-xs font-semibold text-teal-700">Responder</span></summary>
+    <div className="mt-3">{contenido}</div>
+  </details>
+  return <section aria-labelledby="completa-perfil-titulo" className="mb-6 rounded-2xl border border-amber-200 bg-white p-5">{contenido}</section>
 }

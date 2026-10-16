@@ -15,6 +15,8 @@ import ListaDocumentos from '../documentos/ListaDocumentos'
 import EnlazarDocumento from '../documentos/EnlazarDocumento'
 import SubirDocumentoForm from '../documentos/SubirDocumentoForm'
 import AbrirLegajo from '../AbrirLegajo'
+import EspacioSeccion, { DocumentoDeRegistro, EnZona, SinAsociar } from '../documentos/EspacioSeccion'
+import { atajosDe, idBloque, idTipo, mostrarEstado, tituloPaso, tituloSeccion } from '../../config/espacioSeccion'
 import Registros from '../seccion07/Registros'
 import { AfiliacionForm, ControversiaForm } from './Formularios'
 
@@ -90,11 +92,13 @@ function Documentos({ usuario, data, tipos, sinLegajo }) {
     setEnlazando(null)
     setAviso(guardado ? 'Datos guardados y enlazados al documento.' : 'El documento quedó cargado sin registro de datos enlazado.')
   }
-  return <section aria-label="Documentos del bloque">
+  const enlazar = puedeSubir && !sinLegajo && !ocupado ? (tipo, documento) => { setAviso(''); setRecuperando({ tipoId: tipo.id, documento }) } : null
+  return <section id={idBloque.documentos} aria-label="Documentos del bloque" className="scroll-mt-4">
     <h3 className="mb-1 text-base font-semibold text-slate-800">Documentos</h3>
     <p className="mb-4 text-xs text-slate-500">Cada documento se sube en PDF con sus metadatos. Los folios son correlativos en toda la sección. Ningún documento de esta sección es obligatorio: se incorpora solo si existe.{sinLegajo && puedeSubir ? ` ${sinLegajo}` : ''}</p>
     {aviso && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
-    <GruposTipos tipos={tipos} noAplica={noAplica} render={tipo => <li key={tipo.id} className="p-4">
+    <SinAsociar tipos={tipos} onEnlazar={enlazar} />
+    <GruposTipos tipos={tipos} noAplica={noAplica} render={tipo => <li key={tipo.id} id={idTipo(tipo.id)} className="scroll-mt-4 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-slate-800">{tipo.literal && <span className="mr-1 text-slate-500">{tipo.literal})</span>}{tipo.nombre}</p>
@@ -105,16 +109,16 @@ function Documentos({ usuario, data, tipos, sinLegajo }) {
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <Etiqueta clase="bg-slate-100 text-slate-600">Opcional</Etiqueta>
-          <Etiqueta clase={coloresEstadoDocumento[tipo.estado] || 'bg-slate-100 text-slate-700'}>{etiqueta(estadosDocumento, tipo.estado)}{tipo.documentos > 1 ? ` · ${tipo.documentos} documentos` : ''}</Etiqueta>
+          {mostrarEstado(tipo) && <Etiqueta clase={coloresEstadoDocumento[tipo.estado] || 'bg-slate-100 text-slate-700'}>{etiqueta(estadosDocumento, tipo.estado)}{tipo.documentos > 1 ? ` · ${tipo.documentos} documentos` : ''}</Etiqueta>}
           {puedeSubir && ofrecerTipo(noAplica, tipo) && <button disabled={ocupado || !!sinLegajo} title={sinLegajo || undefined} onClick={() => { setAviso(''); setSubiendo(tipo.id) }} className={`${enlace} inline-flex items-center gap-2`}><Icon name="paperclip" size={18} />Subir documento</button>}
         </div>
       </div>
       {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={9} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo, data)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}
-      {recuperando?.tipoId === tipo.id && <EnlazarDocumento usuario={usuario} documento={recuperando.documento} opciones={enlacesDe(tipo, data)}
+      {recuperando?.tipoId === tipo.id && <EnZona titulo={tituloPaso('Enlazar', tipo, recuperando.documento)}><EnlazarDocumento usuario={usuario} documento={recuperando.documento} opciones={enlacesDe(tipo, data)}
         onRegistrarNuevo={() => { setEnlazando({ tipo, documentoId: recuperando.documento.id }); setRecuperando(null) }}
-        onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} />}
+        onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} /></EnZona>}
       {subsanando?.tipoId === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={9} tipo={tipo} titular={data.titular} subsanar={subsanando.documento} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubsanando(null)} /></div>}
-      {enlazando?.tipo.id === tipo.id && <div className="mt-4"><FormularioEnlazado usuario={usuario} tipo={enlazando.tipo} documentoId={enlazando.documentoId} onDone={enlazado} /></div>}
+      {enlazando?.tipo.id === tipo.id && <EnZona titulo={tituloPaso('Completar los datos que acredita', tipo)}><div className="mt-4"><FormularioEnlazado usuario={usuario} tipo={enlazando.tipo} documentoId={enlazando.documentoId} onDone={enlazado} /></div></EnZona>}
     </li>} />
   </section>
 }
@@ -122,7 +126,7 @@ function Documentos({ usuario, data, tipos, sinLegajo }) {
 function Controversias({ usuario, data, bloque, sinLegajo }) {
   const tipo = tipoControversiaDe[bloque]
   const nombre = tipo === 'individual' ? 'individuales' : 'colectivas'
-  return <Registros titulo={`Controversias ${nombre}`} agregar="Registrar controversia" registros={data.controversias.filter(c => c.values.tipo === tipo)} bloqueo={sinLegajo} permisos={permisosSeccion09}
+  return <Registros documento={record => <DocumentoDeRegistro tipos={data.tipos} record={record} />} titulo={`Controversias ${nombre}`} agregar="Registrar controversia" registros={data.controversias.filter(c => c.values.tipo === tipo)} bloqueo={sinLegajo} permisos={permisosSeccion09}
     adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={etiquetaControversia(record)} sinLegajo={sinLegajo} />}
     vacio={`No hay controversias ${nombre} registradas. No todas las personas las tienen.`}
     tituloRegistro={c => c.values.materia} subtitulo={c => `${etiqueta(instancias, c.values.instancia)} · desde ${fecha(c.values.fecha_inicio)}`}
@@ -136,7 +140,7 @@ function Controversias({ usuario, data, bloque, sinLegajo }) {
 }
 
 function Afiliaciones({ usuario, data, sinLegajo }) {
-  return <Registros titulo="Afiliación al sindicato" agregar="Registrar afiliación" registros={data.afiliaciones} bloqueo={sinLegajo} permisos={permisosSeccion09}
+  return <Registros documento={record => <DocumentoDeRegistro tipos={data.tipos} record={record} />} titulo="Afiliación al sindicato" agregar="Registrar afiliación" registros={data.afiliaciones} bloqueo={sinLegajo} permisos={permisosSeccion09}
     adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={etiquetaAfiliacion(record)} sinLegajo={sinLegajo} />}
     vacio="No hay afiliación sindical registrada. No todas las personas están afiliadas."
     tituloRegistro={a => a.values.entidad} subtitulo={a => `Desde ${fecha(a.values.fecha_inicio)}${a.values.fecha_fin ? ` hasta ${fecha(a.values.fecha_fin)}` : ''}`}
@@ -153,13 +157,16 @@ export default function Seccion09Panel({ usuario, categoria }) {
   if (!data) return error || <p role="status" className="rounded-xl bg-slate-100 p-6 text-sm text-slate-500">Cargando…</p>
   const sinLegajo = !data.legajo && 'La persona no tiene un legajo abierto.'
 
-  return <section aria-label={titulo}>
+  const tipos = data.tipos.filter(tipo => tipo.bloque === bloque)
+  const registros = bloque in tipoControversiaDe ? data.controversias.filter(c => c.values.tipo === tipoControversiaDe[bloque]).length : bloque === 'afiliacion' ? data.afiliaciones.length : undefined
+  return <EspacioSeccion seccion={tituloSeccion('09')} subseccion={titulo} atajos={atajosDe({ registros, tipos })}>
     {error}
-    <h2 className="mb-1 text-xl font-semibold text-slate-800">{titulo}</h2>
     <p className="mb-5 text-xs text-slate-500">Sección 09 · Relaciones laborales individuales y colectivas{literales ? ` · literal ${literales} del Anexo 01` : ' · documentos requeridos por la universidad'}. Información sensible: solo con acceso a datos sensibles.</p>
     {sinLegajo && <Aviso accion={<AbrirLegajo usuario={usuario} />}>{sinLegajo} Los formularios y la carga de documentos de la sección 09 están deshabilitados hasta abrirlo.</Aviso>}
-    {bloque in tipoControversiaDe && <Controversias usuario={usuario} data={data} bloque={bloque} sinLegajo={sinLegajo} />}
-    {bloque === 'afiliacion' && <Afiliaciones usuario={usuario} data={data} sinLegajo={sinLegajo} />}
-    <Documentos usuario={usuario} data={data} tipos={data.tipos.filter(tipo => tipo.bloque === bloque)} sinLegajo={sinLegajo} />
-  </section>
+    {registros !== undefined && <div id={idBloque.registros} className="scroll-mt-4">
+      {bloque in tipoControversiaDe && <Controversias usuario={usuario} data={data} bloque={bloque} sinLegajo={sinLegajo} />}
+      {bloque === 'afiliacion' && <Afiliaciones usuario={usuario} data={data} sinLegajo={sinLegajo} />}
+    </div>}
+    <Documentos usuario={usuario} data={data} tipos={tipos} sinLegajo={sinLegajo} />
+  </EspacioSeccion>
 }

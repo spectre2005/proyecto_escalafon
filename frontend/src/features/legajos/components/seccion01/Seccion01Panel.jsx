@@ -10,6 +10,8 @@ import { folios, textoSubirTipo } from '../../config/documentos'
 import { etiqueta, formulariosDatos01, gruposSeccion01, parentescos, personasCertificado, resultadosDeclaracion, tiposDeclaracion, tiposDocIdentidad } from '../../config/seccion01'
 import { coloresEstadoDocumento, estadosDocumento } from '../../config/seccion02'
 import AbrirLegajo from '../AbrirLegajo'
+import EspacioSeccion, { DocumentoDeRegistro, EnZona, SinAsociar } from '../documentos/EspacioSeccion'
+import { atajosDe, idBloque, idTipo, mostrarEstado, tituloPaso, tituloSeccion } from '../../config/espacioSeccion'
 import AdjuntarDocumento from '../documentos/AdjuntarDocumento'
 import GruposTipos from '../documentos/GruposTipos'
 import ListaDocumentos from '../documentos/ListaDocumentos'
@@ -46,9 +48,10 @@ function Anexo05() {
 
 // Resumen de la sección: exigencias (una por tipo; en i y j, una por familiar). Pendientes, cargados y recepcionados
 // van por separado: la fórmula de completitud la define el cliente. Lo que no se exige no cuenta como pendiente.
-function Resumen({ data }) {
+// Dentro de la cabecera (EspacioSeccion) va plegado.
+function Resumen({ data, compacto = false }) {
   const r = data.resumen
-  return <section aria-label="Resumen de la sección 01" className="mb-8 rounded-2xl border border-teal-100 bg-white p-5">
+  return <section aria-label="Resumen de la sección 01" className={compacto ? '' : 'mb-8 rounded-2xl border border-teal-100 bg-white p-5'}>
     <div className="flex flex-wrap gap-x-10 gap-y-4">
       {[['Exigidos pendientes', r.pendientes], ['Exigidos con documento cargado', r.cargados], ['Exigidos con recepción registrada', r.recepcionados]].map(([titulo, valor]) =>
         <div key={titulo}><p className="text-xs text-slate-500">{titulo}</p><p className="mt-1 text-2xl font-bold text-slate-800">{valor} <span className="text-sm font-normal text-slate-500">de {r.exigidos}</span></p></div>)}
@@ -133,14 +136,16 @@ function Documentos({ usuario, data, codigos }) {
     setEnlazando(null)
     setAviso(guardado ? 'Datos guardados y enlazados al documento.' : 'El documento quedó cargado sin registro de datos enlazado.')
   }
-  return <section aria-label="Documentos" className="mt-8">
+  const enlazar = puedeSubir && !sinLegajo && !ocupado ? (tipo, documento) => { setAviso(''); setRecuperando({ tipoId: tipo.id, documento }) } : null
+  return <section id={idBloque.documentos} aria-label="Documentos" className="scroll-mt-4 mt-8">
     <h3 className="mb-1 text-base font-semibold text-slate-800">Documentos</h3>
     <p className="mb-4 text-xs text-slate-500">Cada documento se sube en PDF con sus metadatos. Los folios son correlativos en toda la sección 01.{sinLegajo && puedeSubir ? ' La persona no tiene un legajo abierto: la carga está deshabilitada.' : ''}</p>
     {aviso && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
+    <SinAsociar tipos={catalogo} onEnlazar={enlazar} />
     {/* Solo los tipos que corresponden a la persona (o que ya tienen documentos), agrupados. */}
     <GruposTipos tipos={catalogo} noAplica={noAplica} render={tipo => {
       const [exigeTexto, exigeClase] = tipo.aplica ? exigencia[String(tipo.exigido)] : ['No aplica', 'bg-slate-100 text-slate-500']
-      return <li key={tipo.id} className={`p-4 ${tipo.aplica ? '' : 'opacity-60'}`}>
+      return <li key={tipo.id} id={idTipo(tipo.id)} className={`scroll-mt-4 p-4 ${tipo.aplica ? '' : 'opacity-60'}`}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-slate-800">{tipo.literal && <span className="mr-1 text-slate-500">{tipo.literal})</span>}{tipo.nombre}</p>
@@ -152,16 +157,16 @@ function Documentos({ usuario, data, codigos }) {
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {tipo.solo_anexo_05 && <Anexo05 />}
             <Etiqueta clase={exigeClase}>{exigeTexto}</Etiqueta>
-            <Etiqueta clase={coloresEstadoDocumento[tipo.estado] || 'bg-slate-100 text-slate-700'}>{etiqueta(estadosDocumento, tipo.estado)}{tipo.documentos > 1 ? ` · ${tipo.documentos} documentos` : ''}</Etiqueta>
+            {mostrarEstado(tipo) && <Etiqueta clase={coloresEstadoDocumento[tipo.estado] || 'bg-slate-100 text-slate-700'}>{etiqueta(estadosDocumento, tipo.estado)}{tipo.documentos > 1 ? ` · ${tipo.documentos} documentos` : ''}</Etiqueta>}
             {puedeSubir && ofrecerTipo(noAplica, tipo) && textoSubirTipo(tipo) && <button disabled={ocupado || sinLegajo} onClick={() => { setAviso(''); setSubiendo(tipo.id) }} className={`${enlace} inline-flex items-center gap-2`}><Icon name="paperclip" size={18} />{textoSubirTipo(tipo)}</button>}
           </div>
         </div>
         {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={1} tipo={tipo} titular={data.titular} relacion={relacionPorTipo[tipo.codigo]} enlaces={enlacesDe(tipo, data)} precarga={id => precargaDe(tipo, data, id)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}
-        {recuperando?.tipoId === tipo.id && <EnlazarDocumento usuario={usuario} documento={recuperando.documento} opciones={enlacesDe(tipo, data)}
+        {recuperando?.tipoId === tipo.id && <EnZona titulo={tituloPaso('Enlazar', tipo, recuperando.documento)}><EnlazarDocumento usuario={usuario} documento={recuperando.documento} opciones={enlacesDe(tipo, data)}
           onRegistrarNuevo={() => { setEnlazando({ tipoId: tipo.id, documentoId: recuperando.documento.id }); setRecuperando(null) }}
-          onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} />}
+          onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} /></EnZona>}
         {subsanando?.tipoId === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={1} tipo={tipo} titular={data.titular} relacion={relacionPorTipo[tipo.codigo]} subsanar={subsanando.documento} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubsanando(null)} /></div>}
-        {enlazando?.tipoId === tipo.id && <div className="mt-4"><FormularioEnlazado usuario={usuario} data={data} tipo={tipo} documentoId={enlazando.documentoId} onDone={enlazado} /></div>}
+        {enlazando?.tipoId === tipo.id && <EnZona titulo={tituloPaso('Completar los datos que acredita', tipo)}><div className="mt-4"><FormularioEnlazado usuario={usuario} data={data} tipo={tipo} documentoId={enlazando.documentoId} onDone={enlazado} /></div></EnZona>}
       </li>
     }} />
   </section>
@@ -198,11 +203,11 @@ function Declaraciones({ usuario, data, codigos, titulo }) {
   // backend la rechaza); una DJBR ya registrada se sigue corrigiendo.
   const tiposNuevos = motivoNoAplica(noAplica, { codigo: 'S01_E_DJ_BIENES_RENTAS' }) ? tipos.filter(tipo => tipo !== 'djbr') : tipos
   return <>
-    <Registros titulo={titulo} agregar={tiposNuevos.length ? 'Registrar' : undefined} vacio="No hay registros." registros={registros}
+    <Registros documento={record => <DocumentoDeRegistro tipos={data.tipos} record={record} />} titulo={titulo} agregar={tiposNuevos.length ? 'Registrar' : undefined} vacio="No hay registros." registros={registros}
       adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={`${tituloRegistro(record)} · ${fecha(record.values.fecha)}`} noAplica={noAplica} />}
       tituloRegistro={record => <>{tituloRegistro(record)}{declaracionesAnexo05.includes(record.values.tipo) && <span className="ml-2 align-middle"><Anexo05 /></span>}</>}
       subtitulo={record => `${fecha(record.values.fecha)}${record.values.anio ? ` · Año ${record.values.anio}` : ''}`}
-      campos={[['Resultado', v => etiqueta(resultadosDeclaracion, v.resultado)], ['Vigente hasta', v => v.vigente_hasta ? fecha(v.vigente_hasta) : 'Sin vencimiento registrado'], ['Observación', v => v.observacion || 'Sin observación'], ['Documento', v => v.documento_id ? 'Enlazado a un documento del legajo' : 'Sin documento enlazado']]}
+      campos={[['Resultado', v => etiqueta(resultadosDeclaracion, v.resultado)], ['Vigente hasta', v => v.vigente_hasta ? fecha(v.vigente_hasta) : 'Sin vencimiento registrado'], ['Observación', v => v.observacion || 'Sin observación']]}
       corregir={{ etiqueta: 'Corregir', puede: () => true }}
       onAnular={(record, motivo) => anularRegistro(usuario, 'declaraciones-verificaciones', record.id, motivo)}
       detalle={record => <PdfAnterior usuario={usuario} tipo="declaraciones-verificaciones" record={record} />}
@@ -215,7 +220,7 @@ function Familia({ usuario, data }) {
   const titulo = record => record.values.apellidos_nombres
   const noAplica = useNoAplicables(usuario)
   return <>
-    <Registros titulo="Familiares y derechohabientes" agregar="Agregar familiar" vacio="No hay familiares registrados." registros={data.familiares}
+    <Registros documento={record => <DocumentoDeRegistro tipos={data.tipos} record={record} />} titulo="Familiares y derechohabientes" agregar="Agregar familiar" vacio="No hay familiares registrados." registros={data.familiares}
       adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={`${titulo(record)} · ${etiqueta(parentescos, record.values.parentesco)}`} noAplica={noAplica} />}
       tituloRegistro={titulo} subtitulo={record => etiqueta(parentescos, record.values.parentesco)}
       campos={[
@@ -244,10 +249,10 @@ function Discapacidad({ usuario, data, aplica }) {
   return <>
     {!aplica && <p className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">No aplica: la persona figura sin discapacidad (el servidor ni sus hijos). Los certificados ya registrados se conservan; para registrar uno nuevo, cambia «Con discapacidad» a Sí en Información personal.</p>}
     {/* Con «Con discapacidad» en No no se ofrecen certificados nuevos (el backend los rechaza). */}
-    <Registros titulo="Certificados de discapacidad" agregar={aplica ? 'Registrar certificado' : undefined} vacio="No hay certificados de discapacidad registrados." registros={data.certificados}
+    <Registros documento={record => <DocumentoDeRegistro tipos={data.tipos} record={record} />} titulo="Certificados de discapacidad" agregar={aplica ? 'Registrar certificado' : undefined} vacio="No hay certificados de discapacidad registrados." registros={data.certificados}
       adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={titulo(record)} noAplica={noAplica} />}
       tituloRegistro={titulo} subtitulo={record => record.values.persona === 'familiar' ? `De un familiar: ${record.familiar || 'no identificado'}` : etiqueta(personasCertificado, 'servidor')}
-      campos={[['Fecha de emisión', v => fecha(v.fecha_emision)], ['Vigente hasta', v => v.vigente_hasta ? fecha(v.vigente_hasta) : 'Sin vencimiento registrado'], ['Documento', v => v.documento_id ? 'Enlazado a un documento del legajo' : 'Sin documento enlazado']]}
+      campos={[['Fecha de emisión', v => fecha(v.fecha_emision)], ['Vigente hasta', v => v.vigente_hasta ? fecha(v.vigente_hasta) : 'Sin vencimiento registrado']]}
       corregir={{ etiqueta: 'Corregir', puede: () => true }}
       onAnular={(record, motivo) => anularRegistro(usuario, 'certificados-discapacidad', record.id, motivo)}
       detalle={record => <PdfAnterior usuario={usuario} tipo="certificados-discapacidad" record={record} />}
@@ -268,17 +273,28 @@ export default function Seccion01Panel({ usuario, categoria }) {
   if (!data) return error || <p role="status" className="rounded-xl bg-slate-100 p-6 text-sm text-slate-500">Cargando…</p>
   const discapacidad = data.tipos.find(tipo => tipo.codigo === 'S01_K_CERTIFICADO_DISCAPACIDAD')
 
-  return <section aria-label={grupo.titulo} className={categoria === 'general' ? 'mt-6' : ''}>
+  const r = data.resumen
+  // Mismo criterio que Declaraciones: los tipos de declaración que admiten los tipos documentales del grupo.
+  const tiposDeclaracion = new Set(grupo.codigos.flatMap(codigo => data.tipos.find(tipo => tipo.codigo === codigo)?.declaraciones || []))
+  const registros = ['s01-antecedentes', 's01-declaraciones'].includes(categoria) ? data.declaraciones.filter(d => tiposDeclaracion.has(d.values.tipo)).length
+    : { 's01-familia': data.familiares?.length, 's01-discapacidad': data.certificados?.length }[categoria]
+  const tipos = data.tipos.filter(tipo => grupo.codigos.includes(tipo.codigo))
+
+  const contenido = <>
     {error}
-    <Resumen data={data} />
     {/* El aviso de las condiciones del puesto ya dice dónde corregirlas (vínculo laboral, sección 02). */}
     {data.avisos.map(aviso => <Aviso key={aviso}>{aviso}{aviso.startsWith('No tiene un vínculo laboral vigente') ? '' : ' Revisa la bandera en Información personal o los registros.'}</Aviso>)}
     {!data.legajo && <Aviso accion={<AbrirLegajo usuario={usuario} />}>La persona no tiene un legajo abierto. La carga de documentos de la sección 01 está deshabilitada hasta abrirlo.</Aviso>}
-    {categoria !== 'general' && <h2 className="mb-5 text-xl font-semibold text-slate-800">{grupo.titulo}</h2>}
+    <div id={idBloque.registros} className="scroll-mt-4">
     {categoria === 's01-antecedentes' && <Declaraciones usuario={usuario} data={data} codigos={grupo.codigos} titulo="Antecedentes e impedimentos registrados" />}
     {categoria === 's01-declaraciones' && <Declaraciones usuario={usuario} data={data} codigos={grupo.codigos} titulo="Declaraciones juradas registradas" />}
     {categoria === 's01-familia' && <Familia usuario={usuario} data={data} />}
     {categoria === 's01-discapacidad' && <Discapacidad usuario={usuario} data={data} aplica={discapacidad?.aplica !== false} />}
+    </div>
     <Documentos usuario={usuario} data={data} codigos={grupo.codigos} />
-  </section>
+  </>
+  // «Datos personales e identidad» va bajo la información personal de la ficha: sin cabecera propia.
+  if (categoria === 'general') return <section aria-label={grupo.titulo} className="mt-6"><Resumen data={data} />{contenido}</section>
+  return <EspacioSeccion seccion={tituloSeccion('01')} subseccion={grupo.titulo} cifras={`Sección: ${r.pendientes} de ${r.exigidos} exigidos pendientes · ${r.cargados} con documento, ${r.recepcionados} con recepción.`}
+    resumen={<Resumen data={data} compacto />} atajos={atajosDe({ registros, tipos })}>{contenido}</EspacioSeccion>
 }

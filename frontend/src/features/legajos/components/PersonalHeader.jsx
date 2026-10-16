@@ -13,12 +13,28 @@ function SummaryField({ title, value, nota }) {
   </div>
 }
 
-export default function PersonalHeader({ data, usuario }) {
+// compacto: dentro de una sección del legajo basta una línea con quién es y su legajo (la ficha completa, en «Información
+// personal»); así la sección de trabajo aparece en la primera pantalla.
+export default function PersonalHeader({ data, usuario, compacto = false, onVerFicha }) {
   const person = data.usuario.values
   const personnelType = { docente: 'Docente', administrativo: 'Administrativo' }[person.tipo_personal] || person.tipo_personal
   const documentType = person.tipo_doc_identidad?.trim()
   const regimen = textoRegimen(data.regimen)
   const actual = puestoActual(data.puesto_actual)
+  if (compacto) {
+    const activo = data.legajos.find(legajo => legajo.values.estado_legajo === 'activo')
+    const legajo = activo || data.legajos[0]
+    return <header className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-teal-100 bg-white px-5 py-3 shadow-sm">
+      <div className="min-w-0">
+        <p className="break-words text-base font-semibold text-slate-900">{data.nombre}</p>
+        <p className="mt-0.5 text-xs text-slate-500">{documentType ? documentType.toUpperCase() : 'Documento'} {person.numero_doc_identidad || 'no registrado'} · {personnelType || 'Tipo de personal no registrado'} · {actual.puesto || 'Sin puesto registrado'}{legajo ? ` · Legajo ${legajo.values.numero_legajo || 'sin número'} (${legajo.values.estado_legajo === 'activo' ? 'activo' : 'cerrado'})` : ' · Sin legajo'}</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        {!activo && <AbrirLegajo usuario={usuario} />}
+        {onVerFicha && <button type="button" onClick={onVerFicha} className="text-xs font-semibold text-teal-700 hover:underline">Ver ficha completa</button>}
+      </div>
+    </header>
+  }
 
   return <header className="mb-6 overflow-hidden rounded-2xl border border-teal-100 bg-white shadow-sm">
     <div className="h-1 bg-teal-600" />

@@ -11,6 +11,8 @@ import { etiqueta } from '../../config/seccion01'
 import { coloresEstadoDocumento, estadosDocumento } from '../../config/seccion02'
 import { categoriasSeccion05, coloresGoce, formasPermiso, formulariosSeccion05, movimientosLicencia, movimientoDe, tiposGoce, tiposLicencia } from '../../config/seccion05'
 import AbrirLegajo from '../AbrirLegajo'
+import EspacioSeccion, { DocumentoDeRegistro, EnZona, SinAsociar } from '../documentos/EspacioSeccion'
+import { atajosDe, idBloque, idTipo, mostrarEstado, tituloPaso, tituloSeccion } from '../../config/espacioSeccion'
 import AdjuntarDocumento from '../documentos/AdjuntarDocumento'
 import GruposTipos from '../documentos/GruposTipos'
 import ListaDocumentos from '../documentos/ListaDocumentos'
@@ -31,16 +33,6 @@ function Aviso({ tono = 'amber', children, accion }) {
 
 function Etiqueta({ children, clase }) {
   return <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${clase}`}>{children}</span>
-}
-
-// Documento de la sección que acredita un registro (o "Sin documento").
-function documentoDe(data, id) {
-  if (!id) return 'Sin documento enlazado'
-  for (const tipo of data.tipos) {
-    const documento = tipo.lista.find(d => d.id === id)
-    if (documento) return `${tipo.literal ? `${tipo.literal}) ` : ''}${tipo.nombre} · folios ${folios(documento.values.folio_inicio, documento.values.folio_fin)}`
-  }
-  return 'Documento enlazado'
 }
 
 // Permiso con su forma (papeleta, memorándum u otro); los registrados antes de existir el campo, sin forma.
@@ -111,11 +103,13 @@ function Documentos({ usuario, data, tipos, sinLegajo, subiendo, setSubiendo }) 
     setEnlazando(null)
     setAviso(guardado ? 'Movimiento guardado y enlazado al documento.' : 'El documento quedó cargado sin movimiento enlazado.')
   }
-  return <section aria-label="Documentos" className="mb-8">
+  const enlazar = puedeSubir && !sinLegajo && !ocupado ? (tipo, documento) => { setAviso(''); setRecuperando({ tipoId: tipo.id, documento }) } : null
+  return <section id={idBloque.documentos} aria-label="Documentos" className="scroll-mt-4 mb-8">
     <h3 className="mb-1 text-base font-semibold text-slate-800">Documentos</h3>
     <p className="mb-4 text-xs text-slate-500">Cada documento se sube en PDF con sus metadatos y puede acreditar un movimiento registrado. Los folios son correlativos en toda la sección 05. Cada tipo admite varios documentos a lo largo del tiempo.{sinLegajo && puedeSubir ? ` ${sinLegajo}` : ''}</p>
     {aviso && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
-    <GruposTipos tipos={tipos} noAplica={noAplica} render={tipo => <li key={tipo.id} id={`tipo-${tipo.id}`} className="p-4">
+    <SinAsociar tipos={tipos} onEnlazar={enlazar} />
+    <GruposTipos tipos={tipos} noAplica={noAplica} render={tipo => <li key={tipo.id} id={idTipo(tipo.id)} className="scroll-mt-4 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-slate-800">{tipo.literal && <span className="mr-1 text-slate-500">{tipo.literal})</span>}{tipo.nombre}</p>
@@ -126,16 +120,16 @@ function Documentos({ usuario, data, tipos, sinLegajo, subiendo, setSubiendo }) 
               onEnlazar={puedeSubir && !sinLegajo && !ocupado && ofrecerTipo(noAplica, tipo) ? documento => { setAviso(''); setRecuperando({ tipoId: tipo.id, documento }) } : null} />}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {!tipo.restringido && <Etiqueta clase={coloresEstadoDocumento[tipo.estado] || 'bg-slate-100 text-slate-700'}>{etiqueta(estadosDocumento, tipo.estado)}{tipo.documentos > 1 ? ` · ${tipo.documentos} documentos` : ''}</Etiqueta>}
+          {!tipo.restringido && mostrarEstado(tipo) && <Etiqueta clase={coloresEstadoDocumento[tipo.estado] || 'bg-slate-100 text-slate-700'}>{etiqueta(estadosDocumento, tipo.estado)}{tipo.documentos > 1 ? ` · ${tipo.documentos} documentos` : ''}</Etiqueta>}
           {puedeSubir && !tipo.restringido && ofrecerTipo(noAplica, tipo) && <button disabled={ocupado || !!sinLegajo} onClick={() => { setAviso(''); setSubiendo(tipo.id) }} className={`${enlace} inline-flex items-center gap-2`}><Icon name="paperclip" size={18} />Subir documento</button>}
         </div>
       </div>
       {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={5} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo, data)} precarga={id => precargaDe(tipo, data, id)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}
-      {recuperando?.tipoId === tipo.id && <EnlazarDocumento usuario={usuario} documento={recuperando.documento} opciones={enlacesDe(tipo, data)}
+      {recuperando?.tipoId === tipo.id && <EnZona titulo={tituloPaso('Enlazar', tipo, recuperando.documento)}><EnlazarDocumento usuario={usuario} documento={recuperando.documento} opciones={enlacesDe(tipo, data)}
         onRegistrarNuevo={() => { setEnlazando({ tipoId: tipo.id, documentoId: recuperando.documento.id }); setRecuperando(null) }}
-        onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} />}
+        onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} /></EnZona>}
       {subsanando?.tipoId === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={5} tipo={tipo} titular={data.titular} subsanar={subsanando.documento} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubsanando(null)} /></div>}
-      {enlazando?.tipoId === tipo.id && <div className="mt-4"><FormularioEnlazado usuario={usuario} data={data} tipo={tipo} documentoId={enlazando.documentoId} onDone={enlazado} /></div>}
+      {enlazando?.tipoId === tipo.id && <EnZona titulo={tituloPaso('Completar los datos que acredita', tipo)}><div className="mt-4"><FormularioEnlazado usuario={usuario} data={data} tipo={tipo} documentoId={enlazando.documentoId} onDone={enlazado} /></div></EnZona>}
     </li>} />
   </section>
 }
@@ -169,11 +163,11 @@ function ListaAnulados({ usuario, clave, titulo }) {
 
 function Licencias({ usuario, data, sinLegajo }) {
   return <>
-    <Registros titulo="Licencias, permisos y suspensiones" agregar="Registrar movimiento" registros={data.licencias} bloqueo={sinLegajo}
+    <Registros documento={record => <DocumentoDeRegistro tipos={data.tipos} record={record} />} titulo="Licencias, permisos y suspensiones" agregar="Registrar movimiento" registros={data.licencias} bloqueo={sinLegajo}
       adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={etiquetaLicencia(record.values)} sinLegajo={sinLegajo} />}
       vacio="No hay licencias, permisos, suspensiones ni descansos médicos registrados."
       tituloRegistro={record => nombreLicencia(record.values)} subtitulo={record => rango(record.values)}
-      campos={[['Con goce de remuneraciones', v => movimientosLicencia[movimientoDe(v.tipo)]?.conGoce === false ? 'Sin definir (pendiente de validar con la universidad)' : texto(v.con_goce)], ['N.º de documento', v => texto(v.numero_documento)], ['Documento que lo acredita', v => documentoDe(data, v.documento_id)]]}
+      campos={[['Con goce de remuneraciones', v => movimientosLicencia[movimientoDe(v.tipo)]?.conGoce === false ? 'Sin definir (pendiente de validar con la universidad)' : texto(v.con_goce)], ['N.º de documento', v => texto(v.numero_documento)]]}
       onAnular={(record, motivo) => anularSeccion05(usuario, 'licencias-permisos', record.id, motivo)}
       renderForm={props => <LicenciaForm usuario={usuario} veSalud={data.ve_datos_salud} {...props} />} />
     {!data.ve_datos_salud && <p className="-mt-6 mb-8 text-xs text-slate-500">Los descansos médicos son datos de salud y no se muestran sin acceso a datos sensibles.</p>}
@@ -186,19 +180,19 @@ function Vacaciones({ usuario, data, sinLegajo, onRol }) {
   const sinVinculo = !data.vinculos.length && 'Primero registra un vínculo laboral en 2.2: el período vacacional pertenece a un vínculo.'
   const vinculo = id => data.vinculos.find(v => v.id === id)
   return <>
-    <Registros titulo="Períodos vacacionales" agregar="Registrar período" registros={data.periodos} bloqueo={sinLegajo || sinVinculo}
+    <Registros documento={record => <DocumentoDeRegistro tipos={data.tipos} record={record} />} titulo="Períodos vacacionales" agregar="Registrar período" registros={data.periodos} bloqueo={sinLegajo || sinVinculo}
       vacio="No hay períodos vacacionales registrados."
       tituloRegistro={record => `Período ${record.values.periodo_anio}`} subtitulo={record => `${record.values.dias_derecho} días de derecho · ${record.dias_registrados} día(s) de goce o adelanto registrados`}
       campos={[['Vínculo laboral', v => vinculo(v.vinculo_laboral_id)?.nombre_puesto || 'No encontrado']]}
       onAnular={(record, motivo) => anularSeccion05(usuario, 'periodos-vacacionales', record.id, motivo)}
       renderForm={props => <PeriodoVacacionalForm usuario={usuario} vinculos={data.vinculos} {...props} />} />
     <Anulados usuario={usuario} clave="periodos_vacacionales" nombre="períodos anulados" titulo={v => `Período ${v.periodo_anio}`} />
-    <Registros titulo="Goces, adelantos y postergaciones" agregar="Registrar movimiento vacacional" registros={data.goces} bloqueo={sinLegajo}
+    <Registros documento={record => <DocumentoDeRegistro tipos={data.tipos} record={record} />} titulo="Goces, adelantos y postergaciones" agregar="Registrar movimiento vacacional" registros={data.goces} bloqueo={sinLegajo}
       adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={etiquetaGoce(record.values, data)} sinLegajo={sinLegajo} />}
       vacio="No hay goces, adelantos ni postergaciones registrados."
       tituloRegistro={record => etiqueta(tiposGoce, record.values.tipo)}
       subtitulo={record => <><Etiqueta clase={coloresGoce[record.values.tipo] || 'bg-slate-100 text-slate-700'}>{record.values.tipo === 'goce' ? 'b) Goce' : 'c) Adelanto o postergación'}</Etiqueta><span className="ml-2">{rango(record.values)}</span></>}
-      campos={[['Período', v => data.periodos.find(p => p.id === v.periodo_vacacional_id)?.values.periodo_anio ?? 'No encontrado'], ['N.º de documento', v => texto(v.numero_documento)], ['Documento que lo acredita', v => documentoDe(data, v.documento_id)]]}
+      campos={[['Período', v => data.periodos.find(p => p.id === v.periodo_vacacional_id)?.values.periodo_anio ?? 'No encontrado'], ['N.º de documento', v => texto(v.numero_documento)]]}
       onAnular={(record, motivo) => anularSeccion05(usuario, 'goces-vacacionales', record.id, motivo)}
       renderForm={props => <GoceForm usuario={usuario} periodos={data.periodos} onRol={onRol && (() => { props.onCancel(); onRol() })} {...props} />} />
     <Anulados usuario={usuario} clave="goces_vacacionales" nombre="goces anulados" titulo={v => `${etiqueta(tiposGoce, v.tipo)} · ${rango(v)}`} />
@@ -221,13 +215,16 @@ export default function Seccion05Panel({ usuario, categoria }) {
     requestAnimationFrame(() => document.getElementById(`tipo-${tipoRol.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   } : null
 
-  return <section aria-label={titulo}>
+  const tipos = data.tipos.filter(tipo => tipo.bloque === bloque)
+  const registros = { licencias: data.licencias.length, vacaciones: data.periodos.length + data.goces.length }[bloque]
+  return <EspacioSeccion seccion={tituloSeccion('05')} subseccion={titulo} atajos={atajosDe({ registros, tipos })}>
     {error}
-    <h2 className="text-xl font-semibold text-slate-800">{titulo}</h2>
-    <p className="mb-5 mt-2 text-xs text-slate-500">Sección 05 · Movimientos del personal{literales ? ` · Anexo 01, literales ${literales}` : ' · otros documentos requeridos por la universidad'}. Un trabajador puede tener varios movimientos y documentos; ninguno se elimina.</p>
+    <p className="mb-5 text-xs text-slate-500">Sección 05 · Movimientos del personal{literales ? ` · Anexo 01, literales ${literales}` : ' · otros documentos requeridos por la universidad'}. Un trabajador puede tener varios movimientos y documentos; ninguno se elimina.</p>
     {sinLegajo && <Aviso accion={<AbrirLegajo usuario={usuario} />}>{sinLegajo} Los registros y la carga de documentos de la sección 05 están deshabilitados hasta abrirlo.</Aviso>}
-    {bloque === 'licencias' && <Licencias usuario={usuario} data={data} sinLegajo={sinLegajo} />}
-    {bloque === 'vacaciones' && <Vacaciones usuario={usuario} data={data} sinLegajo={sinLegajo} onRol={abrirRol} />}
-    <Documentos usuario={usuario} data={data} tipos={data.tipos.filter(tipo => tipo.bloque === bloque)} sinLegajo={sinLegajo} subiendo={subiendo} setSubiendo={setSubiendo} />
-  </section>
+    {registros !== undefined && <div id={idBloque.registros} className="scroll-mt-4">
+      {bloque === 'licencias' && <Licencias usuario={usuario} data={data} sinLegajo={sinLegajo} />}
+      {bloque === 'vacaciones' && <Vacaciones usuario={usuario} data={data} sinLegajo={sinLegajo} onRol={abrirRol} />}
+    </div>}
+    <Documentos usuario={usuario} data={data} tipos={tipos} sinLegajo={sinLegajo} subiendo={subiendo} setSubiendo={setSubiendo} />
+  </EspacioSeccion>
 }

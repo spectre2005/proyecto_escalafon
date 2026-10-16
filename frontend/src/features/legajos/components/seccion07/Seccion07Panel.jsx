@@ -16,6 +16,8 @@ import ListaDocumentos from '../documentos/ListaDocumentos'
 import EnlazarDocumento from '../documentos/EnlazarDocumento'
 import SubirDocumentoForm from '../documentos/SubirDocumentoForm'
 import AbrirLegajo from '../AbrirLegajo'
+import EspacioSeccion, { DocumentoDelRegistro, EnZona, SinAsociar } from '../documentos/EspacioSeccion'
+import { atajosDe, buscarDocumento, idBloque, idTipo, mostrarEstado, tituloSeccion } from '../../config/espacioSeccion'
 import { DesplazamientoForm, EvaluacionForm, ProgresionForm, RatificacionForm } from './Formularios'
 import Registros from './Registros'
 
@@ -45,22 +47,23 @@ function Reservado() {
 
 // Resumen de la sección: pendientes, exigidos con documento cargado y con recepción, y estado de cada subsección.
 // La fórmula de completitud del legajo la define el cliente: los números van por separado.
-function Resumen({ data, onNavigate }) {
+// Dentro de la cabecera (EspacioSeccion) va plegado y sin las tarjetas de subsección: la cabecera ya las muestra.
+function Resumen({ data, onNavigate, compacto = false }) {
   const r = data.resumen
-  return <section aria-label="Resumen de la sección 07" className="mb-8 rounded-2xl border border-teal-100 bg-white p-5">
+  return <section aria-label="Resumen de la sección 07" className={compacto ? '' : 'mb-8 rounded-2xl border border-teal-100 bg-white p-5'}>
     <div className="flex flex-wrap gap-x-10 gap-y-4">
       <div><p className="text-xs text-slate-500">Tipos de documento pendientes</p><p className="mt-1 text-2xl font-bold text-slate-800">{r.pendientes} <span className="text-sm font-normal text-slate-500">de {r.tipos}</span></p></div>
       <div><p className="text-xs text-slate-500">Exigidos con documento cargado</p><p className="mt-1 text-2xl font-bold text-slate-800">{r.exigidos_cargados} <span className="text-sm font-normal text-slate-500">de {r.exigidos.length}</span></p></div>
       <div><p className="text-xs text-slate-500">Exigidos con recepción registrada</p><p className="mt-1 text-2xl font-bold text-slate-800">{r.exigidos_recepcionados} <span className="text-sm font-normal text-slate-500">de {r.exigidos.length}</span></p></div>
     </div>
     <p className="mt-3 text-xs text-slate-500">{data.perfil.es_carrera ? '' : 'La subsección 7.2 no aplica (la persona no es servidor/a de carrera) y no se cuenta. '}Los documentos de progresión y de desplazamiento existen solo si hubo el movimiento: no se exigen. Cargados y recepcionados se muestran por separado: el criterio de completitud está pendiente de definir.</p>
-    <div className="mt-4 grid gap-2 sm:grid-cols-3">{data.subsecciones.map(sub => {
+    {!compacto && <div className="mt-4 grid gap-2 sm:grid-cols-3">{data.subsecciones.map(sub => {
       const [nombre, clase] = estadosSubseccion[sub.estado]
       return <button key={sub.codigo} onClick={() => onNavigate(categoriaDe[sub.codigo])} className={`rounded-xl border border-slate-200 p-3 text-left hover:bg-slate-50 ${sub.aplica ? '' : 'opacity-60'}`}>
         <span className="block text-xs font-semibold text-slate-700">{subseccionesSeccion07[categoriaDe[sub.codigo]]?.titulo || sub.nombre}</span>
         <span className="mt-2 flex flex-wrap items-center gap-2"><Etiqueta clase={clase}>{nombre}</Etiqueta>{sub.aplica && sub.exigidos > 0 && <span className="text-[11px] text-slate-500">{sub.exigidos_cargados}/{sub.exigidos} cargados · {sub.exigidos_recepcionados} recepcionados</span>}</span>
       </button>
-    })}</div>
+    })}</div>}
   </section>
 }
 
@@ -160,14 +163,16 @@ function Documentos({ usuario, data, subseccion, sinLegajo, aplica }) {
     setEnlazando(null)
     setAviso(guardado ? 'Datos guardados y enlazados al documento.' : 'El documento quedó cargado sin registro de datos enlazado.')
   }
-  return <section aria-label="Documentos de la subsección" className={aplica ? '' : 'opacity-60'}>
+  const enlazar = puedeSubir && !sinLegajo ? (tipo, documento) => { setAviso(''); setRecuperando({ tipoId: tipo.id, documento }) } : null
+  return <section id={idBloque.documentos} aria-label="Documentos de la subsección" className={`scroll-mt-4 ${aplica ? '' : 'opacity-60'}`}>
     <h3 className="mb-1 text-base font-semibold text-slate-800">Documentos</h3>
     <p className="mb-4 text-xs text-slate-500">Cada documento se sube en PDF con sus metadatos. Los folios son correlativos en toda la sección.{sinLegajo && puedeSubir ? ` ${sinLegajo}` : ''}</p>
     {aviso && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
+    <SinAsociar tipos={subseccion.tipos} onEnlazar={ocupado ? null : enlazar} />
     <GruposTipos tipos={subseccion.tipos} noAplica={noAplica} render={tipo => {
       const [exigeTexto, exigeClase] = exigencia[String(aplica ? tipo.exigido : false)]
       const datos = tipo.formulario_datos === 'progresiones_carrera' ? 'progresión (administrativos) o ratificación (docentes)' : formulariosDatos07[tipo.formulario_datos]?.toLowerCase()
-      return <li key={tipo.id} className="p-4">
+      return <li key={tipo.id} id={idTipo(tipo.id)} className="scroll-mt-4 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-slate-800">{tipo.literal && <span className="mr-1 text-slate-500">{tipo.literal})</span>}{tipo.nombre}</p>
@@ -178,25 +183,28 @@ function Documentos({ usuario, data, subseccion, sinLegajo, aplica }) {
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             <Etiqueta clase={exigeClase}>{exigeTexto}</Etiqueta>
-            <Etiqueta clase={coloresEstadoDocumento[tipo.estado] || 'bg-slate-100 text-slate-700'}>{etiqueta(estadosDocumento, tipo.estado)}{tipo.documentos > 1 ? ` · ${tipo.documentos} documentos` : ''}</Etiqueta>
+            {mostrarEstado(tipo) && <Etiqueta clase={coloresEstadoDocumento[tipo.estado] || 'bg-slate-100 text-slate-700'}>{etiqueta(estadosDocumento, tipo.estado)}{tipo.documentos > 1 ? ` · ${tipo.documentos} documentos` : ''}</Etiqueta>}
             {puedeSubir && ofrecerTipo(noAplica, tipo) && <button disabled={ocupado || !!sinLegajo || !aplica} title={!aplica ? 'No aplica a esta persona.' : sinLegajo || undefined} onClick={() => { setAviso(''); setSubiendo(tipo.id) }} className={`${enlace} inline-flex items-center gap-2`}><Icon name="paperclip" size={18} />Subir documento</button>}
           </div>
         </div>
-        {recuperando?.tipoId === tipo.id && <EnlazarDocumento usuario={usuario} documento={recuperando.documento} opciones={enlacesDe(tipo, data)}
+        {recuperando?.tipoId === tipo.id && <EnZona titulo={`Enlazar: ${tipo.literal ? `${tipo.literal}) ` : ''}${tipo.nombre} (folios ${folios(recuperando.documento.values.folio_inicio, recuperando.documento.values.folio_fin)})`}><EnlazarDocumento usuario={usuario} documento={recuperando.documento} opciones={enlacesDe(tipo, data)}
           onRegistrarNuevo={() => { setEnlazando({ tipo, documentoId: recuperando.documento.id }); setRecuperando(null) }}
-          onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} />}
+          onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} /></EnZona>}
         {subsanando?.tipoId === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={7} tipo={tipo} titular={data.titular} subsanar={subsanando.documento} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubsanando(null)} /></div>}
         {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={7} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo, data)} precarga={id => precargaDe(tipo, data, id)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}
-        {enlazando?.tipo.id === tipo.id && <div className="mt-4"><FormularioEnlazado usuario={usuario} data={data} tipo={enlazando.tipo} documentoId={enlazando.documentoId} onDone={enlazado} /></div>}
+        {enlazando?.tipo.id === tipo.id && <EnZona titulo={`Completar los datos que acredita: ${tipo.literal ? `${tipo.literal}) ` : ''}${tipo.nombre}`}><FormularioEnlazado usuario={usuario} data={data} tipo={enlazando.tipo} documentoId={enlazando.documentoId} onDone={enlazado} /></EnZona>}
       </li>
     }} />
   </section>
 }
 
+// Documento que acredita cada registro, dentro de su tarjeta (lo busca en los tipos de toda la sección).
+const documentoDe = data => record => <DocumentoDelRegistro encontrado={buscarDocumento(data.subsecciones.flatMap(sub => sub.tipos), record.values.documento_id)} enlazado={!!record.values.documento_id} />
+
 const anular = (usuario, formulario) => (record, motivo) => anularSeccion07(usuario, rutaFormulario[formulario], record.id, motivo)
 
 function Desempeno({ usuario, data, bloqueo }) {
-  return <Registros titulo="Evaluaciones de desempeño" agregar="Registrar evaluación" registros={data.evaluaciones} bloqueo={bloqueo}
+  return <Registros documento={documentoDe(data)} titulo="Evaluaciones de desempeño" agregar="Registrar evaluación" registros={data.evaluaciones} bloqueo={bloqueo}
     adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={etiquetaEvaluacion(record)} bloqueo={bloqueo} />}
     vacio={bloqueo ? `No hay evaluaciones registradas. ${bloqueo}` : 'No hay evaluaciones registradas. Se registran al subir el formato de gestión del rendimiento (7.1 a) o con «Registrar evaluación».'}
     tituloRegistro={etiquetaEvaluacion} subtitulo={e => e.values.fecha_evaluacion ? `Evaluada el ${fecha(e.values.fecha_evaluacion)}` : 'Sin fecha de evaluación'}
@@ -215,14 +223,14 @@ function Progresion({ usuario, data, bloqueo }) {
   const sinCarrera = vinculos.length ? null : 'Sin vínculo administrativo de carrera (se registra en 2.2).'
   const sinDocente = perfiles.length ? null : 'Sin perfil docente (datos del puesto en 2.2).'
   return <>
-    <Registros titulo="Progresiones en la carrera (administrativos)" agregar="Registrar progresión" registros={data.progresiones} bloqueo={bloqueo || sinCarrera}
+    <Registros documento={documentoDe(data)} titulo="Progresiones en la carrera (administrativos)" agregar="Registrar progresión" registros={data.progresiones} bloqueo={bloqueo || sinCarrera}
       adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={etiquetaProgresion(record)} bloqueo={bloqueo} />}
       vacio="No hay progresiones registradas."
       tituloRegistro={etiquetaProgresion} subtitulo={p => `Fecha efectiva: ${fecha(p.values.fecha_efectiva)}`}
       campos={[['Vínculo laboral', v => vinculos.find(item => item.id === v.vinculo_laboral_id)?.etiqueta || 'Vínculo no vigente o no encontrado']]}
       onAnular={anular(usuario, 'progresiones_carrera')}
       renderForm={props => <ProgresionForm key={props.record?.id || 'nuevo'} usuario={usuario} vinculos={vinculos} {...props} />} />
-    <Registros titulo="Ratificaciones y promociones docentes" agregar="Registrar ratificación" registros={data.ratificaciones} bloqueo={bloqueo || sinDocente}
+    <Registros documento={documentoDe(data)} titulo="Ratificaciones y promociones docentes" agregar="Registrar ratificación" registros={data.ratificaciones} bloqueo={bloqueo || sinDocente}
       adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={etiquetaRatificacion(record)} bloqueo={bloqueo} />}
       vacio="No hay ratificaciones ni promociones registradas."
       tituloRegistro={etiquetaRatificacion} subtitulo={r => `Resultado: ${etiqueta(resultadosRatificacion, r.values.resultado)}`}
@@ -239,7 +247,7 @@ function Progresion({ usuario, data, bloqueo }) {
 function Desplazamiento({ usuario, data, bloqueo }) {
   const unidades = data.opciones.unidades
   const unidad = id => unidades.find(u => u.id === id)?.nombre
-  return <Registros titulo="Desplazamientos" agregar="Registrar desplazamiento" registros={data.desplazamientos} bloqueo={bloqueo}
+  return <Registros documento={documentoDe(data)} titulo="Desplazamientos" agregar="Registrar desplazamiento" registros={data.desplazamientos} bloqueo={bloqueo}
     adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} etiqueta={etiquetaDesplazamiento(record)} bloqueo={bloqueo} />}
     vacio={bloqueo ? `No hay desplazamientos registrados. ${bloqueo}` : 'No hay desplazamientos registrados. Se registran al subir su documento (b a f) o con «Registrar desplazamiento».'}
     tituloRegistro={etiquetaDesplazamiento} subtitulo={d => d.values.fecha_fin ? `Hasta ${fecha(d.values.fecha_fin)}` : 'Sin fecha de fin'}
@@ -264,10 +272,15 @@ export default function Seccion07Panel({ usuario, categoria, onNavigate }) {
   const aplica = subseccion ? subseccion.aplica : true
   const bloqueo = sinLegajo || (!aplica && 'No aplica: la persona no es servidor/a de carrera.')
 
-  return <section aria-label={titulo}>
+  const r = data.resumen
+  const registros = { '7.1': data.evaluaciones.length, '7.2': data.progresiones.length + data.ratificaciones.length, '7.3': data.desplazamientos.length }[codigo]
+  const subsecciones = data.subsecciones.map(sub => ({ codigo: sub.codigo, titulo: subseccionesSeccion07[categoriaDe[sub.codigo]]?.titulo || sub.nombre, estado: sub.estado,
+    aplica: sub.aplica, activa: sub.codigo === codigo, onIr: () => onNavigate(categoriaDe[sub.codigo]) }))
+
+  return <EspacioSeccion seccion={tituloSeccion('07')} subseccion={titulo} subsecciones={subsecciones}
+    cifras={`Sección: ${r.pendientes} de ${r.tipos} tipos pendientes · exigidos ${r.exigidos_cargados}/${r.exigidos.length} con documento, ${r.exigidos_recepcionados} con recepción.`}
+    resumen={<Resumen data={data} onNavigate={onNavigate} compacto />} atajos={atajosDe({ registros, tipos: subseccion?.tipos })}>
     {error}
-    <Resumen data={data} onNavigate={onNavigate} />
-    <h2 className="mb-5 text-xl font-semibold text-slate-800">{titulo}</h2>
     {sinLegajo && <Aviso accion={<AbrirLegajo usuario={usuario} />}>{sinLegajo} Los formularios y la carga de documentos de la sección 07 están deshabilitados hasta abrirlo.</Aviso>}
     {!aplica && <section className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-6 text-slate-500">
       <p className="text-sm font-semibold">No aplica: la persona no es servidor/a civil de carrera</p>
@@ -275,11 +288,11 @@ export default function Seccion07Panel({ usuario, categoria, onNavigate }) {
       <button onClick={() => onNavigate('s02-vinculo')} className="mt-4 text-xs font-semibold text-teal-700 hover:underline">Revisar los vínculos en 2.2</button>
     </section>}
     <Avisos data={data} codigo={codigo} />
-    <div className={aplica ? '' : 'opacity-60'}>
+    <div id={idBloque.registros} className={`scroll-mt-4 ${aplica ? '' : 'opacity-60'}`}>
       {codigo === '7.1' && <Desempeno usuario={usuario} data={data} bloqueo={bloqueo} />}
       {codigo === '7.2' && <Progresion usuario={usuario} data={data} bloqueo={bloqueo} />}
       {codigo === '7.3' && <Desplazamiento usuario={usuario} data={data} bloqueo={bloqueo} />}
     </div>
     <Documentos usuario={usuario} data={data} subseccion={subseccion} sinLegajo={sinLegajo} aplica={aplica} />
-  </section>
+  </EspacioSeccion>
 }

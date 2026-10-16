@@ -16,6 +16,8 @@ import ListaDocumentos from '../documentos/ListaDocumentos'
 import EnlazarDocumento from '../documentos/EnlazarDocumento'
 import SubirDocumentoForm from '../documentos/SubirDocumentoForm'
 import AbrirLegajo from '../AbrirLegajo'
+import EspacioSeccion, { DocumentoDeRegistro, EnZona, SinAsociar } from '../documentos/EspacioSeccion'
+import { atajosDe, idBloque, idTipo, mostrarEstado, tituloPaso, tituloSeccion } from '../../config/espacioSeccion'
 import Registros from '../seccion07/Registros'
 import DesvinculacionForm from './DesvinculacionForm'
 
@@ -115,7 +117,7 @@ function Desvinculaciones({ usuario, data, sinLegajo, onNavigate }) {
   return <>
     <Vinculos data={data} onNavigate={onNavigate} />
     {data.desvinculaciones.some(d => !d.coincide_fecha_vinculo) && <Aviso>Hay desvinculaciones cuya fecha de cese ya no coincide con la del vínculo (se corrigió en la sección 02). Corrígelas para que coincidan.</Aviso>}
-    <Registros titulo="Desvinculaciones" agregar="Registrar desvinculación" registros={data.desvinculaciones} bloqueo={bloqueo} permisos={permisosSeccion11}
+    <Registros documento={record => <DocumentoDeRegistro tipos={data.tipos} record={record} />} titulo="Desvinculaciones" agregar="Registrar desvinculación" registros={data.desvinculaciones} bloqueo={bloqueo} permisos={permisosSeccion11}
       adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} sinLegajo={sinLegajo} />}
       vacio="No hay desvinculaciones registradas. No todas las personas han cesado."
       tituloRegistro={d => etiqueta(motivosCese, d.values.motivo_cese)} subtitulo={d => `${vinculoDe(data, d.values.vinculo_laboral_id) ? etiquetaVinculo11(vinculoDe(data, d.values.vinculo_laboral_id)) : 'Vínculo no encontrado'} · cese ${fecha(d.values.fecha_cese)}`}
@@ -155,7 +157,7 @@ function TipoDocumento({ usuario, data, tipo, sinLegajo, ofrecer }) {
     setAviso(`Documento cargado (folios ${folios(documento.folio_inicio, documento.folio_fin)}).${documento.enlazado ? ' Quedó enlazado.' : abre ? ' Registra la desvinculación que acredita o cancela si es un documento adicional.' : tipo.formulario_datos ? ' Quedó sin vínculo: para agruparlo, súbelo eligiendo la desvinculación.' : ''}`)
     if (abre) setRegistrando(documento.id)
   }
-  return <li className="p-4">
+  return <li id={idTipo(tipo.id)} className="scroll-mt-4 p-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-slate-800">{tipo.literal ? <span className="mr-1 text-slate-500">{tipo.literal})</span> : tipo.codigo === 'S11_X_ACEPTACION_RENUNCIA' && <span className="mr-1 text-slate-500">Anexo 05 ·</span>}{tipo.nombre}</p>
@@ -168,29 +170,30 @@ function TipoDocumento({ usuario, data, tipo, sinLegajo, ofrecer }) {
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         {tipo.es_dato_sensible && <Etiqueta clase="bg-rose-50 text-rose-700">Dato sensible</Etiqueta>}
-        {!tipo.restringido && <Etiqueta clase={coloresEstadoDocumento[tipo.estado] || 'bg-slate-100 text-slate-700'}>{etiqueta(estadosDocumento, tipo.estado)}{tipo.documentos > 1 ? ` · ${tipo.documentos} documentos` : ''}</Etiqueta>}
+        {!tipo.restringido && mostrarEstado(tipo) && <Etiqueta clase={coloresEstadoDocumento[tipo.estado] || 'bg-slate-100 text-slate-700'}>{etiqueta(estadosDocumento, tipo.estado)}{tipo.documentos > 1 ? ` · ${tipo.documentos} documentos` : ''}</Etiqueta>}
         {puedeSubir && <button disabled={subiendo || !!registrando || !!sinLegajo || tipo.restringido} title={tipo.restringido ? 'Requiere acceso a datos sensibles.' : sinLegajo || undefined} onClick={() => { setAviso(''); setSubiendo(true) }} className={`${enlace} inline-flex items-center gap-2`}><Icon name="paperclip" size={18} />Subir documento</button>}
       </div>
     </div>
     {aviso && <p role="status" className="mt-3 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
     {subiendo && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={11} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo, data)} precarga={id => precargaDe(tipo, data, id)} onSaved={subido} onCancel={() => setSubiendo(false)} /></div>}
-    {recuperando && <EnlazarDocumento usuario={usuario} documento={recuperando} opciones={enlacesDe(tipo, data)}
+    {recuperando && <EnZona titulo={tituloPaso('Enlazar', tipo, recuperando)}><EnlazarDocumento usuario={usuario} documento={recuperando} opciones={enlacesDe(tipo, data)}
       onRegistrarNuevo={tipo.principal ? () => { setRegistrando(recuperando.id); setRecuperando(null) } : null}
-      onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} />}
+      onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} /></EnZona>}
     {subsanando && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={11} tipo={tipo} titular={data.titular} subsanar={subsanando} onSaved={subido} onCancel={() => setSubsanando(null)} /></div>}
-    {registrando && (libres.length
+    {registrando && <EnZona titulo={tituloPaso('Registrar la desvinculación que acredita', tipo)}>{libres.length
       ? <div className="mt-4"><DesvinculacionForm usuario={usuario} vinculos={libres} motivos={tipo.motivos} documentoId={registrando} onSaved={() => { setRegistrando(null); setAviso('Desvinculación registrada y acreditada por el documento.') }} onCancel={() => { setRegistrando(null); setAviso('El documento quedó cargado sin desvinculación enlazada.') }} /></div>
-      : <div className="mt-4"><Aviso accion={<button onClick={() => setRegistrando(null)} className={enlace}>Entendido</button>}>El documento quedó cargado, pero no hay vínculos con cese registrado pendientes de desvinculación{tipo.solo_plazo_determinado ? ' de plazo determinado' : ''}. Registra el cese en la sección 02.</Aviso></div>)}
+      : <div className="mt-4"><Aviso accion={<button onClick={() => setRegistrando(null)} className={enlace}>Entendido</button>}>El documento quedó cargado, pero no hay vínculos con cese registrado pendientes de desvinculación{tipo.solo_plazo_determinado ? ' de plazo determinado' : ''}. Registra el cese en la sección 02.</Aviso></div>}</EnZona>}
   </li>
 }
 
 function Documentos({ usuario, data, sinLegajo }) {
   const noAplica = useNoAplicables(usuario)
   if (!data.tipos.length) return <Aviso>El catálogo de documentos de la sección 11 no está cargado en la base de datos (Seccion11CatalogoSeeder).</Aviso>
-  return Object.entries(bloquesDocumentos11).map(([bloque, titulo]) => <section key={bloque} aria-label={titulo} className="mb-8">
+  // Los que quedaron sin desvinculación: arriba, con acceso a su tipo (cada tipo ofrece «Enlazar ahora»).
+  return <div id={idBloque.documentos} className="scroll-mt-4"><SinAsociar tipos={data.tipos} />{Object.entries(bloquesDocumentos11).map(([bloque, titulo]) => <section key={bloque} aria-label={titulo} className="mb-8">
     <h3 className="mb-3 text-base font-semibold text-slate-800">{titulo}</h3>
     <GruposTipos tipos={data.tipos.filter(t => t.bloque === bloque)} noAplica={noAplica} render={tipo => <TipoDocumento key={tipo.id} usuario={usuario} data={data} tipo={tipo} sinLegajo={sinLegajo} ofrecer={ofrecerTipo(noAplica, tipo)} />} />
-  </section>)
+  </section>)}</div>
 }
 
 export default function Seccion11Panel({ usuario, categoria, onNavigate }) {
@@ -201,11 +204,12 @@ export default function Seccion11Panel({ usuario, categoria, onNavigate }) {
   if (!data) return error || <p role="status" className="rounded-xl bg-slate-100 p-6 text-sm text-slate-500">Cargando…</p>
   const sinLegajo = !data.legajo && 'La persona no tiene un legajo abierto (activo).'
 
-  return <section aria-label={titulo}>
+  const enRegistros = categoria === 's11-desvinculacion'
+  return <EspacioSeccion seccion={tituloSeccion('11')} subseccion={titulo} atajos={atajosDe(enRegistros ? { registros: data.desvinculaciones.length } : { tipos: data.tipos })}>
     {error}
-    <h2 className="mb-1 text-xl font-semibold text-slate-800">{titulo}</h2>
     <p className="mb-6 text-xs text-slate-500">Sección 11 · Desvinculación (Anexo 01, literales a a g; la aceptación de renuncia es del Anexo 05). Ningún documento es obligatorio para todos: depende del cese y del régimen. El legajo no pasa a pasivo automáticamente.</p>
     {sinLegajo && <Aviso accion={<AbrirLegajo usuario={usuario} />}>{sinLegajo} Los formularios y la carga de documentos de la sección 11 están deshabilitados.</Aviso>}
-    {categoria === 's11-desvinculacion' ? <Desvinculaciones usuario={usuario} data={data} sinLegajo={sinLegajo} onNavigate={onNavigate} /> : <Documentos usuario={usuario} data={data} sinLegajo={sinLegajo} />}
-  </section>
+    {enRegistros ? <div id={idBloque.registros} className="scroll-mt-4"><Desvinculaciones usuario={usuario} data={data} sinLegajo={sinLegajo} onNavigate={onNavigate} /></div>
+      : <Documentos usuario={usuario} data={data} sinLegajo={sinLegajo} />}
+  </EspacioSeccion>
 }
