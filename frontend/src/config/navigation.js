@@ -8,6 +8,7 @@ export const navigation = [
   { label: 'Reportes', icon: 'chart', group: 'Principal' },
   // Requerimientos lee hoy del CRUD genérico (sistema.administrar).
   { label: 'Requerimientos', to: '/requerimientos', icon: 'clock', group: 'Principal', permiso: 'sistema.administrar' },
+  { label: 'Vencimientos', to: '/vencimientos', icon: 'clock', group: 'Principal', permiso: 'legajo.ver' },
   { label: 'Fiscalización', icon: 'search', group: 'Administración', permiso: 'sistema.administrar' },
   { label: 'Accesos y custodia', icon: 'shield', group: 'Administración', permiso: 'sistema.administrar' },
   // Configuración institucional (sistema.administrar) y de funcionalidades (configuracion.modulos, asignación explícita).

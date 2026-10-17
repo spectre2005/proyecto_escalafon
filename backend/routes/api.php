@@ -76,6 +76,7 @@ use App\Http\Controllers\Api\V1\UbigeoController;
 use App\Http\Controllers\Api\V1\UnidadOrganicaController;
 use App\Http\Controllers\Api\V1\UsuarioController;
 use App\Http\Controllers\Api\V1\UsuarioRolController;
+use App\Http\Controllers\Api\V1\VencimientosController;
 use App\Http\Controllers\Api\V1\VinculoAdendaController;
 use App\Http\Controllers\Api\V1\VinculoLaboralController;
 use App\Http\Middleware\ApiHabilitada;
@@ -93,6 +94,7 @@ Route::prefix('v1/auth')->middleware(ApiHabilitada::class)->group(function (): v
 
 // FuncionalidadActiva: con una funcionalidad desactivada, sus rutas de creación y modificación responden 409.
 Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCambioPassword::class, FuncionalidadActiva::class, LegajoSoloLectura::class])->group(function (): void {
+    Route::get('vencimientos', VencimientosController::class)->middleware('can:legajo.ver');
     Route::get('institucion', [InstitutionSettingsController::class, 'show']);
     // Qué ocultar en la navegación (cualquier sesión). Cambiar la configuración exige configuracion.modulos.
     Route::get('funcionalidades', [ConfiguracionFuncionalidadController::class, 'publico']);
