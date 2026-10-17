@@ -4,7 +4,7 @@ import { activarInstitucion, aprovisionarInstitucion, editarInstitucion, mensaje
 import { Aviso, Credenciales, EstadoInstitucion, EstadoServicio, SinAprovisionar } from '../componentes'
 import AdministradoresInstitucion from './AdministradoresInstitucion'
 import ServicioInstitucion from './ServicioInstitucion'
-import { AVISO_SUSPENSION, accionesDisponibles, cambios, etiquetaAccion, fecha } from '../estado'
+import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, accionesDisponibles, cambios, etiquetaAccion, fecha } from '../estado'
 import { useSesionPlataforma } from '../sesion'
 
 const entrada = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 disabled:bg-slate-50 disabled:text-slate-500'
@@ -36,7 +36,7 @@ function ConfirmarEstado({ accion, institucion, onConfirmar, onCerrar }) {
   return <dialog ref={ref} onClose={onCerrar} aria-labelledby="titulo-confirmar" className="m-auto w-full max-w-md rounded-2xl p-0 backdrop:bg-slate-900/40">
     <form onSubmit={confirmar} aria-busy={busy} className="space-y-4 p-6">
       <h2 id="titulo-confirmar" className="text-lg font-bold text-slate-900">{suspender ? 'Suspender' : accionesDisponibles(institucion).textoActivar} «{institucion.nombre}»</h2>
-      <p className="text-sm text-slate-600">{suspender ? 'Su base de datos, sus archivos y sus datos se conservan: nada se borra.' : 'La institución quedará activa. Solo es posible porque su aprovisionamiento está verificado.'}</p>
+      <p className="text-sm text-slate-600">{suspender ? `Su base de datos, sus archivos y sus datos se conservan: nada se borra.${institucion.suspension_bloquea_acceso ? ` ${AVISO_SUSPENSION_BLOQUEA}` : ''}` : 'La institución quedará activa. Solo es posible porque su aprovisionamiento está verificado.'}</p>
       {suspender && !institucion.suspension_bloquea_acceso && <Aviso tipo="info">{AVISO_SUSPENSION}</Aviso>}
       <Aviso>{error}</Aviso>
       <label className="grid gap-2 text-xs font-medium text-slate-600">{suspender ? 'Motivo *' : 'Motivo (opcional)'}<textarea required={suspender} minLength={suspender ? 5 : undefined} maxLength={500} rows={3} value={motivo} onChange={event => setMotivo(event.target.value)} disabled={busy} className={entrada} /></label>

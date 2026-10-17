@@ -5,8 +5,14 @@ export const ESTADOS = {
   suspendida: { etiqueta: 'Suspendida', clase: 'bg-rose-50 text-rose-700 ring-rose-200' },
 }
 
-/** Solo se muestra si la institución no se identifica por subdominio (suspension_bloquea_acceso = false). */
-export const AVISO_SUSPENSION = 'La suspensión queda registrada, pero aún no bloquea el acceso de la institución.'
+/**
+ * Efecto de suspender, según suspension_bloquea_acceso del backend (PLATAFORMA_MODO=subdominio): con subdominio,
+ * ResolverInstitucion responde 403 a toda petición de la institución, también con sesiones ya abiertas.
+ */
+export const AVISO_SUSPENSION_BLOQUEA = 'Sus usuarios pierden el acceso de inmediato, también los que tienen la sesión abierta, hasta que la reactives.'
+
+/** Solo con PLATAFORMA_MODO=unica (suspension_bloquea_acceso = false): no hay subdominio con el que bloquear. */
+export const AVISO_SUSPENSION = 'Este servidor atiende una sola institución (PLATAFORMA_MODO=unica): la suspensión queda registrada, pero no bloquea el acceso. Para bloquearlo, las instituciones deben identificarse por subdominio.'
 
 export const etiquetaEstado = estado => ESTADOS[estado]?.etiqueta || estado || '—'
 

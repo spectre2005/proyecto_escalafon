@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { AVISO_SUSPENSION, accionesDisponibles, cambios, etiquetaEstado, fechaCorta, proponerPeriodo, proponerSlug, proponerUbicacion, textoServicio } from './estado.js'
+import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, accionesDisponibles, cambios, etiquetaEstado, fechaCorta, proponerPeriodo, proponerSlug, proponerUbicacion, textoServicio } from './estado.js'
 import { esEscritura, mensajeError } from './api.js'
 
 test('state actions follow what the backend allows', () => {
@@ -14,8 +14,16 @@ test('state actions follow what the backend allows', () => {
     { aprovisionar: false, activar: true, suspender: false, textoActivar: 'Reactivar' })
   assert.equal(accionesDisponibles(null).activar, false)
   assert.equal(etiquetaEstado('suspendida'), 'Suspendida')
-  // Sin identificar la institución por subdominio, suspender no bloquea el acceso: se avisa junto al botón.
-  assert.equal(AVISO_SUSPENSION, 'La suspensión queda registrada, pero aún no bloquea el acceso de la institución.')
+})
+
+test('the suspension notices describe what really happens', () => {
+  // Con subdominio, suspender bloquea el acceso, también con la sesión abierta.
+  assert.match(AVISO_SUSPENSION_BLOQUEA, /pierden el acceso de inmediato/)
+  assert.match(AVISO_SUSPENSION_BLOQUEA, /sesión abierta/)
+  // Con una sola institución (modo unica) no bloquea, y el aviso dice por qué; ya no lo presenta como algo que falta.
+  assert.match(AVISO_SUSPENSION, /PLATAFORMA_MODO=unica/)
+  assert.match(AVISO_SUSPENSION, /subdominio/)
+  assert.doesNotMatch(AVISO_SUSPENSION, /aún no bloquea/)
 })
 
 test('identifier and location are proposed from the name', () => {
