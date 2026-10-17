@@ -1,4 +1,3 @@
-import ProximosVencimientos from './ProximosVencimientos'
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import api, { apiErrorMessage } from '../../axios'
@@ -161,7 +160,7 @@ function Detail({ id, onClose }) {
   </section>
 }
 
-function RenovacionesDocentes() {
+export default function VencimientosPage() {
   const view = usePuede('vencimientos.ver')
   const own = usePuede('renovacion.propia')
   const manager = usePuede('vencimientos.gestionar')
@@ -197,9 +196,4 @@ function RenovacionesDocentes() {
     {result && <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white" aria-label="Legajos docentes"><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr>{['Docente', 'Categoría', 'Vencimiento', 'Días restantes', 'Documentos', 'Acciones'].map(h => <th key={h} className="px-5 py-4 font-medium">{h}</th>)}</tr></thead><tbody>{result.data.map(row => <tr key={row.legajo_id} className="border-t border-slate-100 align-top"><td className="px-5 py-4 font-semibold text-slate-800">{row.nombre}<p className="mt-1 text-xs font-normal text-slate-500">{row.numero_legajo}</p></td><td className="px-5 py-4 text-slate-600">{categories[row.categoria] || 'Por revisar'}</td><td className="whitespace-nowrap px-5 py-4 text-slate-600">{dateText(row.fecha_vencimiento)}</td><td className="px-5 py-4"><span className={`inline-block rounded-xl px-3 py-2 text-xs font-medium ${colors[row.color]}`}>{remainingText(row.dias_restantes)}</span><p className="mt-1 text-xs text-slate-500">{states[row.estado_vigencia]}</p></td><td className="px-5 py-4 text-slate-600">{row.pendientes == null ? 'Por definir' : `${row.pendientes} pendientes`}{row.estado_renovacion && <p className="mt-1 text-xs">{renewalStates[row.estado_renovacion]}</p>}</td><td className="px-5 py-4"><button className={button} onClick={() => setSelected(row.legajo_id)} aria-pressed={selected === row.legajo_id}>Ver detalle</button></td></tr>)}</tbody></table></div>{!result.data.length && <p className="p-10 text-center text-sm text-slate-500">No hay legajos docentes para estos filtros.</p>}<div className="flex items-center justify-between gap-3 border-t border-slate-100 p-4 text-xs text-slate-500"><span>{result.total} legajos · Página {result.current_page} de {result.last_page} · Corte {dateText(result.hoy)}</span>{result.last_page > 1 && <div className="flex gap-2"><button className={button} disabled={result.current_page <= 1} onClick={() => { const p = new URLSearchParams(params); p.set('page', result.current_page - 1); setParams(p) }}>Anterior</button><button className={button} disabled={result.current_page >= result.last_page} onClick={() => { const p = new URLSearchParams(params); p.set('page', result.current_page + 1); setParams(p) }}>Siguiente</button></div>}</div></section>}
     {selected && <Detail key={selected} id={selected} onClose={() => setSelected(null)} />}
   </>
-}
-
-export default function VencimientosPage() {
-  const [params] = useSearchParams()
-  return params.get('vista') === 'renovaciones' ? <><Link to="/vencimientos" className="mb-5 inline-block rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-teal-800 focus-visible:outline-2 focus-visible:outline-teal-700">← Próximos vencimientos de los tres tipos</Link><RenovacionesDocentes /></> : <ProximosVencimientos />
 }

@@ -21,7 +21,6 @@ use App\Support\PerfilDocumental;
 use App\Support\RegimenesLaborales;
 use App\Support\ReglasVinculo;
 use App\Support\ResumenSeccion02;
-use App\Support\VencimientoVinculo;
 use Database\Seeders\Seccion02CatalogoSeeder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
@@ -332,7 +331,7 @@ class Seccion02Controller extends Controller
     {
         $hoy = today();
         $adendas = $vinculo->vinculoAdendas;
-        $fin = VencimientoVinculo::fecha($vinculo);
+        $fin = $adendas->last()?->fecha_fin ?? $vinculo->fecha_fin_prevista;
         $dias = $fin ? (int) $hoy->diffInDays($fin, false) : null;
         $estado = match (true) {
             $vinculo->fecha_cese !== null => 'cesado',

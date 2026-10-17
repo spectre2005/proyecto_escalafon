@@ -60,7 +60,6 @@ use App\Http\Controllers\Api\V1\PeriodoPruebaController;
 use App\Http\Controllers\Api\V1\PeriodoVacacionalController;
 use App\Http\Controllers\Api\V1\ProcesoFiscalizacionController;
 use App\Http\Controllers\Api\V1\ProgresionCarreraController;
-use App\Http\Controllers\Api\V1\ProximosVencimientosController;
 use App\Http\Controllers\Api\V1\RatificacionDocenteController;
 use App\Http\Controllers\Api\V1\ReconocimientoController;
 use App\Http\Controllers\Api\V1\ReferenciaLegajoPasivoController;
@@ -99,7 +98,6 @@ Route::prefix('v1/auth')->middleware(ApiHabilitada::class)->group(function (): v
 
 // FuncionalidadActiva: con una funcionalidad desactivada, sus rutas de creación y modificación responden 409.
 Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', AccesoSecciones::class, ExigirVigenciaLegajo::class, ExigeCambioPassword::class, FuncionalidadActiva::class, LegajoSoloLectura::class])->group(function (): void {
-    Route::get('vencimientos/proximos', ProximosVencimientosController::class);
     Route::prefix('vencimientos')->controller(VencimientoLegajoController::class)->group(function (): void {
         Route::get('/', 'index');
         Route::get('/opciones', 'opciones');
