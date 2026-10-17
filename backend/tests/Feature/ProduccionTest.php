@@ -2,6 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Models\Plataforma\AdministradorPlataforma;
+use App\Models\Plataforma\Institucion;
+use App\Models\Usuario;
+use Database\Seeders\AdministradorSeeder;
+use Database\Seeders\InstitucionesPruebaSeeder;
+use Database\Seeders\SuperadministradorSeeder;
+use Database\Seeders\UsuarioSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Concerns\UsaPlataforma;
 use Tests\TestCase;
@@ -13,6 +22,7 @@ use Tests\TestCase;
  */
 class ProduccionTest extends TestCase
 {
+    use RefreshDatabase;
     use UsaPlataforma;
 
     /** Configuración segura de producción con subdominios. */
@@ -25,6 +35,10 @@ class ProduccionTest extends TestCase
             'database.connections.pgsql.password' => 'clave-larga-de-produccion-1', 'database.connections.plataforma.password' => 'otra-clave-larga-produccion-2',
             'plataforma.modo' => 'subdominio', 'plataforma.dominio' => 'escalafon.pe', 'sanctum.stateful' => ['escalafon.pe', '*.escalafon.pe'],
             'logging.default' => 'stderr', 'logging.channels.stderr.level' => 'warning',
+            // Vacías aunque el .env local (copiado de .env.example) traiga las cuentas de prueba.
+            'auth.administrador_inicial' => ['email' => null, 'password' => null],
+            'plataforma.administrador_prueba' => ['email' => null, 'password' => null],
+            'plataforma.institucion_prueba' => ['slug' => null, 'nombre' => null],
             ...$cambios,
         ]);
     }
@@ -48,6 +62,39 @@ class ProduccionTest extends TestCase
         }
         $this->app->detectEnvironment(fn (): string => 'staging');
         $this->artisan('produccion:verificar')->expectsOutputToContain('APP_ENV debe ser production')->assertFailed();
+    }
+
+    public function test_the_demo_accounts_of_env_example_do_not_start(): void
+    {
+        foreach ([
+            'auth.administrador_inicial.email' => 'ADMIN_EMAIL', 'auth.administrador_inicial.password' => 'ADMIN_PASSWORD',
+            'plataforma.administrador_prueba.email' => 'PLATAFORMA_ADMIN_EMAIL', 'plataforma.administrador_prueba.password' => 'PLATAFORMA_ADMIN_PASSWORD',
+            'plataforma.institucion_prueba.slug' => 'PLATAFORMA_PRUEBA_SLUG', 'plataforma.institucion_prueba.nombre' => 'PLATAFORMA_PRUEBA_NOMBRE',
+        ] as $clave => $variable) {
+            $this->segura([$clave => 'valor-de-env-example']);
+            $this->artisan('produccion:verificar')->expectsOutputToContain("{$variable} debe quedar vacía")->assertFailed();
+        }
+    }
+
+    public function test_the_demo_seeders_create_nothing_in_production(): void
+    {
+        $this->segura([
+            'auth.administrador_inicial' => ['email' => 'admin.uniq@demo.test', 'password' => 'Demo-Escalafon-2026'],
+            'plataforma.administrador_prueba' => ['email' => 'superadmin@demo.test', 'password' => 'Demo-Escalafon-2026'],
+            'plataforma.institucion_prueba' => ['slug' => 'uniq', 'nombre' => 'Institución principal de prueba'],
+        ]);
+        DB::connection()->setDatabaseName('escalafon');
+        try {
+            foreach ([AdministradorSeeder::class, SuperadministradorSeeder::class, InstitucionesPruebaSeeder::class, UsuarioSeeder::class] as $seeder) {
+                $this->app->make($seeder)->run();
+            }
+        } finally {
+            DB::connection()->setDatabaseName(':memory:');
+        }
+
+        $this->assertSame(0, Usuario::query()->count());
+        $this->assertSame(0, AdministradorPlataforma::query()->count());
+        $this->assertSame(0, Institucion::query()->count());
     }
 
     public function test_outside_local_the_api_answers_only_when_enabled(): void

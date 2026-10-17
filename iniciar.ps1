@@ -28,11 +28,15 @@ try {
 
     Invoke-Docker @('compose', 'exec', '-T', 'app', 'php', 'artisan', 'migrate', '--no-interaction')
     # Base de la plataforma y bases de cada institución aprovisionada (con una sola institución no hace nada).
-    Invoke-Docker @('compose', 'exec', '-T', 'app', 'php', 'artisan', 'plataforma:migrar-instituciones', '--no-interaction')
+    Invoke-Docker @('compose', 'exec', '-T', 'app', 'php', 'artisan', 'plataforma:migrar-instituciones', '--crear-base', '--no-interaction')
+    # Catálogos y cuentas de prueba (backend/.env); se puede repetir sin duplicar datos.
+    Invoke-Docker @('compose', 'exec', '-T', 'app', 'php', 'artisan', 'db:seed', '--no-interaction')
     Invoke-Docker @('compose', 'exec', '-T', 'app', 'php', 'artisan', 'optimize:clear', '--no-interaction')
     Invoke-Docker @('compose', 'up', '-d', '--build', '--force-recreate', 'frontend')
 
-    Write-Host 'Sistema preparado. Abre http://localhost:5173'
+    Write-Host 'Sistema preparado. Cuentas de prueba en el README:'
+    Write-Host '  Institucion: http://uniq.localhost:5173 (tambien uno. y dos.)'
+    Write-Host '  Panel de plataforma: http://localhost:5173/plataforma/login'
     Write-Host 'Cada computadora que clona el proyecto tiene su propia base de datos y archivos.'
 } finally {
     Pop-Location

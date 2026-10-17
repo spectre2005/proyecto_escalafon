@@ -92,6 +92,49 @@ class ResolverInstitucionTest extends TestCase
         $this->postJson('http://uno.otro-dominio.test/api/v1/auth/login', ['email' => self::EMAIL, 'password' => self::CLAVE])->assertNotFound();
     }
 
+    public function test_an_open_session_is_blocked_once_the_institution_is_suspended(): void
+    {
+        $uno = $this->activa('uno', conAdministrador: true);
+        $this->login('uno')->assertOk();
+        $this->getJson('http://uno.localhost/api/v1/auth/me')->assertOk();
+
+        $uno->update(['estado' => Institucion::SUSPENDIDA, 'suspendida_en' => now(), 'motivo_suspension' => 'Prueba']);
+        $this->getJson('http://uno.localhost/api/v1/auth/me')->assertForbidden()->assertJsonPath('codigo', 'institucion_suspendida');
+        $this->getJson('http://uno.localhost/api/v1/legajos')->assertForbidden()->assertJsonPath('codigo', 'institucion_suspendida');
+    }
+
+    public function test_forwarded_headers_do_not_change_the_institution(): void
+    {
+        $this->activa('uno', conAdministrador: true);
+        $this->activa('suspendida', conAdministrador: true, estado: Institucion::SUSPENDIDA);
+
+        // Sin proxies de confianza, X-Forwarded-Host no decide la institución: manda el Host de la petición.
+        $falsas = ['X-Forwarded-Host' => 'uno.localhost', 'X-Forwarded-Server' => 'uno.localhost', 'X-Original-Host' => 'uno.localhost'];
+        $this->withHeaders([...$falsas, 'Origin' => 'http://suspendida.localhost:5173'])
+            ->postJson('http://suspendida.localhost/api/v1/auth/login', ['email' => self::EMAIL, 'password' => self::CLAVE])
+            ->assertForbidden()->assertJsonPath('codigo', 'institucion_suspendida');
+        $this->withHeaders(['X-Forwarded-Host' => 'suspendida.localhost', 'Origin' => 'http://uno.localhost:5173'])
+            ->postJson('http://uno.localhost/api/v1/auth/login', ['email' => self::EMAIL, 'password' => self::CLAVE])->assertOk();
+    }
+
+    public function test_identification_errors_expose_nothing_about_other_institutions(): void
+    {
+        $this->activa('uno', conAdministrador: true);
+        $this->activa('suspendida', estado: Institucion::SUSPENDIDA);
+        $this->activa('registrada', estado: Institucion::REGISTRADA);
+
+        foreach (['suspendida' => 403, 'registrada' => 404, 'no-existe' => 404] as $slug => $estado) {
+            $respuesta = $this->getJson("http://{$slug}.localhost/api/v1/auth/me")->assertStatus($estado);
+            $this->assertSame(['message', 'codigo'], array_keys($respuesta->json()));
+            foreach (['uno', 'inst_', 'base_datos', 'instituciones/', sys_get_temp_dir()] as $privado) {
+                $this->assertStringNotContainsString($privado, $respuesta->getContent());
+            }
+        }
+        // Una institución registrada y una inexistente responden igual: no se puede saber cuál existe.
+        $this->assertSame($this->getJson('http://registrada.localhost/api/v1/auth/me')->getContent(),
+            $this->getJson('http://no-existe.localhost/api/v1/auth/me')->getContent());
+    }
+
     public function test_the_platform_panel_only_answers_on_the_base_domain(): void
     {
         $this->activa('uno');

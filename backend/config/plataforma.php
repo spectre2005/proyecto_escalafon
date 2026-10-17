@@ -19,6 +19,16 @@ return [
     'zona_horaria' => env('PLATAFORMA_ZONA_HORARIA', 'America/Lima'),
     'aviso_vencimiento_dias' => (int) env('PLATAFORMA_AVISO_VENCIMIENTO_DIAS', 15),
 
+    /* Cuenta e institución principal de prueba (SuperadministradorSeeder e InstitucionesPruebaSeeder, solo local/testing). */
+    'administrador_prueba' => [
+        'email' => env('PLATAFORMA_ADMIN_EMAIL'),
+        'password' => env('PLATAFORMA_ADMIN_PASSWORD'),
+    ],
+    'institucion_prueba' => [
+        'slug' => env('PLATAFORMA_PRUEBA_SLUG'),
+        'nombre' => env('PLATAFORMA_PRUEBA_NOMBRE'),
+    ],
+
     /*
      * Sesión del panel de plataforma: cookie propia (nombre y path distintos de la institucional), para que iniciar o
      * cerrar sesión ahí no toque la sesión institucional del mismo navegador. La aplica App\Http\Middleware\SesionPlataforma.

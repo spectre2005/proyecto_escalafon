@@ -15,6 +15,8 @@ class DatabaseSeeder extends Seeder
             UnidadOrganicaSeeder::class,
             CatalogosInstitucionSeeder::class,
             AdministradorSeeder::class,
+            SuperadministradorSeeder::class,
+            InstitucionesPruebaSeeder::class,
             UsuarioSeeder::class,
             EvaluacionDesempenoSeeder::class,
             RequerimientoDocumentoSeeder::class,

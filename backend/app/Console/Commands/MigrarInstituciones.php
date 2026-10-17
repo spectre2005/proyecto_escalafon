@@ -21,18 +21,26 @@ use Throwable;
  * una (institucion.migrada) y cada fallo (institucion.migracion_fallida). Nunca crea una base que falte: eso es del
  * aprovisionamiento. Sin base de plataforma en el modo «unica» (desarrollo con una sola institución) no hay nada que
  * migrar y no es un error.
+ *
+ * Con --crear-base (instalación local: iniciar.ps1 y README) crea antes la base de la plataforma si falta, para que un
+ * equipo recién clonado no dependa de crearla a mano. En producción la crea docker/produccion/initdb.
  */
 class MigrarInstituciones extends Command
 {
     private const CONEXION = 'migracion_institucion';
 
-    protected $signature = 'plataforma:migrar-instituciones {--institucion= : Solo la institución con este identificador}';
+    private const SERVIDOR = 'migracion_servidor';
+
+    protected $signature = 'plataforma:migrar-instituciones {--institucion= : Solo la institución con este identificador} {--crear-base : Crea la base de la plataforma si falta (instalación local)}';
 
     protected $description = 'Migra la base de la plataforma y la de cada institución aprovisionada (ejecutar en cada despliegue)';
 
     public function handle(): int
     {
         try {
+            if ($this->option('crear-base')) {
+                $this->crearBasePlataforma();
+            }
             $this->migrar('plataforma', ['--path' => 'database/migrations/plataforma']);
         } catch (Throwable $error) {
             if (config('plataforma.modo') === 'unica' && ! $this->option('institucion')) {
@@ -92,6 +100,25 @@ class MigrarInstituciones extends Command
             return array_values(array_diff($this->aplicadas(), $antes));
         } finally {
             DB::purge(self::CONEXION);
+        }
+    }
+
+    /** Solo PostgreSQL; el nombre se valida antes de ir entre comillas dobles. */
+    private function crearBasePlataforma(): void
+    {
+        $conexion = (array) config('database.connections.plataforma');
+        $base = (string) ($conexion['database'] ?? '');
+        if (($conexion['driver'] ?? null) !== 'pgsql' || ! preg_match(Institucion::PATRON_BASE_DATOS, $base)) {
+            return;
+        }
+        config(['database.connections.'.self::SERVIDOR => [...$conexion, 'database' => 'postgres']]);
+        try {
+            if (DB::connection(self::SERVIDOR)->selectOne('select 1 from pg_database where datname = ?', [$base]) === null) {
+                DB::connection(self::SERVIDOR)->statement('CREATE DATABASE "'.$base.'"');
+                $this->info("Base de la plataforma {$base} creada.");
+            }
+        } finally {
+            DB::purge(self::SERVIDOR);
         }
     }
 
