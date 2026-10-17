@@ -15,6 +15,14 @@ return [
 
     // Catálogo cerrado: un permiso que no esté aquí no existe.
     'catalogo' => [
+        'renovaciones.gestionar' => 'Presentar y vincular evidencias de renovación.',
+        'documento.fiscalizar' => 'Registrar fiscalización con informe de respaldo.',
+        'legajo.propio' => 'Consultar únicamente su propio legajo.',
+        'vencimientos.ver' => 'Consultar vencimientos institucionales.',
+        'vencimientos.gestionar' => 'Gestionar ciclos y políticas de renovación.',
+        'vencimientos.notificar' => 'Notificar vencimientos.',
+        'renovacion.propia' => 'Presentar renovación de su propio legajo.',
+        'renovaciones.aprobar' => 'Revisar renovaciones de legajos.',
         'personal.ver' => 'Ver la lista del personal.',
         'usuarios.gestionar' => 'Crear, editar y desactivar personal y cuentas.',
         'legajo.ver' => 'Ver el legajo de una persona.',
@@ -55,6 +63,7 @@ return [
     // Código de rol (roles.codigo) => permisos. '*' = todo el catálogo menos
     // los derivados, los pendientes y los explícitos.
     'roles' => [
+        'personal' => ['legajo.propio', 'renovacion.propia'],
         'ADMIN' => '*',
 
         // Rol adicional para cambiar la configuración de funcionalidades. No existe en la base ni en los
@@ -66,6 +75,8 @@ return [
         // Pendiente de confirmar con el cliente: el rol no existe en la base
         // ni en los seeders. Basado en la tabla "Límites del asistente".
         'asistente_legajo' => [
+            'vencimientos.ver',
+            'renovaciones.gestionar',
             'personal.ver',
             'legajo.ver',
             'legajo.editar',

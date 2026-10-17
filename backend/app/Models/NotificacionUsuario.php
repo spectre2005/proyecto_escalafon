@@ -21,6 +21,7 @@ class NotificacionUsuario extends Model
 
     protected $fillable = [
         'usuario_id',
+        'aviso_vencimiento_id',
         'tipo',
         'titulo',
         'mensaje',

@@ -21,7 +21,7 @@ import { puestoActual, subseccionesSeccion02, textoRegimen } from '../config/sec
 import Seccion05Panel from '../components/seccion05/Seccion05Panel'
 import { categoriasSeccion05 } from '../config/seccion05'
 import { categoriasSensibles, gruposSeccion01 } from '../config/seccion01'
-import { ReadOnlyContext, usePuede } from '../../auth/session'
+import { ReadOnlyContext, usePuede, useSesion } from '../../auth/session'
 import PersonalHeader from '../components/PersonalHeader'
 import GeneralDataEditor from '../components/GeneralDataEditor'
 import PersonalDocuments from '../components/PersonalDocuments'
@@ -164,7 +164,9 @@ const avisosModuloOculto = {
 
 function Detail({ usuario }) {
   const funcionalidades = useFuncionalidades()
-  const veSensibles = usePuede('datos_sensibles.ver')
+  const sesion = useSesion()
+  const propio = sesion.usuario?.id === usuario && sesion.permisos.includes('legajo.propio') && !sesion.permisos.includes('legajo.ver')
+  const veSensibles = usePuede('datos_sensibles.ver') || propio
   const permisoEditar = usePuede('legajo.editar') && veSensibles
   const permisoSubir = usePuede('documento.subir')
   const [uploadCode, setUploadCode] = useState(null)
@@ -186,8 +188,8 @@ function Detail({ usuario }) {
   // Lo que desactiva Funcionalidades muestra «Función no disponible»; lo que oculta una condición en No (sin
   // datos registrados) desaparece del menú y redirige a la primera entrada disponible, con un aviso breve.
   const modulosOcultos = data?.condiciones?.modulos_ocultos || []
-  const porFuncionalidad = seccionesVisibles(legajoSections, funcionalidades)
-  const secciones = seccionesVisibles(legajoSections, conModulosOcultos(funcionalidades, modulosOcultos))
+  const porFuncionalidad = seccionesVisibles(legajoSections.filter(item => data?.document_sections?.find(section => Number(section.id) === Number(item.number))?.activa !== false), funcionalidades)
+  const secciones = seccionesVisibles(porFuncionalidad, conModulosOcultos(funcionalidades, modulosOcultos))
   const ocultaPorBandera = modulosOcultos.includes(pedida)
   const selected = ocultaPorBandera ? primeraCategoria(secciones) : pedida
   useEffect(() => {
@@ -203,7 +205,7 @@ function Detail({ usuario }) {
   // Solo mientras siga oculto: si la bandera cambia (p. ej. a Sí), el aviso ya no aplica.
   const avisoOculto = modulosOcultos.includes(params.get('oculto')) ? avisosModuloOculto[params.get('oculto')] : null
   const hasActiveLegajo = data?.legajos.some(legajo => legajo.values.estado_legajo === 'activo')
-  const readOnly = !!data?.legajos.length && !hasActiveLegajo
+  const readOnly = propio || (!!data?.legajos.length && !hasActiveLegajo)
   const puedeEditar = permisoEditar && !readOnly
   const puedeSubir = permisoSubir && veSensibles && !readOnly
   const group = legajoSections.find(item => item.categories.includes(selected) || (!item.sinDocumentos && selected === `documentos-${item.number}`))

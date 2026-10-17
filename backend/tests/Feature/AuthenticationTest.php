@@ -53,7 +53,8 @@ class AuthenticationTest extends TestCase
         $admin->update(['password' => 'changed-password']);
         $this->seed(AdministradorSeeder::class);
         $this->assertDatabaseCount('usuarios', 1);
-        $this->assertDatabaseCount('roles', 1);
+        $this->assertSame(1, Rol::query()->where('codigo', 'ADMIN')->count());
+        $this->assertSame(2, Rol::query()->whereIn('codigo', ['personal', 'asistente_legajo'])->count());
         $this->assertDatabaseCount('usuario_roles', 1);
         $this->assertTrue(Hash::check('changed-password', $admin->fresh()->password));
     }
@@ -183,7 +184,7 @@ class AuthenticationTest extends TestCase
     {
         $asistente = $this->actuarComo(Usuario::factory()->create(), 'asistente_legajo');
         $this->assertSame(
-            ['personal.ver', 'legajo.ver', 'legajo.editar', 'documento.subir', 'documento.recepcionar', 'seccion07.ver'],
+            ['vencimientos.ver', 'renovaciones.gestionar', 'personal.ver', 'legajo.ver', 'legajo.editar', 'documento.subir', 'documento.recepcionar', 'seccion07.ver'],
             $asistente->permisos(),
         );
         $this->getJson('/api/v1/expedientes')->assertOk();

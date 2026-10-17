@@ -24,7 +24,10 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         foreach (array_keys(config('permisos.catalogo')) as $permiso) {
-            Gate::define($permiso, fn (Usuario $usuario): bool => $usuario->tienePermiso($permiso));
+            Gate::define($permiso, fn (Usuario $usuario): bool => $usuario->tienePermiso($permiso)
+                || (in_array($permiso, ['legajo.ver', 'datos_sensibles.ver', 'seccion07.ver', 'seccion08.sanciones.ver'], true)
+                    && request()->isMethod('GET') && request()->is('api/v1/expedientes/*')
+                    && request()->route('usuario') === $usuario->id && $usuario->tienePermiso('legajo.propio')));
         }
 
         Password::defaults(fn (): Password => $this->app->isProduction()

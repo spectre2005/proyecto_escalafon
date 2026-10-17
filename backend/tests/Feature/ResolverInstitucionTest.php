@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\CicloVigencia;
 use App\Models\Plataforma\Institucion;
 use App\Support\Plataforma\ConexionInstitucion;
+use App\Support\VigenciaLegajo;
 use Database\Seeders\AdministradorSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -174,5 +176,29 @@ class ResolverInstitucionTest extends TestCase
 
         $this->withHeader('Origin', 'http://uno.localhost:5173')
             ->postJson('http://cualquiera.localhost/api/v1/auth/login', ['email' => self::EMAIL, 'password' => self::CLAVE])->assertOk();
+    }
+
+    public function test_scheduler_processes_each_active_institution_and_restores_context(): void
+    {
+        $uno = $this->activa('uno');
+        $dos = $this->activa('dos');
+        $suspendida = $this->activa('suspendida', estado: Institucion::SUSPENDIDA);
+        foreach ([$uno, $dos, $suspendida] as $institucion) {
+            ConexionInstitucion::usar($institucion, function (): void {
+                $base = VigenciaLegajo::hoy()->addDays(10)->subYears(3);
+                CicloVigencia::factory()->create(['fecha_base' => $base->toDateString(),
+                    'fecha_vencimiento' => $base->addYears(3)->toDateString(), 'estado_vigencia' => 'vigente']);
+            });
+        }
+        $this->artisan('plataforma:procesar-vencimientos', ['accion' => 'controlar'])->assertSuccessful();
+        $this->assertSame('sqlite', config('database.default'));
+        $this->assertFalse(app()->bound(Institucion::class));
+        $this->assertDatabaseCount('ciclos_vigencia_legajo', 0);
+        foreach ([$uno, $dos, $suspendida] as $institucion) {
+            ConexionInstitucion::usar($institucion, function () use ($institucion): void {
+                $this->assertSame($institucion->estado === Institucion::ACTIVA ? 'por_vencer' : 'vigente',
+                    CicloVigencia::query()->sole()->estado_vigencia);
+            });
+        }
     }
 }

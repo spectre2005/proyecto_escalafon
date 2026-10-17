@@ -34,7 +34,7 @@ function BanderasSinResponder({ panel }) {
   </section>
 }
 
-export default function DashboardPage() {
+function DashboardGestion() {
   const { users, loading, loadError, refreshUsers } = useUsers()
   const administra = usePuede('sistema.administrar')
   // Acceso al sistema (cuenta) y situación laboral se cuentan por separado: sin cuenta no significa sin vínculo.
@@ -103,4 +103,9 @@ export default function DashboardPage() {
     </div>
     {ready && !users.length && <p className="mt-6 rounded-xl border border-teal-100 bg-teal-50 p-4 text-sm text-teal-800">Aún no hay personal registrado. <Link to="/personal" className="font-semibold underline">Ir a registrar personal</Link></p>}
   </>
+}
+
+export default function DashboardPage() {
+  const personal = usePuede('personal.ver')
+  return personal ? <DashboardGestion /> : <section className="rounded-2xl border border-slate-200 bg-white p-6"><h1 className="text-2xl font-semibold text-slate-800">Mi espacio</h1><p className="mt-3 text-slate-600">Consulta tu legajo y los próximos vencimientos.</p><div className="mt-5 flex flex-wrap gap-4"><Link to="/mi-legajo" className="rounded-xl bg-teal-700 px-4 py-3 text-white">Mi legajo</Link><Link to="/vencimientos" className="rounded-xl border border-teal-300 px-4 py-3 text-teal-800">Vencimientos</Link></div></section>
 }

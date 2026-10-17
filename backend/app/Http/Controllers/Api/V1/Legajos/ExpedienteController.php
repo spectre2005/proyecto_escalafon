@@ -256,7 +256,7 @@ class ExpedienteController extends Controller
             'condiciones' => ['banderas' => $banderas, 'sin_vinculo_vigente' => $aplicacion->sinVinculoVigente, 'avisos' => $aplicacion->avisos(),
                 'modulos_ocultos' => [...($veSensibles ? $aplicacion->modulosOcultos() : []), ...$aplicacion->modulosOcultosPuesto()],
                 'pendientes' => PerfilPendiente::de($person, $aplicacion, $veSensibles)],
-            'document_sections' => SeccionLegajo::query()->orderBy('orden')->get(['id', 'nombre']),
+            'document_sections' => SeccionLegajo::query()->orderBy('orden')->get(['id', 'nombre', 'activa', 'disponibilidad']),
             'document_states' => DocumentoUsuario::query()->where('usuario_id', $usuario)->whereHas('legajo', fn (Builder $query): Builder => $query->where('usuario_id', $usuario))
                 ->when(! $veSensibles, fn (Builder $query): Builder => $query->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES))
                 ->distinct()->orderBy('estado')->pluck('estado'),

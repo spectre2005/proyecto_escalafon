@@ -1,5 +1,9 @@
 // permiso: el ítem se oculta si la sesión no lo tiene (con una lista, basta uno). Es solo presentación; el backend valida.
 export const navigation = [
+  { label: 'Incorporación', to: '/incorporacion', icon: 'users', group: 'Principal', permiso: 'legajo.editar' },
+  { label: 'Mi legajo', to: '/mi-legajo', icon: 'folder', group: 'Principal', permiso: 'legajo.propio' },
+  { label: 'Vencimientos', to: '/vencimientos', icon: 'clock', group: 'Principal', permiso: ['vencimientos.ver', 'renovacion.propia'] },
+  { label: 'Acceso y autorización', to: '/accesos', icon: 'shield', group: 'Administración', permiso: 'sistema.administrar' },
   { label: 'Inicio', to: '/', icon: 'home', group: 'Principal' },
   { label: 'Personal', to: '/personal', icon: 'users', group: 'Principal', permiso: 'personal.ver' },
   { label: 'Legajos', to: '/legajos', icon: 'folder', group: 'Principal', permiso: 'legajo.ver' },

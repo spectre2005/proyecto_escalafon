@@ -93,12 +93,19 @@ class Usuario extends Authenticatable
             return $this->rolesVigentesCalculados;
         }
         $hoy = today()->toDateString();
+        if ($this->relationLoaded('usuarioRolesPorUsuario') && $this->usuarioRolesPorUsuario->every(fn ($asignacion) => $asignacion->relationLoaded('rol'))) {
+            return $this->rolesVigentesCalculados = $this->usuarioRolesPorUsuario
+                ->filter(fn ($asignacion) => $asignacion->rol?->activo
+                    && $asignacion->vigente_desde->toDateString() <= $hoy
+                    && ($asignacion->vigente_hasta === null || $asignacion->vigente_hasta->toDateString() >= $hoy))
+                ->map(fn ($asignacion) => $asignacion->rol)->unique('id')->values();
+        }
 
         return $this->rolesVigentesCalculados = Rol::query()
             ->where('activo', true)
             ->whereIn('id', $this->usuarioRolesPorUsuario()
-                ->where('vigente_desde', '<=', $hoy)
-                ->where(fn (Builder $query): Builder => $query->whereNull('vigente_hasta')->orWhere('vigente_hasta', '>=', $hoy))
+                ->whereDate('vigente_desde', '<=', $hoy)
+                ->where(fn (Builder $query): Builder => $query->whereNull('vigente_hasta')->orWhereDate('vigente_hasta', '>=', $hoy))
                 ->select('rol_id'))
             ->get();
     }
@@ -138,7 +145,9 @@ class Usuario extends Authenticatable
 
     public function veDatosSensibles(): bool
     {
-        return $this->tienePermiso('datos_sensibles.ver');
+        return $this->tienePermiso('datos_sensibles.ver')
+            || ($this->tienePermiso('legajo.propio') && request()->isMethod('GET')
+                && request()->is('api/v1/expedientes/*') && request()->route('usuario') === $this->id);
     }
 
     public function isAdministrator(): bool
