@@ -2,3 +2,7 @@
 # Secretos y datos de producción: nunca al repositorio.
 .env.produccion
 respaldos/
+# Copias de respaldo de los .env (editores, nano): tienen los mismos datos que el .env.
+*.env.save
+# Resultados de las pruebas de Playwright (capturas y estado de la última ejecución).
+frontend/test-results/
