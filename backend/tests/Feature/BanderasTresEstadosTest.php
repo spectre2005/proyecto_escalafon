@@ -7,7 +7,6 @@ use App\Models\DocumentoUsuario;
 use App\Models\Familiar;
 use App\Models\Legajo;
 use App\Models\RegimenNormativo;
-use App\Models\Rol;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
@@ -236,9 +235,7 @@ class BanderasTresEstadosTest extends TestCase
         $this->assertSame(1, $eventos()->count());
 
         // El asistente (aun con datos sensibles) no tiene el permiso: pendiente del cliente.
-        // La migración ya crea este rol; esta prueba habilita expresamente acceso sensible.
-        Rol::query()->where('codigo', 'asistente_legajo')->update(['ve_datos_sensibles' => true]);
-        $asistente = $this->asignarRol(Usuario::factory()->create(), 'asistente_legajo')->refresh();
+        $asistente = $this->asignarRol(Usuario::factory()->create(), 'asistente_legajo', [], ['ve_datos_sensibles' => true])->refresh();
         $this->assertNotContains('discapacidad.editar', $asistente->permisos());
         Sanctum::actingAs($asistente);
         $this->patchJson($uri, ['con_discapacidad' => false])->assertForbidden();

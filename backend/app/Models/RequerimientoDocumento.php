@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class RequerimientoDocumento extends Model
 {
@@ -32,8 +31,6 @@ class RequerimientoDocumento extends Model
         'documento_id',
         'solicitado_por',
         'cerrado_en',
-        'ciclo_id', 'politica_id', 'documento_objetivo_id', 'motivo_renovacion',
-        'unidad_plazo', 'antiguedad_maxima_dias', 'fecha_vencimiento_evidencia',
     ];
 
     /** @return array<string, string> */
@@ -45,7 +42,6 @@ class RequerimientoDocumento extends Model
             'fecha_limite' => 'date',
             'prorroga_hasta' => 'date',
             'cerrado_en' => 'datetime',
-            'fecha_vencimiento_evidencia' => 'date',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
@@ -54,11 +50,6 @@ class RequerimientoDocumento extends Model
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'usuario_id', 'id');
-    }
-
-    public function presentacion(): HasOne
-    {
-        return $this->hasOne(PresentacionRenovacion::class, 'requerimiento_id')->where('actual', true);
     }
 
     public function tipoDocumento(): BelongsTo

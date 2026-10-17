@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Api\V1\AccesoSeccionesController;
 use App\Http\Controllers\Api\V1\AfiliacionController;
 use App\Http\Controllers\Api\V1\ArchivoDocumentoController;
 use App\Http\Controllers\Api\V1\AuditoriaEventoController;
@@ -27,7 +26,6 @@ use App\Http\Controllers\Api\V1\FeriadoController;
 use App\Http\Controllers\Api\V1\FormacionAcademicaController;
 use App\Http\Controllers\Api\V1\GoceVacacionalController;
 use App\Http\Controllers\Api\V1\HistorialEstadoDocumentoController;
-use App\Http\Controllers\Api\V1\IncorporacionController;
 use App\Http\Controllers\Api\V1\InduccionController;
 use App\Http\Controllers\Api\V1\InstitutionSettingsController;
 use App\Http\Controllers\Api\V1\LegajoController;
@@ -78,13 +76,10 @@ use App\Http\Controllers\Api\V1\UbigeoController;
 use App\Http\Controllers\Api\V1\UnidadOrganicaController;
 use App\Http\Controllers\Api\V1\UsuarioController;
 use App\Http\Controllers\Api\V1\UsuarioRolController;
-use App\Http\Controllers\Api\V1\VencimientoLegajoController;
 use App\Http\Controllers\Api\V1\VinculoAdendaController;
 use App\Http\Controllers\Api\V1\VinculoLaboralController;
-use App\Http\Middleware\AccesoSecciones;
 use App\Http\Middleware\ApiHabilitada;
 use App\Http\Middleware\ExigeCambioPassword;
-use App\Http\Middleware\ExigirVigenciaLegajo;
 use App\Http\Middleware\FuncionalidadActiva;
 use App\Http\Middleware\LegajoSoloLectura;
 use Illuminate\Support\Facades\Route;
@@ -97,37 +92,7 @@ Route::prefix('v1/auth')->middleware(ApiHabilitada::class)->group(function (): v
 });
 
 // FuncionalidadActiva: con una funcionalidad desactivada, sus rutas de creación y modificación responden 409.
-Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', AccesoSecciones::class, ExigirVigenciaLegajo::class, ExigeCambioPassword::class, FuncionalidadActiva::class, LegajoSoloLectura::class])->group(function (): void {
-    Route::prefix('vencimientos')->controller(VencimientoLegajoController::class)->group(function (): void {
-        Route::get('/', 'index');
-        Route::get('/opciones', 'opciones');
-        Route::post('/politicas', 'politica');
-        Route::post('/procesar', 'procesar');
-        Route::get('/legajos/{legajo}', 'show')->whereUuid('legajo');
-        Route::post('/legajos/{legajo}/inicializar', 'inicializar')->whereUuid('legajo');
-        Route::get('/legajos/{legajo}/constancia', 'constancia')->whereUuid('legajo');
-        Route::post('/ciclos/{ciclo}/preparar', 'preparar')->whereUuid('ciclo');
-        Route::post('/ciclos/{ciclo}/presentar', 'presentar')->whereUuid('ciclo');
-        Route::post('/ciclos/{ciclo}/revisar', 'revisar')->whereUuid('ciclo');
-        Route::post('/ciclos/{ciclo}/notificar', 'notificar')->whereUuid('ciclo');
-        Route::post('/ciclos/{ciclo}/requisitos/{requisito}/pdf', 'subir')->whereUuid(['ciclo', 'requisito']);
-        Route::post('/ciclos/{ciclo}/requisitos/{requisito}/vincular', 'vincular')->whereUuid(['ciclo', 'requisito']);
-        Route::post('/ciclos/{ciclo}/requisitos/{requisito}/fiscalizar', 'fiscalizar')->whereUuid(['ciclo', 'requisito']);
-        Route::get('/ciclos/{ciclo}/presentaciones/{presentacion}', 'archivo')->whereUuid(['ciclo', 'presentacion']);
-    });
-    Route::get('acceso-secciones', [AccesoSeccionesController::class, 'show']);
-    Route::put('acceso-secciones', [AccesoSeccionesController::class, 'update'])->middleware('can:sistema.administrar');
-    Route::prefix('incorporaciones')->middleware('can:legajo.editar')->controller(IncorporacionController::class)->group(function (): void {
-        Route::get('/', 'index');
-        Route::get('/opciones', 'opciones')->middleware('can:sistema.administrar');
-        Route::post('/responsables', 'habilitarResponsable')->middleware('can:sistema.administrar');
-        Route::post('/', 'store')->middleware('can:sistema.administrar');
-        Route::get('/{incorporacion}', 'show')->whereUuid('incorporacion');
-        Route::patch('/{incorporacion}', 'actualizar')->whereUuid('incorporacion');
-        Route::post('/{incorporacion}/documentos/{documento}', 'subir')->whereUuid(['incorporacion', 'documento']);
-        Route::get('/{incorporacion}/documentos/{documento}', 'archivo')->whereUuid(['incorporacion', 'documento']);
-    });
-
+Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCambioPassword::class, FuncionalidadActiva::class, LegajoSoloLectura::class])->group(function (): void {
     Route::get('institucion', [InstitutionSettingsController::class, 'show']);
     // Qué ocultar en la navegación (cualquier sesión). Cambiar la configuración exige configuracion.modulos.
     Route::get('funcionalidades', [ConfiguracionFuncionalidadController::class, 'publico']);
@@ -326,7 +291,7 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', AccesoSec
 // afiliaciones y controversias (sección 09, sensibles): solo lectura y con datos_sensibles.ver; se registran, corrigen y
 // anulan desde Legajos\Seccion09Controller.
 // desvinculaciones (sección 11): solo lectura; se registran, corrigen y anulan desde Legajos\Seccion11Controller.
-Route::prefix('v1')->middleware([ApiHabilitada::class.':crud', 'auth:sanctum', AccesoSecciones::class, ExigeCambioPassword::class, 'can:sistema.administrar', FuncionalidadActiva::class])->group(function (): void {
+Route::prefix('v1')->middleware([ApiHabilitada::class.':crud', 'auth:sanctum', ExigeCambioPassword::class, 'can:sistema.administrar', FuncionalidadActiva::class])->group(function (): void {
     Route::apiResource('afiliaciones', AfiliacionController::class)->parameters(['afiliaciones' => 'record'])->whereUuid('record')->names('api.v1.afiliaciones')->only(['index', 'show'])->middleware('can:datos_sensibles.ver');
     Route::apiResource('archivos-documento', ArchivoDocumentoController::class)->parameters(['archivos-documento' => 'record'])->whereUuid('record')->names('api.v1.archivos-documento')->only(['index', 'show']);
     Route::apiResource('auditoria-eventos', AuditoriaEventoController::class)->parameters(['auditoria-eventos' => 'record'])->whereUuid('record')->names('api.v1.auditoria-eventos');

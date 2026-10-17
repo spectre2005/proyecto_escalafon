@@ -4,11 +4,10 @@ import { createQueryStore } from './queryStore'
 
 const store = createQueryStore((url, signal) => api.get(url, { signal }).then(response => response.data))
 const subscriptions = new Map()
-const disabledSnapshot = { data: null, error: null, loading: false }
 
 export function useLiveQuery(url, queryStore = store) {
-  const subscribe = useCallback(listener => url ? queryStore.subscribe(url, listener) : () => {}, [url, queryStore])
-  const snapshot = useCallback(() => url ? queryStore.snapshot(url) : disabledSnapshot, [url, queryStore])
+  const subscribe = useCallback(listener => queryStore.subscribe(url, listener), [url, queryStore])
+  const snapshot = useCallback(() => queryStore.snapshot(url), [url, queryStore])
   const result = useSyncExternalStore(subscribe, snapshot)
   useEffect(() => {
     let subscription = subscriptions.get(queryStore)
@@ -34,5 +33,5 @@ export function useLiveQuery(url, queryStore = store) {
       }
     }
   }, [queryStore])
-  return { ...result, retry: () => url && queryStore.refresh(url), setData: data => url && queryStore.setData(url, data) }
+  return { ...result, retry: () => queryStore.refresh(url), setData: data => queryStore.setData(url, data) }
 }
