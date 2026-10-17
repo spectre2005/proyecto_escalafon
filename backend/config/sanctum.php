@@ -1,8 +1,8 @@
 <?php
 
+use App\Http\Middleware\AutenticarSesion;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
-use Laravel\Sanctum\Http\Middleware\AuthenticateSession;
 use Laravel\Sanctum\Sanctum;
 
 return [
@@ -80,7 +80,8 @@ return [
     */
 
     'middleware' => [
-        'authenticate_session' => AuthenticateSession::class,
+        // El de Sanctum, que además rechaza sesiones sin huella de la contraseña (App\Http\Middleware\AutenticarSesion).
+        'authenticate_session' => AutenticarSesion::class,
         'encrypt_cookies' => EncryptCookies::class,
         'validate_csrf_token' => ValidateCsrfToken::class,
     ],

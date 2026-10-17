@@ -43,6 +43,11 @@ class AuthController extends Controller
 
         RateLimiter::clear($clave);
         $request->session()->regenerate();
+        // Huella de la contraseña desde el inicio de la sesión, con la misma clave y cálculo que AuthenticateSession
+        // de Sanctum (que solo la guarda al terminar una petición que ya traía usuario). Así, si la contraseña cambia
+        // (p. ej. la restablece la plataforma), también se cierra una sesión que solo llegó a iniciarse.
+        $guard = Auth::guard('web');
+        $request->session()->put('password_hash_web', $guard->hashPasswordForCookie($request->user()->getAuthPassword()));
         // Sin tocar updated_at: lo usa la edición del legajo para detectar cambios ajenos.
         Usuario::withoutTimestamps(fn () => $request->user()->forceFill(['ultimo_acceso' => now()])->saveQuietly());
 
