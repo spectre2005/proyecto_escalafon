@@ -115,12 +115,13 @@ class Usuario extends Authenticatable
         $catalogo = array_keys(config('permisos.catalogo'));
         $derivados = config('permisos.derivados');
         $asignables = array_diff($catalogo, array_keys($derivados), config('permisos.pendientes'));
-        // Los explícitos se asignan solo nombrándolos en la lista de un rol, nunca por '*'.
+        // Los explícitos se asignan solo nombrándolos en la lista de un rol, nunca por '*'. Un rol puede combinar
+        // el comodín con explícitos: ['*', 'configuracion.modulos'].
         $comodin = array_diff($asignables, config('permisos.explicitos', []));
         $permisos = [];
         foreach ($this->rolesVigentes() as $rol) {
-            $delRol = config('permisos.roles.'.$rol->codigo, []);
-            $permisos = [...$permisos, ...($delRol === '*' ? $comodin : array_intersect($delRol, $asignables))];
+            $delRol = (array) config('permisos.roles.'.$rol->codigo, []);
+            $permisos = [...$permisos, ...(in_array('*', $delRol, true) ? $comodin : []), ...array_intersect($delRol, $asignables)];
             foreach ($derivados as $permiso => $columna) {
                 if ($rol->{$columna}) {
                     $permisos[] = $permiso;

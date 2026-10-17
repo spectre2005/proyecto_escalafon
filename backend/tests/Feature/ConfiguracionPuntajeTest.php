@@ -71,13 +71,21 @@ class ConfiguracionPuntajeTest extends TestCase
     {
         $this->getJson(self::URL)->assertUnauthorized();
 
-        // ADMIN ('*') no recibe configuracion.modulos.
-        $admin = $this->actuarComo();
-        $this->assertNotContains('configuracion.modulos', $admin->permisos());
-        $this->assertContains('sistema.administrar', $admin->permisos());
+        // Un rol con solo '*' no recibe configuracion.modulos.
+        config(['permisos.roles.solo_comodin' => '*']);
+        $comodin = $this->actuarComo(null, 'solo_comodin');
+        $this->assertNotContains('configuracion.modulos', $comodin->permisos());
+        $this->assertContains('sistema.administrar', $comodin->permisos());
         $this->getJson(self::URL)->assertForbidden();
         $this->cambiar(false)->assertForbidden();
         $this->assertNotContains('configuracion.modulos', $this->getJson('/api/v1/auth/me')->assertOk()->json('data.permisos'));
+
+        // ADMIN lo nombra junto a '*': tiene todo el catálogo asignable y además configuracion.modulos.
+        $admin = $this->actuarComo();
+        $this->assertContains('configuracion.modulos', $admin->permisos());
+        $this->assertSame([], array_diff([...$comodin->permisos(), 'configuracion.modulos'], $admin->permisos()));
+        $this->assertContains('configuracion.modulos', $this->getJson('/api/v1/auth/me')->assertOk()->json('data.permisos'));
+        $this->getJson(self::URL)->assertOk();
 
         $this->actuarComo(null, 'asistente_legajo');
         $this->getJson(self::URL)->assertForbidden();

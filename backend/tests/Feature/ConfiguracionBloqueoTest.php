@@ -135,13 +135,23 @@ class ConfiguracionBloqueoTest extends TestCase
         $this->assertFalse($data['activas']['s06.compensaciones']);
     }
 
-    public function test_admin_wildcard_does_not_grant_configuracion_modulos(): void
+    public function test_the_wildcard_alone_does_not_grant_configuracion_modulos(): void
     {
-        // configuracion.modulos es de asignación explícita: el '*' de ADMIN no lo incluye.
-        $this->actuarComo();
+        // configuracion.modulos es de asignación explícita: un rol con solo '*' no lo recibe.
+        config(['permisos.roles.solo_comodin' => '*']);
+        $this->actuarComo(null, 'solo_comodin');
         $this->getJson('/api/v1/configuracion/funcionalidades')->assertForbidden();
         $this->patchJson('/api/v1/configuracion/funcionalidades/s06.compensaciones', ['activa' => false, 'motivo' => 'Prueba'])->assertForbidden();
         $this->assertDatabaseCount('configuracion_funcionalidades', 0);
+    }
+
+    public function test_the_institution_administrator_configures_features(): void
+    {
+        // ADMIN lo nombra junto a '*': el administrador de cada institución configura sus funcionalidades.
+        $this->actuarComo();
+        $this->getJson('/api/v1/configuracion/funcionalidades')->assertOk();
+        $this->patchJson('/api/v1/configuracion/funcionalidades/s06.compensaciones', ['activa' => false, 'motivo' => 'Prueba del administrador'])->assertOk();
+        $this->assertFalse(ConfiguracionFuncionalidades::activa('s06.compensaciones'));
     }
 
     public function test_changing_a_feature_without_configuracion_modulos_is_rejected(): void

@@ -189,8 +189,9 @@ verificación. Falta, en el orden propuesto (sin decidir):
 - Permisos: sistema.administrar → Institución; configuracion.modulos → Funcionalidades.
   Cada ruta del backend valida su propio permiso (api.php:95-100). Tests en
   ConfiguracionBloqueoTest e InstitutionSettingsTest.
-- ATENCIÓN: el comodín '*' del rol ADMIN NO incluye configuracion.modulos. Un
-  administrador nuevo necesita los dos roles (ADMIN y configuracion_modulos).
+- configuracion.modulos sigue siendo explícito: el comodín '*' solo no lo da. Desde el 17/10/2026, el rol
+  ADMIN lo nombra junto a '*' (config/permisos.php): el administrador de cada institución configura sus
+  funcionalidades, con motivo y auditoría. El rol configuracion_modulos queda para otra persona que no sea ADMIN.
 - Un usuario sin ningún permiso no puede iniciar sesión (AuthController.php:31).
 - La base real tiene 68 tablas; escalafon_drawdb_55.sql está desactualizado.
 - asistente_legajo aún no existe en la base (pendiente de confirmar con el cliente).
