@@ -243,6 +243,50 @@ Cambiar `ADMIN_PASSWORD` y repetir el seeder **no restablece automáticamente la
 
 No todos los archivos de `database/seeders/` se ejecutan con `db:seed`: la lista está en `DatabaseSeeder.php`. Algunos son ejemplos o crean datos con factories; revisa su contenido antes de ejecutarlos individualmente. Las personas demo no reemplazan a la cuenta administradora.
 
+### Si no puedes entrar como administrador o superadministrador (local)
+
+El archivo `backend/.env.example` es una plantilla: sus valores no se aplican automáticamente a una instalación existente. Agrega o actualiza las siguientes variables en **`backend/.env`**, conservando el resto de tu configuración y sin duplicar claves:
+
+```dotenv
+APP_ENV=local
+ADMIN_EMAIL=admin.uniq@demo.test
+ADMIN_PASSWORD=Demo-Escalafon-2026
+PLATAFORMA_ADMIN_EMAIL=superadmin@demo.test
+PLATAFORMA_ADMIN_PASSWORD=Demo-Escalafon-2026
+PLATAFORMA_PRUEBA_SLUG=uniq
+PLATAFORMA_PRUEBA_NOMBRE="Universidad Nacional Intercultural de Quillabamba"
+PLATAFORMA_DB_DATABASE=escalafon_plataforma
+PLATAFORMA_MODO=subdominio
+PLATAFORMA_DOMINIO=localhost
+SANCTUM_STATEFUL_DOMAINS=localhost:5173,127.0.0.1:5173,localhost:8000,*.localhost:5173
+SESSION_SECURE_COOKIE=false
+```
+
+Estas cuentas y contraseñas son públicas y sirven únicamente para desarrollo local. Los seeders de cuentas de prueba solo se ejecutan en `local` o `testing`.
+
+Si aparece `database "escalafon_plataforma" does not exist`, falta crear la base de plataforma. Desde la **raíz del proyecto**, ejecuta los siguientes comandos en orden para preparar las bases y cargar las cuentas de prueba; detente si alguno falla:
+
+```sh
+docker compose up -d db app nginx frontend
+docker compose exec app php artisan config:clear --no-interaction
+docker compose exec app php artisan migrate --no-interaction
+docker compose exec app php artisan plataforma:migrar-instituciones --crear-base --no-interaction
+docker compose exec app php artisan db:seed --no-interaction
+```
+
+`--crear-base` crea la base de plataforma si falta, sin borrar bases existentes. `db:seed` carga también catálogos, personas e instituciones de demostración; si encuentra al administrador inicial con otro correo, puede actualizar su correo y contraseña a los configurados arriba.
+
+Después, entra por la dirección correspondiente:
+
+| Acceso | Dirección | Correo | Contraseña local |
+| --- | --- | --- | --- |
+| Administrador UNIQ | http://uniq.localhost:5173 | `admin.uniq@demo.test` | `Demo-Escalafon-2026` |
+| Superadministrador | http://localhost:5173/plataforma/login | `superadmin@demo.test` | `Demo-Escalafon-2026` |
+
+El acceso institucional necesita el subdominio `uniq`; el panel de plataforma se abre en `localhost`, sin subdominio. Si sigue apareciendo «credenciales incorrectas», ten en cuenta que **ninguno de los dos seeders restablece la contraseña de una cuenta existente con el mismo correo**. Cambiar las variables de contraseña del `.env` no cambia por sí solo la contraseña guardada en la base.
+
+No subas `.env` ni sus copias de respaldo al repositorio. Comparte la configuración mediante `.env.example`; cada integrante debe actualizar su `.env` local y ejecutar los comandos en su propia instalación.
+
 ## 4. Trabajo diario y actualizaciones
 
 ```sh
