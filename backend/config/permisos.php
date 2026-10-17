@@ -53,12 +53,14 @@ return [
     ],
 
     // Código de rol (roles.codigo) => permisos. '*' = todo el catálogo menos
-    // los derivados, los pendientes y los explícitos.
+    // los derivados, los pendientes y los explícitos; un explícito se suma nombrándolo junto a '*'.
     'roles' => [
-        'ADMIN' => '*',
+        // El administrador de cada institución (jefe de la ORH) también configura sus funcionalidades
+        // (decisión del 17/10/2026). Cada cambio exige motivo y queda auditado.
+        'ADMIN' => ['*', 'configuracion.modulos'],
 
-        // Rol adicional para cambiar la configuración de funcionalidades. No existe en la base ni en los
-        // seeders: se asigna expresamente a una persona. Pendiente de confirmar quién es el responsable (U9).
+        // Rol adicional para que otra persona, sin ser ADMIN, cambie la configuración de funcionalidades. No
+        // existe en la base ni en los seeders: se asigna expresamente.
         'configuracion_modulos' => [
             'configuracion.modulos',
         ],
