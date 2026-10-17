@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import Modal from '../../../../components/ui/Modal'
+import { useState } from 'react'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { apiErrorMessage } from '../../../../axios'
 import Icon from '../../../../components/ui/Icon'
@@ -22,23 +23,6 @@ const acciones = {
   REEMPLAZAR_ARCHIVO: 'Nueva versión del archivo', COMPLETAR_TRAMITE: 'Trámite completado', DOCUMENTO_SUBSANADO: 'Sustituido por una nueva evidencia',
   ANULAR_DOCUMENTO: 'Documento anulado', DESCARGAR_DOCUMENTO: 'Documento descargado',
   'sst.documento.aceptado': 'Documento aceptado', 'sst.documento.observado': 'Documento observado',
-}
-
-function Modal({ titulo, onClose, children }) {
-  const dialogo = useRef(null)
-  useEffect(() => {
-    const element = dialogo.current
-    element.showModal()
-    return () => element.close()
-  }, [])
-  function cerrar() {
-    if (!dialogo.current.querySelector('form[aria-busy="true"]')) onClose()
-  }
-  return <dialog ref={dialogo} aria-label={titulo} onCancel={event => { event.preventDefault(); cerrar() }}
-    className="m-auto max-h-[92vh] w-[min(96vw,1280px)] overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-xl backdrop:bg-slate-900/50 sm:p-6">
-    <div className="mb-4 flex items-center justify-between gap-4"><h3 className="font-semibold text-slate-800">{titulo}</h3><button type="button" className={boton} onClick={cerrar}>Cerrar</button></div>
-    {children}
-  </dialog>
 }
 
 function Historial({ usuario, documento }) {
@@ -127,11 +111,11 @@ export default function Seccion10Panel({ usuario, subseccion = '10.1' }) {
     {itemSeleccionado && <Modal titulo={`Documentos de ${itemSeleccionado.nombre}`} onClose={() => setSeleccion(null)}>
       <Documentos key={itemSeleccionado.id} item={itemSeleccionado} permisos={{ subir, editar, revisar, anular }} abrir={abrir} ver={setVisor} mostrarTitulo={false} />
     </Modal>}
-    {visor && <Modal titulo={`Documento de ${titulo}`} onClose={() => setVisor(null)}><VisorPdf usuario={usuario} documento={visor} titulo={visor.nombre} onClose={() => setVisor(null)} /></Modal>}
-    {modal && <Modal titulo={modal.modo === 'historial' ? `Historial: ${modal.documento.nombre}` : modal.item.nombre} onClose={() => setModal(null)}>
-      {modal.modo === 'historial' ? <Historial usuario={usuario} documento={modal.documento} /> : ['aceptado', 'observado', 'anulado'].includes(modal.modo)
+    {visor && <VisorPdf usuario={usuario} documento={visor} titulo={visor.nombre} onClose={() => setVisor(null)} />}
+    {modal && <>
+      {modal.modo === 'historial' ? <Modal titulo={`Historial: ${modal.documento.nombre}`} onClose={() => setModal(null)}><Historial usuario={usuario} documento={modal.documento} /></Modal> : ['aceptado', 'observado', 'anulado'].includes(modal.modo)
         ? <Revision03Form usuario={usuario} documento={modal.documento} item={modal.item} estado={modal.modo} fechaActual={data.fecha_actual} revisar={modal.modo === 'anulado' ? anularDocumento10 : revisarDocumento10} onSaved={guardado} onCancel={() => setModal(null)} nota="La operación conserva el archivo y queda registrada con tu usuario, fecha y hora. La revisión requiere una persona distinta de quien realizó la carga." />
         : <Documento10Form usuario={usuario} datos={data} item={modal.item} documento={modal.documento} modo={modal.modo} onSaved={guardado} onCancel={() => setModal(null)} />}
-    </Modal>}
+    </>}
   </section>
 }

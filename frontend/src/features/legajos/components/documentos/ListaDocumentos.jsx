@@ -1,3 +1,5 @@
+import Modal from '../../../../components/ui/Modal'
+import Icon from '../../../../components/ui/Icon'
 import { useState } from 'react'
 import { apiErrorMessage } from '../../../../axios'
 import { usePuede } from '../../../auth/session'
@@ -19,6 +21,7 @@ const kb = bytes => bytes ? `${Math.max(1, Math.round(bytes / 1024))} KB` : ''
 export default function ListaDocumentos({ usuario, tipo, enlazado }) {
   const puedeVer = usePuede('legajo.ver')
   const puedeRecepcionar = usePuede('documento.recepcionar')
+  const [abierto, setAbierto] = useState(false)
   const [visor, setVisor] = useState(null)
   const [confirmando, setConfirmando] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -41,7 +44,8 @@ export default function ListaDocumentos({ usuario, tipo, enlazado }) {
     }
   }
 
-  return <div className="mt-3 space-y-2">
+  return <><button type="button" aria-haspopup="dialog" onClick={() => setAbierto(true)} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-800 hover:bg-teal-100 focus-visible:outline-2 focus-visible:outline-teal-700"><Icon name="eye" size={18} />Ver documentos ({lista.length})</button>
+    {abierto && <Modal titulo={`Documentos de ${tipo.nombre}`} onClose={() => setAbierto(false)} busy={busy}><div className="space-y-3">
     {error && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
     {lista.map(documento => {
       const v = documento.values
@@ -77,5 +81,5 @@ export default function ListaDocumentos({ usuario, tipo, enlazado }) {
         {visor === documento.id && <VisorPdf usuario={usuario} documento={documento} titulo={titulo(documento)} onClose={() => setVisor(null)} />}
       </article>
     })}
-  </div>
+  </div></Modal>}</>
 }

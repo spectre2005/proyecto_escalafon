@@ -1,3 +1,4 @@
+import DocumentoDesplegable from '../documentos/DocumentoDesplegable'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiErrorMessage } from '../../../../axios'
@@ -78,10 +79,9 @@ export default function Seccion08Panel({ usuario, categoria }) {
         {listaTiempo.length === 0 ? <p className="mt-2 text-sm text-slate-500">Todavía no hay documentos registrados.</p> : <ol className="mt-4 space-y-3">{[...listaTiempo].reverse().map(doc => <li key={doc.id} className="flex min-w-0 gap-3 border-l-2 border-teal-200 pl-4"><span aria-hidden="true" className={`mt-1 size-2.5 shrink-0 rounded-full ${doc.grupo === 'sanciones' ? 'bg-rose-600' : 'bg-teal-700'}`} /><div className="min-w-0"><p className="break-words text-sm font-medium text-slate-800">{doc.nombre}</p><p className="mt-1 text-xs text-slate-500">{fechaEvento(doc)} · {doc.grupo === 'sanciones' ? 'Sanción disciplinaria' : 'Reconocimiento'} · Folios {folios(doc.folio_inicio, doc.folio_fin)}</p></div></li>)}</ol>}
       </section>
       <section className="space-y-3" aria-label={titulo}>
-        {items?.map(item => <details key={item.codigo} className="group overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <summary id={`item-${item.codigo}`} className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 p-5 focus-visible:outline-2 focus-visible:outline-teal-600">
+        {items?.map(item => <DocumentoDesplegable compacto key={item.codigo} id={`item-${item.codigo}`} titulo={item.nombre} formulario={formulario?.item === item.codigo && !formulario.documento ? <Documento08Form usuario={usuario} item={item} datos={data} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado. Queda en revisión de RR. HH.')} /> : null} onAdjuntar={item.aplica && data.legajo && (grupoActual === 'sanciones' ? puedeRegistrarSanciones : puedeSubir) ? () => { setAviso(''); setFormulario({ item: item.codigo, origen: `adjuntar-item-${item.codigo}` }) } : undefined} resumen={<>
             <div className="min-w-0"><h4 className="break-words text-sm font-semibold text-slate-800">{item.nombre}</h4><p className="mt-1 text-xs text-slate-500">{item.motivo} · {item.cantidad} documento(s)</p></div><Estado estado={item.estado} />
-          </summary>
+           </>}>
           <div className="space-y-4 border-t border-slate-100 p-4 sm:p-5">
             {item.documentos.length === 0 && <p className="text-sm text-slate-500">{item.estado === 'no_aplica' ? 'No aplica al tipo de personal registrado.' : 'No hay documentos registrados. Este ítem es opcional; agrega un documento si corresponde.'}</p>}
             {item.documentos.map(doc => <article key={doc.id} className="min-w-0 rounded-xl border border-slate-200 p-4">
@@ -105,10 +105,10 @@ export default function Seccion08Panel({ usuario, categoria }) {
               {visor?.id === doc.id && <VisorPdf usuario={usuario} documento={doc} titulo={doc.nombre} onClose={() => setVisor(null)} />}
             </article>)}
             {item.aplica && data.legajo && (grupoActual === 'sanciones' ? puedeRegistrarSanciones : puedeSubir) && <>
-              {formulario?.item === item.codigo && !formulario.documento ? <Documento08Form usuario={usuario} item={item} datos={data} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado. Queda en revisión de RR. HH.')} /> : <button id={`agregar-${item.codigo}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.codigo, origen: `agregar-${item.codigo}` }) }}>{item.cantidad ? 'Agregar otro documento' : 'Agregar documento'}</button>}
+              <button id={`agregar-${item.codigo}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.codigo, origen: `agregar-${item.codigo}` }) }}>{item.cantidad ? 'Agregar otro documento' : 'Agregar documento'}</button>
             </>}
           </div>
-        </details>)}
+        </DocumentoDesplegable>)}
       </section>
       <p className="text-sm font-semibold text-slate-800">Número de folios: {data.numero_folios}</p>
       <p className="rounded-xl border border-slate-200 bg-white p-4 text-xs leading-relaxed text-slate-500">Los folios se asignan correlativamente. Los documentos registrados se conservan sin editar ni eliminar.</p>

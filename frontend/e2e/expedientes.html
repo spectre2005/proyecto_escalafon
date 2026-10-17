@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Prueba de ventanas del expediente</title></head>
+<body><div id="root"></div>
+<script type="module">
+import React from 'react'
+import { createRoot } from 'react-dom/client'
+import { BrowserRouter } from 'react-router-dom'
+import { SessionContext } from '/src/features/auth/session.js'
+import Seccion03Panel from '/src/features/legajos/components/seccion03/Seccion03Panel.jsx'
+import Seccion10Panel from '/src/features/legajos/components/seccion10/Seccion10Panel.jsx'
+import IncorporacionPage from '/src/features/incorporation/IncorporacionPage.jsx'
+import '/src/index.css'
+const vista = new URLSearchParams(location.search).get('vista')
+const componente = vista === 'incorporacion' ? IncorporacionPage : vista === 'sst' ? Seccion10Panel : Seccion03Panel
+createRoot(document.getElementById('root')).render(React.createElement(BrowserRouter, null,
+  React.createElement(SessionContext.Provider, { value: { usuario: { id: 'revisor' }, permisos: ['legajo.ver', 'legajo.editar', 'documento.subir', 'sistema.administrar'], ve_datos_sensibles: true } },
+    React.createElement(componente, { usuario: 'persona' }))))
+</script>
+</body>
+</html>

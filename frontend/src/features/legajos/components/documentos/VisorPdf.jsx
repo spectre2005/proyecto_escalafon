@@ -1,3 +1,4 @@
+import Modal from '../../../../components/ui/Modal'
 import { useEffect, useRef, useState } from 'react'
 import { archivoDocumento } from '../../api/documentosApi'
 
@@ -42,7 +43,7 @@ export default function VisorPdf({ usuario, documento, titulo, onClose }) {
     }
   }
 
-  return <section aria-label="Visor de PDF" className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+  return <Modal titulo={titulo || 'Documento PDF'} onClose={onClose}><section aria-label="Visor de PDF" className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
     <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
       <h4 className="min-w-0 break-words text-sm font-semibold text-slate-800">{titulo}</h4>
       <div className="flex flex-wrap gap-4">
@@ -53,5 +54,5 @@ export default function VisorPdf({ usuario, documento, titulo, onClose }) {
     {error ? <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>
       : url ? <iframe title={titulo} src={url} className="h-[70vh] w-full rounded-xl border border-slate-100" />
         : <p role="status" className="rounded-xl bg-slate-100 p-6 text-sm text-slate-500">Cargando PDF…</p>}
-  </section>
+  </section></Modal>
 }

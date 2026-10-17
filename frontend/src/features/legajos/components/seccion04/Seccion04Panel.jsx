@@ -1,3 +1,4 @@
+import DocumentoDesplegable from '../documentos/DocumentoDesplegable'
 import { useState } from 'react'
 import { apiErrorMessage } from '../../../../axios'
 import { Link } from 'react-router-dom'
@@ -62,12 +63,11 @@ export default function Seccion04Panel({ usuario }) {
     {data.items.length === 0 && <p className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600">No hay tipos documentales disponibles para tu perfil. Solicita a administración revisar el catálogo de la Sección 04.</p>}
     {[['Documentos de experiencia laboral', 'Certificados, asignación de funciones y documentos que requiera la entidad.']].map(([titulo, descripcion], grupo) => <section key={titulo} aria-label={titulo} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <header className="border-b border-slate-100 p-5"><h3 className="font-semibold text-slate-800">{titulo}</h3><p className="mt-1 text-xs text-slate-500">{descripcion}</p></header>
-      {data.items.filter(item => item.grupo === grupo).map(item => <details key={item.id} open={item.letra === 'a'} className="border-b border-slate-100 last:border-b-0">
-        <summary id={`item-${item.id}`} className="grid cursor-pointer grid-cols-[28px_minmax(0,1fr)] items-start gap-3 p-4 focus-visible:outline-2 focus-visible:outline-teal-700 sm:grid-cols-[28px_minmax(0,1fr)_auto]">
+      {data.items.filter(item => item.grupo === grupo).map(item => <DocumentoDesplegable key={item.id} id={`item-${item.id}`} titulo={item.nombre} formulario={formulario?.item === item.id && !formulario.documento ? <Documento04Form usuario={usuario} item={item} datos={data} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado. Queda en revisión de RR. HH.')} /> : null} onAdjuntar={puedeAgregar && data.legajo && item.aplica ? () => { setAviso(''); setFormulario({ item: item.id, origen: `adjuntar-item-${item.id}` }) } : undefined} resumen={<>
           <span className="grid size-7 place-items-center rounded-lg bg-teal-50 text-sm font-bold text-teal-800">{item.letra}</span>
           <span className="min-w-0"><span className="block break-words text-sm font-semibold text-slate-800">{item.nombre}</span><span className="mt-1 block text-xs text-slate-500">{item.motivo}{item.requiere_fedateo && ' Requiere fedateo.'}</span><span className="mt-1 block text-xs text-slate-500">{item.cantidad} documento(s) vigente(s)</span></span>
           <span className="col-start-2 sm:col-start-auto"><Estado estado={item.estado} /></span>
-        </summary>
+         </>}>
         <div className="space-y-4 px-4 pb-5 sm:pl-14">
           {item.documentos.length === 0 && <p className="text-sm text-slate-500">{item.estado === 'falta' ? 'Todavía no se registró este documento. Agrégalo para que RR. HH. lo revise.' : item.estado === 'no_aplica' ? 'Este documento no se exige para el puesto registrado.' : 'No hay documentos registrados. Puedes agregar uno si corresponde.'}</p>}
           <ul className="space-y-3">{item.documentos.map(doc => <li key={doc.id} className={`min-w-0 rounded-xl border border-slate-200 p-4 ${doc.subsanado ? 'bg-slate-50' : ''}`}>
@@ -89,10 +89,10 @@ export default function Seccion04Panel({ usuario }) {
             {visor?.id === doc.id && <VisorPdf usuario={usuario} documento={doc} titulo={doc.nombre} onClose={() => setVisor(null)} />}
           </li>)}</ul>
           {puedeAgregar && data.legajo && item.aplica && <>
-            {formulario?.item === item.id && !formulario.documento ? <Documento04Form usuario={usuario} item={item} datos={data} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado. Queda en revisión de RR. HH.')} /> : <button id={`agregar-${item.id}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.id, origen: `agregar-${item.id}` }) }}>{item.cantidad ? (item.permite_multiples ? 'Agregar otro documento' : 'Agregar documento que subsane al anterior') : 'Agregar documento'}</button>}
+            <button id={`agregar-${item.id}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.id, origen: `agregar-${item.id}` }) }}>{item.cantidad ? (item.permite_multiples ? 'Agregar otro documento' : 'Agregar documento que subsane al anterior') : 'Agregar documento'}</button>
           </>}
         </div>
-      </details>)}
+      </DocumentoDesplegable>)}
     </section>)}
     <p className="text-sm font-semibold text-slate-800">Número de folios: {data.numero_folios}</p>
     <p className="rounded-xl border border-slate-200 bg-white p-4 text-xs leading-relaxed text-slate-500">Los documentos se conservan sin editar ni eliminar. Los folios son correlativos por sección. La aceptación de RR. HH., el fedateo, la fiscalización posterior y el análisis antivirus se muestran por separado.</p>
