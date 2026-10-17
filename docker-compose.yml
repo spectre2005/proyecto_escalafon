@@ -10,6 +10,14 @@ services:
       - vendor:/var/www/html/vendor
       - ./docker/php/performance.ini:/usr/local/etc/php/conf.d/zz-performance.ini:ro
     command: sh -c "if [ ! -f vendor/autoload.php ]; then composer install --no-interaction --prefer-dist || exit 1; fi; exec php-fpm"
+    # Sano solo con las dependencias instaladas y PHP-FPM escuchando: «up --wait» (iniciar.ps1, README) espera al
+    # composer install del primer arranque y no lanza otro a la vez sobre el mismo vendor.
+    healthcheck:
+      test: ["CMD-SHELL", "test -f vendor/autoload.php && php -r 'exit(@fsockopen(\"127.0.0.1\", 9000) ? 0 : 1);'"]
+      interval: 3s
+      timeout: 5s
+      retries: 3
+      start_period: 15m
     depends_on:
       db:
         condition: service_healthy
@@ -22,7 +30,8 @@ services:
       - ./backend:/var/www/html
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
     depends_on:
-      - app
+      app:
+        condition: service_healthy
 
   frontend_dependencies:
     build: ./docker/node
