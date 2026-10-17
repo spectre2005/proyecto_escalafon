@@ -287,6 +287,22 @@ El acceso institucional necesita el subdominio `uniq`; el panel de plataforma se
 
 No subas `.env` ni sus copias de respaldo al repositorio. Comparte la configuración mediante `.env.example`; cada integrante debe actualizar su `.env` local y ejecutar los comandos en su propia instalación.
 
+### Paneles de acceso, incorporación y vencimientos
+
+- **Acceso y autorización** (`/accesos`): habilita secciones sin borrar su información, con control de cambios concurrentes.
+- **Incorporación** (`/incorporacion`): registro, delegación, revisión documental y activación del personal.
+- **Vencimientos** (`/vencimientos`): ciclos del legajo, contratos y documentos, con rango inicial de 30 días incluyendo hoy, filtros y orden ascendente. Rojo: menos de 7 días; amarillo: el resto del rango.
+- **Renovación docente** (`/vencimientos?vista=renovaciones`): gestión de ciclos y requisitos conservada de la rama feature.
+
+Después de actualizar, aplica las migraciones institucionales y renueva la sesión:
+
+```sh
+docker compose exec app php artisan migrate --no-interaction
+docker compose exec app php artisan plataforma:migrar-instituciones --no-interaction
+```
+
+Cada panel valida permisos en la API. Usa el subdominio de tu institución, por ejemplo `http://uniq.localhost:5173/vencimientos`. No hace falta volver a cargar datos demo. Los avisos automáticos de renovación requieren el scheduler y solo se aplican a ciclos docentes. Consulta [el funcionamiento de vencimientos](docs/vencimiento-legajo.md), [incorporación y acceso](docs/incorporacion-y-acceso.md) y [el reporte de integración](docs/revision-integracion-paneles.md).
+
 ## 4. Trabajo diario y actualizaciones
 
 ```sh
