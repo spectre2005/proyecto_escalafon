@@ -58,13 +58,14 @@ class Institucion extends Model
 
     public function ultimoRespaldo(): HasOne
     {
-        return $this->hasOne(Respaldo::class, 'institucion_id')->latestOfMany();
+        // PostgreSQL no admite MAX(uuid): ordenar también funciona al cargar varias instituciones.
+        return $this->hasOne(Respaldo::class, 'institucion_id')->latest('created_at')->orderByDesc('id');
     }
 
     public function ultimoRespaldoCorrecto(): HasOne
     {
-        return $this->hasOne(Respaldo::class, 'institucion_id')->ofMany(['created_at' => 'max', 'id' => 'max'],
-            fn ($consulta) => $consulta->where('estado', Respaldo::CORRECTO));
+        return $this->hasOne(Respaldo::class, 'institucion_id')->where('estado', Respaldo::CORRECTO)
+            ->latest('created_at')->orderByDesc('id');
     }
 
     /**

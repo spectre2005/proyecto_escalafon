@@ -10,7 +10,7 @@ export const navigation = [
   { label: 'Requerimientos', to: '/requerimientos', icon: 'clock', group: 'Principal', permiso: 'sistema.administrar' },
   { label: 'Vencimientos', to: '/vencimientos', icon: 'clock', group: 'Principal', permiso: 'legajo.ver' },
   { label: 'Fiscalización', icon: 'search', group: 'Administración', permiso: 'sistema.administrar' },
-  { label: 'Accesos y custodia', icon: 'shield', group: 'Administración', permiso: 'sistema.administrar' },
-  // Configuración institucional (sistema.administrar) y de funcionalidades (configuracion.modulos, asignación explícita).
-  { label: 'Configuración', to: '/configuracion', icon: 'settings', group: 'Administración', permiso: ['sistema.administrar', 'configuracion.modulos'] },
+  { label: 'Accesos y custodia', to: '/accesos-y-custodia', icon: 'shield', group: 'Administración', permiso: ['sistema.administrar', 'configuracion.modulos'] },
+  // La identidad institucional y las funcionalidades conservan sus permisos independientes.
+  { label: 'Configuración', to: '/configuracion', icon: 'settings', group: 'Administración', permiso: 'sistema.administrar' },
 ]
