@@ -48,6 +48,7 @@ use App\Http\Controllers\Api\V1\Legajos\Seccion11Controller;
 use App\Http\Controllers\Api\V1\Legajos\VinculoTipoController;
 use App\Http\Controllers\Api\V1\LegajoSeccionController;
 use App\Http\Controllers\Api\V1\LicenciaPermisoController;
+use App\Http\Controllers\Api\V1\ModuloSistemaController;
 use App\Http\Controllers\Api\V1\MovimientoCustodiaLegajoController;
 use App\Http\Controllers\Api\V1\NotificacionUsuarioController;
 use App\Http\Controllers\Api\V1\ObservacionDocumentoController;
@@ -63,6 +64,7 @@ use App\Http\Controllers\Api\V1\ReconocimientoController;
 use App\Http\Controllers\Api\V1\ReferenciaLegajoPasivoController;
 use App\Http\Controllers\Api\V1\RegimenNormativoController;
 use App\Http\Controllers\Api\V1\RegistroSstBienestarController;
+use App\Http\Controllers\Api\V1\ReporteController;
 use App\Http\Controllers\Api\V1\RequerimientoDocumentoController;
 use App\Http\Controllers\Api\V1\RolController;
 use App\Http\Controllers\Api\V1\SancionController;
@@ -83,6 +85,8 @@ use App\Http\Middleware\ApiHabilitada;
 use App\Http\Middleware\ExigeCambioPassword;
 use App\Http\Middleware\FuncionalidadActiva;
 use App\Http\Middleware\LegajoSoloLectura;
+use App\Http\Middleware\ModuloSistemaActivo;
+use App\Support\ConsultaReportes;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1/auth')->middleware(ApiHabilitada::class)->group(function (): void {
@@ -94,6 +98,8 @@ Route::prefix('v1/auth')->middleware(ApiHabilitada::class)->group(function (): v
 
 // FuncionalidadActiva: con una funcionalidad desactivada, sus rutas de creación y modificación responden 409.
 Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCambioPassword::class, FuncionalidadActiva::class, LegajoSoloLectura::class])->group(function (): void {
+    Route::get('reportes/opciones', [ReporteController::class, 'opciones']);
+    Route::get('reportes/{tipo}', [ReporteController::class, 'show'])->whereIn('tipo', array_keys(ConsultaReportes::catalogo()));
     Route::get('vencimientos', VencimientosController::class)->middleware('can:legajo.ver');
     Route::get('institucion', [InstitutionSettingsController::class, 'show']);
     // Qué ocultar en la navegación (cualquier sesión). Cambiar la configuración exige configuracion.modulos.
@@ -101,6 +107,8 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
     Route::put('institucion', [InstitutionSettingsController::class, 'update'])->middleware('can:sistema.administrar');
     // Configuración de funcionalidades: solo configuracion.modulos (asignación explícita, fuera de '*').
     Route::middleware('can:configuracion.modulos')->group(function (): void {
+        Route::get('configuracion/modulos-sistema', [ModuloSistemaController::class, 'index']);
+        Route::patch('configuracion/modulos-sistema/{codigo}', [ModuloSistemaController::class, 'update']);
         Route::get('configuracion/funcionalidades', [ConfiguracionFuncionalidadController::class, 'index']);
         Route::patch('configuracion/funcionalidades/{codigo}', [ConfiguracionFuncionalidadController::class, 'update'])->where('codigo', '[a-z0-9_.]+');
     });
@@ -260,7 +268,7 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
             ->whereUuid(['usuario', 'registro'])->whereIn('tipo', ['familiares', 'declaraciones-verificaciones', 'certificados-discapacidad']);
     });
 
-    Route::middleware('can:seccion07.ver')->group(function (): void {
+    Route::middleware(['can:seccion07.ver', ModuloSistemaActivo::class.':evaluaciones'])->group(function (): void {
         Route::get('seccion07-opciones', [Seccion07Controller::class, 'options']);
         Route::get('seccion07/{tipo}', [Seccion07Controller::class, 'index'])->whereIn('tipo', ['evaluaciones', 'progresiones', 'ratificaciones', 'desplazamientos']);
     });

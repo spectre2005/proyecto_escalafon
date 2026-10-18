@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { activarInstitucion, aprovisionarInstitucion, editarInstitucion, mensajeError, sesionTerminada, suspenderInstitucion, verInstitucion } from '../api'
+import ModulosSistemaConfig from '../../settings/ModulosSistemaConfig'
+import { consultarModulosInstitucion, guardarModuloInstitucion, activarInstitucion, aprovisionarInstitucion, editarInstitucion, mensajeError, sesionTerminada, suspenderInstitucion, verInstitucion } from '../api'
 import { Aviso, Credenciales, EstadoInstitucion, EstadoRespaldo, EstadoServicio, SinAprovisionar } from '../componentes'
 import AdministradoresInstitucion from './AdministradoresInstitucion'
 import ServicioInstitucion from './ServicioInstitucion'
@@ -109,6 +110,8 @@ function Aprovisionar({ institucion, onAprovisionada, onSesionTerminada, onCerra
 
 export default function InstitucionDetallePage() {
   const { id } = useParams()
+  const consultarModulos = useCallback(signal => consultarModulosInstitucion(id, signal), [id])
+  const guardarModulo = useCallback((codigo, datos) => guardarModuloInstitucion(id, codigo, datos), [id])
   const { state } = useLocation()
   const { terminada } = useSesionPlataforma()
   const [estado, setEstado] = useState({ loading: true })
@@ -201,6 +204,7 @@ export default function InstitucionDetallePage() {
       <Dato etiqueta="Registrada">{fecha(institucion.created_at)}</Dato>
       <Dato etiqueta="Última modificación">{fecha(institucion.updated_at)}</Dato>
     </dl>}
+    <div className="mt-6"><ModulosSistemaConfig consultar={consultarModulos} guardar={guardarModulo} onCambio={recargar} /></div>
     <ClienteContrato institucion={institucion} onCambio={recargar} />
     <ServicioInstitucion institucion={institucion} onCambio={recargar} />
     {institucion.aprovisionada && <AdministradoresInstitucion institucion={institucion} onCambio={recargar} />}

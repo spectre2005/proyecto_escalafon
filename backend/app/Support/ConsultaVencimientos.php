@@ -66,7 +66,7 @@ final class ConsultaVencimientos
             'incluye_requerimientos' => $actor->can('sistema.administrar')];
     }
 
-    private static function alertas(Usuario $actor, CarbonImmutable $hoy, int $dias, ?string $origen): Builder
+    public static function alertas(Usuario $actor, CarbonImmutable $hoy, int $dias, ?string $origen): Builder
     {
         $documentos = DB::table('documentos_usuario as d')->join('legajos as l', 'l.id', '=', 'd.legajo_id')
             ->join('tipos_documento as t', 't.id', '=', 'd.tipo_documento_id')->whereColumn('d.usuario_id', 'l.usuario_id')

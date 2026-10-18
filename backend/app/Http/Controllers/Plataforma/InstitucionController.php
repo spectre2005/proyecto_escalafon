@@ -246,7 +246,7 @@ class InstitucionController extends Controller
     private function evento(AuditoriaPlataforma $evento): array
     {
         return [...$evento->only(['id', 'accion', 'institucion_id', 'datos_antes', 'datos_despues', 'motivo']),
-            'administrador' => $evento->administrador?->nombre, 'institucion' => $evento->institucion?->nombre,
+            'administrador' => $evento->administrador?->nombre ?? (($evento->datos_despues['origen'] ?? null) === 'institucion' ? ($evento->datos_despues['por'] ?? 'Administración institucional') : null), 'institucion' => $evento->institucion?->nombre,
             'created_at' => $evento->created_at?->toIso8601String()];
     }
 }

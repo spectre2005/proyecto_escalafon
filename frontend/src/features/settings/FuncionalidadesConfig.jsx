@@ -73,7 +73,7 @@ export default function FuncionalidadesConfig() {
   }
 
   return <section aria-label="Funcionalidades" className={cardClass}>
-    <div className="mb-6 flex items-center gap-3"><span className="grid size-11 place-items-center rounded-xl bg-teal-50 text-teal-700"><Icon name="settings" /></span><div><h2 className="font-semibold text-slate-800">Módulos y funcionalidades</h2><p className="mt-1 text-xs text-slate-500">Selecciona un módulo para ver sus subfunciones y activar o desactivar las que utiliza la institución. Desactivar no elimina datos y se puede revertir.</p></div></div>
+    <div className="mb-6 flex items-center gap-3"><span className="grid size-11 place-items-center rounded-xl bg-teal-50 text-teal-700"><Icon name="settings" /></span><div><h2 className="font-semibold text-slate-800">Secciones del legajo</h2><p className="mt-1 text-xs text-slate-500">Selecciona una sección para ver sus funcionalidades y activar o desactivar las que utiliza la institución. Desactivar no elimina datos y se puede revertir.</p></div></div>
     {!consulta.data && !consulta.error && <p role="status" className="text-sm text-slate-500">Cargando funcionalidades…</p>}
     {consulta.error && <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{apiErrorMessage(consulta.error)} <button type="button" onClick={consulta.retry} className="font-semibold underline">Reintentar</button></p>}
     {notice && <p role={notice.error ? 'alert' : 'status'} className={`mb-5 rounded-xl p-4 text-sm ${notice.error ? 'bg-rose-50 text-rose-700' : 'bg-teal-50 text-teal-800'}`}>{notice.text}</p>}

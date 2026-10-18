@@ -1,0 +1,151 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\ArchivoDocumento;
+use App\Models\ConfiguracionFuncionalidad;
+use App\Models\DocumentoUsuario;
+use App\Models\Familiar;
+use App\Models\Legajo;
+use App\Models\TipoDocumento;
+use App\Models\UnidadOrganica;
+use App\Models\Usuario;
+use App\Models\VinculoAdenda;
+use App\Models\VinculoLaboral;
+use App\Support\ConfiguracionFuncionalidades;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class ReportesTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function tipo(array $datos = []): TipoDocumento
+    {
+        return TipoDocumento::factory()->create($datos + ['seccion_legajo_id' => 3, 'obligatorio' => true,
+            'activo' => true, 'aplica_carrera' => true, 'aplica_plazo_determinado' => true, 'aplica_designado' => true]);
+    }
+
+    private function documento(Legajo $legajo, TipoDocumento $tipo, array $datos = []): DocumentoUsuario
+    {
+        return DocumentoUsuario::factory()->create($datos + ['usuario_id' => $legajo->usuario_id, 'legajo_id' => $legajo->id,
+            'tipo_documento_id' => $tipo->id, 'seccion_legajo_id' => $tipo->seccion_legajo_id, 'estado' => 'cargado',
+            'archivo_id' => ArchivoDocumento::factory()->create()->id, 'folio_inicio' => 1, 'folio_fin' => 3]);
+    }
+
+    public function test_requires_a_session_and_each_reports_existing_permission(): void
+    {
+        $this->getJson('/api/v1/reportes/personal')->assertUnauthorized();
+        $this->actuarComo(codigo: 'sin_permisos');
+        $this->getJson('/api/v1/reportes/opciones')->assertForbidden();
+        $this->getJson('/api/v1/reportes/personal?exportar=1')->assertForbidden();
+        config(['permisos.roles.lector_personal' => ['personal.ver']]);
+        $this->actuarComo(codigo: 'lector_personal');
+        $this->getJson('/api/v1/reportes/opciones')->assertOk()->assertJsonCount(2, 'data.reportes')->assertJsonPath('data.reportes.0.id', 'dotacion');
+        $this->getJson('/api/v1/reportes/inventario')->assertForbidden();
+    }
+
+    public function test_personnel_uses_current_unit_and_separates_account_from_employment(): void
+    {
+        $this->actuarComo();
+        $anterior = UnidadOrganica::factory()->create();
+        $actual = UnidadOrganica::factory()->create();
+        $persona = Usuario::factory()->create(['numero_doc_identidad' => '00123456', 'unidad_organica_id' => $anterior->id, 'activo' => false]);
+        Legajo::factory()->create(['usuario_id' => $persona->id]);
+        VinculoLaboral::factory()->create(['usuario_id' => $persona->id, 'unidad_organica_id' => $actual->id, 'nombre_puesto' => 'Puesto actual']);
+        $this->getJson('/api/v1/reportes/personal?unidad_id='.$actual->id)->assertOk()->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.documento', '00123456')->assertJsonPath('data.0.puesto', 'Puesto actual')
+            ->assertJsonPath('data.0.cuenta', 'Deshabilitada')->assertJsonPath('data.0.estado_codigo', 'con_vinculo');
+        $this->getJson('/api/v1/reportes/personal?unidad_id='.$anterior->id)->assertOk()->assertJsonCount(0, 'data');
+    }
+
+    public function test_export_contains_all_filtered_rows_instead_of_only_the_current_page(): void
+    {
+        $this->actuarComo();
+        Usuario::factory()->has(Legajo::factory(), 'legajos')->count(23)->create(['apellido_paterno' => 'ReporteFiltro']);
+        $url = '/api/v1/reportes/personal?q=ReporteFiltro';
+        $this->getJson($url)->assertOk()->assertJsonCount(20, 'data')->assertJsonPath('meta.total', 23)->assertJsonPath('meta.last_page', 2);
+        $this->getJson($url.'&page=2')->assertOk()->assertJsonCount(3, 'data');
+        $this->getJson($url.'&exportar=1')->assertOk()->assertJsonCount(23, 'data')->assertJsonPath('meta.generado_por', fn ($valor) => is_string($valor));
+    }
+
+    public function test_inventory_does_not_expose_sensitive_documents_or_folios_to_a_reader(): void
+    {
+        $legajo = Legajo::factory()->create(['numero_legajo' => 'INV-PRUEBA']);
+        $this->documento($legajo, $this->tipo());
+        $this->documento($legajo, $this->tipo(['seccion_legajo_id' => 10, 'es_dato_salud' => true]), ['folio_inicio' => 1, 'folio_fin' => 9]);
+        $this->actuarComo(codigo: 'asistente_legajo');
+        $url = '/api/v1/reportes/inventario?q=INV-PRUEBA';
+        $this->getJson($url.'&exportar=1')->assertOk()->assertJsonPath('data.0.documentos', 1)->assertJsonPath('data.0.folios', 3)->assertJsonMissing(['seccion' => '10']);
+        $this->getJson('/api/v1/reportes/opciones')->assertOk()->assertJsonMissing(['id' => 10, 'nombre' => 'Seguridad y Salud en el Trabajo (SST) y Bienestar Social']);
+        $this->actuarComo();
+        $this->getJson($url.'&seccion=3')->assertOk()->assertJsonPath('data.0.documentos', 1)
+            ->assertJsonPath('data.0.folios', 3)->assertJsonPath('data.0.por_seccion', '03: 3');
+    }
+
+    public function test_pending_report_distinguishes_missing_undetermined_and_superseded_documents(): void
+    {
+        $this->actuarComo();
+        $legajo = Legajo::factory()->create(['numero_legajo' => 'PEND-PRUEBA']);
+        $falta = $this->tipo(['nombre' => 'Documento que falta']);
+        $incierto = $this->tipo(['nombre' => 'Condición sin responder', 'requiere_colegiatura' => true]);
+        $legajo->usuario->update(['exige_colegiatura' => null]);
+        $tipo = $this->tipo(['nombre' => 'Documento corregido']);
+        $anterior = $this->documento($legajo, $tipo, ['estado' => 'observado']);
+        $this->documento($legajo, $tipo, ['estado' => 'aceptado', 'subsana_a_documento_id' => $anterior->id, 'fecha_recepcion' => today(), 'recepcionado_por' => $legajo->usuario_id]);
+        $data = $this->getJson('/api/v1/reportes/pendientes?q=PEND-PRUEBA&exportar=1')->assertOk()->json('data');
+        $filas = collect($data)->keyBy('detalle');
+        $this->assertSame('faltante', $filas[$falta->nombre]['estado_codigo']);
+        $this->assertSame('por_determinar', $filas[$incierto->nombre]['estado_codigo']);
+        $this->assertFalse($filas->has('Documento corregido'));
+    }
+
+    public function test_disabled_optional_and_inapplicable_types_do_not_create_missing_documents(): void
+    {
+        $this->actuarComo();
+        $legajo = Legajo::factory()->create(['numero_legajo' => 'SIN-FALTAS']);
+        $legajo->usuario->update(['exige_colegiatura' => false]);
+        $this->tipo(['nombre' => 'Opcional del reporte', 'obligatorio' => false]);
+        $this->tipo(['nombre' => 'No aplica al reporte', 'requiere_colegiatura' => true]);
+        $tipo = TipoDocumento::query()->where('codigo', 'FORM_ESTUDIOS_BASICOS')->firstOrFail();
+        $data = collect($this->getJson('/api/v1/reportes/pendientes?q=SIN-FALTAS&exportar=1')->assertOk()->json('data'));
+        $this->assertFalse($data->contains('detalle', 'Opcional del reporte'));
+        $this->assertFalse($data->contains('detalle', 'No aplica al reporte'));
+        $codigo = ConfiguracionFuncionalidades::deTipo($tipo->codigo, 3)[0];
+        ConfiguracionFuncionalidad::query()->updateOrCreate(['codigo' => $codigo], ['activa' => false, 'motivo' => 'Prueba', 'updated_by' => $legajo->usuario_id]);
+        ConfiguracionFuncionalidades::olvidar();
+        $this->getJson('/api/v1/reportes/pendientes?q=SIN-FALTAS&exportar=1')->assertOk()->assertJsonMissing(['detalle' => $tipo->nombre]);
+    }
+
+    public function test_family_documents_are_checked_per_family_member(): void
+    {
+        $this->actuarComo();
+        $legajo = Legajo::factory()->create(['numero_legajo' => 'FAMILIA-REPORTE']);
+        $legajo->usuario->update(['tiene_derechohabientes' => true]);
+        Familiar::factory()->create(['usuario_id' => $legajo->usuario_id, 'parentesco' => 'hijo', 'apellidos_nombres' => 'Hijo menor', 'fecha_nacimiento' => today()->subYears(8), 'anulado' => false]);
+        Familiar::factory()->create(['usuario_id' => $legajo->usuario_id, 'parentesco' => 'hijo', 'apellidos_nombres' => 'Hijo mayor', 'fecha_nacimiento' => today()->subYears(22), 'anulado' => false]);
+        $data = collect($this->getJson('/api/v1/reportes/pendientes?q=FAMILIA-REPORTE&exportar=1')->assertOk()->json('data'));
+        $this->assertTrue($data->contains(fn ($fila) => str_contains($fila['detalle'], 'Hijo menor')));
+        $this->assertFalse($data->contains(fn ($fila) => str_contains($fila['detalle'], 'Hijo mayor')));
+    }
+
+    public function test_expiry_report_uses_latest_extension_and_respects_sensitive_permissions(): void
+    {
+        $this->actuarComo(codigo: 'asistente_legajo');
+        $legajo = Legajo::factory()->create(['numero_legajo' => 'VENCE-REPORTE']);
+        $vinculo = VinculoLaboral::factory()->create(['usuario_id' => $legajo->usuario_id, 'fecha_inicio' => today()->subMonth(), 'fecha_fin_prevista' => today()->addDays(2)]);
+        VinculoAdenda::factory()->create(['vinculo_laboral_id' => $vinculo->id, 'fecha_inicio' => today(), 'fecha_fin' => today()->addDays(60), 'anulado' => false]);
+        $this->documento($legajo, $this->tipo(['seccion_legajo_id' => 10, 'es_dato_salud' => true]), ['fecha_caducidad' => today()->addDay()]);
+        $this->getJson('/api/v1/reportes/vencimientos?q=VENCE-REPORTE&dias=30&exportar=1')->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson('/api/v1/reportes/vencimientos?q=VENCE-REPORTE&dias=90')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.origen', 'Contrato');
+    }
+
+    public function test_invalid_filters_are_rejected_and_upper_date_can_be_used_alone(): void
+    {
+        $this->actuarComo();
+        $this->getJson('/api/v1/reportes/personal?estado=aceptado')->assertUnprocessable();
+        $this->getJson('/api/v1/reportes/personal?desde=2026-10-20&hasta=2026-10-01')->assertUnprocessable();
+        $this->getJson('/api/v1/reportes/personal?hasta=2099-01-01')->assertOk();
+        $this->getJson('/api/v1/reportes/inexistente')->assertNotFound();
+    }
+}

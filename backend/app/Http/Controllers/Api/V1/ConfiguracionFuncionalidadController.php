@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\ConfiguracionFuncionalidad;
 use App\Support\ConfiguracionFuncionalidades;
+use App\Support\ModulosSistema;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -18,7 +19,7 @@ class ConfiguracionFuncionalidadController extends Controller
     /** Para cualquier sesión: entradas de menú y secciones que se ocultan, y tipos de documento que no se ofrecen. */
     public function publico(): JsonResponse
     {
-        return response()->json(['data' => ConfiguracionFuncionalidades::estadoPublico()])->header('Cache-Control', 'private, no-store');
+        return response()->json(['data' => [...ConfiguracionFuncionalidades::estadoPublico(), 'modulos_sistema' => collect(ModulosSistema::estados())->pluck('activa', 'codigo')]])->header('Cache-Control', 'private, no-store');
     }
 
     public function index(): JsonResponse

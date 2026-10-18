@@ -4,8 +4,8 @@ export const navigation = [
   { label: 'Personal', to: '/personal', icon: 'users', group: 'Principal', permiso: 'personal.ver' },
   { label: 'Legajos', to: '/legajos', icon: 'folder', group: 'Principal', permiso: 'legajo.ver' },
   // funcionalidades: el ítem se oculta si la institución las desactivó todas (configuración de funcionalidades).
-  { label: 'Evaluaciones', to: '/evaluaciones', icon: 'check', group: 'Principal', permiso: 'seccion07.ver', funcionalidades: ['s07.evaluaciones', 's07.progresion', 's07.desplazamientos'] },
-  { label: 'Reportes', icon: 'chart', group: 'Principal' },
+  { label: 'Evaluaciones', to: '/evaluaciones', modulo: 'evaluaciones', icon: 'check', group: 'Principal', permiso: 'seccion07.ver', funcionalidades: ['s07.evaluaciones', 's07.progresion', 's07.desplazamientos'] },
+  { label: 'Reportes', to: '/reportes', icon: 'chart', group: 'Principal', permiso: ['personal.ver', 'legajo.ver'] },
   // Requerimientos lee hoy del CRUD genérico (sistema.administrar).
   { label: 'Requerimientos', to: '/requerimientos', icon: 'clock', group: 'Principal', permiso: 'sistema.administrar' },
   { label: 'Vencimientos', to: '/vencimientos', icon: 'clock', group: 'Principal', permiso: 'legajo.ver' },

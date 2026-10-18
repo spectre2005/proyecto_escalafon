@@ -77,3 +77,6 @@ export const accionSuperadmin = (id, accion) => plataforma.post(`/superadministr
 export const cambiarMiPassword = datos => plataforma.put('/auth/password', datos).then(r => r.data.data)
 // Uso y estado técnico de una institución (se guarda unos minutos; actualizar lo vuelve a medir).
 export const verUso = (id, actualizar = false, signal) => plataforma.get(`/instituciones/${id}/uso`, { params: actualizar ? { actualizar: 1 } : {}, signal }).then(r => r.data.data)
+
+export const consultarModulosInstitucion = (id, signal) => plataforma.get(`/instituciones/${id}/modulos-sistema`, { signal }).then(r => r.data.data)
+export const guardarModuloInstitucion = (id, codigo, datos) => plataforma.patch(`/instituciones/${id}/modulos-sistema/${codigo}`, datos).then(r => r.data.data)

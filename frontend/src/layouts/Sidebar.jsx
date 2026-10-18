@@ -10,6 +10,7 @@ function Content({ institution, onNavigate }) {
   const sesion = useSesion()
   const funcionalidades = useFuncionalidades()
   const items = navigation.filter(item => (Array.isArray(item.permiso) ? item.permiso.some(permiso => puede(sesion, permiso)) : puede(sesion, item.permiso))
+    && (!item.modulo || funcionalidades.modulos_sistema?.[item.modulo] === true)
     && (!item.funcionalidades || item.funcionalidades.some(codigo => activa(funcionalidades, codigo))))
   return <div className="flex h-full flex-col px-5 py-7">
     <Link to="/" onClick={onNavigate} className="mb-9 flex items-center gap-3 px-1"><span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-teal-700 text-sm font-bold text-white">{institution.logo ? <img src={institution.logo} alt={`Logo de ${institution.name}`} className="size-full rounded-2xl bg-white object-contain p-1" /> : institution.initials}</span><span className="min-w-0"><strong className="block truncate text-sm text-slate-800">{institution.name}</strong><span className="text-[11px] text-slate-500">{institution.area}</span></span></Link>

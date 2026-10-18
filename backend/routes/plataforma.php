@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\ModuloSistemaController;
 use App\Http\Controllers\Plataforma\AdministradorInstitucionController;
 use App\Http\Controllers\Plataforma\AuthController;
 use App\Http\Controllers\Plataforma\InstitucionController;
@@ -34,6 +35,8 @@ Route::middleware(ApiHabilitada::class)->group(function (): void {
         Route::get('dashboard', [InstitucionController::class, 'resumen']);
         Route::get('instituciones', [InstitucionController::class, 'index']);
         Route::post('instituciones', [InstitucionController::class, 'store']);
+        Route::get('instituciones/{institucion}/modulos-sistema', [ModuloSistemaController::class, 'indexPlataforma'])->whereUuid('institucion');
+        Route::patch('instituciones/{institucion}/modulos-sistema/{codigo}', [ModuloSistemaController::class, 'updatePlataforma'])->whereUuid('institucion');
         Route::get('instituciones/{institucion}', [InstitucionController::class, 'show'])->whereUuid('institucion');
         Route::patch('instituciones/{institucion}', [InstitucionController::class, 'update'])->whereUuid('institucion');
         Route::post('instituciones/{institucion}/suspender', [InstitucionController::class, 'suspender'])->whereUuid('institucion');

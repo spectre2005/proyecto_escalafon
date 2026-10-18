@@ -196,6 +196,8 @@ const ACCIONES = {
   'institucion.registrada': 'Registró la institución',
   'institucion.editada': 'Editó sus datos',
   'institucion.suspendida': 'Suspendió la institución',
+  'modulo.activado': 'Activó un módulo del menú principal',
+  'modulo.desactivado': 'Desactivó un módulo del menú principal',
   'institucion.activada': 'Activó la institución',
   'institucion.aprovisionada': 'Quedó aprovisionada',
   'institucion.aprovisionamiento_fallido': 'Falló el aprovisionamiento',

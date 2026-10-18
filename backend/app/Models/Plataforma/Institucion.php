@@ -57,7 +57,7 @@ class Institucion extends Model
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['aprovisionada_en' => 'datetime', 'suspendida_en' => 'datetime', 'dias_gracia' => 'integer', 'contrato_inicio' => 'date:Y-m-d'];
+        return ['modulos_sistema' => 'array', 'aprovisionada_en' => 'datetime', 'suspendida_en' => 'datetime', 'dias_gracia' => 'integer', 'contrato_inicio' => 'date:Y-m-d'];
     }
 
     public function respaldos(): HasMany

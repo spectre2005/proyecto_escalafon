@@ -1,4 +1,4 @@
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from '../../../shared/queries/useLiveQuery'
 import Seccion07Filtros from '../components/Seccion07Filtros'
 import Seccion07Tabla from '../components/Seccion07Tabla'
@@ -31,6 +31,13 @@ function Pagination({ data, perPage, onChange }) {
 }
 
 export default function EvaluacionesPage() {
+  const consulta = useLiveQuery('/funcionalidades')
+  if (!consulta.data) return <p role="status" className={`${panel} p-6 text-sm text-slate-500`}>{consulta.error ? 'No se pudo consultar la disponibilidad del módulo.' : 'Consultando disponibilidad…'}</p>
+  if (consulta.data.data.modulos_sistema?.evaluaciones !== true) return <div className={`${panel} space-y-3 p-6`}><h1 className="text-xl font-semibold text-slate-800">Módulo desactivado</h1><p className="text-sm text-slate-500">La consulta general de Evaluaciones está desactivada para esta institución. Los registros de la sección 07 continúan disponibles en el legajo según tus permisos.</p><Link to="/" className="inline-block text-sm font-semibold text-teal-700">Volver al inicio</Link></div>
+  return <ConsultaEvaluaciones />
+}
+
+function ConsultaEvaluaciones() {
   const [params, setParams] = useSearchParams()
   // Solo las pestañas de funcionalidades activas en la configuración de la institución.
   const visibles = tiposVisibles(useFuncionalidades())
