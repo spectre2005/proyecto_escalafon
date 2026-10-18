@@ -69,3 +69,9 @@ export function mensajeError(error) {
 }
 
 export const sesionTerminada = error => [401, 419].includes(error?.response?.status)
+
+// Cuentas de superadministrador (no se borran: se desactivan) y cambio de la propia contraseña.
+export const listarSuperadmins = signal => plataforma.get('/superadministradores', { signal }).then(r => r.data.data)
+export const crearSuperadmin = datos => plataforma.post('/superadministradores', datos).then(r => r.data.data)
+export const accionSuperadmin = (id, accion) => plataforma.post(`/superadministradores/${id}/${accion}`).then(r => r.data.data)
+export const cambiarMiPassword = datos => plataforma.put('/auth/password', datos).then(r => r.data.data)

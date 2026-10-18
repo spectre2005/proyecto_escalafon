@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, COPIA_EXTERNA, VERIFICACION, accionesDisponibles, cambiosCliente, importe, textoVencimiento, etiquetaAccion, tamano, cambios, etiquetaEstado, fechaCorta, proponerPeriodo, proponerSlug, proponerUbicacion, textoServicio } from './estado.js'
+import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, COPIA_EXTERNA, VERIFICACION, ACCION_SUPERADMIN, accionesDisponibles, accionesSuperadmin, cambiosCliente, importe, textoVencimiento, etiquetaAccion, tamano, cambios, etiquetaEstado, fechaCorta, proponerPeriodo, proponerSlug, proponerUbicacion, textoServicio } from './estado.js'
 import { esEscritura, mensajeError } from './api.js'
 
 test('state actions follow what the backend allows', () => {
@@ -106,4 +106,17 @@ test('each due date is described from its group', () => {
   assert.equal(textoVencimiento('vencidas', { vence_el: '2026-12-01', dias_vencida: 30 }), 'Venció el 01/12/2026, hace 30 días: sin acceso')
   assert.match(textoVencimiento('vencidas', { vence_el: null, proximo_desde: '2027-02-01' }), /empieza el 01\/02\/2027/)
   assert.match(textoVencimiento('vencidas', { vence_el: null, proximo_desde: null }), /Sin un periodo pagado vigente/)
+})
+
+test('superadministrator actions never apply to the own account', () => {
+  assert.deepEqual(accionesSuperadmin({ activo: true, es_actual: true }), [])
+  assert.deepEqual(accionesSuperadmin({ activo: true, es_actual: false }), ['restablecer', 'desactivar'])
+  assert.deepEqual(accionesSuperadmin({ activo: false, es_actual: false }), ['reactivar'])
+  assert.deepEqual(accionesSuperadmin(null), [])
+  // Lo que se avisa antes de confirmar: sesiones cerradas y contraseña temporal nueva al reactivar.
+  assert.match(ACCION_SUPERADMIN.restablecer.pregunta, /cerrarán sus sesiones/)
+  assert.match(ACCION_SUPERADMIN.desactivar.pregunta, /sesiones abiertas/)
+  assert.match(ACCION_SUPERADMIN.reactivar.pregunta, /contraseña temporal nueva/)
+  assert.equal(etiquetaAccion('administrador.desactivado'), 'Desactivó a un superadministrador')
+  assert.equal(etiquetaAccion('administrador.clave_cambiada'), 'Cambió su propia contraseña')
 })

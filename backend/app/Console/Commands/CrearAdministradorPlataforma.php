@@ -27,8 +27,8 @@ class CrearAdministradorPlataforma extends Command
         $validacion = Validator::make(['nombre' => $nombre, 'email' => $email, 'password' => $password, 'password_confirmation' => $confirmacion], [
             'nombre' => 'required|string|min:3|max:150',
             'email' => 'required|email:rfc|max:255|unique:plataforma.administradores_plataforma,email',
-            'password' => ['required', 'string', 'min:12', 'max:255', 'confirmed', 'regex:/[A-Za-z]/', 'regex:/[0-9]/'],
-        ], ['password.regex' => 'La contraseña debe tener letras y números.', 'password.confirmed' => 'Las contraseñas no coinciden.']);
+            'password' => [...AdministradorPlataforma::reglasPassword(), 'confirmed'],
+        ], AdministradorPlataforma::mensajesPassword());
         if ($validacion->fails()) {
             foreach ($validacion->errors()->all() as $error) {
                 $this->error($error);

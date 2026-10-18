@@ -4,7 +4,9 @@ use App\Http\Controllers\Plataforma\AdministradorInstitucionController;
 use App\Http\Controllers\Plataforma\AuthController;
 use App\Http\Controllers\Plataforma\InstitucionController;
 use App\Http\Controllers\Plataforma\PeriodoServicioController;
+use App\Http\Controllers\Plataforma\SuperadministradorController;
 use App\Http\Middleware\ApiHabilitada;
+use App\Http\Middleware\SesionPlataformaValida;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -17,9 +19,18 @@ Route::middleware(ApiHabilitada::class)->group(function (): void {
     Route::get('auth/csrf', [AuthController::class, 'csrf']);
     Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:20,1');
 
-    Route::middleware('auth:plataforma')->group(function (): void {
+    // SesionPlataformaValida: cuenta activa, contraseña sin cambios desde el inicio de sesión y, con contraseña temporal,
+    // solo sesión, cierre y cambio de contraseña.
+    Route::middleware(['auth:plataforma', SesionPlataformaValida::class])->group(function (): void {
         Route::get('auth/me', [AuthController::class, 'me']);
         Route::post('auth/logout', [AuthController::class, 'logout']);
+        Route::put('auth/password', [AuthController::class, 'cambiarPassword'])->middleware('throttle:10,1');
+        // Cuentas de superadministrador: no se borran; se desactivan.
+        Route::get('superadministradores', [SuperadministradorController::class, 'index']);
+        Route::post('superadministradores', [SuperadministradorController::class, 'store']);
+        Route::post('superadministradores/{cuenta}/restablecer', [SuperadministradorController::class, 'restablecer'])->whereUuid('cuenta');
+        Route::post('superadministradores/{cuenta}/desactivar', [SuperadministradorController::class, 'desactivar'])->whereUuid('cuenta');
+        Route::post('superadministradores/{cuenta}/reactivar', [SuperadministradorController::class, 'reactivar'])->whereUuid('cuenta');
         Route::get('dashboard', [InstitucionController::class, 'resumen']);
         Route::get('instituciones', [InstitucionController::class, 'index']);
         Route::post('instituciones', [InstitucionController::class, 'store']);

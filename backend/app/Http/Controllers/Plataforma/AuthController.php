@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Plataforma;
 
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\SesionPlataformaValida;
 use App\Models\Plataforma\AdministradorPlataforma;
 use App\Support\Plataforma\AuditoriaOperaciones;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 
@@ -47,6 +49,7 @@ class AuthController extends Controller
         /** @var AdministradorPlataforma $administrador */
         $administrador = Auth::guard('plataforma')->user();
         $administrador->forceFill(['ultimo_acceso' => now()])->save();
+        SesionPlataformaValida::recordar($request, $administrador);
         AuditoriaOperaciones::registrar('sesion.inicio', $request, $administrador->id);
 
         return $this->sesion($administrador);
@@ -64,6 +67,32 @@ class AuthController extends Controller
         return $this->sesion($administrador);
     }
 
+    /**
+     * Cambio de la propia contraseña, con la actual. Quita la marca de contraseña temporal. La sesión con la que se cambia
+     * sigue válida (se renueva su huella); las demás sesiones de la cuenta se cierran en su siguiente petición.
+     */
+    public function cambiarPassword(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'password_actual' => 'required|string|max:255',
+            'password' => [...AdministradorPlataforma::reglasPassword(), 'confirmed'],
+        ], AdministradorPlataforma::mensajesPassword());
+        /** @var AdministradorPlataforma $administrador */
+        $administrador = Auth::guard('plataforma')->user();
+        if (! Hash::check($data['password_actual'], $administrador->password)) {
+            throw ValidationException::withMessages(['password_actual' => 'La contraseña actual no es correcta.']);
+        }
+        if (Hash::check($data['password'], $administrador->password)) {
+            throw ValidationException::withMessages(['password' => 'La nueva contraseña debe ser distinta de la actual.']);
+        }
+        $administrador->forceFill(['password' => $data['password'], 'debe_cambiar_password' => false])->save();
+        $request->session()->regenerate();
+        SesionPlataformaValida::recordar($request, $administrador);
+        AuditoriaOperaciones::registrar('administrador.clave_cambiada', $request, $administrador->id, null, null, $administrador->only(['id', 'email']));
+
+        return $this->sesion($administrador);
+    }
+
     public function logout(Request $request): JsonResponse
     {
         AuditoriaOperaciones::registrar('sesion.cierre', $request, Auth::guard('plataforma')->id());
@@ -74,7 +103,8 @@ class AuthController extends Controller
 
     private function sesion(AdministradorPlataforma $administrador): JsonResponse
     {
-        return response()->json(['data' => ['administrador' => $administrador->only(['id', 'nombre', 'email'])]]);
+        return response()->json(['data' => ['administrador' => $administrador->only(['id', 'nombre', 'email']),
+            'debe_cambiar_password' => (bool) $administrador->debe_cambiar_password]]);
     }
 
     private function cerrar(Request $request): void

@@ -138,6 +138,18 @@ export function cambios(original, borrador) {
   return Object.fromEntries(campos.filter(campo => String(borrador[campo] ?? '').trim() !== String(original?.[campo] ?? '')).map(campo => [campo, String(borrador[campo]).trim()]))
 }
 
+/** Acciones sobre otra cuenta de superadministrador: la propia nunca (se usa «Mi cuenta»). */
+export function accionesSuperadmin(cuenta) {
+  if (!cuenta || cuenta.es_actual) return []
+  return cuenta.activo ? ['restablecer', 'desactivar'] : ['reactivar']
+}
+
+export const ACCION_SUPERADMIN = {
+  restablecer: { boton: 'Restablecer contraseña', pregunta: 'Se le dará una contraseña temporal y se cerrarán sus sesiones abiertas.', exito: 'Contraseña restablecida.' },
+  desactivar: { boton: 'Desactivar', pregunta: 'Perderá el acceso de inmediato, también en sus sesiones abiertas. Sus operaciones anteriores se conservan.', exito: 'Cuenta desactivada.' },
+  reactivar: { boton: 'Reactivar', pregunta: 'Se reactivará con una contraseña temporal nueva; sus sesiones anteriores no vuelven a valer.', exito: 'Cuenta reactivada.' },
+}
+
 const ACCIONES = {
   'institucion.registrada': 'Registró la institución',
   'institucion.editada': 'Editó sus datos',
@@ -157,7 +169,11 @@ const ACCIONES = {
   'periodo.anulado': 'Anuló un periodo de uso',
   'sesion.inicio': 'Inició sesión',
   'sesion.cierre': 'Cerró sesión',
-  'administrador.creado': 'Se creó una cuenta de administración',
+  'administrador.creado': 'Se creó una cuenta de superadministrador',
+  'administrador.clave_restablecida': 'Dio una contraseña temporal a un superadministrador',
+  'administrador.desactivado': 'Desactivó a un superadministrador',
+  'administrador.reactivado': 'Reactivó a un superadministrador',
+  'administrador.clave_cambiada': 'Cambió su propia contraseña',
 }
 export const etiquetaAccion = accion => ACCIONES[accion] || accion
 

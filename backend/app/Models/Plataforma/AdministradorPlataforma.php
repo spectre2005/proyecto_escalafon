@@ -17,7 +17,7 @@ class AdministradorPlataforma extends Authenticatable
 
     protected $table = 'administradores_plataforma';
 
-    protected $fillable = ['nombre', 'email', 'password', 'activo', 'ultimo_acceso'];
+    protected $fillable = ['nombre', 'email', 'password', 'activo', 'ultimo_acceso', 'debe_cambiar_password'];
 
     protected $hidden = ['password'];
 
@@ -27,6 +27,26 @@ class AdministradorPlataforma extends Authenticatable
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['password' => 'hashed', 'activo' => 'boolean', 'ultimo_acceso' => 'datetime'];
+        return ['password' => 'hashed', 'activo' => 'boolean', 'ultimo_acceso' => 'datetime', 'debe_cambiar_password' => 'boolean'];
+    }
+
+    /** Reglas de contraseña de un superadministrador (comando, panel y cambio de la propia). */
+    public static function reglasPassword(): array
+    {
+        return ['required', 'string', 'min:12', 'max:255', 'regex:/[A-Za-z]/', 'regex:/[0-9]/'];
+    }
+
+    /** @return array<string, string> */
+    public static function mensajesPassword(string $campo = 'password'): array
+    {
+        return ["{$campo}.regex" => 'La contraseña debe tener letras y números.', "{$campo}.min" => 'La contraseña debe tener al menos 12 caracteres.',
+            "{$campo}.confirmed" => 'Las contraseñas no coinciden.'];
+    }
+
+    /** Datos administrativos de la cuenta: nunca la contraseña ni su hash. @return array<string, mixed> */
+    public function datos(): array
+    {
+        return [...$this->only(['id', 'nombre', 'email']), 'activo' => (bool) $this->activo, 'debe_cambiar_password' => (bool) $this->debe_cambiar_password,
+            'ultimo_acceso' => $this->ultimo_acceso?->toIso8601String(), 'created_at' => $this->created_at?->toIso8601String()];
     }
 }

@@ -164,7 +164,9 @@ migraciones y verificación. Respaldos (17/10/2026): uno por institución, copia
    18/10/2026 (RUC con dígito verificador de SUNAT).
 2. ~~Resumen útil: vencimientos en los próximos 30 días, en gracia o vencidas, ingresos del mes y del año.~~ Hecho
    el 18/10/2026 (ver «Tiempo de uso pagado»).
-3. Seguridad del superadmin: gestionarlos desde el panel, cambiar la propia contraseña y verificación en dos pasos.
+3. Seguridad del superadmin: ~~gestionarlos desde el panel, cambiar la propia contraseña~~ hecho el 18/10/2026
+   (crear, restablecer, desactivar y reactivar con contraseña temporal; SesionPlataformaValida cierra las sesiones de
+   una cuenta desactivada o con la contraseña cambiada). Pendiente de decidir: verificación en dos pasos.
 4. Dar de baja una institución y exportar sus datos (base y PDF) al terminar el contrato; luego archivarla.
 5. Uso por institución (personas, legajos, documentos, espacio, último ingreso) y estado técnico (salud, cola fallida,
    último respaldo, migraciones pendientes).
