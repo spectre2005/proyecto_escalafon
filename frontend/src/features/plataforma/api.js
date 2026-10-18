@@ -75,3 +75,5 @@ export const listarSuperadmins = signal => plataforma.get('/superadministradores
 export const crearSuperadmin = datos => plataforma.post('/superadministradores', datos).then(r => r.data.data)
 export const accionSuperadmin = (id, accion) => plataforma.post(`/superadministradores/${id}/${accion}`).then(r => r.data.data)
 export const cambiarMiPassword = datos => plataforma.put('/auth/password', datos).then(r => r.data.data)
+// Uso y estado técnico de una institución (se guarda unos minutos; actualizar lo vuelve a medir).
+export const verUso = (id, actualizar = false, signal) => plataforma.get(`/instituciones/${id}/uso`, { params: actualizar ? { actualizar: 1 } : {}, signal }).then(r => r.data.data)

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, COPIA_EXTERNA, VERIFICACION, ACCION_SUPERADMIN, accionesDisponibles, accionesSuperadmin, cambiosCliente, importe, textoVencimiento, etiquetaAccion, tamano, cambios, etiquetaEstado, fechaCorta, proponerPeriodo, proponerSlug, proponerUbicacion, textoServicio } from './estado.js'
+import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, COPIA_EXTERNA, VERIFICACION, ACCION_SUPERADMIN, ESTADO_TECNICO, cifra, resumenTecnico, textoEspacio, accionesDisponibles, accionesSuperadmin, cambiosCliente, importe, textoVencimiento, etiquetaAccion, tamano, cambios, etiquetaEstado, fechaCorta, proponerPeriodo, proponerSlug, proponerUbicacion, textoServicio } from './estado.js'
 import { esEscritura, mensajeError } from './api.js'
 
 test('state actions follow what the backend allows', () => {
@@ -119,4 +119,30 @@ test('superadministrator actions never apply to the own account', () => {
   assert.match(ACCION_SUPERADMIN.reactivar.pregunta, /contraseña temporal nueva/)
   assert.equal(etiquetaAccion('administrador.desactivado'), 'Desactivó a un superadministrador')
   assert.equal(etiquetaAccion('administrador.clave_cambiada'), 'Cambió su propia contraseña')
+})
+
+test('technical state is never shown as correct without a check', () => {
+  assert.deepEqual(resumenTecnico({ comprobaciones: [{ estado: 'correcto' }, { estado: 'no_disponible' }] }), { estado: 'correcto', texto: 'Sin problemas detectados' })
+  assert.deepEqual(resumenTecnico({ comprobaciones: [{ estado: 'correcto' }, { estado: 'aviso' }, { estado: 'aviso' }] }), { estado: 'aviso', texto: '2 avisos' })
+  assert.deepEqual(resumenTecnico({ comprobaciones: [{ estado: 'error' }, { estado: 'no_verificado' }, { estado: 'aviso' }] }), { estado: 'error', texto: '1 error y 1 aviso' })
+  // Sin nada comprobado (sin aprovisionar o solo «no verificado»): no se dice «correcto».
+  assert.equal(resumenTecnico({ comprobaciones: [{ estado: 'no_disponible' }] }).estado, 'no_disponible')
+  assert.equal(resumenTecnico({ comprobaciones: [{ estado: 'no_verificado' }] }).estado, 'no_disponible')
+  assert.equal(resumenTecnico(null).estado, 'no_disponible')
+  assert.equal(ESTADO_TECNICO.no_verificado.etiqueta, 'No se pudo comprobar')
+  // Una métrica no disponible se muestra como «—», no como 0.
+  assert.equal(cifra(null), '—')
+  assert.equal(cifra(undefined), '—')
+  assert.equal(cifra(0), '0')
+})
+
+test('an incomplete storage measure says so in the figure itself', () => {
+  // Enlaces a carpetas de fuera (como UNIQ en local): 0 B no se presenta como una medición completa.
+  const uniq = textoEspacio({ bytes: 0, archivos: 0, parcial: false, enlaces_externos: 3 })
+  assert.equal(uniq.texto, '0 B (incompleto)')
+  assert.equal(uniq.completo, false)
+  assert.match(uniq.nota, /no cuenta 3 enlaces a carpetas de fuera/)
+  assert.match(textoEspacio({ bytes: 2048, archivos: 9, parcial: true, enlaces_externos: 0 }).nota, /recuento parcial/)
+  assert.deepEqual(textoEspacio({ bytes: 1536, archivos: 2, parcial: false, enlaces_externos: 0 }), { texto: '1,5 KB', completo: true, nota: '2 archivos' })
+  assert.deepEqual(textoEspacio(null), { texto: '—', completo: false, nota: 'No se pudo medir.' })
 })

@@ -11,9 +11,11 @@ use App\Support\Plataforma\Aprovisionamiento;
 use App\Support\Plataforma\AprovisionamientoRechazado;
 use App\Support\Plataforma\AuditoriaOperaciones;
 use App\Support\Plataforma\ResumenCobranza;
+use App\Support\Plataforma\UsoInstitucion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -27,6 +29,9 @@ use Throwable;
  */
 class InstitucionController extends Controller
 {
+    /** Minutos que se guarda la medición de uso y estado técnico de una institución. */
+    private const USO_MINUTOS = 10;
+
     public function resumen(): JsonResponse
     {
         $conteo = Institucion::query()->select('estado', DB::raw('count(*) as total'))->groupBy('estado')->pluck('total', 'estado');
@@ -76,6 +81,22 @@ class InstitucionController extends Controller
             'auditoria' => AuditoriaPlataforma::query()->where('institucion_id', $registro->id)->with('administrador:id,nombre')->latest('created_at')->limit(30)->get()
                 ->map(fn (AuditoriaPlataforma $evento): array => $this->evento($evento)),
         ]]);
+    }
+
+    /**
+     * Uso y estado técnico (UsoInstitucion). Recorrer la carpeta de archivos cuesta: el resultado se guarda
+     * USO_MINUTOS en la caché y ?actualizar=1 lo vuelve a medir. Solo cifras y estados, sin datos personales.
+     */
+    public function uso(Request $request, string $institucion): JsonResponse
+    {
+        $request->validate(['actualizar' => 'sometimes|boolean']);
+        $registro = Institucion::query()->findOrFail($institucion);
+        $clave = 'plataforma:uso:'.$registro->id;
+        if ($request->boolean('actualizar')) {
+            Cache::forget($clave);
+        }
+
+        return response()->json(['data' => Cache::remember($clave, now()->addMinutes(self::USO_MINUTOS), fn (): array => UsoInstitucion::medir($registro))]);
     }
 
     /** Se registra sin aprovisionar: base y almacenamiento propuestos a partir del identificador (editables). */

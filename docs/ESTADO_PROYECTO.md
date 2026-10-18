@@ -168,8 +168,10 @@ migraciones y verificación. Respaldos (17/10/2026): uno por institución, copia
    (crear, restablecer, desactivar y reactivar con contraseña temporal; SesionPlataformaValida cierra las sesiones de
    una cuenta desactivada o con la contraseña cambiada). Pendiente de decidir: verificación en dos pasos.
 4. Dar de baja una institución y exportar sus datos (base y PDF) al terminar el contrato; luego archivarla.
-5. Uso por institución (personas, legajos, documentos, espacio, último ingreso) y estado técnico (salud, cola fallida,
-   último respaldo, migraciones pendientes).
+5. ~~Uso por institución (personas, legajos, espacio, último ingreso) y estado técnico~~ hecho el 18/10/2026
+   (UsoInstitucion, página «Estado técnico» y sección en el detalle): base de datos, migraciones, carpeta, respaldo y
+   copia externa. Último ingreso = último inicio de sesión (usuarios.ultimo_acceso). El espacio no sigue enlaces
+   simbólicos y la medición se guarda 10 minutos. Pendiente: trabajos en cola fallidos por institución.
 6. Comprobante adjunto al pago, auditoría global con filtros y exportación, avisos a las instituciones.
 7. Planes y límites: pendiente del cliente.
 - No recomendado: «entrar como» una institución para soporte (vería datos personales y de salud).

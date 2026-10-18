@@ -62,6 +62,48 @@ export function textoVencimiento(grupo, item) {
   return item.proximo_desde ? `Su pago empieza el ${fechaCorta(item.proximo_desde)}: sin acceso hasta entonces` : 'Sin un periodo pagado vigente: sin acceso'
 }
 
+/** Estado de cada comprobación técnica (UsoInstitucion): «correcto» solo si se comprobó. */
+export const ESTADO_TECNICO = {
+  correcto: { etiqueta: 'Correcto', clase: 'bg-teal-50 text-teal-800 ring-teal-200' },
+  aviso: { etiqueta: 'Requiere atención', clase: 'bg-amber-50 text-amber-800 ring-amber-200' },
+  error: { etiqueta: 'Error', clase: 'bg-rose-50 text-rose-700 ring-rose-200' },
+  no_verificado: { etiqueta: 'No se pudo comprobar', clase: 'bg-slate-100 text-slate-600 ring-slate-200' },
+  no_disponible: { etiqueta: 'No disponible', clase: 'bg-slate-100 text-slate-600 ring-slate-200' },
+}
+
+export const COMPROBACION = {
+  instalacion: 'Instalación', base_datos: 'Base de datos', esquema: 'Migraciones', almacenamiento: 'Carpeta de archivos',
+  enlaces: 'Enlaces en la carpeta', recorrido: 'Recuento de archivos', respaldo: 'Respaldo', copia_externa: 'Copia externa cifrada',
+}
+
+/** Resumen de una medición: el peor estado y cuántas comprobaciones requieren atención. */
+export function resumenTecnico(uso) {
+  const estados = (uso?.comprobaciones || []).map(c => c.estado)
+  const errores = estados.filter(e => e === 'error').length
+  const avisos = estados.filter(e => e === 'aviso').length
+  if (errores) return { estado: 'error', texto: `${errores} error${errores === 1 ? '' : 'es'}${avisos ? ` y ${avisos} aviso${avisos === 1 ? '' : 's'}` : ''}` }
+  if (avisos) return { estado: 'aviso', texto: `${avisos} aviso${avisos === 1 ? '' : 's'}` }
+  if (estados.includes('correcto')) return { estado: 'correcto', texto: 'Sin problemas detectados' }
+  return { estado: 'no_disponible', texto: 'Sin comprobaciones disponibles' }
+}
+
+/**
+ * Espacio medido de una institución. La cifra dice ella misma si es incompleta: enlaces a fuera que no se cuentan
+ * (no son exclusivos de la institución) o recuento detenido por el tope de archivos. Sin medición, «—».
+ */
+export function textoEspacio(almacenamiento) {
+  if (!almacenamiento) return { texto: '—', completo: false, nota: 'No se pudo medir.' }
+  const notas = []
+  if (almacenamiento.enlaces_externos > 0) notas.push(`no cuenta ${almacenamiento.enlaces_externos} enlace${almacenamiento.enlaces_externos === 1 ? '' : 's'} a carpetas de fuera`)
+  if (almacenamiento.parcial) notas.push('recuento parcial')
+  const completo = notas.length === 0
+  return { texto: `${tamano(almacenamiento.bytes)}${completo ? '' : ' (incompleto)'}`, completo,
+    nota: `${Number(almacenamiento.archivos).toLocaleString('es-PE')} archivos${completo ? '' : `; ${notas.join(' y ')}`}` }
+}
+
+/** Cifra o «—» si la métrica no está disponible (nunca un 0 inventado). */
+export const cifra = valor => (valor === null || valor === undefined ? '—' : Number(valor).toLocaleString('es-PE'))
+
 /** Fecha del backend (AAAA-MM-DD) como DD/MM/AAAA, sin pasar por zonas horarias. */
 export const fechaCorta = valor => /^\d{4}-\d{2}-\d{2}/.test(valor || '') ? valor.slice(0, 10).split('-').reverse().join('/') : '—'
 

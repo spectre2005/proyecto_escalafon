@@ -8,6 +8,7 @@ import MiCuentaPage from './pages/MiCuentaPage'
 const menu = [
   { to: '/plataforma', label: 'Resumen', icon: 'home', end: true },
   { to: '/plataforma/instituciones', label: 'Instituciones', icon: 'building' },
+  { to: '/plataforma/estado-tecnico', label: 'Estado técnico', icon: 'chart' },
   { to: '/plataforma/superadministradores', label: 'Superadministradores', icon: 'users' },
   { to: '/plataforma/mi-cuenta', label: 'Mi cuenta', icon: 'user' },
 ]

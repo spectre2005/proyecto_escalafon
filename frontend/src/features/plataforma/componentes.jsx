@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ESTADOS, SERVICIO, etiquetaEstado } from './estado'
+import { ESTADOS, ESTADO_TECNICO, SERVICIO, etiquetaEstado } from './estado'
 
 export function EstadoInstitucion({ estado }) {
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${ESTADOS[estado]?.clase || 'bg-slate-50 text-slate-600 ring-slate-200'}`}>{etiquetaEstado(estado)}</span>
@@ -18,6 +18,12 @@ export function EstadoRespaldo({ institucion }) {
   const { atrasado, ultimo_correcto_en } = institucion.respaldo
   return <span title={ultimo_correcto_en ? `Último respaldo correcto: ${new Date(ultimo_correcto_en).toLocaleString('es-PE')}` : 'Todavía no hay un respaldo correcto.'}
     className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${atrasado ? 'bg-rose-50 text-rose-700 ring-rose-200' : 'bg-teal-50 text-teal-800 ring-teal-200'}`}>{atrasado ? 'Sin respaldo reciente' : 'Respaldo al día'}</span>
+}
+
+/** Estado de una comprobación técnica (o del resumen de una institución). */
+export function EstadoTecnico({ estado, texto }) {
+  const valor = ESTADO_TECNICO[estado] || ESTADO_TECNICO.no_disponible
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${valor.clase}`}>{texto || valor.etiqueta}</span>
 }
 
 export function SinAprovisionar({ institucion }) {

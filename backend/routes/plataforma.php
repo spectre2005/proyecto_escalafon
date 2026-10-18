@@ -39,6 +39,8 @@ Route::middleware(ApiHabilitada::class)->group(function (): void {
         Route::post('instituciones/{institucion}/suspender', [InstitucionController::class, 'suspender'])->whereUuid('institucion');
         Route::post('instituciones/{institucion}/activar', [InstitucionController::class, 'activar'])->whereUuid('institucion');
         Route::post('instituciones/{institucion}/aprovisionar', [InstitucionController::class, 'aprovisionar'])->whereUuid('institucion');
+        // Uso (personas, legajos, espacio, último ingreso) y estado técnico: solo cifras y estados.
+        Route::get('instituciones/{institucion}/uso', [InstitucionController::class, 'uso'])->whereUuid('institucion');
         // Tiempo de uso pagado: periodos (no se editan; se anulan con motivo).
         Route::get('instituciones/{institucion}/periodos', [PeriodoServicioController::class, 'index'])->whereUuid('institucion');
         Route::post('instituciones/{institucion}/periodos', [PeriodoServicioController::class, 'store'])->whereUuid('institucion');

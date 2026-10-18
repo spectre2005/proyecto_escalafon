@@ -5,6 +5,7 @@ import { Aviso, Credenciales, EstadoInstitucion, EstadoRespaldo, EstadoServicio,
 import AdministradoresInstitucion from './AdministradoresInstitucion'
 import ServicioInstitucion from './ServicioInstitucion'
 import ClienteContrato from './ClienteContrato'
+import UsoTecnico from './UsoTecnico'
 import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, COPIA_EXTERNA, VERIFICACION, accionesDisponibles, cambios, etiquetaAccion, fecha, tamano } from '../estado'
 import { useSesionPlataforma } from '../sesion'
 
@@ -203,6 +204,7 @@ export default function InstitucionDetallePage() {
     <ClienteContrato institucion={institucion} onCambio={recargar} />
     <ServicioInstitucion institucion={institucion} onCambio={recargar} />
     {institucion.aprovisionada && <AdministradoresInstitucion institucion={institucion} onCambio={recargar} />}
+    <UsoTecnico institucion={institucion} />
     {institucion.aprovisionada && <Respaldos institucion={institucion} />}
     <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
       <h2 className="font-semibold text-slate-800">Auditoría</h2>
