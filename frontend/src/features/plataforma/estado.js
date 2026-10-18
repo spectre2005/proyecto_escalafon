@@ -24,6 +24,29 @@ export const SERVICIO = {
   vencido: { etiqueta: 'Vencido: sin acceso', clase: 'bg-rose-50 text-rose-700 ring-rose-200' },
 }
 
+/** Respaldos (docker/produccion/respaldar.sh): estado de la copia externa cifrada y de la restauración de prueba. */
+export const COPIA_EXTERNA = {
+  correcta: { etiqueta: 'Copia externa cifrada', clase: 'text-teal-700' },
+  fallida: { etiqueta: 'Falló la copia externa', clase: 'text-rose-700' },
+  no_configurada: { etiqueta: 'Sin copia externa', clase: 'text-amber-800' },
+}
+export const VERIFICACION = {
+  correcta: { etiqueta: 'Restauración probada', clase: 'text-teal-700' },
+  fallida: { etiqueta: 'Falló la restauración de prueba', clase: 'text-rose-700' },
+}
+
+/** Tamaño legible: 1536 → «1,5 KB». */
+export function tamano(bytes) {
+  if (bytes === null || bytes === undefined || Number.isNaN(Number(bytes))) return '—'
+  const unidades = ['B', 'KB', 'MB', 'GB', 'TB']
+  let valor = Number(bytes)
+  let indice = 0
+  while (valor >= 1024 && indice < unidades.length - 1) { valor /= 1024; indice++ }
+  // Coma decimal sin depender de los datos de idioma del entorno (Node sin ICU completo daría «1.5»).
+  const texto = indice === 0 ? String(valor) : (Math.round(valor * 10) / 10).toString().replace('.', ',')
+  return `${texto} ${unidades[indice]}`
+}
+
 /** Fecha del backend (AAAA-MM-DD) como DD/MM/AAAA, sin pasar por zonas horarias. */
 export const fechaCorta = valor => /^\d{4}-\d{2}-\d{2}/.test(valor || '') ? valor.slice(0, 10).split('-').reverse().join('/') : '—'
 
@@ -95,6 +118,8 @@ const ACCIONES = {
   'administrador_institucion.clave_restablecida': 'Dio una contraseña temporal nueva a un administrador',
   'administrador_institucion.desactivado': 'Desactivó a un administrador',
   'administrador_institucion.reactivado': 'Reactivó a un administrador',
+  'respaldo.fallido': 'Falló un respaldo',
+  'respaldo.verificacion_fallida': 'Falló la restauración de prueba de un respaldo',
   'periodo.registrado': 'Registró un pago (periodo de uso)',
   'periodo.anulado': 'Anuló un periodo de uso',
   'sesion.inicio': 'Inició sesión',

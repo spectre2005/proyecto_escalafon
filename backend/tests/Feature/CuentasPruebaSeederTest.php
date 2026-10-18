@@ -73,6 +73,7 @@ class CuentasPruebaSeederTest extends TestCase
         $this->assertSame(['principal', 'Universidad Principal de Prueba', Institucion::ACTIVA, 'escalafon_prueba', 'instituciones/principal'],
             [$principal->slug, $principal->nombre, $principal->estado, $principal->base_datos, $principal->almacenamiento]);
         $this->assertTrue($principal->aprovisionada() && $principal->operativa());
+        $this->assertDirectoryExists(storage_path('app/private/instituciones/principal'), 'Su carpeta de archivos, como en el aprovisionamiento.');
         $this->assertSame('Universidad Principal de Prueba', json_decode(DB::table('institution_settings')->value('settings'), true)['name']);
     }
 

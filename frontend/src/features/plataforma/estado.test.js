@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, accionesDisponibles, cambios, etiquetaEstado, fechaCorta, proponerPeriodo, proponerSlug, proponerUbicacion, textoServicio } from './estado.js'
+import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, COPIA_EXTERNA, VERIFICACION, accionesDisponibles, etiquetaAccion, tamano, cambios, etiquetaEstado, fechaCorta, proponerPeriodo, proponerSlug, proponerUbicacion, textoServicio } from './estado.js'
 import { esEscritura, mensajeError } from './api.js'
 
 test('state actions follow what the backend allows', () => {
@@ -68,4 +68,18 @@ test('the service state is described with local dates', () => {
   assert.match(textoServicio({ estado: 'en_gracia', vence_el: '2026-06-10', gracia_hasta: '2026-06-17' }), /funciona hasta el 17\/06\/2026/)
   assert.match(textoServicio({ estado: 'vencido', vence_el: null, proximo_desde: '2026-07-01' }), /empieza el 01\/07\/2026/)
   assert.match(textoServicio({ estado: 'sin_periodos' }), /no se controla/)
+})
+
+test('backup sizes and states are readable', () => {
+  assert.equal(tamano(0), '0 B')
+  assert.equal(tamano(512), '512 B')
+  assert.equal(tamano(1536), '1,5 KB')
+  assert.equal(tamano(217655), '212,6 KB')
+  assert.equal(tamano(5 * 1024 ** 3), '5 GB')
+  assert.equal(tamano(null), '—')
+  // La copia externa siempre es cifrada; si no hay, se dice.
+  assert.match(COPIA_EXTERNA.correcta.etiqueta, /cifrada/)
+  assert.match(COPIA_EXTERNA.no_configurada.etiqueta, /Sin copia externa/)
+  assert.match(VERIFICACION.correcta.etiqueta, /Restauración probada/)
+  assert.equal(etiquetaAccion('respaldo.fallido'), 'Falló un respaldo')
 })

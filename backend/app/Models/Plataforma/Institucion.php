@@ -5,6 +5,7 @@ namespace App\Models\Plataforma;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -35,7 +36,8 @@ class Institucion extends Model
     public const PATRON_ALMACENAMIENTO = '/^instituciones\/[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/';
 
     /** Subdominios reservados para la plataforma. */
-    public const SLUGS_RESERVADOS = ['admin', 'api', 'app', 'plataforma', 'www', 'soporte', 'static', 'assets', 'mail'];
+    // «principal» nombra en los respaldos a la base del .env que no es de ninguna institución (plataforma:respaldo-plan).
+    public const SLUGS_RESERVADOS = ['admin', 'api', 'app', 'plataforma', 'principal', 'www', 'soporte', 'static', 'assets', 'mail'];
 
     protected $connection = 'plataforma';
 
@@ -47,6 +49,35 @@ class Institucion extends Model
     protected function casts(): array
     {
         return ['aprovisionada_en' => 'datetime', 'suspendida_en' => 'datetime', 'dias_gracia' => 'integer'];
+    }
+
+    public function respaldos(): HasMany
+    {
+        return $this->hasMany(Respaldo::class, 'institucion_id');
+    }
+
+    public function ultimoRespaldo(): HasOne
+    {
+        return $this->hasOne(Respaldo::class, 'institucion_id')->latestOfMany();
+    }
+
+    public function ultimoRespaldoCorrecto(): HasOne
+    {
+        return $this->hasOne(Respaldo::class, 'institucion_id')->ofMany(['created_at' => 'max', 'id' => 'max'],
+            fn ($consulta) => $consulta->where('estado', Respaldo::CORRECTO));
+    }
+
+    /**
+     * Último respaldo y si está atrasado: aprovisionada y sin un respaldo correcto en las últimas Respaldo::HORAS_AVISO.
+     *
+     * @return array{ultimo: ?array<string, mixed>, ultimo_correcto_en: ?string, atrasado: bool}
+     */
+    public function estadoRespaldo(): array
+    {
+        $correcto = $this->ultimoRespaldoCorrecto?->created_at;
+
+        return ['ultimo' => $this->ultimoRespaldo?->datos(), 'ultimo_correcto_en' => $correcto?->toIso8601String(),
+            'atrasado' => $this->aprovisionada() && ($correcto === null || $correcto->lt(now()->subHours(Respaldo::HORAS_AVISO)))];
     }
 
     public function periodos(): HasMany
@@ -145,6 +176,7 @@ class Institucion extends Model
             'motivo_no_suspendible' => $this->motivoNoSuspendible(),
             'dias_gracia' => $this->dias_gracia ?? 0,
             'servicio' => $this->servicio(),
+            'respaldo' => $this->estadoRespaldo(),
             // Solo identificando por subdominio (ResolverInstitucion) la suspensión bloquea el acceso.
             'suspension_bloquea_acceso' => config('plataforma.modo') === 'subdominio',
             'created_at' => $this->created_at?->toIso8601String(),

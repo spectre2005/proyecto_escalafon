@@ -77,21 +77,72 @@ falla, la versión anterior sigue funcionando.
 
     sh docker/produccion/respaldar.sh
 
-Guarda en `respaldos/AAAAMMDD-HHMMSS/` cada base (`pg_dump`) y los archivos privados de todas las instituciones, y
-borra los respaldos de más de 14 días (`RESPALDO_DIAS`). Programarlo cada noche con `crontab -e`:
+Hace un respaldo **por institución** en `respaldos/AAAAMMDD-HHMMSS/<objetivo>/`:
+
+- `plataforma/`: la base de la plataforma (instituciones, superadministradores, pagos y auditoría).
+- `<slug>/` de cada institución aprovisionada, también las suspendidas: `base.dump` (`pg_dump`), `archivos.tar.gz`
+  (sus PDF y fotos, de `storage/app/private/instituciones/<slug>`) y `SHA256SUMS`.
+- `principal/`: la base del `.env`, solo si no es de ninguna institución.
+- `otras/`: cualquier otra base del servidor que no figure en el plan, para no perder nada.
+
+Qué respaldar lo decide `php artisan plataforma:respaldo-plan`. Cada resultado se registra en la base de la
+plataforma y el **panel** lo muestra: el estado en cada institución y, en el resumen, las instituciones sin un
+respaldo correcto en las últimas 26 horas. El script termina con error si algo falló. Se conservan
+`RESPALDO_DIAS` días en el servidor (14 por defecto).
+
+Programarlo cada noche con `crontab -e`:
 
     0 2 * * * cd /ruta/del/proyecto && sh docker/produccion/respaldar.sh >> respaldos/respaldo.log 2>&1
 
-Un respaldo en el mismo servidor no protege si se pierde el servidor: copiar `respaldos/` a otro lugar (otro
-servidor, almacenamiento en la nube del cliente) con `rsync` o `rclone`.
+### Copia externa cifrada (Google Drive u otro servicio)
 
-Restaurar una base:
+Un respaldo en el mismo servidor no protege si se pierde el servidor. Con `RESPALDO_REMOTO`, el script sube cada
+respaldo con [rclone](https://rclone.org), usando su imagen Docker, sin instalarlo, y lo comprueba con
+`rclone cryptcheck`. Solo sube a un remoto de tipo **crypt**: el servicio externo guarda los archivos cifrados y con
+nombres ilegibles, porque llevan datos personales y de salud. Si el remoto no es crypt, no sube nada y lo registra
+como fallo.
 
-    docker compose --env-file .env.produccion -f docker-compose.produccion.yml exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d NOMBRE_BASE --clean --if-exists' < respaldos/FECHA/NOMBRE_BASE.dump
+**Pendiente del cliente:** de quién es la cuenta de destino (del proveedor o de cada universidad), y que la
+universidad autorice que sus datos, aunque vayan cifrados, se guarden en un servicio externo.
 
-Restaurar los archivos:
+1. Crear la configuración en el servidor, con un remoto de Drive y un remoto crypt encima de una carpeta solo para
+   respaldos:
 
-    docker compose --env-file .env.produccion -f docker-compose.produccion.yml exec -T app tar -xzf - -C /var/www/html/storage < respaldos/FECHA/archivos.tar.gz
+       mkdir -p ~/.config/rclone
+       docker run --rm -it -v ~/.config/rclone:/config/rclone rclone/rclone:1.68.2 config
+
+   - `n` (nuevo) → nombre `drive` → tipo `drive` → seguir el asistente (cuenta de Google).
+   - `n` (nuevo) → nombre `cifrado` → tipo `crypt` → remote `drive:escalafon-respaldos` → cifrar nombres →
+     **contraseña y sal generadas**.
+2. **Guardar la contraseña y la sal del remoto crypt fuera del servidor** (gestor de contraseñas del equipo).
+   Sin ellas, los respaldos de la copia externa no se pueden descifrar.
+3. En `.env.produccion`:
+
+       RESPALDO_REMOTO=cifrado:escalafon
+
+   Opcional: `RESPALDO_RCLONE_CONF`, por defecto `~/.config/rclone/rclone.conf`, y `RESPALDO_REMOTO_DIAS`, que
+   son los días que se conservan en la copia externa (30). `RESPALDO_REMOTO` debe ser `remoto:carpeta`: las copias de
+   más de `RESPALDO_REMOTO_DIAS` días de esa carpeta se borran, así que nunca debe apuntar a una carpeta con otros
+   archivos.
+
+Para recuperar un respaldo de la copia externa en otro servidor, con la misma configuración de rclone:
+
+    docker run --rm -v ~/.config/rclone:/config/rclone -v "$PWD/respaldos:/respaldos" rclone/rclone:1.68.2 copy cifrado:escalafon/AAAAMMDD-HHMMSS /respaldos/AAAAMMDD-HHMMSS
+
+### Verificar y restaurar
+
+Prueba de restauración, que no toca nada real. Comprueba las huellas, restaura cada base en una base temporal, que
+se borra siempre, y lee los paquetes de archivos. El resultado aparece en el panel. Conviene programarla cada semana:
+
+    sh docker/produccion/restaurar.sh verificar AAAAMMDD-HHMMSS          # todos los objetivos
+    sh docker/produccion/restaurar.sh verificar AAAAMMDD-HHMMSS uniq     # solo uno
+
+Restaurar **una** institución, o `plataforma`, o `principal`. Conviene suspenderla antes desde el panel. Pide
+escribir su nombre para confirmar. Antes guarda su estado actual en `respaldos/antes-de-restaurar-…/` y aparta sus
+archivos actuales en `storage/app/private/instituciones/<slug>.antes-de-restaurar-…`, sin borrarlos. Después
+aplica las migraciones pendientes:
+
+    sh docker/produccion/restaurar.sh restaurar AAAAMMDD-HHMMSS uniq
 
 ## Seguridad
 
@@ -109,7 +160,8 @@ Restaurar los archivos:
 - Cifrado en reposo de los PDF (pendiente 9 de `ESTADO_PROYECTO.md`) y antivirus de las cargas.
 - La aplicación usa el usuario administrador de PostgreSQL (lo necesita para crear las bases al aprovisionar).
   Separar un usuario con permisos mínimos para la operación diaria.
-- Copia de los respaldos fuera del servidor y una prueba de restauración.
+- Configurar la copia externa cifrada de los respaldos (`RESPALDO_REMOTO`, «Copia externa cifrada») y programar
+  la verificación semanal (`restaurar.sh verificar`). Decidir con el cliente de quién es la cuenta de destino.
 - Avisos de vencimiento por correo (`MAIL_*`); hoy solo se ven dentro del sistema.
 
 ## Probar en una máquina sin dominio

@@ -1,16 +1,39 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { activarInstitucion, aprovisionarInstitucion, editarInstitucion, mensajeError, sesionTerminada, suspenderInstitucion, verInstitucion } from '../api'
-import { Aviso, Credenciales, EstadoInstitucion, EstadoServicio, SinAprovisionar } from '../componentes'
+import { Aviso, Credenciales, EstadoInstitucion, EstadoRespaldo, EstadoServicio, SinAprovisionar } from '../componentes'
 import AdministradoresInstitucion from './AdministradoresInstitucion'
 import ServicioInstitucion from './ServicioInstitucion'
-import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, accionesDisponibles, cambios, etiquetaAccion, fecha } from '../estado'
+import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, COPIA_EXTERNA, VERIFICACION, accionesDisponibles, cambios, etiquetaAccion, fecha, tamano } from '../estado'
 import { useSesionPlataforma } from '../sesion'
 
 const entrada = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 disabled:bg-slate-50 disabled:text-slate-500'
 
 function Dato({ etiqueta, children }) {
   return <div><dt className="text-xs text-slate-500">{etiqueta}</dt><dd className="mt-1 break-all text-sm text-slate-800">{children || '—'}</dd></div>
+}
+
+/** Últimos respaldos de la institución (docker/produccion/respaldar.sh): solo metadatos, el contenido no pasa por el panel. */
+function Respaldos({ institucion }) {
+  const lista = institucion.respaldos || []
+  return <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
+    <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold text-slate-800">Respaldos</h2><EstadoRespaldo institucion={institucion} /></div>
+    {lista.length === 0 ? <p className="mt-3 text-sm text-slate-500">Todavía no hay respaldos. Se generan en el servidor con docker/produccion/respaldar.sh (cada noche, con cron).</p> : <ol className="mt-3 divide-y divide-slate-100">
+      {lista.map(respaldo => <li key={respaldo.id} className="grid gap-1 py-3 text-sm">
+        <div className="flex flex-wrap justify-between gap-2">
+          <span><strong className={respaldo.estado === 'correcto' ? 'text-slate-700' : 'text-rose-700'}>{respaldo.estado === 'correcto' ? 'Correcto' : 'Fallido'}</strong>
+            <span className="text-slate-500"> · base {tamano(respaldo.base_bytes)}{respaldo.archivos_bytes !== null && ` · archivos ${tamano(respaldo.archivos_bytes)}`}</span></span>
+          <span className="text-xs text-slate-500">{fecha(respaldo.created_at)}</span>
+        </div>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+          <span className={COPIA_EXTERNA[respaldo.copia_externa]?.clase}>{COPIA_EXTERNA[respaldo.copia_externa]?.etiqueta || respaldo.copia_externa}</span>
+          {respaldo.verificacion && <span className={VERIFICACION[respaldo.verificacion]?.clase}>{VERIFICACION[respaldo.verificacion]?.etiqueta} {fecha(respaldo.verificado_en)}</span>}
+        </div>
+        {respaldo.detalle && <p className="text-xs text-rose-700">{respaldo.detalle}</p>}
+        {respaldo.verificacion === 'fallida' && respaldo.detalle_verificacion && <p className="text-xs text-rose-700">{respaldo.detalle_verificacion}</p>}
+      </li>)}
+    </ol>}
+  </div>
 }
 
 /** Confirmación de suspender o activar. Suspender exige motivo; los datos y archivos de la institución se conservan. */
@@ -178,6 +201,7 @@ export default function InstitucionDetallePage() {
     </dl>}
     <ServicioInstitucion institucion={institucion} onCambio={recargar} />
     {institucion.aprovisionada && <AdministradoresInstitucion institucion={institucion} onCambio={recargar} />}
+    {institucion.aprovisionada && <Respaldos institucion={institucion} />}
     <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
       <h2 className="font-semibold text-slate-800">Auditoría</h2>
       {institucion.auditoria.length === 0 ? <p className="mt-3 text-sm text-slate-500">Sin operaciones registradas.</p> : <ol className="mt-3 divide-y divide-slate-100">

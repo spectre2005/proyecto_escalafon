@@ -2,8 +2,22 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { mensajeError, resumen, sesionTerminada } from '../api'
 import { Aviso } from '../componentes'
-import { ESTADOS, etiquetaAccion, fecha } from '../estado'
+import { COPIA_EXTERNA, ESTADOS, etiquetaAccion, fecha } from '../estado'
 import { useSesionPlataforma } from '../sesion'
+
+/** Instituciones sin un respaldo correcto reciente y último respaldo de la base de la plataforma. */
+function Respaldos({ respaldos }) {
+  if (!respaldos) return null
+  const { atrasados, plataforma, horas_aviso: horas } = respaldos
+  return <div className={`mt-8 rounded-2xl border p-5 ${atrasados.length ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white'}`}>
+    <h2 className="font-semibold text-slate-800">Respaldos</h2>
+    {atrasados.length === 0 ? <p className="mt-2 text-sm text-slate-600">Todas las instituciones aprovisionadas tienen un respaldo correcto de las últimas {horas} horas.</p> : <>
+      <p className="mt-2 text-sm text-rose-800">{atrasados.length === 1 ? 'Una institución no tiene' : `${atrasados.length} instituciones no tienen`} un respaldo correcto de las últimas {horas} horas:</p>
+      <ul className="mt-2 space-y-1 text-sm">{atrasados.map(i => <li key={i.id}><Link to={`/plataforma/instituciones/${i.id}`} className="text-rose-800 underline">{i.nombre}</Link><span className="text-rose-700"> · {i.ultimo_correcto_en ? `último correcto ${fecha(i.ultimo_correcto_en)}` : 'sin ningún respaldo correcto'}</span></li>)}</ul>
+    </>}
+    <p className="mt-3 text-xs text-slate-500">Base de la plataforma: {plataforma ? <>{plataforma.estado === 'correcto' ? 'respaldo correcto' : 'el último respaldo falló'} {fecha(plataforma.created_at)} · <span className={COPIA_EXTERNA[plataforma.copia_externa]?.clase}>{COPIA_EXTERNA[plataforma.copia_externa]?.etiqueta}</span></> : 'todavía sin respaldos'}.</p>
+  </div>
+}
 
 export default function ResumenPage() {
   const { terminada } = useSesionPlataforma()
@@ -22,7 +36,7 @@ export default function ResumenPage() {
   const { data } = estado
   return <section aria-labelledby="titulo-resumen" aria-busy={Boolean(estado.loading)}>
     <h1 id="titulo-resumen" className="text-2xl font-bold text-slate-900">Resumen</h1>
-    <p className="mt-1 text-sm text-slate-500">Instituciones registradas en la plataforma por estado y últimas operaciones.</p>
+    <p className="mt-1 text-sm text-slate-500">Instituciones registradas en la plataforma por estado, sus respaldos y las últimas operaciones.</p>
     {estado.loading && <p role="status" className="mt-6 text-sm text-slate-500">Cargando…</p>}
     {estado.error && <div className="mt-6 space-y-3"><Aviso>{estado.error}</Aviso><button type="button" onClick={() => { setEstado({ loading: true }); setIntento(intento + 1) }} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm">Reintentar</button></div>}
     {data && <>
@@ -30,6 +44,7 @@ export default function ResumenPage() {
         <Link to="/plataforma/instituciones" className="rounded-2xl border border-slate-200 bg-white p-5 hover:border-slate-300"><p className="text-xs text-slate-500">Total</p><p className="mt-2 text-3xl font-bold text-slate-900">{data.total}</p></Link>
         {Object.entries(ESTADOS).map(([clave, { etiqueta }]) => <Link key={clave} to={`/plataforma/instituciones?estado=${clave}`} className="rounded-2xl border border-slate-200 bg-white p-5 hover:border-slate-300"><p className="text-xs text-slate-500">{etiqueta}{clave === 'registrada' ? ' (sin operar)' : ''}</p><p className="mt-2 text-3xl font-bold text-slate-900">{data.por_estado?.[clave] ?? 0}</p></Link>)}
       </div>
+      <Respaldos respaldos={data.respaldos} />
       <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-5">
         <h2 className="font-semibold text-slate-800">Últimas operaciones</h2>
         {data.recientes.length === 0 ? <p className="mt-3 text-sm text-slate-500">Todavía no hay operaciones registradas.</p> : <ul className="mt-3 divide-y divide-slate-100">

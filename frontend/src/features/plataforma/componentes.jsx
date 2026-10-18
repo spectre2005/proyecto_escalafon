@@ -12,6 +12,14 @@ export function EstadoServicio({ servicio }) {
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${estado.clase}`}>{estado.etiqueta}</span>
 }
 
+/** Respaldo al día o atrasado (respaldo.atrasado: sin un respaldo correcto reciente). Sin aprovisionar no hay qué respaldar. */
+export function EstadoRespaldo({ institucion }) {
+  if (!institucion.aprovisionada || !institucion.respaldo) return null
+  const { atrasado, ultimo_correcto_en } = institucion.respaldo
+  return <span title={ultimo_correcto_en ? `Último respaldo correcto: ${new Date(ultimo_correcto_en).toLocaleString('es-PE')}` : 'Todavía no hay un respaldo correcto.'}
+    className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${atrasado ? 'bg-rose-50 text-rose-700 ring-rose-200' : 'bg-teal-50 text-teal-800 ring-teal-200'}`}>{atrasado ? 'Sin respaldo reciente' : 'Respaldo al día'}</span>
+}
+
 export function SinAprovisionar({ institucion }) {
   if (institucion.aprovisionada) return null
   return <span title="Su base de datos, su almacenamiento y su configuración aún no están listos y verificados." className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">Pendiente de aprovisionamiento</span>

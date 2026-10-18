@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Plataforma;
 use App\Http\Controllers\Controller;
 use App\Models\Plataforma\AuditoriaPlataforma;
 use App\Models\Plataforma\Institucion;
+use App\Models\Plataforma\Respaldo;
 use App\Support\Plataforma\Aprovisionamiento;
 use App\Support\Plataforma\AprovisionamientoRechazado;
 use App\Support\Plataforma\AuditoriaOperaciones;
@@ -29,8 +30,18 @@ class InstitucionController extends Controller
         $conteo = Institucion::query()->select('estado', DB::raw('count(*) as total'))->groupBy('estado')->pluck('total', 'estado');
         $porEstado = collect(Institucion::ESTADOS)->mapWithKeys(fn (string $estado): array => [$estado => (int) ($conteo[$estado] ?? 0)]);
 
+        $aprovisionadas = Institucion::query()->whereNotNull('aprovisionada_en')->with(['ultimoRespaldo', 'ultimoRespaldoCorrecto'])->orderBy('nombre')->get();
+        $plataforma = Respaldo::query()->where('objetivo', 'plataforma')->latest('created_at')->first();
+
         return response()->json(['data' => [
             'total' => $porEstado->sum(), 'por_estado' => $porEstado,
+            // Instituciones sin un respaldo correcto reciente, y el último respaldo de la base de la plataforma.
+            'respaldos' => [
+                'atrasados' => $aprovisionadas->filter(fn (Institucion $i): bool => $i->estadoRespaldo()['atrasado'])
+                    ->map(fn (Institucion $i): array => ['id' => $i->id, 'nombre' => $i->nombre, 'ultimo_correcto_en' => $i->estadoRespaldo()['ultimo_correcto_en']])->values(),
+                'plataforma' => $plataforma?->datos(),
+                'horas_aviso' => Respaldo::HORAS_AVISO,
+            ],
             'recientes' => AuditoriaPlataforma::query()->with(['administrador:id,nombre', 'institucion:id,nombre'])->latest('created_at')->limit(8)->get()->map(fn (AuditoriaPlataforma $evento): array => $this->evento($evento)),
         ]]);
     }
@@ -38,7 +49,7 @@ class InstitucionController extends Controller
     public function index(Request $request): JsonResponse
     {
         $filtros = $request->validate(['q' => 'nullable|string|max:150', 'estado' => ['nullable', Rule::in(Institucion::ESTADOS)], 'page' => 'sometimes|integer|min:1']);
-        $consulta = Institucion::query()->with('periodos')->orderBy('nombre')->orderBy('id');
+        $consulta = Institucion::query()->with(['periodos', 'ultimoRespaldo', 'ultimoRespaldoCorrecto'])->orderBy('nombre')->orderBy('id');
         if (! empty($filtros['q'])) {
             $texto = '%'.mb_strtolower(trim($filtros['q'])).'%';
             $consulta->where(fn ($q) => $q->whereRaw('LOWER(nombre) LIKE ?', [$texto])->orWhereRaw('LOWER(slug) LIKE ?', [$texto]));
@@ -56,6 +67,7 @@ class InstitucionController extends Controller
         $registro = Institucion::query()->findOrFail($institucion);
 
         return response()->json(['data' => [...$registro->datos(),
+            'respaldos' => $registro->respaldos()->latest('created_at')->limit(10)->get()->map(fn (Respaldo $respaldo): array => $respaldo->datos()),
             'auditoria' => AuditoriaPlataforma::query()->where('institucion_id', $registro->id)->with('administrador:id,nombre')->latest('created_at')->limit(30)->get()
                 ->map(fn (AuditoriaPlataforma $evento): array => $this->evento($evento)),
         ]]);

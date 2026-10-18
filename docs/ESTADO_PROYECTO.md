@@ -155,9 +155,11 @@ Funcionalidades que faltan, con su base en la directiva. Orden propuesto, sin de
 
 ## Hoja de ruta del panel de plataforma (superadmin) (por definir, analizado el 13/10/2026)
 
-Hoy tiene: resumen por estado y últimas 8 operaciones; listado, registro y detalle de instituciones (datos,
-aprovisionar, activar/suspender, tiempo de uso, administradores, auditoría). Por consola: superadmins, migraciones y
-verificación. Falta, en el orden propuesto (sin decidir):
+Hoy tiene: resumen por estado, respaldos y últimas 8 operaciones; listado, registro y detalle de instituciones (datos,
+aprovisionar, activar/suspender, tiempo de uso, administradores, respaldos, auditoría). Por consola: superadmins,
+migraciones y verificación. Respaldos (17/10/2026): uno por institución, copia externa cifrada opcional con rclone
+(Google Drive u otro; de quién es la cuenta: pendiente del cliente), verificación y restauración por institución
+(docker/produccion/respaldar.sh y restaurar.sh, docs/PRODUCCION.md). Falta, en el orden propuesto (sin decidir):
 1. Datos del cliente y del contrato: razón social, RUC, contacto, N.º de contrato y fecha de inicio.
 2. Resumen útil: vencimientos en los próximos 30 días, en gracia o vencidas, ingresos del mes y del año.
 3. Seguridad del superadmin: gestionarlos desde el panel, cambiar la propia contraseña y verificación en dos pasos.

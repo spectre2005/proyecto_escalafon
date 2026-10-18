@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import Icon from '../../../components/ui/Icon'
 import { listarInstituciones, mensajeError, sesionTerminada } from '../api'
-import { Aviso, EstadoInstitucion, EstadoServicio, SinAprovisionar } from '../componentes'
+import { Aviso, EstadoInstitucion, EstadoRespaldo, EstadoServicio, SinAprovisionar } from '../componentes'
 import { ESTADOS, fecha } from '../estado'
 import { useSesionPlataforma } from '../sesion'
 
@@ -48,7 +48,7 @@ export default function InstitucionesPage() {
         <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
           {data.data.map(institucion => <li key={institucion.id}><Link to={`/plataforma/instituciones/${institucion.id}`} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 hover:bg-slate-50">
             <span className="min-w-0"><strong className="block truncate text-sm text-slate-800">{institucion.nombre}</strong><span className="text-xs text-slate-500">{institucion.slug} · registrada {fecha(institucion.created_at)}</span></span>
-            <span className="flex flex-wrap gap-2"><SinAprovisionar institucion={institucion} /><EstadoInstitucion estado={institucion.estado} /><EstadoServicio servicio={institucion.servicio} /></span>
+            <span className="flex flex-wrap gap-2"><SinAprovisionar institucion={institucion} /><EstadoInstitucion estado={institucion.estado} /><EstadoServicio servicio={institucion.servicio} /><EstadoRespaldo institucion={institucion} /></span>
           </Link></li>)}
         </ul>
         {data.last_page > 1 && <nav aria-label="Paginación" className="mt-4 flex items-center justify-between text-sm"><button type="button" disabled={pagina <= 1} onClick={() => filtrar({ page: String(pagina - 1) })} className="rounded-xl border border-slate-200 bg-white px-4 py-2">Anterior</button><span className="text-slate-500">Página {data.current_page} de {data.last_page} · {data.total} instituciones</span><button type="button" disabled={pagina >= data.last_page} onClick={() => filtrar({ page: String(pagina + 1) })} className="rounded-xl border border-slate-200 bg-white px-4 py-2">Siguiente</button></nav>}
