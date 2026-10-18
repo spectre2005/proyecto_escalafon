@@ -73,13 +73,20 @@ export default function FuncionalidadesConfig() {
   }
 
   return <section aria-label="Funcionalidades" className={cardClass}>
-    <div className="mb-6 flex items-center gap-3"><span className="grid size-11 place-items-center rounded-xl bg-teal-50 text-teal-700"><Icon name="settings" /></span><div><h2 className="font-semibold text-slate-800">Funcionalidades</h2><p className="mt-1 text-xs text-slate-500">Desactiva lo que la institución no utiliza: deja de mostrarse en el legajo y no admite registros nuevos. Desactivar no elimina datos y se puede revertir.</p></div></div>
+    <div className="mb-6 flex items-center gap-3"><span className="grid size-11 place-items-center rounded-xl bg-teal-50 text-teal-700"><Icon name="settings" /></span><div><h2 className="font-semibold text-slate-800">Módulos y funcionalidades</h2><p className="mt-1 text-xs text-slate-500">Selecciona un módulo para ver sus subfunciones y activar o desactivar las que utiliza la institución. Desactivar no elimina datos y se puede revertir.</p></div></div>
     {!consulta.data && !consulta.error && <p role="status" className="text-sm text-slate-500">Cargando funcionalidades…</p>}
     {consulta.error && <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{apiErrorMessage(consulta.error)} <button type="button" onClick={consulta.retry} className="font-semibold underline">Reintentar</button></p>}
     {notice && <p role={notice.error ? 'alert' : 'status'} className={`mb-5 rounded-xl p-4 text-sm ${notice.error ? 'bg-rose-50 text-rose-700' : 'bg-teal-50 text-teal-800'}`}>{notice.text}</p>}
-    {consulta.data && <div className="space-y-6">{porSeccion.map(([seccion, funcionalidades]) => <section key={seccion} aria-label={nombresSeccion[seccion] || `Sección ${seccion}`}>
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">{seccion === 13 ? '' : `${String(seccion).padStart(2, '0')} · `}{nombresSeccion[seccion] || `Sección ${seccion}`}</h3>
-      <ul className="divide-y divide-slate-100 rounded-xl border border-slate-100">{funcionalidades.map(funcionalidad => <li key={funcionalidad.codigo} className="px-4 py-3">
+    {consulta.data && <div className="space-y-3">{porSeccion.map(([seccion, funcionalidades]) => <details key={seccion} className="group rounded-xl border border-slate-200 bg-white open:border-teal-200">
+      <summary className="flex cursor-pointer list-none items-center gap-3 rounded-xl px-4 py-4 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 [&::-webkit-details-marker]:hidden">
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-teal-50 text-sm font-semibold text-teal-800">{String(seccion).padStart(2, '0')}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-slate-800">{nombresSeccion[seccion] || `Sección ${seccion}`}</span>
+          <span className="mt-1 block text-xs text-slate-500">{funcionalidades.length} subfunciones · {funcionalidades.filter(funcionalidad => funcionalidad.activa || funcionalidad.nucleo).length} activas · {funcionalidades.filter(funcionalidad => !funcionalidad.activa && !funcionalidad.nucleo).length} desactivadas</span>
+        </span>
+        <span className="shrink-0 text-teal-700 transition-transform group-open:rotate-90"><Icon name="arrow" size={18} /></span>
+      </summary>
+      <ul className="divide-y divide-slate-100 border-t border-slate-100">{funcionalidades.map(funcionalidad => <li key={funcionalidad.codigo} className="px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm text-slate-800">{funcionalidad.nombre} <Estado funcionalidad={funcionalidad} /></p>
@@ -90,6 +97,6 @@ export default function FuncionalidadesConfig() {
         </div>
         {cambiando?.codigo === funcionalidad.codigo && <Confirmar funcionalidad={funcionalidad} busy={busy} onCancel={() => setCambiando(null)} onConfirm={confirmar} />}
       </li>)}</ul>
-    </section>)}</div>}
+    </details>)}</div>}
   </section>
 }
