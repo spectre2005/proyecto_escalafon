@@ -99,6 +99,24 @@ export function proponerUbicacion(slug) {
   return { base_datos: `escalafon_${limpio.replaceAll('-', '_')}`, almacenamiento: `instituciones/${limpio}` }
 }
 
+/** Datos del cliente y del contrato (opcionales). */
+export const CAMPOS_CLIENTE = [
+  { campo: 'razon_social', etiqueta: 'Razón social', max: 200 },
+  { campo: 'ruc', etiqueta: 'RUC', max: 11, ayuda: '11 dígitos; se comprueba el dígito verificador.' },
+  { campo: 'contrato_numero', etiqueta: 'N.º de contrato', max: 60 },
+  { campo: 'contrato_inicio', etiqueta: 'Inicio del contrato', tipo: 'date' },
+  { campo: 'contacto_nombre', etiqueta: 'Contacto', max: 150 },
+  { campo: 'contacto_email', etiqueta: 'Correo de contacto', tipo: 'email', max: 255 },
+  { campo: 'contacto_telefono', etiqueta: 'Teléfono de contacto', tipo: 'tel', max: 20 },
+]
+
+/** Solo los datos del cliente que cambiaron, sin espacios sobrantes; vacío = quitar el dato (null). */
+export function cambiosCliente(original, borrador) {
+  return Object.fromEntries(CAMPOS_CLIENTE.map(({ campo }) => campo)
+    .filter(campo => String(borrador?.[campo] ?? '').trim() !== String(original?.[campo] ?? ''))
+    .map(campo => [campo, String(borrador[campo]).trim() || null]))
+}
+
 /** Solo los campos cambiados (para PATCH); los de ubicación solo si siguen editables. */
 export function cambios(original, borrador) {
   const campos = original?.ubicacion_editable ? ['nombre', 'slug', 'base_datos', 'almacenamiento'] : ['nombre']

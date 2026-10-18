@@ -4,6 +4,7 @@ import { activarInstitucion, aprovisionarInstitucion, editarInstitucion, mensaje
 import { Aviso, Credenciales, EstadoInstitucion, EstadoRespaldo, EstadoServicio, SinAprovisionar } from '../componentes'
 import AdministradoresInstitucion from './AdministradoresInstitucion'
 import ServicioInstitucion from './ServicioInstitucion'
+import ClienteContrato from './ClienteContrato'
 import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, COPIA_EXTERNA, VERIFICACION, accionesDisponibles, cambios, etiquetaAccion, fecha, tamano } from '../estado'
 import { useSesionPlataforma } from '../sesion'
 
@@ -199,6 +200,7 @@ export default function InstitucionDetallePage() {
       <Dato etiqueta="Registrada">{fecha(institucion.created_at)}</Dato>
       <Dato etiqueta="Última modificación">{fecha(institucion.updated_at)}</Dato>
     </dl>}
+    <ClienteContrato institucion={institucion} onCambio={recargar} />
     <ServicioInstitucion institucion={institucion} onCambio={recargar} />
     {institucion.aprovisionada && <AdministradoresInstitucion institucion={institucion} onCambio={recargar} />}
     {institucion.aprovisionada && <Respaldos institucion={institucion} />}

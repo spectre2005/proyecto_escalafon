@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Plataforma\AuditoriaPlataforma;
 use App\Models\Plataforma\Institucion;
 use App\Models\Plataforma\Respaldo;
+use App\Rules\Ruc;
 use App\Support\Plataforma\Aprovisionamiento;
 use App\Support\Plataforma\AprovisionamientoRechazado;
 use App\Support\Plataforma\AuditoriaOperaciones;
@@ -91,7 +92,7 @@ class InstitucionController extends Controller
     public function update(Request $request, string $institucion): JsonResponse
     {
         $registro = Institucion::query()->findOrFail($institucion);
-        $this->sinCamposAjenos($request, ['nombre', 'slug', 'base_datos', 'almacenamiento', 'dias_gracia']);
+        $this->sinCamposAjenos($request, ['nombre', 'slug', 'base_datos', 'almacenamiento', 'dias_gracia', ...Institucion::DATOS_CLIENTE]);
         $ubicacion = array_intersect(array_keys($request->all()), ['slug', 'base_datos', 'almacenamiento']);
         if ($ubicacion !== [] && ! $registro->ubicacionEditable()) {
             throw ValidationException::withMessages(array_fill_keys($ubicacion,
@@ -100,9 +101,22 @@ class InstitucionController extends Controller
         if ($request->has('slug')) {
             $request->merge(['slug' => mb_strtolower(trim((string) $request->input('slug')))]);
         }
+        // Datos del cliente: sin espacios sobrantes; vacío = sin dato. El correo, en minúsculas.
+        foreach (array_intersect(Institucion::DATOS_CLIENTE, array_keys($request->all())) as $campo) {
+            $valor = trim((string) $request->input($campo));
+            $request->merge([$campo => $valor === '' ? null : ($campo === 'contacto_email' ? mb_strtolower($valor) : $valor)]);
+        }
         $data = $request->validate([...array_map(fn (array $reglas): array => ['sometimes', ...$reglas], $this->reglas($registro->id)),
             // Días que sigue funcionando (con aviso) después de vencer su tiempo de uso.
-            'dias_gracia' => ['sometimes', 'integer', 'min:0', 'max:90']]);
+            'dias_gracia' => ['sometimes', 'integer', 'min:0', 'max:90'],
+            'razon_social' => ['sometimes', 'nullable', 'string', 'min:3', 'max:200'],
+            'ruc' => ['sometimes', 'nullable', 'string', new Ruc],
+            'contacto_nombre' => ['sometimes', 'nullable', 'string', 'min:3', 'max:150'],
+            'contacto_email' => ['sometimes', 'nullable', 'email:rfc', 'max:255'],
+            'contacto_telefono' => ['sometimes', 'nullable', 'string', 'regex:/^\+?[0-9][0-9 ()-]{5,18}$/'],
+            'contrato_numero' => ['sometimes', 'nullable', 'string', 'max:60'],
+            'contrato_inicio' => ['sometimes', 'nullable', 'date_format:Y-m-d', 'after_or_equal:2000-01-01', 'before_or_equal:2100-12-31']],
+            ['contacto_telefono.regex' => 'El teléfono solo puede tener dígitos, espacios, guiones, paréntesis y un + inicial.']);
         $antes = $this->huella($registro);
         $registro->update(isset($data['nombre']) ? [...$data, 'nombre' => trim($data['nombre'])] : $data);
         AuditoriaOperaciones::registrar('institucion.editada', $request, Auth::guard('plataforma')->id(), $registro->id, $antes, $this->huella($registro));
@@ -198,7 +212,9 @@ class InstitucionController extends Controller
     /** @return array<string, mixed> */
     private function huella(Institucion $institucion): array
     {
-        return $institucion->only(['nombre', 'slug', 'estado', 'base_datos', 'almacenamiento', 'motivo_suspension', 'dias_gracia']);
+        return [...$institucion->only(['nombre', 'slug', 'estado', 'base_datos', 'almacenamiento', 'motivo_suspension', 'dias_gracia',
+            'razon_social', 'ruc', 'contacto_nombre', 'contacto_email', 'contacto_telefono', 'contrato_numero']),
+            'contrato_inicio' => $institucion->contrato_inicio?->toDateString()];
     }
 
     /** @return array<string, mixed> */

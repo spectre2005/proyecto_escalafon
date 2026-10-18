@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, COPIA_EXTERNA, VERIFICACION, accionesDisponibles, etiquetaAccion, tamano, cambios, etiquetaEstado, fechaCorta, proponerPeriodo, proponerSlug, proponerUbicacion, textoServicio } from './estado.js'
+import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, COPIA_EXTERNA, VERIFICACION, accionesDisponibles, cambiosCliente, etiquetaAccion, tamano, cambios, etiquetaEstado, fechaCorta, proponerPeriodo, proponerSlug, proponerUbicacion, textoServicio } from './estado.js'
 import { esEscritura, mensajeError } from './api.js'
 
 test('state actions follow what the backend allows', () => {
@@ -82,4 +82,11 @@ test('backup sizes and states are readable', () => {
   assert.match(COPIA_EXTERNA.no_configurada.etiqueta, /Sin copia externa/)
   assert.match(VERIFICACION.correcta.etiqueta, /Restauración probada/)
   assert.equal(etiquetaAccion('respaldo.fallido'), 'Falló un respaldo')
+})
+
+test('only the changed client fields are sent, and emptying one removes it', () => {
+  const original = { razon_social: 'Universidad Uno', ruc: '20100000009', contacto_email: null, contrato_inicio: '2026-03-01' }
+  assert.deepEqual(cambiosCliente(original, { ...original, razon_social: ' Universidad Uno ' }), {})
+  assert.deepEqual(cambiosCliente(original, { ...original, contacto_email: ' orh@uno.test ', ruc: '' }), { contacto_email: 'orh@uno.test', ruc: null })
+  assert.deepEqual(cambiosCliente(original, { ...original, contrato_inicio: '2026-04-01' }), { contrato_inicio: '2026-04-01' })
 })

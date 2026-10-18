@@ -42,12 +42,16 @@ class Institucion extends Model
 
     protected $table = 'instituciones';
 
-    protected $fillable = ['nombre', 'slug', 'estado', 'base_datos', 'almacenamiento', 'aprovisionada_en', 'suspendida_en', 'motivo_suspension', 'dias_gracia'];
+    protected $fillable = ['nombre', 'slug', 'estado', 'base_datos', 'almacenamiento', 'aprovisionada_en', 'suspendida_en', 'motivo_suspension', 'dias_gracia',
+        ...self::DATOS_CLIENTE];
+
+    /** Datos del cliente y del contrato, editables en el panel en cualquier estado. */
+    public const DATOS_CLIENTE = ['razon_social', 'ruc', 'contacto_nombre', 'contacto_email', 'contacto_telefono', 'contrato_numero', 'contrato_inicio'];
 
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['aprovisionada_en' => 'datetime', 'suspendida_en' => 'datetime', 'dias_gracia' => 'integer'];
+        return ['aprovisionada_en' => 'datetime', 'suspendida_en' => 'datetime', 'dias_gracia' => 'integer', 'contrato_inicio' => 'date:Y-m-d'];
     }
 
     public function respaldos(): HasMany
@@ -164,7 +168,9 @@ class Institucion extends Model
     public function datos(): array
     {
         return [
-            ...$this->only(['id', 'nombre', 'slug', 'estado', 'base_datos', 'almacenamiento', 'motivo_suspension']),
+            ...$this->only(['id', 'nombre', 'slug', 'estado', 'base_datos', 'almacenamiento', 'motivo_suspension',
+                'razon_social', 'ruc', 'contacto_nombre', 'contacto_email', 'contacto_telefono', 'contrato_numero']),
+            'contrato_inicio' => $this->contrato_inicio?->toDateString(),
             'aprovisionada' => $this->aprovisionada(),
             'aprovisionada_en' => $this->aprovisionada_en?->toIso8601String(),
             'suspendida_en' => $this->suspendida_en?->toIso8601String(),
