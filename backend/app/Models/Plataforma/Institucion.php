@@ -14,6 +14,9 @@ use Illuminate\Support\Carbon;
  * Estados: registrada (sin aprovisionar: no opera), activa (aprovisionada y habilitada) y suspendida (sin acceso; sus
  * datos y archivos se conservan). Una institución solo pasa a activa con aprovisionada_en, que fija el comando
  * plataforma:verificar-aprovisionamiento tras comprobar su base y su almacenamiento.
+ *
+ * Lista blanca: solo los ESTADOS_OPERATIVOS atienden peticiones y trabajos. Un estado que no está en ESTADOS (uno
+ * futuro, o un valor escrito a mano en la base) no opera, no se activa y no se suspende.
  */
 class Institucion extends Model
 {
@@ -26,6 +29,9 @@ class Institucion extends Model
     public const SUSPENDIDA = 'suspendida';
 
     public const ESTADOS = [self::REGISTRADA, self::ACTIVA, self::SUSPENDIDA];
+
+    /** Únicos estados que atienden peticiones institucionales y trabajos en cola (ResolverInstitucion, operativa()). */
+    public const ESTADOS_OPERATIVOS = [self::ACTIVA];
 
     public const PATRON_SLUG = '/^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/';
 
@@ -128,10 +134,15 @@ class Institucion extends Model
             'gracia_hasta' => ($this->dias_gracia ?? 0) > 0 ? $gracia->toDateString() : null];
     }
 
-    /** Opera (atiende peticiones y trabajos en cola): activa y con el servicio no vencido. */
+    /** Opera (atiende peticiones y trabajos en cola): en un estado operativo y con el servicio no vencido. */
     public function operativa(): bool
     {
-        return $this->estado === self::ACTIVA && $this->servicio()['estado'] !== 'vencido';
+        return $this->estadoOperativo() && $this->servicio()['estado'] !== 'vencido';
+    }
+
+    public function estadoOperativo(): bool
+    {
+        return in_array($this->estado, self::ESTADOS_OPERATIVOS, true);
     }
 
     public function aprovisionada(): bool
@@ -150,6 +161,7 @@ class Institucion extends Model
     {
         return match (true) {
             $this->estado === self::ACTIVA => 'La institución ya está activa.',
+            ! in_array($this->estado, self::ESTADOS, true) => 'La institución tiene un estado no reconocido: no se puede activar.',
             ! $this->aprovisionada() => 'La institución aún no está aprovisionada: su base de datos, su almacenamiento y su configuración deben estar listos y verificados.',
             default => null,
         };
@@ -160,7 +172,8 @@ class Institucion extends Model
         return match ($this->estado) {
             self::SUSPENDIDA => 'La institución ya está suspendida.',
             self::REGISTRADA => 'Una institución aún no activa no se suspende: todavía no opera.',
-            default => null,
+            self::ACTIVA => null,
+            default => 'La institución tiene un estado no reconocido: no se puede suspender.',
         };
     }
 

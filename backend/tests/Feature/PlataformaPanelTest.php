@@ -198,6 +198,22 @@ class PlataformaPanelTest extends TestCase
         $this->assertSame(1, Institucion::query()->count());
     }
 
+    /** Un estado no reconocido (futuro o escrito a mano) no se activa ni se suspende, y no deja auditoría. */
+    public function test_an_unknown_state_cannot_be_activated_or_suspended(): void
+    {
+        $this->entrar();
+        foreach (['archivada', 'desconocido'] as $estado) {
+            $institucion = $this->institucion(['slug' => "estado-{$estado}", 'estado' => $estado, 'aprovisionada_en' => now()]);
+            $this->assertFalse($institucion->operativa());
+            $this->postJson("/api/plataforma/instituciones/{$institucion->id}/activar")->assertConflict()
+                ->assertJsonPath('message', 'La institución tiene un estado no reconocido: no se puede activar.');
+            $this->postJson("/api/plataforma/instituciones/{$institucion->id}/suspender", ['motivo' => 'Prueba de estado'])->assertConflict()
+                ->assertJsonPath('message', 'La institución tiene un estado no reconocido: no se puede suspender.');
+            $this->assertSame($estado, $institucion->refresh()->estado);
+            $this->assertSame(0, AuditoriaPlataforma::query()->where('institucion_id', $institucion->id)->count());
+        }
+    }
+
     public function test_administrative_operations_are_audited(): void
     {
         $this->entrar();

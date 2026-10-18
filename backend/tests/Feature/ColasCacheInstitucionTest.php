@@ -115,4 +115,18 @@ class ColasCacheInstitucionTest extends TestCase
         $this->assertSame(0, DB::connection('plataforma')->table('jobs')->count());
         $this->assertStringContainsString('no está activa', DB::connection('plataforma')->table('failed_jobs')->value('exception'));
     }
+
+    public function test_a_job_of_an_institution_in_an_unknown_state_fails_without_running(): void
+    {
+        $uno = $this->con('uno');
+        ConexionInstitucion::usar($uno, function (): void {
+            TrabajoQueAnotaSuEntorno::dispatch();
+        });
+        $uno->update(['estado' => 'archivada']);
+
+        $this->trabajar();
+
+        $this->assertSame([], TrabajoQueAnotaSuEntorno::$ejecuciones);
+        $this->assertSame(1, DB::connection('plataforma')->table('failed_jobs')->count());
+    }
 }

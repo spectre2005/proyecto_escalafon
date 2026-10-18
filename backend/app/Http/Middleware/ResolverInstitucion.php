@@ -12,10 +12,13 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Con PLATAFORMA_MODO=subdominio, identifica la institución por el subdominio ({slug}.{PLATAFORMA_DOMINIO}) y atiende la
  * petición con su base, su almacenamiento y sus sesiones (ConexionInstitucion). Es global y va primero, antes de que se
- * abra la sesión. Solo opera una institución activa y con su tiempo de uso al día: la registrada responde como
- * inexistente; la suspendida y la vencida (pasados sus días de gracia), 403.
+ * abra la sesión, y se evalúa en cada petición: una sesión ya abierta deja de servir en cuanto cambia el estado.
+ * Lista blanca: solo opera un estado de Institucion::ESTADOS_OPERATIVOS (activa) con su tiempo de uso al día. La
+ * registrada responde como inexistente; la suspendida, la vencida (pasados sus días de gracia) y cualquier otro estado
+ * (futuro o no reconocido), 403.
  * El panel (api/plataforma) solo responde en el dominio base, sin subdominio.
- * Con PLATAFORMA_MODO=unica (por defecto) no hace nada: una sola institución con la base del .env.
+ * Con PLATAFORMA_MODO=unica (por defecto) no hace nada: una sola institución con la base del .env, sin identificarla;
+ * ningún estado del panel bloquea el acceso en ese modo.
  */
 class ResolverInstitucion
 {
@@ -40,6 +43,9 @@ class ResolverInstitucion
         }
         if ($institucion->estado === Institucion::SUSPENDIDA) {
             return self::rechazo(403, 'institucion_suspendida', 'El acceso de esta institución está suspendido. Comunícate con el soporte de la plataforma.');
+        }
+        if (! $institucion->estadoOperativo()) {
+            return self::rechazo(403, 'institucion_no_disponible', 'Esta institución no está disponible. Comunícate con el soporte de la plataforma.');
         }
         $servicio = $institucion->servicio();
         if ($servicio['estado'] === 'vencido') {
