@@ -40,12 +40,12 @@ export const resultadosPeriodo = { pendiente: 'Pendiente', aprobado: 'Aprobado',
 // documento cargado con recepción registrada. Los estados de fiscalización quedan preparados, sin acciones todavía.
 export const estadosDocumento = { pendiente: 'Pendiente', cargado: 'Cargado', recepcionado: 'Recepcionado', en_fiscalizacion: 'En fiscalización', verificado: 'Verificado', observado: 'Observado', falso: 'Falso' }
 
-export const coloresEstadoDocumento = { pendiente: 'bg-slate-100 text-slate-600', cargado: 'bg-amber-50 text-amber-800', recepcionado: 'bg-teal-50 text-teal-800' }
+export const coloresEstadoDocumento = { pendiente: 'bg-slate-100 text-slate-600', cargado: 'bg-slate-100 text-slate-600', recepcionado: 'bg-teal-50 text-teal-800' }
 
 // Estado de cada subsección en el resumen (backend: App\Support\ResumenSeccion02).
 export const estadosSubseccion = {
   completa: ['Completa', 'bg-teal-50 text-teal-800'],
-  parcial: ['Parcial', 'bg-amber-50 text-amber-800'],
+  parcial: ['Parcial', 'bg-slate-100 text-slate-600'],
   sin_datos: ['Sin datos', 'bg-slate-100 text-slate-600'],
   no_aplica: ['No aplica', 'bg-slate-100 text-slate-400'],
 }

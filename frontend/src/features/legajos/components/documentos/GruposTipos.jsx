@@ -1,6 +1,7 @@
 import { cantidadDocumentos, ofrecerTipo } from '../../config/aplicacion'
 import { vistaDe } from '../../config/vistasDocumentales'
 import VistasDocumentales from './VistasDocumentales'
+import ResumenTipo from './ResumenTipo'
 
 const lista = 'divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white'
 
@@ -22,6 +23,24 @@ export default function GruposTipos({ tipos, noAplica, render, aplica = true }) 
   })
   const nombre = tipo => `${tipo.literal ? `${tipo.literal}) ` : ''}${tipo.nombre}`
   return <VistasDocumentales elementos={tipos} clasificar={clasificar} nombreDe={nombre}>
-    {visibles => <ul className={lista}>{visibles.map(render)}</ul>}
+    {visibles => <ul className={lista}>{visibles.map(tipo => {
+      const vista = clasificar(tipo)
+      const estados = {
+        pendientes: [observado(tipo) ? 'Observado' : tipo.exigido === null ? 'Revisar datos' : cantidadDocumentos(tipo) === 0 ? 'Falta documento' : 'Revisar datos', 'bg-slate-100 text-slate-600'],
+        conDocumentos: ['Con documentos', 'bg-teal-50 text-teal-800'],
+        opcionales: ['Opcional', 'bg-slate-100 text-slate-600'],
+        noCorresponde: ['No corresponde', 'bg-slate-100 text-slate-600'],
+      }
+      const [estado, color] = estados[vista]
+      const cantidad = cantidadDocumentos(tipo)
+      return <li key={tipo.id}>
+        <details className="group/tipo">
+          <summary className="flex cursor-pointer list-none flex-wrap items-center gap-3 px-4 py-4 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-teal-700 [&::-webkit-details-marker]:hidden">
+            <ResumenTipo nombre={tipo.nombre} literal={tipo.literal} cantidad={cantidad} estado={<span className={`rounded-full px-2.5 py-1 text-xs font-medium ${color}`}>{estado}</span>} />
+          </summary>
+          <ul className="list-none border-t border-slate-100 bg-slate-50/40">{render(tipo)}</ul>
+        </details>
+      </li>
+    })}</ul>}
   </VistasDocumentales>
 }

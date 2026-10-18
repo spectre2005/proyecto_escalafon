@@ -83,4 +83,4 @@ export function opcionesVacacion(permitidos) {
 }
 
 // Etiqueta de color de cada tipo de goces_vacacionales en la lista (colores del panel).
-export const coloresGoce = { goce: 'bg-teal-50 text-teal-800', adelanto: 'bg-amber-50 text-amber-800', postergacion: 'bg-amber-50 text-amber-800' }
+export const coloresGoce = { goce: 'bg-teal-50 text-teal-800', adelanto: 'bg-slate-100 text-slate-600', postergacion: 'bg-slate-100 text-slate-600' }

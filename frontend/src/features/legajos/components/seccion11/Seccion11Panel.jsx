@@ -1,3 +1,4 @@
+import Aviso from '../documentos/AvisoSeccion'
 import Icon from '../../../../components/ui/Icon'
 import { useState } from 'react'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
@@ -25,10 +26,7 @@ const fecha = value => value ? value.split('-').reverse().join('/') : 'No regist
 const texto = value => value === null || value === undefined || value === '' ? 'No registrado' : String(value)
 const enlace = 'text-sm font-semibold text-teal-700 disabled:opacity-50'
 
-function Aviso({ tono = 'amber', children, accion }) {
-  const clases = { amber: 'border-amber-200 bg-amber-50 text-amber-900', slate: 'border-slate-200 bg-slate-50 text-slate-600' }[tono]
-  return <div role="note" className={`mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 text-sm ${clases}`}><div>{children}</div>{accion}</div>
-}
+
 
 function Etiqueta({ children, clase }) {
   return <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${clase}`}>{children}</span>
@@ -65,8 +63,8 @@ function Vinculos({ data, onNavigate }) {
       <thead className="bg-slate-50 text-slate-500"><tr>{['Vínculo', 'Tipo de vínculo', 'Fecha de cese (sección 02)', 'Desvinculación', 'Documentos'].map(t => <th key={t} className="px-4 py-3 font-medium">{t}</th>)}</tr></thead>
       <tbody>{data.vinculos.map(v => <tr key={v.id} className="border-t border-slate-100 text-slate-700">
         <td className="px-4 py-3">{etiquetaVinculo11(v)}</td>
-        <td className={`px-4 py-3 ${v.values.regimen_laboral ? '' : 'text-amber-700'}`}>{tipoVinculo(v.values.regimen_laboral)}</td>
-        <td className="px-4 py-3">{v.values.fecha_cese ? fecha(v.values.fecha_cese) : <span className="text-amber-700">Sin cese: regístralo primero en la sección 02</span>}</td>
+        <td className={`px-4 py-3 ${v.values.regimen_laboral ? '' : 'text-slate-600'}`}>{tipoVinculo(v.values.regimen_laboral)}</td>
+        <td className="px-4 py-3">{v.values.fecha_cese ? fecha(v.values.fecha_cese) : <span className="text-slate-600">Sin cese: regístralo primero en la sección 02</span>}</td>
         <td className="px-4 py-3">{v.desvinculacion_id ? <Etiqueta clase="bg-teal-50 text-teal-800">Registrada</Etiqueta> : <Etiqueta clase="bg-slate-100 text-slate-600">{v.values.fecha_cese ? 'Pendiente de registrar' : 'No aplica aún'}</Etiqueta>}</td>
         <td className="px-4 py-3">{v.documentos}</td>
       </tr>)}</tbody>
@@ -162,7 +160,7 @@ function TipoDocumento({ usuario, data, tipo, sinLegajo, ofrecer }) {
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-slate-800">{tipo.literal ? <span className="mr-1 text-slate-500">{tipo.literal})</span> : tipo.codigo === 'S11_X_ACEPTACION_RENUNCIA' && <span className="mr-1 text-slate-500">Anexo 05 ·</span>}{tipo.nombre}</p>
         <p className="mt-1 text-xs text-slate-500">{tipo.descripcion ? `${tipo.descripcion} ` : ''}Opcional; admite varios documentos.{tipo.motivos ? ` Solo para el motivo: ${tipo.motivos.map(m => etiqueta(motivosCese, m).toLowerCase()).join(', ')}.` : ''}</p>
-        {sinDefinir && <p role="note" className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">Hay vínculos con el tipo de vínculo sin definir y este documento solo corresponde a plazo determinado. Define el tipo de vínculo en la sección 02 (2.2: «Completar tipo» si el vínculo está cerrado).</p>}
+        {sinDefinir && <p role="note" className="mt-2 rounded-lg bg-slate-50 p-2 text-xs text-slate-700">Hay vínculos con el tipo de vínculo sin definir y este documento solo corresponde a plazo determinado. Define el tipo de vínculo en la sección 02 (2.2: «Completar tipo» si el vínculo está cerrado).</p>}
         {tipo.restringido ? <p className="mt-2 text-[11px] text-slate-400">Documento con datos sensibles: requiere acceso a datos sensibles.</p>
           : <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo, documento, data)}
             onSubsanar={puedeCargar && !sinLegajo && !subiendo && !subsanando && !registrando && !recuperando ? documento => { setAviso(''); setSubsanando(documento) } : null}

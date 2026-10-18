@@ -35,7 +35,7 @@ export default function CompletaPerfil({ usuario, pendientes, legajoActivo, pleg
   const contenido = <>
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h2 id="completa-perfil-titulo" className="text-sm font-semibold text-slate-800">Completa el perfil <span className="ml-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">{pendientes.length} sin responder</span></h2>
+        <h2 id="completa-perfil-titulo" className="text-sm font-semibold text-slate-800">Completa el perfil <span className="ml-1 rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600">{pendientes.length} sin responder</span></h2>
         <p className="mt-1 text-xs text-slate-500">Mientras una condición esté sin responder, sus documentos quedan por determinar. Si aún no sabes la respuesta, déjala como está.</p>
       </div>
     </div>
@@ -59,9 +59,9 @@ export default function CompletaPerfil({ usuario, pendientes, legajoActivo, pleg
       })}
     </ul>
   </>
-  if (plegado) return <details className="mb-4 rounded-2xl border border-amber-200 bg-white px-5 py-3">
-    <summary className="cursor-pointer text-sm text-slate-700"><strong className="font-semibold text-slate-800">Completa el perfil</strong> <span className="ml-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">{pendientes.length} sin responder</span> <span className="ml-2 text-xs font-semibold text-teal-700">Responder</span></summary>
+  if (plegado) return <details className="mb-4 rounded-2xl border border-slate-200 bg-white px-5 py-3">
+    <summary className="cursor-pointer text-sm text-slate-700"><strong className="font-semibold text-slate-800">Completa el perfil</strong> <span className="ml-1 rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600">{pendientes.length} sin responder</span> <span className="ml-2 text-xs font-semibold text-teal-700">Responder</span></summary>
     <div className="mt-3">{contenido}</div>
   </details>
-  return <section aria-labelledby="completa-perfil-titulo" className="mb-6 rounded-2xl border border-amber-200 bg-white p-5">{contenido}</section>
+  return <section aria-labelledby="completa-perfil-titulo" className="mb-6 rounded-2xl border border-slate-200 bg-white p-5">{contenido}</section>
 }

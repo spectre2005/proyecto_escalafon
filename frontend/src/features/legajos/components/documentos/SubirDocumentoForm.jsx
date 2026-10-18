@@ -1,11 +1,12 @@
+import Icon from '../../../../components/ui/Icon'
 import FormSplit from '../../../../components/pdf/FormSplit'
 import PdfPreviewField from '../../../../components/pdf/PdfPreviewField'
 import { useRef, useState } from 'react'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { subirDocumento } from '../../api/documentosApi'
 import { aplicarPrecarga, CAMPOS_PRECARGA, precargaDesdeDocumento } from '../../config/acreditacion'
-import { folios, modalidadesPresentacion, modalidadRecordada, recordarModalidad, relacionesTitular } from '../../config/documentos'
-import { EmisorInstitucion, SugerenciaFolio } from './AyudasCarga'
+import { folioFinalPorPaginas, folios, modalidadesPresentacion, modalidadRecordada, recordarModalidad, relacionesTitular } from '../../config/documentos'
+import { EmisorInstitucion } from './AyudasCarga'
 import Campo, { Formulario, Opciones } from '../seccion01/Campo'
 import { hoy, useBorrador, useGuardar } from '../seccion01/useGuardar'
 
@@ -36,6 +37,7 @@ export default function SubirDocumentoForm({ usuario, seccion, tipo, titular, en
   const [pdf, setPdf] = useState(null)
   const [paginas, setPaginas] = useState(null)
   const [errorPdf, setErrorPdf] = useState('')
+  const folioAutomatico = folioFinalPorPaginas(sugerido, paginas)
   const [cambiarTitular, setCambiarTitular] = useState(false)
   const respuesta = useRef(null)
   // Valores de partida de los campos que puede proponer un registro (titular del expediente, sin número ni fecha).
@@ -70,7 +72,7 @@ export default function SubirDocumentoForm({ usuario, seccion, tipo, titular, en
   if (identidadBloqueada) return <Formulario modal={modal} titulo="Subir copia de DNI" guardar="Guardar DNI" busy={busy} error={error}
     onSubmit={() => pdf && !errorPdf && guardar(draft)} onCancel={onCancel}
     nota="Al actualizar el DNI, el nuevo PDF queda vigente y la copia anterior se conserva en el historial.">
-    <FormSplit pdf={<PdfPreviewField label={`Archivo PDF${maximoKb ? ` (máx. ${maximoKb} KB)` : ''}`} required maxMB={maximoKb ? maximoKb / 1024 : 2} help="Selecciona la copia del DNI para revisarla antes de guardar." error={errorPdf || errors.pdf} onChange={(file, message) => { setPdf(file); setErrorPdf(message) }} />}>
+    <FormSplit pdf={<PdfPreviewField label={`Archivo PDF${maximoKb ? ` (máx. ${maximoKb} KB)` : ''}`} required maxMB={maximoKb ? maximoKb / 1024 : 2} help="Selecciona la copia del DNI para revisarla antes de guardar." error={errorPdf || errors.pdf} onChange={(file, message) => { setPdf(file); setPaginas(null); poner('folio_fin')(''); setErrorPdf(message) }} />}>
       <Campo label="Nombre" error={errors.titular_nombre}><input readOnly value={draft.titular_nombre} /></Campo>
       <Campo label="DNI" error={errors.titular_documento}><input readOnly value={draft.titular_documento} /></Campo>
       <Campo label="Fecha de incorporación" required error={errors.fecha_incorporacion}><input type="date" required max={hoy()} value={draft.fecha_incorporacion} onChange={set('fecha_incorporacion')} /></Campo>
@@ -95,16 +97,18 @@ export default function SubirDocumentoForm({ usuario, seccion, tipo, titular, en
   // Al editar el titular el bloque queda abierto aunque el valor vuelva a ser el de partida.
   const setTitular = campo => event => { setCambiarTitular(true); set(campo)(event) }
   return <Formulario modal={modal} titulo={subsanar ? `Subsanar documento: ${nombreTipo}` : `Subir documento: ${nombreTipo}`} guardar={subsanar ? 'Subir documento que subsana' : 'Subir documento'} busy={busy} error={error}
-    onSubmit={() => sugerido && pdf && !errorPdf && guardar(draft)} onCancel={onCancel}
+    onSubmit={() => sugerido && pdf && !errorPdf && guardar({ ...draft, folio_fin: folioAutomatico || draft.folio_fin })} onCancel={onCancel}
     nota="El documento no se puede eliminar ni reemplazar después: si hay un error, se sube uno nuevo que lo subsana. Quien sube queda registrado con tu sesión.">
-    <FormSplit pdf={<PdfPreviewField label={`Archivo PDF${maximoKb ? ` (máx. ${maximoKb} KB)` : ''}`} required maxMB={maximoKb ? maximoKb / 1024 : 2} help="Selecciona el PDF para ver su contenido antes de guardarlo." error={errorPdf || errors.pdf} onChange={(file, message) => { setPdf(file); setErrorPdf(message) }} onPages={setPaginas} />}>
-    {subsanar && <p role="note" className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900 sm:col-span-2">Subsana a: {resumen(subsanar)}. Se proponen sus datos: cambia solo lo que corrige. El documento anterior se conserva en el historial.{errors.subsana_a_documento_id ? ` ${[].concat(errors.subsana_a_documento_id).join(' ')}` : ''}</p>}
+    <FormSplit pdf={<PdfPreviewField label={`Archivo PDF${maximoKb ? ` (máx. ${maximoKb} KB)` : ''}`} required maxMB={maximoKb ? maximoKb / 1024 : 2} help="Selecciona el PDF para ver su contenido antes de guardarlo." error={errorPdf || errors.pdf} onChange={(file, message) => { setPdf(file); setPaginas(null); poner('folio_fin')(''); setErrorPdf(message) }} onPages={setPaginas} />}>
+    {subsanar && <div role="note" className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
+      <span className="mt-0.5 text-teal-700"><Icon name="file" size={20} /></span>
+      <div className="min-w-0"><p className="text-sm font-semibold text-slate-800">Nueva evidencia del documento</p><p className="mt-1 text-xs leading-relaxed text-slate-500">Anterior: {resumen(subsanar)}.</p><p className="mt-1 text-xs leading-relaxed text-slate-500">Los datos se han precargado. Revisa los que cambian; el documento anterior se conserva en el historial.</p>{errors.subsana_a_documento_id && <p role="alert" className="mt-2 text-xs text-rose-700">{[].concat(errors.subsana_a_documento_id).join(' ')}</p>}</div>
+    </div>}
     {registroFijo && <p role="note" className="rounded-lg bg-teal-50 p-3 text-xs text-teal-900 sm:col-span-2">Acredita: <strong>{registroFijo.etiqueta}</strong>. Los datos del registro ya guardados no se vuelven a pedir.{errors.enlace_id ? ` ${[].concat(errors.enlace_id).join(' ')}` : ''}</p>}
     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 sm:col-span-2">Metadatos del documento</p>
     <Campo label="Folio inicial (siguiente de la sección)" error={errors.folio_inicio}><input readOnly value={sugerido ?? 'Calculando…'} /></Campo>
-    <Campo label="Folio final" required error={errors.folio_fin}><input type="number" required min={sugerido || 1} value={draft.folio_fin} onChange={set('folio_fin')} placeholder={sugerido ? String(sugerido) : ''} /></Campo>
-    <SugerenciaFolio inicio={sugerido} paginas={paginas} valor={draft.folio_fin} onUsar={poner('folio_fin')} />
-    {sugerido && draft.folio_fin && <p className="text-xs text-slate-500 sm:col-span-2">Folios que ocupará: {folios(sugerido, Number(draft.folio_fin))}</p>}
+    <Campo label={folioAutomatico ? 'Folio final (automático)' : 'Folio final'} required error={errors.folio_fin}><input type="number" required readOnly={!!folioAutomatico} min={sugerido || 1} value={folioAutomatico || draft.folio_fin} onChange={set('folio_fin')} placeholder={sugerido ? String(sugerido) : ''} /></Campo>
+    {folioAutomatico ? <p role="status" className="flex items-center gap-2 rounded-lg bg-teal-50 px-3 py-2 text-xs text-teal-800 sm:col-span-2"><Icon name="check" size={16} />{paginas} {paginas === 1 ? 'página' : 'páginas'} · Folios {folios(sugerido, folioAutomatico)} asignados automáticamente (una página por folio).</p> : <p className="text-xs text-slate-500 sm:col-span-2">Selecciona un PDF para calcular el folio final según sus páginas. Si la vista previa no puede leerlo, puedes indicarlo manualmente.</p>}
     <Campo label="Fecha de emisión" required error={errors.fecha_emision}><input type="date" required max={hoy()} value={draft.fecha_emision} onChange={set('fecha_emision')} /></Campo>
     <div className="grid min-w-0 content-start gap-1.5">
       <Campo label="Emisor" required error={errors.emisor}><input required maxLength={200} value={draft.emisor} onChange={set('emisor')} placeholder="Entidad u oficina que emite" /></Campo>
@@ -117,7 +121,7 @@ export default function SubirDocumentoForm({ usuario, seccion, tipo, titular, en
         <option value="">Selecciona</option>
         {vigentes.map(documento => <option key={documento.id} value={documento.id}>{resumen(documento)}</option>)}
       </select></Campo>}
-    {enlaces && !registroFijo && <Campo label="Registro que acredita" error={errors.enlace_id} className="sm:col-span-2">
+    {enlaces && !registroFijo && !subsanar && !debeSubsanar && <Campo label="Registro que acredita" error={errors.enlace_id} className="sm:col-span-2">
       <select value={draft.enlace_id} onChange={elegirEnlace}>
         <option value="">Registrar uno nuevo después de subir</option>
         {enlaces.map(enlace => <option key={enlace.id} value={enlace.id}>{enlace.etiqueta}</option>)}

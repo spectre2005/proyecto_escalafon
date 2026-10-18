@@ -1,3 +1,4 @@
+import Aviso from '../documentos/AvisoSeccion'
 import Icon from '../../../../components/ui/Icon'
 import { useState } from 'react'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
@@ -24,9 +25,7 @@ const fecha = value => value ? value.split('-').reverse().join('/') : 'No regist
 const texto = value => value === null || value === undefined || value === '' ? 'No registrado' : String(value)
 const enlace = 'text-sm font-semibold text-teal-700 disabled:opacity-50'
 
-function Aviso({ children, accion }) {
-  return <div role="note" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><div>{children}</div>{accion}</div>
-}
+
 
 function Etiqueta({ children, clase }) {
   return <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${clase}`}>{children}</span>

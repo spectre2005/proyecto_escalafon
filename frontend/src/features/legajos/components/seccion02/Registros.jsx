@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import DocumentoModal from '../documentos/DocumentoModal'
+import { cloneElement, isValidElement, useState } from 'react'
 import { apiErrorMessage } from '../../../../axios'
 import { usePuede } from '../../../auth/session'
 import { AnularForm } from '../seccion01/RegistrosPanel'
-import { EnZona, LineaDocumento } from '../documentos/EspacioSeccion'
+import { EnZona } from '../documentos/EspacioSeccion'
 
 const button = 'rounded-xl bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50'
 
@@ -23,6 +24,7 @@ export function Bloqueo({ children }) {
 export default function Registros({ titulo, agregar, vacio, registros, bloqueo, tituloRegistro, subtitulo, campos, renderForm, corregir, onAnular, detalle, adjuntar, documento }) {
   const puedeRegistrar = usePuede('legajo.editar')
   const puedeAnular = usePuede('sistema.administrar') && !!onAnular
+  const [viendo, setViendo] = useState(null)
   const [editing, setEditing] = useState(null)
   const [anulando, setAnulando] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -63,16 +65,21 @@ export default function Registros({ titulo, agregar, vacio, registros, bloqueo, 
       const motivoNoCorrige = corregir && puedeRegistrar && !corregir.puede(record) && corregir.motivo
       return <article key={record.id} className="rounded-2xl border border-slate-200 bg-white p-5">
         <div className="min-w-0"><h4 className="font-semibold text-slate-800">{tituloRegistro(record)}</h4>{subtitulo && <p className="mt-1 text-xs text-slate-500">{subtitulo(record)}</p>}</div>
-        <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">{campos.map(([label, render]) => <div key={label}><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 break-words text-slate-800">{render(values, record)}</dd></div>)}
-          {'registrado_por' in values && <div><dt className="text-xs text-slate-500">Registrado por</dt><dd className="mt-1 break-words text-slate-800">{values.registrado_por || 'No registrado'}</dd></div>}
-        </dl>
-        <LineaDocumento documento={documento?.(record)} adjuntar={adjuntar?.(record)} />
-        {detalle && detalle(record)}
-        {(corregible || puedeAnular || motivoNoCorrige) && <div className="mt-5 flex flex-wrap items-center gap-4">
-          {corregible && <button disabled={ocupado} onClick={() => start(record, setEditing)} className="text-sm font-semibold text-teal-700 disabled:opacity-50">{corregir.etiqueta}</button>}
-          {puedeAnular && <button disabled={ocupado} onClick={() => start(record, setAnulando)} className="text-sm font-semibold text-rose-700 disabled:opacity-50">Anular</button>}
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
+          <button type="button" onClick={() => setViendo(record)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50">Ver detalles</button>
+          {(() => { const nodo = documento?.(record); return isValidElement(nodo) ? cloneElement(nodo, { compacto: true }) : nodo })()}
+          {corregible && <button disabled={ocupado} onClick={() => start(record, setEditing)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-teal-700 disabled:opacity-50">{corregir.etiqueta}</button>}
+          {adjuntar?.(record)}
+          {puedeAnular && <button disabled={ocupado} onClick={() => start(record, setAnulando)} className="rounded-lg px-3 py-2 text-sm font-semibold text-rose-700 disabled:opacity-50">Anular</button>}
           {motivoNoCorrige && <Bloqueo>{motivoNoCorrige}</Bloqueo>}
-        </div>}
+        </div>
+        {viendo?.id === record.id && <DocumentoModal titulo="Detalles del registro" onCancel={() => setViendo(null)}>
+          <h3 className="mb-4 font-semibold text-slate-800">{tituloRegistro(record)}</h3>
+          <dl className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 text-sm sm:grid-cols-2">{campos.map(([label, render]) => <div key={label}><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 break-words text-slate-800">{render(values, record)}</dd></div>)}
+            {'registrado_por' in values && <div><dt className="text-xs text-slate-500">Registrado por</dt><dd className="mt-1 text-slate-800">{values.registrado_por || 'No registrado'}</dd></div>}
+          </dl>
+          {detalle && <div className="mt-4">{detalle(record)}</div>}
+        </DocumentoModal>}
         {anulando?.id === record.id && <AnularForm record={record} titulo={tituloRegistro} busy={busy} onCancel={() => setAnulando(null)} onConfirm={anular} />}
       </article>
     })}</div>

@@ -84,7 +84,7 @@ export default function Documento10Form({ usuario, item, datos, documento, modo,
     {documento && !editar && <p className="col-span-full text-xs text-slate-600">Esta evidencia completará o subsanará «{documento.nombre}». El registro anterior se conservará en el historial.</p>}
     {errors.subsana_a_documento_id && <p role="alert" className="col-span-full text-sm text-rose-700">{errors.subsana_a_documento_id.join(' ')}</p>}
   </>
-  return <Formulario titulo={editar ? 'Editar metadatos' : documento ? 'Adjuntar evidencia o subsanar documento' : `Adjuntar documento de ${tituloModulo}`}
+  return <Formulario modal={false} titulo={editar ? 'Editar metadatos' : documento ? 'Adjuntar evidencia o subsanar documento' : `Adjuntar documento de ${tituloModulo}`}
     guardar={editar ? 'Guardar cambios' : 'Guardar documento'} busy={busy} error={error} onCancel={onCancel}
     onSubmit={() => { if (!errorPdf && (!requierePdf || pdf)) guardar(draft) }}
     nota={editar ? 'Solo se pueden editar metadatos antes de la recepción o validación. Cada cambio queda en la auditoría.' : requierePdf ? 'Adjunta la nueva evidencia para subsanar el documento anterior.' : pendiente ? 'Si guardas sin PDF, el registro quedará Pendiente y no sumará folios.' : 'El PDF se envía al guardar y los folios se recalculan automáticamente.'}>

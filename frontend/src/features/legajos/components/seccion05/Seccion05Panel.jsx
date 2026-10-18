@@ -1,3 +1,4 @@
+import Aviso from '../documentos/AvisoSeccion'
 import Icon from '../../../../components/ui/Icon'
 import { useState } from 'react'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
@@ -26,10 +27,7 @@ const texto = value => value === null || value === undefined || value === '' ? '
 const enlace = 'text-sm font-semibold text-teal-700 disabled:opacity-50'
 const rango = v => `${fecha(v.fecha_inicio)} – ${fecha(v.fecha_fin)} · ${v.dias} día(s)`
 
-function Aviso({ tono = 'amber', children, accion }) {
-  const clases = { amber: 'border-amber-200 bg-amber-50 text-amber-900', slate: 'border-slate-200 bg-slate-50 text-slate-600' }[tono]
-  return <div role="note" className={`mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 text-sm ${clases}`}><div>{children}</div>{accion}</div>
-}
+
 
 function Etiqueta({ children, clase }) {
   return <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${clase}`}>{children}</span>
@@ -212,7 +210,6 @@ export default function Seccion05Panel({ usuario, categoria }) {
   const tipoRol = data.tipos.find(tipo => tipo.codigo === 'S05_D_ROL_VACACIONES')
   const abrirRol = puedeSubir && tipoRol && !sinLegajo ? () => {
     setSubiendo(tipoRol.id)
-    requestAnimationFrame(() => document.getElementById(`tipo-${tipoRol.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   } : null
 
   const tipos = data.tipos.filter(tipo => tipo.bloque === bloque)

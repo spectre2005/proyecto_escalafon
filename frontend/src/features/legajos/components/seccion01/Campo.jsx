@@ -23,7 +23,7 @@ export function Opciones({ lista, actual, vacio }) {
 }
 
 // Contenedor común de los formularios de la sección 01.
-export function Formulario({ titulo, nota, busy, error, onSubmit, onCancel, guardar, children, modal = false }) {
+export function Formulario({ titulo, nota, busy, error, onSubmit, onCancel, guardar, children, modal = true }) {
   const form = <form onSubmit={event => { event.preventDefault(); onSubmit() }} className="mb-5 min-w-0 rounded-2xl border border-teal-200 bg-white p-5" aria-busy={busy}>
     {!modal && <h3 className="mb-5 font-semibold text-slate-800">{titulo}</h3>}
     {error && <p role="alert" className="mb-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}

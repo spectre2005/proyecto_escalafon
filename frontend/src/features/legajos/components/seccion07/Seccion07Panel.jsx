@@ -1,3 +1,4 @@
+import Aviso from '../documentos/AvisoSeccion'
 import Icon from '../../../../components/ui/Icon'
 import { useState } from 'react'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
@@ -29,13 +30,10 @@ const categoriaDe = Object.fromEntries(Object.entries(subseccionesSeccion07).map
 const exigencia = {
   true: ['Se exige', 'bg-teal-50 text-teal-800'],
   false: ['No se exige', 'bg-slate-100 text-slate-600'],
-  null: ['Por determinar', 'bg-amber-50 text-amber-800'],
+  null: ['Por determinar', 'bg-slate-50 text-slate-600'],
 }
 
-function Aviso({ tono = 'amber', children, accion }) {
-  const clases = { amber: 'border-amber-200 bg-amber-50 text-amber-900', rose: 'border-rose-200 bg-rose-50 text-rose-800', slate: 'border-slate-200 bg-slate-50 text-slate-600' }[tono]
-  return <div role="note" className={`mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 text-sm ${clases}`}><div>{children}</div>{accion}</div>
-}
+
 
 function Etiqueta({ children, clase }) {
   return <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${clase}`}>{children}</span>

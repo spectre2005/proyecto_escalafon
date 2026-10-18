@@ -1,3 +1,5 @@
+import Aviso from '../documentos/AvisoSeccion'
+import AvisosExpediente from '../documentos/AvisosExpediente'
 import Icon from '../../../../components/ui/Icon'
 import { useState } from 'react'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
@@ -31,19 +33,17 @@ const relacionPorTipo = { S01_I_DNI_CONYUGE_CONCUBINO: 'conyuge_concubino', S01_
 const exigencia = {
   true: ['Se exige', 'bg-teal-50 text-teal-800'],
   false: ['No se exige', 'bg-slate-100 text-slate-600'],
-  null: ['Por determinar', 'bg-amber-50 text-amber-800'],
+  null: ['Por determinar', 'bg-slate-50 text-slate-600'],
 }
 
-function Aviso({ children, accion }) {
-  return <div role="note" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><div>{children}</div>{accion}</div>
-}
+
 
 function Etiqueta({ children, clase }) {
   return <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${clase}`}>{children}</span>
 }
 
 function Anexo05() {
-  return <Etiqueta clase="bg-amber-50 text-amber-800">Pendiente de confirmar (Anexo 05)</Etiqueta>
+  return <Etiqueta clase="bg-slate-50 text-slate-600">Pendiente de confirmar (Anexo 05)</Etiqueta>
 }
 
 // Resumen de la sección: exigencias (una por tipo; en i y j, una por familiar). Pendientes, cargados y recepcionados
@@ -149,7 +149,7 @@ function Documentos({ usuario, data, codigos }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-slate-800">{tipo.literal && <span className="mr-1 text-slate-500">{tipo.literal})</span>}{tipo.nombre}</p>
-            <p className={`mt-1 text-xs ${tipo.aplica && tipo.exigido === null ? 'text-amber-800' : 'text-slate-500'}`}>{motivoVisible(tipo)}{tipo.permite_multiples ? ' Admite varios documentos.' : ''}{tipo.formulario_datos ? ` Datos: ${formulariosDatos01[tipo.formulario_datos]}.` : ''}</p>
+            <p className={`mt-1 text-xs ${tipo.aplica && tipo.exigido === null ? 'text-slate-600' : 'text-slate-500'}`}>{motivoVisible(tipo)}{tipo.permite_multiples ? ' Admite varios documentos.' : ''}{tipo.formulario_datos ? ` Datos: ${formulariosDatos01[tipo.formulario_datos]}.` : ''}</p>
             <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo, documento, data)}
               onSubsanar={puedeSubir && !sinLegajo && !ocupado ? documento => { setAviso(''); setSubsanando({ tipoId: tipo.id, documento }) } : null}
               onEnlazar={puedeSubir && !sinLegajo && !ocupado && ofrecerTipo(noAplica, tipo) ? documento => { setAviso(''); setRecuperando({ tipoId: tipo.id, documento }) } : null} />
@@ -176,7 +176,7 @@ function Documentos({ usuario, data, codigos }) {
 function PdfAnterior({ usuario, tipo, record }) {
   if (!record.pdf_anterior) return null
   return <div className="mt-4 rounded-xl bg-slate-50 p-3">
-    <Etiqueta clase="bg-amber-50 text-amber-800">Registrado antes del sistema de folios: metadatos pendientes</Etiqueta>
+    <Etiqueta clase="bg-slate-50 text-slate-600">Registrado antes del sistema de folios: metadatos pendientes</Etiqueta>
     <RegistroPdf usuario={usuario} tipo={tipo} record={{ id: record.id, values: { pdf_nombre: record.pdf_anterior } }} />
   </div>
 }
@@ -282,9 +282,7 @@ export default function Seccion01Panel({ usuario, categoria }) {
 
   const contenido = <>
     {error}
-    {/* El aviso de las condiciones del puesto ya dice dónde corregirlas (vínculo laboral, sección 02). */}
-    {/* «Falta definir…» ya lo pregunta «Completa el perfil» (arriba, en la ficha): aquí solo los demás avisos. */}
-    {data.avisos.filter(aviso => !aviso.startsWith('Falta definir')).map(aviso => <Aviso key={aviso}>{aviso}{aviso.startsWith('No tiene un vínculo laboral vigente') ? '' : ' Revisa la bandera en Información personal o los registros.'}</Aviso>)}
+    <AvisosExpediente usuario={usuario} avisos={data.avisos.filter(aviso => !aviso.startsWith('Falta definir'))} />
     {!data.legajo && <Aviso accion={<AbrirLegajo usuario={usuario} />}>La persona no tiene un legajo abierto. La carga de documentos de la sección 01 está deshabilitada hasta abrirlo.</Aviso>}
     {/* Primero los documentos (qué falta, qué hay, qué es opcional); después los registros que acreditan. */}
     <Documentos usuario={usuario} data={data} codigos={grupo.codigos} />
@@ -296,7 +294,7 @@ export default function Seccion01Panel({ usuario, categoria }) {
     </div>
   </>
   // «Datos personales e identidad» va bajo la información personal de la ficha: sin cabecera propia.
-  if (categoria === 'general') return <section aria-label={grupo.titulo} className="mt-6"><Resumen data={data} />{contenido}</section>
+  if (categoria === 'general') return <section aria-label={grupo.titulo} className="mt-6">{contenido}</section>
   return <EspacioSeccion seccion={tituloSeccion('01')} subseccion={grupo.titulo} cifras={`Sección: ${r.pendientes} de ${r.exigidos} exigidos pendientes · ${r.cargados} con documento, ${r.recepcionados} con recepción.`}
     resumen={<Resumen data={data} compacto />} atajos={atajosDe({ registros, tipos })}>{contenido}</EspacioSeccion>
 }

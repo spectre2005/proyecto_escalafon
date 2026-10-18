@@ -1,3 +1,4 @@
+import DocumentoModal from './documentos/DocumentoModal'
 import { useState } from 'react'
 import Icon from '../../../components/ui/Icon'
 import { advanceOnEnter } from '../../../shared/forms/advanceOnEnter'
@@ -91,7 +92,7 @@ export default function GeneralDataEditor({ usuario, data, onSaved, onCancel, on
       setSaving(false)
     }
   }
-  return <form onSubmit={save} onKeyDown={advanceOnEnter} aria-busy={saving}>
+  return <DocumentoModal titulo="Editar información personal" busy={saving} onCancel={onCancel}><form onSubmit={save} onKeyDown={advanceOnEnter} aria-busy={saving}>
     <div className="mb-6 flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-lg font-semibold text-slate-800">Editar información personal</h2><p className="mt-2 text-xs text-slate-500">Los cambios se mostrarán al guardar.</p></div><div className="flex flex-wrap items-center gap-3">{onUploadFicha && <button type="button" disabled={saving} onClick={onUploadFicha} className="inline-flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-100"><Icon name="upload" size={17} />Subir ficha personal</button>}<button type="button" disabled={saving} onClick={onCancel} className="text-sm text-slate-500 hover:text-slate-800">Cancelar</button></div></div>
     {error && <p role="alert" className="mb-5 rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{error}</p>}
     <fieldset disabled={saving} className="grid gap-5 sm:grid-cols-2">
@@ -123,5 +124,5 @@ export default function GeneralDataEditor({ usuario, data, onSaved, onCancel, on
       <div className="col-span-full border-t border-slate-100 pt-5"><h3 className="mb-4 text-sm font-semibold text-slate-700">Ubicación</h3><UbigeoFields value={location} onChange={setLocation} disabled={saving} /><p className="mt-3 text-xs text-slate-500">Selecciona región, provincia y distrito del catálogo.</p></div>
       <div className="col-span-full flex justify-end gap-3 border-t border-slate-100 pt-5"><button type="button" onClick={onCancel} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm">Cancelar</button><button type="submit" className="rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50">{saving ? 'Guardando…' : 'Guardar cambios'}</button></div>
     </fieldset>
-  </form>
+  </form></DocumentoModal>
 }

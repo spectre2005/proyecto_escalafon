@@ -3,7 +3,7 @@ import Campo, { Formulario } from '../seccion01/Campo'
 import { hoy, useBorrador, useGuardar } from '../seccion01/useGuardar'
 import { revisarDocumento03 } from '../../api/seccion03Api'
 
-export default function Revision03Form({ usuario, documento, item, estado, onSaved, onCancel, revisar = revisarDocumento03, fechaActual = hoy(), nota = 'La revisión queda en el historial con tu nombre. La aceptación no acredita una fiscalización posterior con SUNEDU o MINEDU.' }) {
+export default function Revision03Form({ usuario, documento, item, estado, onSaved, onCancel, modal = true, revisar = revisarDocumento03, fechaActual = hoy(), nota = 'La revisión queda en el historial con tu nombre. La aceptación no acredita una fiscalización posterior con SUNEDU o MINEDU.' }) {
   const primero = useRef(null)
   useEffect(() => { primero.current?.focus() }, [])
   const [draft, set] = useBorrador({ descripcion: '', plazo_subsanacion: '', recepcion_confirmada: false, fedateado: documento.fedateado })
@@ -11,7 +11,7 @@ export default function Revision03Form({ usuario, documento, item, estado, onSav
     estado, estado_anterior: documento.estado_original,
     ...(estado === 'observado' ? { descripcion: values.descripcion, plazo_subsanacion: values.plazo_subsanacion } : estado === 'anulado' ? { descripcion: values.descripcion } : { recepcion_confirmada: values.recepcion_confirmada, fedateado: values.fedateado }),
   }), onSaved)
-  return <Formulario titulo={estado === 'aceptado' ? 'Aceptar documento' : estado === 'anulado' ? 'Anular documento' : 'Observar documento'} guardar={estado === 'aceptado' ? 'Confirmar aceptación' : estado === 'anulado' ? 'Confirmar anulación' : 'Guardar observación'} busy={busy} error={error} onCancel={onCancel} onSubmit={() => guardar(draft)}
+  return <Formulario modal={modal} titulo={estado === 'aceptado' ? 'Aceptar documento' : estado === 'anulado' ? 'Anular documento' : 'Observar documento'} guardar={estado === 'aceptado' ? 'Confirmar aceptación' : estado === 'anulado' ? 'Confirmar anulación' : 'Guardar observación'} busy={busy} error={error} onCancel={onCancel} onSubmit={() => guardar(draft)}
     nota={nota}>
     {estado !== 'aceptado' ? <>
       <Campo label={estado === 'anulado' ? 'Motivo de la anulación' : 'Qué debe corregirse'} required error={errors.descripcion} className="sm:col-span-2"><textarea ref={primero} required maxLength={3000} rows={3} value={draft.descripcion} onChange={set('descripcion')} /></Campo>

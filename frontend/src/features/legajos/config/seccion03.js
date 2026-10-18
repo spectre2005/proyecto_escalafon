@@ -6,13 +6,13 @@ export const grupos03 = [
 
 export const estados03 = {
   aceptado: ['Aceptado', 'bg-teal-50 text-teal-800'],
-  pendiente: ['En revisión', 'bg-amber-50 text-amber-900'],
+  pendiente: ['En revisión', 'bg-slate-100 text-slate-600'],
   observado: ['Observado', 'bg-rose-50 text-rose-800'],
   falta: ['Falta', 'bg-rose-50 text-rose-800'],
   no_aplica: ['No aplica', 'bg-slate-100 text-slate-600'],
   opcional: ['Opcional', 'bg-slate-100 text-slate-600'],
   anulado: ['Anulado', 'bg-slate-100 text-slate-600'],
-  por_determinar: ['Revisar requisitos', 'bg-amber-50 text-amber-900'],
+  por_determinar: ['Revisar requisitos', 'bg-slate-100 text-slate-600'],
 }
 
 export const antivirus03 = {

@@ -1,3 +1,6 @@
+import Aviso from '../documentos/AvisoSeccion'
+import AvisosExpediente from '../documentos/AvisosExpediente'
+import DocumentoModal from '../documentos/DocumentoModal'
 import Icon from '../../../../components/ui/Icon'
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -33,13 +36,10 @@ const categoriaDe = Object.fromEntries(Object.entries(subseccionesSeccion02).map
 const exigencia = {
   true: ['Se exige', 'bg-teal-50 text-teal-800'],
   false: ['No se exige', 'bg-slate-100 text-slate-600'],
-  null: ['Por determinar', 'bg-amber-50 text-amber-800'],
+  null: ['Por determinar', 'bg-slate-50 text-slate-600'],
 }
 
-function Aviso({ tono = 'amber', children, accion }) {
-  const clases = { amber: 'border-amber-200 bg-amber-50 text-amber-900', rose: 'border-rose-200 bg-rose-50 text-rose-800', slate: 'border-slate-200 bg-slate-50 text-slate-600' }[tono]
-  return <div role="note" className={`mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 text-sm ${clases}`}><div>{children}</div>{accion}</div>
-}
+
 
 function Etiqueta({ children, clase }) {
   return <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${clase}`}>{children}</span>
@@ -62,7 +62,7 @@ function Resumen({ data, onNavigate, compacto = false }) {
         pruebaNoAplica(data) ? 'La subsección 2.4 no aplica y no se cuenta.' : pruebaEnNoConDatos(data) ? 'La subsección 2.4 tiene registros pero «Tiene período de prueba» está en No: se muestran y no se cuentan.' : data.tiene_periodo_prueba === null ? 'Falta definir si tiene período de prueba: los tipos de 2.4 quedan por determinar.' : '',
         r.por_determinar ? `${r.por_determinar} tipo(s) quedan por determinar y no se cuentan: revisa el motivo de cada tipo.` : '',
       ].filter(Boolean)
-      return avisos.length > 0 && <p className="mt-3 text-xs text-amber-800">{avisos.join(' ')}</p>
+      return avisos.length > 0 && <p className="mt-3 text-xs text-slate-600">{avisos.join(' ')}</p>
     })()}
     <details className="mt-2 text-xs text-slate-500">
       <summary className="cursor-pointer font-semibold text-slate-600">¿Cómo se cuenta?</summary>
@@ -190,7 +190,7 @@ function Documentos({ usuario, data, subseccion, sinLegajo, aplica = true }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-slate-800">{tipo.literal && <span className="mr-1 text-slate-500">{tipo.literal})</span>}{tipo.nombre}</p>
-            <p className={`mt-1 text-xs ${aplica && tipo.exigido === null ? 'text-amber-800' : 'text-slate-500'}`}>{aplica ? motivoVisible(tipo) : 'No aplica a esta persona.'}{tipo.permite_multiples ? ' Admite varios documentos.' : ''}{tipo.formulario_datos ? ` Datos: ${formulariosDatos[tipo.formulario_datos] || tipo.formulario_datos}.` : ''}</p>
+            <p className={`mt-1 text-xs ${aplica && tipo.exigido === null ? 'text-slate-600' : 'text-slate-500'}`}>{aplica ? motivoVisible(tipo) : 'No aplica a esta persona.'}{tipo.permite_multiples ? ' Admite varios documentos.' : ''}{tipo.formulario_datos ? ` Datos: ${formulariosDatos[tipo.formulario_datos] || tipo.formulario_datos}.` : ''}</p>
             <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo.formulario_datos, documento, data)}
               onSubsanar={puedeSubir && !sinLegajo && !ocupado ? documento => { setAviso(''); setSubsanando({ tipoId: tipo.id, documento }) } : null}
               onEnlazar={puedeSubir && !sinLegajo && !ocupado && ofrecerTipo(noAplica, tipo) ? documento => { setAviso(''); setRecuperando({ tipoId: tipo.id, documento }) } : null} />
@@ -277,6 +277,7 @@ function AvisoSinDefinir({ vinculo, corregir }) {
 function CompletarTipo({ usuario, vinculo, disabled }) {
   const sugerido = vinculo.tipo_sugerido?.valor
   const [tipo, setTipo] = useState('')
+  const [abierto, setAbierto] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   async function guardar(event) {
@@ -286,12 +287,14 @@ function CompletarTipo({ usuario, vinculo, disabled }) {
     setError('')
     try {
       await completarTipoVinculo(usuario, vinculo.id, tipo)
+      setAbierto(false)
+      setBusy(false)
     } catch (failure) {
       setError(apiErrorMessage(failure))
       setBusy(false)
     }
   }
-  return <form onSubmit={guardar} className="mb-5 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+  return <><button type="button" disabled={disabled} onClick={() => { setError(''); setAbierto(true) }} className={boton}>Completar tipo de vínculo</button>{abierto && <DocumentoModal titulo="Completar tipo de vínculo" busy={busy} onCancel={() => setAbierto(false)}><form onSubmit={guardar} className="mb-5 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
     <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">Completar tipo de vínculo
       <select required value={tipo} disabled={disabled || busy} onChange={event => setTipo(event.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
         <option value="">Selecciona</option>
@@ -302,7 +305,7 @@ function CompletarTipo({ usuario, vinculo, disabled }) {
     <button type="submit" disabled={disabled || busy || !tipo} className={boton}>{busy ? 'Guardando…' : 'Guardar tipo'}</button>
     <p className="basis-full text-xs text-slate-500">Solo se guarda el tipo; el resto del vínculo cerrado no cambia. Una vez guardado no se puede cambiar.</p>
     {error && <p role="alert" className="basis-full text-xs text-rose-700">{error}</p>}
-  </form>
+  </form></DocumentoModal>}</>
 }
 
 // Un vínculo con su vigencia, sus adendas en orden cronológico, el fin efectivo y los datos del puesto.
@@ -411,8 +414,8 @@ function Formalizacion({ usuario, data, sinLegajo }) {
     : <button disabled={ocupado || !!sinLegajo} onClick={registrarVinculo} className={boton}>Registrar vínculo</button>
   return <section aria-label="Vínculos laborales" className="mb-8">
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h3 className="text-base font-semibold text-slate-800">Vínculos laborales</h3>{puedeRegistrar && <div className="flex flex-wrap items-center gap-3">{sinLegajo && <Bloqueo>{sinLegajo}</Bloqueo>}{botonRegistrar}</div>}</div>
-    {confirmandoOtro && <Aviso accion={<div className="flex flex-wrap gap-3"><button onClick={registrarVinculo} className={enlace}>Sí, registrar otro vínculo</button><button onClick={() => setConfirmandoOtro(false)} className="text-sm text-slate-600">Cancelar</button></div>}>
-      La persona ya tiene {vigentes.length === 1 ? 'un vínculo vigente' : `${vigentes.length} vínculos vigentes`}: {vigentes.map(v => v.values.nombre_puesto).join(', ')}. Para corregirlo usa «Corregir» en su tarjeta; registra otro solo si es un vínculo distinto (por ejemplo, simultáneo).</Aviso>}
+    {confirmandoOtro && <DocumentoModal titulo="Registrar otro vínculo" onCancel={() => setConfirmandoOtro(false)}><Aviso accion={<div className="flex flex-wrap gap-3"><button onClick={registrarVinculo} className={enlace}>Sí, registrar otro vínculo</button><button onClick={() => setConfirmandoOtro(false)} className="text-sm text-slate-600">Cancelar</button></div>}>
+      La persona ya tiene {vigentes.length === 1 ? 'un vínculo vigente' : `${vigentes.length} vínculos vigentes`}: {vigentes.map(v => v.values.nombre_puesto).join(', ')}. Para corregirlo usa «Corregir» en su tarjeta; registra otro solo si es un vínculo distinto (por ejemplo, simultáneo).</Aviso></DocumentoModal>}
     {aviso && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
     {error && <p role="alert" className="mb-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
     {formulario && <EnZona titulo={form.tipo === 'adenda' ? `Registrar adenda: ${form.vinculo.values.nombre_puesto}` : form.tipo === 'puesto' ? `Datos del puesto: ${form.vinculo.values.nombre_puesto}` : form.record ? `Corregir vínculo: ${form.record.values.nombre_puesto}` : 'Registrar vínculo'}>{formulario}</EnZona>}
@@ -521,7 +524,7 @@ export default function Seccion02Panel({ usuario, categoria, onNavigate }) {
   const sinLegajo = !data.legajo && 'La persona no tiene un legajo abierto.'
   const sinVinculo = !data.vinculos.some(v => !v.cerrado) && 'Primero registra un vínculo laboral en 2.2 (los cesados no reciben registros).'
   const bloqueo = sinLegajo || sinVinculo
-  const irAVinculo = categoria !== 's02-vinculo' && <button onClick={() => onNavigate('s02-vinculo')} className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900">Ir a 2.2 Formalización del vínculo</button>
+  const irAVinculo = categoria !== 's02-vinculo' && <button onClick={() => onNavigate('s02-vinculo')} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">Ir a 2.2 Formalización del vínculo</button>
   // Solo No sin datos oculta la 2.4 (pruebaNoAplica); con datos se muestra con aviso; Sin responder, con sus tipos por determinar.
   const noAplica = codigo === '2.4' && pruebaNoAplica(data)
   const enNoConDatos = codigo === '2.4' && pruebaEnNoConDatos(data)
@@ -534,7 +537,7 @@ export default function Seccion02Panel({ usuario, categoria, onNavigate }) {
     cifras={`Sección: ${r.pendientes} de ${r.tipos} tipos pendientes · exigidos ${r.exigidos_cargados}/${r.exigidos.length} con documento, ${r.exigidos_recepcionados} con recepción.`}
     resumen={<Resumen data={data} onNavigate={onNavigate} compacto />} atajos={noAplica ? [] : atajosDe({ registros, tipos: subseccion?.tipos })}>
     {error}
-    {(data.avisos_perfil || []).map(aviso => <Aviso key={aviso}>{aviso}</Aviso>)}
+    <AvisosExpediente usuario={usuario} avisos={data.avisos_perfil || []} />
     {noAplica ? <NoAplicaPrueba onNavigate={onNavigate} /> : <>
       {sinLegajo ? <Aviso accion={<AbrirLegajo usuario={usuario} />}>{sinLegajo} Los formularios y la carga de documentos de la sección 02 están deshabilitados hasta abrirlo.</Aviso>
         : sinVinculo && categoria !== 's02-vinculo' && <Aviso accion={irAVinculo}>La persona no tiene un vínculo laboral abierto. Los formularios de esta subsección dependen del vínculo.</Aviso>}
@@ -544,7 +547,7 @@ export default function Seccion02Panel({ usuario, categoria, onNavigate }) {
       {codigo === '2.1' && <Seleccion usuario={usuario} data={data} sinLegajo={sinLegajo} />}
       {codigo === '2.2' && <Formalizacion usuario={usuario} data={data} sinLegajo={sinLegajo} />}
       {codigo === '2.3' && <Induccion usuario={usuario} data={data} bloqueo={bloqueo} />}
-      {enNoConDatos && <Aviso accion={categoria !== 's02-vinculo' && <button onClick={() => onNavigate('s02-vinculo')} className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900">Revisar la bandera en 2.2</button>}>«Tiene período de prueba» está en No, pero hay períodos o documentos de período de prueba registrados: se muestran y se conservan, pero no se exigen ni se cuentan. Para registrar uno nuevo, cambia la bandera a Sí en el vínculo laboral.</Aviso>}
+      {enNoConDatos && <Aviso accion={categoria !== 's02-vinculo' && <button onClick={() => onNavigate('s02-vinculo')} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">Revisar la bandera en 2.2</button>}>«Tiene período de prueba» está en No, pero hay períodos o documentos de período de prueba registrados: se muestran y se conservan, pero no se exigen ni se cuentan. Para registrar uno nuevo, cambia la bandera a Sí en el vínculo laboral.</Aviso>}
       {codigo === '2.4' && <Prueba usuario={usuario} data={data} bloqueo={bloqueo} />}
       </div>
     </>}

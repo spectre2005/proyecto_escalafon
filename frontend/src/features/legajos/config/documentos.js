@@ -5,8 +5,8 @@ export const relacionesTitular = { servidor: 'El propio servidor', conyuge_concu
 
 export const folios = (inicio, fin) => inicio ? (fin && fin !== inicio ? `${inicio}–${fin}` : String(inicio)) : 'sin foliar'
 
-// Folio final si cada página del PDF ocupa un folio. Solo es una sugerencia: la regla de foliado está pendiente de
-// confirmar con la universidad (P3) y el usuario escribe o acepta el folio final. Sin datos válidos, null.
+// Folio final si cada página del PDF ocupa un folio. Se usa para el cálculo automático del formulario común
+// y para las sugerencias de otros formularios. Sin datos válidos, null.
 export function folioFinalPorPaginas(inicio, paginas) {
   const desde = Number(inicio), hojas = Number(paginas)
   return Number.isInteger(desde) && desde > 0 && Number.isInteger(hojas) && hojas > 0 ? desde + hojas - 1 : null

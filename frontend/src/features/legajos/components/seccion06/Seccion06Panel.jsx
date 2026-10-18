@@ -1,3 +1,4 @@
+import ResumenTipo from '../documentos/ResumenTipo'
 import { useState } from 'react'
 import { apiErrorMessage } from '../../../../axios'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
@@ -38,7 +39,7 @@ export default function Seccion06Panel({ usuario }) {
     const origen = mensaje ? `item-${formulario?.item}` : formulario?.origen
     setFormulario(null)
     if (mensaje) { setAviso(mensaje); request.retry() }
-    setTimeout(() => document.getElementById(origen)?.focus(), 0)
+    setTimeout(() => document.getElementById(origen)?.focus({ preventScroll: true }), 0)
   }
   const error = request.error && <p role="alert" className="mb-4 rounded-xl bg-rose-50 p-4 text-sm text-rose-800">{request.error.response?.status === 403 ? 'No tienes permiso para ver esta sección.' : apiErrorMessage(request.error)} <button className="font-semibold underline" onClick={request.retry}>Reintentar</button></p>
   if (!data) return error || <p role="status" className="p-6 text-sm text-slate-500">Cargando compensaciones…</p>
@@ -51,25 +52,24 @@ export default function Seccion06Panel({ usuario }) {
         <p className="mt-2 text-xs text-slate-500">El avance refleja los documentos registrados; no determina obligaciones individuales no configuradas.</p>
       </div>
       <div className="flex flex-wrap content-center items-center gap-2 text-xs">{data.perfil.tipos_personal.map(tipo => <span key={tipo} className="rounded-full bg-slate-100 px-3 py-1.5">{tipo === 'docente' ? 'Docente' : 'Administrativo'}</span>)}{(data.perfil.puestos.length ? data.perfil.puestos : ['Puesto no registrado']).map(puesto => <span key={puesto} className="max-w-full break-words rounded-full bg-slate-100 px-3 py-1.5">{puesto}</span>)}
-        <span className="rounded-full bg-amber-50 px-3 py-1.5 text-amber-900">{resumen.pendientes} en revisión</span><span className="rounded-full bg-rose-50 px-3 py-1.5 text-rose-800">{resumen.observados} observado(s)</span><span className="rounded-full bg-rose-50 px-3 py-1.5 text-rose-800">{resumen.faltantes} faltante(s)</span>
+        <span className="rounded-full bg-slate-50 px-3 py-1.5 text-slate-700">{resumen.pendientes} en revisión</span><span className="rounded-full bg-rose-50 px-3 py-1.5 text-rose-800">{resumen.observados} observado(s)</span><span className="rounded-full bg-rose-50 px-3 py-1.5 text-rose-800">{resumen.faltantes} faltante(s)</span>
       </div>
     </div>
     </div>}>
     <div className="min-w-0 space-y-5">
     {error}
-    {!data.legajo && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p className="mb-3">Primero abre el legajo para agregar documentos.</p><AbrirLegajo usuario={usuario} /></div>}
+    {!data.legajo && <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700"><p className="mb-3">Primero abre el legajo para agregar documentos.</p><AbrirLegajo usuario={usuario} /></div>}
     {aviso && <p role="status" className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">{aviso}</p>}
     {data.items.length === 0 && <p className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600">No hay tipos documentales disponibles para tu perfil. Solicita a administración revisar el catálogo de la Sección 06.</p>}
     {/* Documentos por vista: Pendientes · Con documentos · Opcionales · No corresponde (cada ítem conserva su formulario). */}
-    <VistasDocumentales elementos={data.items} clasificar={item => vistaDeItem(item, ofrecerTipo(noAplica, item))} nombreDe={item => `${item.letra}) ${item.nombre}`}>{(lista, vista) => <div className="space-y-4">{[['Documentos de compensaciones', 'Reconocimiento de tiempo de servicios, pagos, retenciones, liquidaciones y otros documentos institucionales.']].map(([titulo, descripcion], grupo) => lista.some(item => item.grupo === grupo) && <section key={titulo} aria-label={titulo} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <VistasDocumentales elementos={data.items} clasificar={item => vistaDeItem(item, ofrecerTipo(noAplica, item))} nombreDe={item => `${item.letra}) ${item.nombre}`}>{lista => <div className="space-y-4">{[['Documentos de compensaciones', 'Reconocimiento de tiempo de servicios, pagos, retenciones, liquidaciones y otros documentos institucionales.']].map(([titulo, descripcion], grupo) => lista.some(item => item.grupo === grupo) && <section key={titulo} aria-label={titulo} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <header className="border-b border-slate-100 p-5"><h3 className="font-semibold text-slate-800">{titulo}</h3><p className="mt-1 text-xs text-slate-500">{descripcion}</p></header>
-      {lista.filter(item => item.grupo === grupo).map(item => <details key={item.id} open={vista === 'pendientes' || item.letra === 'a'} className="border-b border-slate-100 last:border-b-0">
-        <summary id={`item-${item.id}`} className="grid cursor-pointer grid-cols-[28px_minmax(0,1fr)] items-start gap-3 p-4 focus-visible:outline-2 focus-visible:outline-teal-700 sm:grid-cols-[28px_minmax(0,1fr)_auto]">
-          <span className="grid size-7 place-items-center rounded-lg bg-teal-50 text-sm font-bold text-teal-800">{item.letra}</span>
-          <span className="min-w-0"><span className="block break-words text-sm font-semibold text-slate-800">{item.nombre}</span><span className="mt-1 block text-xs text-slate-500">{item.motivo}{item.requiere_fedateo && ' Requiere fedateo.'}</span><span className="mt-1 block text-xs text-slate-500">{item.cantidad} documento(s) vigente(s)</span></span>
-          <span className="col-start-2 sm:col-start-auto"><Estado estado={item.estado} /></span>
+      {lista.filter(item => item.grupo === grupo).map(item => <details key={item.id} className="border-b border-slate-100 last:border-b-0">
+        <summary id={`item-${item.id}`} className="cursor-pointer list-none p-4 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-teal-700 [&::-webkit-details-marker]:hidden">
+          <ResumenTipo nombre={item.nombre} literal={item.letra} cantidad={item.cantidad} estado={<Estado estado={item.estado} />} />
         </summary>
         <div className="space-y-4 px-4 pb-5 sm:pl-14">
+          {item.motivo && <p className="text-xs leading-relaxed text-slate-500">{item.motivo}{item.requiere_fedateo && ' Requiere fedateo.'}</p>}
           {item.documentos.length === 0 && <p className="text-sm text-slate-500">{item.estado === 'falta' ? 'Todavía no se registró este documento. Agrégalo para que RR. HH. lo revise.' : item.estado === 'no_aplica' ? 'Este documento no se exige para el puesto registrado.' : 'No hay documentos registrados. Puedes agregar uno si corresponde.'}</p>}
           <ul className="space-y-3">{item.documentos.map(doc => <li key={doc.id} className={`min-w-0 rounded-xl border border-slate-200 p-4 ${doc.subsanado ? 'bg-slate-50' : ''}`}>
             <div className="flex flex-wrap items-start justify-between gap-2"><h4 className="min-w-0 break-words text-sm font-semibold text-slate-800">{doc.nombre}</h4><Estado estado={doc.estado} /></div>

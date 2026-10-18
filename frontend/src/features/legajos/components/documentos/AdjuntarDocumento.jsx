@@ -15,7 +15,7 @@ export default function AdjuntarDocumento({ usuario, seccion, record, etiqueta, 
   if (!puedeSubir || !tipos?.length) return null
   const tipo = tipos.find(item => item.id === tipoId)
   const abrir = () => tipos.length === 1 ? setTipoId(tipos[0].id) : setEligiendo(true)
-  return <div className="mt-4">
+  return <div className="inline-flex flex-wrap items-center gap-2">
     {!tipo && !eligiendo && <button type="button" disabled={!!bloqueo} title={bloqueo || undefined} onClick={abrir} className="inline-flex items-center gap-2 text-sm font-semibold text-teal-700 disabled:opacity-50"><Icon name="paperclip" size={17} />{textoBoton}</button>}
     {eligiendo && !tipo && <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
       <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-medium text-slate-600">Tipo de documento que lo acredita

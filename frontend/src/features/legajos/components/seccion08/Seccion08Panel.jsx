@@ -1,3 +1,4 @@
+import ResumenTipo from '../documentos/ResumenTipo'
 import { useState } from 'react'
 import { apiErrorMessage } from '../../../../axios'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
@@ -45,7 +46,7 @@ export default function Seccion08Panel({ usuario, categoria }) {
     const origen = mensaje ? `item-${formulario?.item}` : formulario?.origen
     setFormulario(null)
     if (mensaje) { setAviso(mensaje); request.retry() }
-    setTimeout(() => document.getElementById(origen)?.focus(), 0)
+    setTimeout(() => document.getElementById(origen)?.focus({ preventScroll: true }), 0)
   }
   const error = request.error && <p role="alert" className="mb-4 rounded-xl bg-rose-50 p-4 text-sm text-rose-800">{request.error.response?.status === 403 ? 'No tienes permiso para ver esta sección.' : apiErrorMessage(request.error)} <button className="font-semibold underline" onClick={request.retry}>Reintentar</button></p>
   if (!data) return error || <p role="status" className="p-6 text-sm text-slate-500">Cargando {categoria === 'sanciones' ? 'sanciones disciplinarias…' : 'reconocimientos…'}</p>
@@ -76,16 +77,17 @@ export default function Seccion08Panel({ usuario, categoria }) {
     </>}</div>}>
     <div className="min-w-0 space-y-5">
     {error}
-    {!data.legajo && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p className="mb-3">Primero abre el legajo para agregar documentos.</p><AbrirLegajo usuario={usuario} /></div>}
+    {!data.legajo && <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700"><p className="mb-3">Primero abre el legajo para agregar documentos.</p><AbrirLegajo usuario={usuario} /></div>}
     {aviso && <p role="status" className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">{aviso}</p>}
-    {items === null ? <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">No tienes permiso para ver la documentación de sanciones disciplinarias.</div> : <>
+    {items === null ? <div role="alert" className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">No tienes permiso para ver la documentación de sanciones disciplinarias.</div> : <>
       <section className="space-y-3" aria-label={titulo}>
         {/* Documentos por vista: Pendientes · Con documentos · Opcionales · No corresponde (cada ítem conserva su formulario). */}
-        <VistasDocumentales elementos={items} idDe={item => item.codigo} clasificar={item => vistaDeItem(item, ofrecerTipo(noAplica, item))}>{(lista, vista) => <div className="space-y-3">{lista.map(item => <details key={item.codigo} open={vista === 'pendientes'} className="group overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <summary id={`item-${item.codigo}`} className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 p-5 focus-visible:outline-2 focus-visible:outline-teal-600">
-            <div className="min-w-0"><h4 className="break-words text-sm font-semibold text-slate-800">{item.nombre}</h4><p className="mt-1 text-xs text-slate-500">{item.motivo} · {item.cantidad} documento(s)</p></div><Estado estado={item.estado} />
-          </summary>
+        <VistasDocumentales elementos={items} idDe={item => item.codigo} clasificar={item => vistaDeItem(item, ofrecerTipo(noAplica, item))}>{lista => <div className="space-y-3">{lista.map(item => <details key={item.codigo} className="group overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <summary id={`item-${item.codigo}`} className="cursor-pointer list-none p-4 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-teal-700 [&::-webkit-details-marker]:hidden">
+          <ResumenTipo nombre={item.nombre} literal={item.letra} cantidad={item.cantidad} estado={<Estado estado={item.estado} />} />
+        </summary>
           <div className="space-y-4 border-t border-slate-100 p-4 sm:p-5">
+          {item.motivo && <p className="text-xs leading-relaxed text-slate-500">{item.motivo}{item.requiere_fedateo && ' Requiere fedateo.'}</p>}
             {item.documentos.length === 0 && <p className="text-sm text-slate-500">{item.estado === 'no_aplica' ? 'No aplica al tipo de personal registrado.' : 'No hay documentos registrados. Este ítem es opcional; agrega un documento si corresponde.'}</p>}
             {item.documentos.map(doc => <article key={doc.id} className="min-w-0 rounded-xl border border-slate-200 p-4">
               <div className="flex flex-wrap items-start justify-between gap-2"><h5 className="min-w-0 break-words text-sm font-semibold text-slate-800">{doc.nombre}</h5><Estado estado={doc.estado} /></div>
@@ -93,7 +95,7 @@ export default function Seccion08Panel({ usuario, categoria }) {
               {doc.motivo && <p className="mt-2 text-xs text-slate-600">Motivo: {doc.motivo}</p>}
               {doc.tipo_sancion && <p className="mt-2 text-xs text-slate-600">{tipoSancion08[doc.tipo_sancion] || doc.tipo_sancion}{doc.dias_suspension ? ` · ${doc.dias_suspension} día(s) de suspensión` : ''} · Estado derivado: {doc.estado_sancion === 'dejada_sin_efecto' ? 'Dejada sin efecto' : doc.estado_sancion === 'vigente' ? 'Vigente' : 'Por determinar: hay resultados distintos en los recursos'} · RNSSC: {doc.registrada_en_rnssc ? 'Sí' : 'No'}</p>}
               {doc.tipo_sancion && doc.referencia_procedimiento && <p className="mt-2 break-words text-xs text-slate-600">Referencia del expediente o procedimiento: {doc.referencia_procedimiento}</p>}
-              {doc.tiempo_servicio_reconocido && <p className="mt-2 text-xs text-slate-600">Tiempo reconocido en el documento: {doc.tiempo_servicio_reconocido.anios} años, {doc.tiempo_servicio_reconocido.meses} meses y {doc.tiempo_servicio_reconocido.dias} días. Experiencia calculada: {data.tiempo_experiencia_calculada.anios} años, {data.tiempo_experiencia_calculada.meses} meses y {data.tiempo_experiencia_calculada.dias} días.{Object.keys(data.tiempo_experiencia_calculada).some(key => doc.tiempo_servicio_reconocido[key] !== data.tiempo_experiencia_calculada[key]) && <strong className="ml-1 text-amber-800">Los valores difieren; esta comparación es informativa.</strong>}</p>}
+              {doc.tiempo_servicio_reconocido && <p className="mt-2 text-xs text-slate-600">Tiempo reconocido en el documento: {doc.tiempo_servicio_reconocido.anios} años, {doc.tiempo_servicio_reconocido.meses} meses y {doc.tiempo_servicio_reconocido.dias} días. Experiencia calculada: {data.tiempo_experiencia_calculada.anios} años, {data.tiempo_experiencia_calculada.meses} meses y {data.tiempo_experiencia_calculada.dias} días.{Object.keys(data.tiempo_experiencia_calculada).some(key => doc.tiempo_servicio_reconocido[key] !== data.tiempo_experiencia_calculada[key]) && <strong className="ml-1 text-slate-600">Los valores difieren; esta comparación es informativa.</strong>}</p>}
               {doc.tipo_sancion && doc.registrada_en_rnssc && (doc.fecha_registro_rnssc || doc.referencia_rnssc) && <p className="mt-2 break-words text-xs text-slate-600">RNSSC: {doc.fecha_registro_rnssc ? `registrada el ${fecha(doc.fecha_registro_rnssc)}` : ''}{doc.referencia_rnssc ? ` · ${doc.referencia_rnssc}` : ''}</p>}
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500"><span>Folios {folios(doc.folio_inicio, doc.folio_fin)}</span><span>{doc.fedateado ? 'Fedateado' : 'Sin fedatear'}</span><span>{doc.archivo ? `PDF · antivirus: ${doc.archivo.estado_antivirus}` : 'Sin archivo'}</span><span>Recepción: {fecha(doc.fecha_recepcion)}</span></div>
               {doc.recursos?.map(recurso => <p key={recurso.id} className="mt-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-700">Recurso del {fecha(recurso.fecha)} · {resultadoRecurso08[recurso.resultado] || recurso.resultado} · {recurso.nombre_documento || 'Documento asociado'}</p>)}
