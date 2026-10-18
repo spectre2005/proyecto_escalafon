@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\Usuario;
+use App\Support\Plataforma\AlmacenamientoUnica;
 use App\Support\Plataforma\ColasInstitucion;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -30,6 +31,9 @@ class AppServiceProvider extends ServiceProvider
         Password::defaults(fn (): Password => $this->app->isProduction()
             ? Password::min(10)->letters()->mixedCase()->numbers()
             : Password::min(8)->letters()->numbers());
+
+        // Modo unica con carpeta institucional propia (PLATAFORMA_ALMACENAMIENTO_UNICA); vacía, no hace nada.
+        AlmacenamientoUnica::aplicar();
 
         // Varias instituciones: los trabajos en cola llevan su institución y se ejecutan con sus recursos.
         ColasInstitucion::configurar();

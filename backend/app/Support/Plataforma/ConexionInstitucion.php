@@ -43,14 +43,7 @@ final class ConexionInstitucion
      */
     public static function entrar(Institucion $institucion): array
     {
-        $privado = storage_path('app/private');
-        $cambios = [];
-        foreach ((array) config('filesystems.disks') as $nombre => $disco) {
-            $raiz = (string) ($disco['root'] ?? '');
-            if (($disco['driver'] ?? null) === 'local' && ($raiz === $privado || str_starts_with($raiz, $privado.'/'))) {
-                $cambios["filesystems.disks.{$nombre}.root"] = $privado.'/'.$institucion->almacenamiento.substr($raiz, strlen($privado));
-            }
-        }
+        $cambios = self::reubicarDiscos($institucion->almacenamiento);
         foreach ((array) config('cache.stores') as $nombre => $almacen) {
             if (($almacen['driver'] ?? null) === 'file') {
                 foreach (['path', 'lock_path'] as $clave) {
@@ -79,6 +72,45 @@ final class ConexionInstitucion
         app()->instance(Institucion::class, $institucion);
 
         return $antes;
+    }
+
+    /**
+     * Discos locales dentro de storage/app/private (nombre => raíz del servidor): los que se reubican en la carpeta de
+     * una institución. Quedan fuera los que no son locales (s3) y los que están fuera de private (public).
+     * Con PLATAFORMA_MODO=unica y PLATAFORMA_ALMACENAMIENTO_UNICA, la raíz es la de antes de reubicarlos
+     * (plataforma.raices_servidor, AlmacenamientoUnica): así nunca se reubica dos veces.
+     *
+     * @return array<string, string>
+     */
+    public static function discosPrivados(): array
+    {
+        $privado = storage_path('app/private');
+        $servidor = (array) config('plataforma.raices_servidor', []);
+        $discos = [];
+        foreach ((array) config('filesystems.disks') as $nombre => $disco) {
+            $raiz = (string) ($servidor[$nombre] ?? $disco['root'] ?? '');
+            if (($disco['driver'] ?? null) === 'local' && ($raiz === $privado || str_starts_with($raiz, $privado.'/'))) {
+                $discos[$nombre] = $raiz;
+            }
+        }
+
+        return $discos;
+    }
+
+    /**
+     * Las raíces de discosPrivados() dentro de storage/app/private/{almacenamiento}, como cambios de configuración.
+     *
+     * @return array<string, string>
+     */
+    public static function reubicarDiscos(string $almacenamiento): array
+    {
+        $privado = storage_path('app/private');
+        $cambios = [];
+        foreach (self::discosPrivados() as $nombre => $raiz) {
+            $cambios["filesystems.disks.{$nombre}.root"] = $privado.'/'.$almacenamiento.substr($raiz, strlen($privado));
+        }
+
+        return $cambios;
     }
 
     /** @param array<string, mixed> $antes lo que devolvió entrar() */

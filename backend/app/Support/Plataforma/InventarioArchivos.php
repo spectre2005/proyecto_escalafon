@@ -63,12 +63,9 @@ final class InventarioArchivos
         }
         $privado = storage_path('app/private');
         $this->privado = realpath($privado) ?: throw new RuntimeException('No existe storage/app/private.');
-        // Los mismos discos que ConexionInstitucion reubica.
-        foreach ((array) config('filesystems.disks') as $nombre => $disco) {
-            $raiz = (string) ($disco['root'] ?? '');
-            if (($disco['driver'] ?? null) === 'local' && ($raiz === $privado || str_starts_with($raiz, $privado.'/'))) {
-                $this->discos[$nombre] = trim(substr($raiz, strlen($privado)), '/');
-            }
+        // Los mismos discos que ConexionInstitucion reubica, con sus raíces del servidor.
+        foreach (ConexionInstitucion::discosPrivados() as $nombre => $raiz) {
+            $this->discos[$nombre] = trim(substr($raiz, strlen($privado)), '/');
         }
     }
 

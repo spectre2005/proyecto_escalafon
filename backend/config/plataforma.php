@@ -13,6 +13,14 @@ return [
     'dominio' => env('PLATAFORMA_DOMINIO', 'localhost'),
 
     /*
+     * Solo con modo unica: carpeta propia de la institución de esta base (instituciones/{slug}) para los discos privados
+     * (App\Support\Plataforma\AlmacenamientoUnica). Vacía (por defecto): las carpetas comunes, como siempre. Se
+     * establece solo después de normalizar esa carpeta (plataforma:normalizar-almacenamiento); con un valor que no
+     * corresponde a esta base, la aplicación no arranca. Con subdominio no se usa.
+     */
+    'almacenamiento_unica' => env('PLATAFORMA_ALMACENAMIENTO_UNICA', ''),
+
+    /*
      * Tiempo de uso pagado (periodos_servicio). Las fechas se comparan con «hoy» en esta zona horaria (la aplicación
      * corre en UTC). Los administradores de la institución ven un aviso desde estos días antes del vencimiento.
      */

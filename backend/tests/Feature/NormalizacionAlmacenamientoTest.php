@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Plataforma\AuditoriaPlataforma;
 use App\Models\Plataforma\Institucion;
+use App\Support\Plataforma\AlmacenamientoUnica;
 use App\Support\Plataforma\ConexionInstitucion;
 use App\Support\Plataforma\InventarioArchivos;
 use App\Support\Plataforma\NormalizacionAlmacenamiento;
@@ -535,5 +536,29 @@ class NormalizacionAlmacenamientoTest extends TestCase
         foreach ([self::DNI, 'legajos/', '.pdf', '.jpg'] as $prohibido) {
             $this->assertStringNotContainsString($prohibido, $auditado);
         }
+    }
+
+    public function test_after_the_change_the_command_gives_the_single_mode_line_and_after_reverting_asks_to_remove_it(): void
+    {
+        $this->uniqConEnlaces();
+        foreach (['preparar', 'verificar'] as $etapa) {
+            $this->artisan('plataforma:normalizar-almacenamiento', ['slug' => 'uniq', "--{$etapa}" => true, '--confirmar' => 'uniq'])
+                ->doesntExpectOutputToContain('PLATAFORMA_ALMACENAMIENTO_UNICA')->assertSuccessful();
+        }
+        $this->assertNotNull(AlmacenamientoUnica::motivoCarpeta('instituciones/uniq'));
+
+        $this->artisan('plataforma:normalizar-almacenamiento', ['slug' => 'uniq', '--cambiar' => true, '--confirmar' => 'uniq'])
+            ->expectsOutputToContain('Etapa «cambiar» terminada')
+            ->expectsOutput('  PLATAFORMA_ALMACENAMIENTO_UNICA=instituciones/uniq')
+            ->expectsOutputToContain('No la añadas antes de terminar y comprobar la normalización')
+            ->doesntExpectOutputToContain('no añadas PLATAFORMA_ALMACENAMIENTO_UNICA')
+            ->doesntExpectOutputToContain(self::DNI)->doesntExpectOutputToContain('PASSWORD')->doesntExpectOutputToContain('APP_KEY')
+            ->assertSuccessful();
+        $this->assertNull(AlmacenamientoUnica::motivoCarpeta('instituciones/uniq'));
+
+        $this->artisan('plataforma:normalizar-almacenamiento', ['slug' => 'uniq', '--revertir' => true, '--confirmar' => 'uniq'])
+            ->expectsOutputToContain('PLATAFORMA_ALMACENAMIENTO_UNICA=instituciones/uniq, quítala de backend/.env')
+            ->doesntExpectOutputToContain('No la añadas antes')->assertSuccessful();
+        $this->assertNotNull(AlmacenamientoUnica::motivoCarpeta('instituciones/uniq'));
     }
 }

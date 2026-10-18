@@ -296,7 +296,7 @@ código las genera).
 - Hoy los enlaces de UNIQ hacen que las dos rutas sean la misma carpeta. **Después de normalizar**, si este equipo
   vuelve a modo `unica`, las cargas nuevas irían a las carpetas comunes y las de subdominio a la carpeta propia: la
   misma institución con archivos en dos lugares. Por eso el comando rechaza toda etapa en modo `unica`, y **no se debe
-  ejecutar el cambio** hasta aprobar la solución de 10.7.
+  ejecutar el cambio** en un equipo que use `unica` sin añadir después la variable de 10.7.
 
 ### 10.4 Equipos de los compañeros
 
@@ -354,20 +354,36 @@ opciones, no cambia nada) en su equipo.
 y después; lectura, descarga y carga probadas; un `respaldar.sh` y un `restaurar.sh verificar` correctos con la
 estructura nueva; el plazo de observación cumplido. Solo entonces se puede quitar `-h` de `respaldar.sh`.
 
-### 10.7 Propuesta para el modo unica (NO implementada)
+### 10.7 Modo unica: `PLATAFORMA_ALMACENAMIENTO_UNICA` (implementado el 18/10/2026, sin commit)
 
-Hacer explícito qué carpeta usa el modo `unica`:
+Qué carpeta usa el modo `unica` se dice de forma explícita (`App\Support\Plataforma\AlmacenamientoUnica`, aplicado
+al arrancar en `AppServiceProvider`):
 
-- Una variable nueva, por ejemplo `PLATAFORMA_ALMACENAMIENTO_UNICA=instituciones/uniq`. **Vacía (por defecto): todo
-  sigue como hoy** (carpetas comunes), en todos los equipos y en las pruebas.
-- Con valor, en modo `unica` se reubican **solo los discos** con la misma regla que `ConexionInstitucion::entrar()`,
-  sin tocar base, caché ni sesiones. Validaciones: que cumpla `PATRON_ALMACENAMIENTO`, que la carpeta exista y que
-  pertenezca a la institución cuya base es `DB_DATABASE`; si no, error al arrancar (no un cambio silencioso).
-- `--cambiar` indicaría al terminar la línea a agregar si ese equipo usa modo `unica`.
-- `produccion:verificar` (o una comprobación propia) avisaría si la carpeta de la institución principal ya no tiene
-  enlaces y la variable está vacía.
-- Pruebas: sin la variable, las pruebas actuales (que fuerzan `unica`) no cambian; con ella, los discos apuntan a la
-  carpeta y el modo subdominio no se ve afectado.
+- **Vacía (por defecto): todo sigue como antes** (carpetas comunes), sin consultar la plataforma: instalaciones
+  anteriores, equipos de los compañeros sin base de plataforma y pruebas (`phpunit.xml` la fuerza vacía).
+- **Con subdominio se ignora**: cada institución usa su carpeta (`ConexionInstitucion`), que no cambia.
+- **Con valor, en modo `unica`**, se reubican **solo los discos privados** (`documentos`, `personal_photos` y
+  `local`; no `public` ni `s3`) con la misma regla que `ConexionInstitucion::entrar()`, sin tocar base, caché ni
+  sesiones, y sin «entrar» en la institución. Antes se valida, en este orden: que cumpla `PATRON_ALMACENAMIENTO`; que la
+  plataforma se pueda leer; que haya una institución con esa carpeta, aprovisionada, y que su `base_datos` sea la base
+  de la conexión por defecto (las bases se relacionan solo por el nombre, en el servidor de esa conexión, como en
+  `ConexionInstitucion`); que la carpeta exista y sea real (no un enlace); que su primer nivel no tenga enlaces
+  simbólicos; y que ningún disco salga de ella.
+- **Si algo falla**, los discos privados quedan inutilizables y la aplicación **no arranca** (peticiones, comandos y
+  worker): nunca escribe en una carpeta común ni en la de otra institución.
+- Las raíces originales se guardan en `plataforma.raices_servidor`: reaplicar (con `config:cache`) o entrar en otra
+  institución no reubica dos veces, y el inventario sigue viendo las carpetas comunes como comunes.
+- **Cuándo se establece:** solo en el equipo cuya base (`DB_DATABASE`) es la de la institución, si usa
+  `PLATAFORMA_MODO=unica`, y **después** de terminar `--cambiar` y comprobar que las carpetas son reales. Antes, con los
+  enlaces actuales de UNIQ, la aplicación no arrancaría (a propósito).
+- **`--cambiar`**, al terminar bien, muestra la línea para `backend/.env`
+  (`PLATAFORMA_ALMACENAMIENTO_UNICA=instituciones/{slug}`, sin secretos) si la carpeta ya sirve; si no, avisa de no
+  añadirla. **`--revertir`** recuerda quitarla.
+- **`produccion:verificar`**: con subdominio y la variable puesta, aviso (se ignora). En `unica` con valor, error con el
+  motivo si no corresponde (la aplicación tampoco arrancaría). En `unica` vacía, aviso solo si la carpeta de la
+  institución de esta base ya es real, con archivos y sin enlaces; si la plataforma no se puede leer, ni aviso ni
+  error. Una configuración válida nunca se rechaza.
+- No revisa el estado de la institución: en `unica` no hay bloqueo por estado (punto 4 de la sección 1).
 
 Alternativa descartada: activar la reubicación en `unica` siempre que la base esté vinculada a una institución.
 Rompería los equipos de los compañeros (carpeta propia vacía y archivos en las carpetas comunes).
@@ -376,7 +392,7 @@ Rompería los equipos de los compañeros (carpeta propia vacía y archivos en la
 
 1. Si se normaliza el equipo de desarrollo de Willian (en producción el aprovisionamiento ya crea carpetas propias).
 2. Ventana de mantenimiento y suspensión de UNIQ durante la preparación y el cambio.
-3. El modo `unica` después: la variable de 10.7, prohibirlo en ese equipo o aceptar que se divida.
+3. ~~El modo `unica` después~~: resuelto con la variable de 10.7 (implementada, sin commit).
 4. Los originales de las carpetas comunes: cuánto se conservan y qué se hace después (archivo cifrado o borrado con
    aprobación expresa). Mientras tanto, ningún respaldo los cubre (el objetivo `principal` no figura en el plan).
 5. Si se ofrece la herramienta a los compañeros para su caso (carpeta vacía y archivos en las carpetas comunes).

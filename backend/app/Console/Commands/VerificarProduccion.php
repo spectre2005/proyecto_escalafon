@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Support\Plataforma\AlmacenamientoUnica;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 
@@ -25,6 +26,9 @@ class VerificarProduccion extends Command
 
     public function handle(): int
     {
+        // La misma instancia atiende cada llamada del proceso (Artisan::call en las pruebas): sin restos de la anterior.
+        $this->errores = [];
+        $this->avisos = [];
         $this->exigir(app()->environment('production'), 'APP_ENV debe ser production.');
         $this->exigir(! config('app.debug'), 'APP_DEBUG debe ser false: con depuración, un error muestra código y datos.');
         $this->exigir(Str::length((string) config('app.key')) > 0, 'Falta APP_KEY (php artisan key:generate --show).');
@@ -53,6 +57,7 @@ class VerificarProduccion extends Command
         } else {
             $this->avisar('PLATAFORMA_MODO=unica: una sola institución, sin panel de plataforma operativo.');
         }
+        $this->almacenamientoUnica();
         if (config('app.crud_generico_escritura')) {
             $this->avisar('API_CRUD_GENERICO_ESCRITURA=true: el CRUD genérico permite borrar y editar sin las reglas de cada sección (auditoría, historial, folios).');
         }
@@ -77,6 +82,34 @@ class VerificarProduccion extends Command
         $this->info('Configuración de producción verificada.');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * PLATAFORMA_ALMACENAMIENTO_UNICA (AlmacenamientoUnica). Con subdominio se ignora: aviso si está puesta. En unica, con
+     * valor debe corresponder a esta base y a una carpeta ya normalizada (si no, la aplicación ni siquiera arranca: aquí
+     * se repite para que el motivo quede en este informe); vacía, aviso si la carpeta de esta base ya está normalizada.
+     */
+    private function almacenamientoUnica(): void
+    {
+        $valor = trim((string) config('plataforma.almacenamiento_unica'));
+        if (config('plataforma.modo') !== 'unica') {
+            if ($valor !== '') {
+                $this->avisar('PLATAFORMA_ALMACENAMIENTO_UNICA solo se usa con PLATAFORMA_MODO=unica: con subdominio se ignora (cada institución usa su carpeta). Déjala vacía.');
+            }
+
+            return;
+        }
+        if ($valor !== '') {
+            $motivo = AlmacenamientoUnica::motivo($valor);
+            $this->exigir($motivo === null, (string) $motivo);
+
+            return;
+        }
+        if ($carpeta = AlmacenamientoUnica::carpetaSinConfigurar()) {
+            $this->avisar("La carpeta {$carpeta} de la institución de esta base ya es una carpeta real con archivos, pero PLATAFORMA_ALMACENAMIENTO_UNICA está vacía: "
+                .'el modo unica sigue usando las carpetas comunes. Si se normalizó con plataforma:normalizar-almacenamiento, '
+                ."añade PLATAFORMA_ALMACENAMIENTO_UNICA={$carpeta}; si sus archivos siguen en las carpetas comunes, no la añadas.");
+        }
     }
 
     private function exigir(bool $cumple, string $mensaje): void

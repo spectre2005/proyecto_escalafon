@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Plataforma\Institucion;
+use App\Support\Plataforma\AlmacenamientoUnica;
 use App\Support\Plataforma\AuditoriaOperaciones;
 use App\Support\Plataforma\InventarioArchivos;
 use App\Support\Plataforma\NormalizacionAlmacenamiento;
@@ -14,6 +15,9 @@ use Throwable;
  * Inventario y normalización del almacenamiento de una institución (NormalizacionAlmacenamiento). Sin opciones, solo
  * inventaría y simula: no escribe nada. Las etapas que tocan archivos (--preparar, --verificar, --cambiar,
  * --revertir) van de una en una, exigen modo subdominio y la institución suspendida, y piden escribir su slug.
+ *
+ * Al terminar --cambiar indica la línea PLATAFORMA_ALMACENAMIENTO_UNICA para los equipos en modo unica con esta base
+ * (solo si la carpeta ya es real y sin enlaces); al terminar --revertir, que hay que quitarla.
  *
  * La salida y la auditoría solo llevan cifras, códigos, nombres de carpeta de primer nivel y huellas agregadas: nunca
  * rutas de archivos (las de las fotos llevan el DNI) ni nombres de documentos.
@@ -131,7 +135,27 @@ class NormalizarAlmacenamiento extends Command
         AuditoriaOperaciones::registrar("almacenamiento.normalizacion_{$etapa}", null, null, $institucion->id, null, $datos);
         $this->info(sprintf('Etapa «%s» terminada (%s): %d carpeta(s), %d archivo(s), %s bytes.', $etapa, $preparacion,
             count($datos['carpetas']), $datos['archivos'], number_format($datos['bytes'], 0, ',', '.')));
+        if ($etapa === 'cambiar') {
+            $this->variableUnica($institucion);
+        } elseif ($etapa === 'revertir') {
+            $this->warn("Si algún equipo en modo unica tiene PLATAFORMA_ALMACENAMIENTO_UNICA={$institucion->almacenamiento}, quítala de backend/.env: "
+                .'la carpeta vuelve a tener enlaces y la aplicación no arrancaría con ella.');
+        }
 
         return self::SUCCESS;
+    }
+
+    /** La línea de backend/.env para el modo unica (sin secretos: solo la carpeta), si la carpeta ya sirve. */
+    private function variableUnica(Institucion $institucion): void
+    {
+        if ($motivo = AlmacenamientoUnica::motivoCarpeta($institucion->almacenamiento)) {
+            $this->warn("La carpeta todavía no sirve para el modo unica ({$motivo}): no añadas PLATAFORMA_ALMACENAMIENTO_UNICA.");
+
+            return;
+        }
+        $this->line('Modo unica: en el equipo cuya base (DB_DATABASE) es la de esta institución, y solo si usa PLATAFORMA_MODO=unica, añade a backend/.env:');
+        $this->line("  PLATAFORMA_ALMACENAMIENTO_UNICA={$institucion->almacenamiento}");
+        $this->line('No la añadas antes de terminar y comprobar la normalización: las carpetas deben ser reales, sin enlaces (si no, la aplicación no arranca). '
+            .'Con subdominio no hace falta. Después, compruébalo con php artisan produccion:verificar.');
     }
 }

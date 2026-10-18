@@ -35,6 +35,8 @@
         <env name="PLATAFORMA_DB_DATABASE" value=":memory:" force="true"/>
         <!-- Una sola institución aunque el .env use subdominios; ResolverInstitucionTest prueba el otro modo. -->
         <env name="PLATAFORMA_MODO" value="unica"/>
+        <!-- Carpetas comunes aunque el .env tenga carpeta propia; AlmacenamientoUnicaTest prueba la variable. -->
+        <env name="PLATAFORMA_ALMACENAMIENTO_UNICA" value="" force="true"/>
         <env name="MAIL_MAILER" value="array" force="true"/>
         <env name="QUEUE_CONNECTION" value="sync" force="true"/>
         <env name="SESSION_DRIVER" value="array" force="true"/>
