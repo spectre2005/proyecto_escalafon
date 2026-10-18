@@ -1,8 +1,10 @@
 # Baja, exportación y archivo de instituciones
 
 > **DISEÑO PROPUESTO — NO IMPLEMENTADO.**
-> Este documento describe cómo se haría la baja de una institución. Salvo la **entrega 1 (protección del estado)**,
-> nada de lo que aquí se describe existe en el código. Las decisiones de la sección 8 **no están aprobadas**: requieren
+> Este documento describe cómo se haría la baja de una institución. Salvo la **entrega 1 (protección del estado)** y
+> la **herramienta de inventario y normalización** (sección 10, implementada y probada solo en entornos aislados,
+> **nunca ejecutada sobre el almacenamiento real**), nada de lo que aquí se describe existe en el código. La
+> normalización de UNIQ **no está hecha**. Las decisiones de la sección 8 **no están aprobadas**: requieren
 > confirmación del cliente o del equipo antes de programarlas.
 
 Fecha del análisis: 2026-10-17 (sobre `main` en `d0e8b88`).
@@ -209,9 +211,8 @@ Exportar por **pertenencia demostrada**, no por recorrido de carpeta:
    «sin referencia» (cifra, sin nombres) para decidir.
 
 **Propuesta para normalizar UNIQ (requiere aprobación; no ejecutar sin ella)**
-Copiar (no mover) a `instituciones/uniq/` los archivos referenciados por la base de UNIQ, verificar huellas, y solo
-entonces reemplazar cada enlace por la carpeta real, conservando las carpetas comunes intactas hasta confirmar que nada
-más las usa. Debe hacerse con un respaldo verificado previo y la institución suspendida.
+Ver la sección 10: inventario, copia de preparación, verificación, cambio y reversión, con
+`plataforma:normalizar-almacenamiento`. Los originales de las carpetas comunes se conservan.
 
 **Ajuste posterior a `respaldar.sh` (propuesto)**
 Sin cambiar qué se respalda: avisar en el registro del respaldo cuando una carpeta de institución tenga enlaces, y que
@@ -229,7 +230,8 @@ normalizar UNIQ.
 4. **Uno o dos superadministradores** para archivar.
 5. **¿Una archivada se sigue respaldando y migrando?**
 6. **¿Se permite archivar con documentos faltantes** (con constancia en la auditoría) o se bloquea siempre?
-7. **UNIQ**: ¿normalizar sus archivos (sección 7) antes de cualquier exportación?
+7. **UNIQ**: ¿normalizar sus archivos (secciones 7 y 10) antes de cualquier exportación? Ver además las decisiones
+   propias de la normalización (sección 10.8).
 8. **¿La auditoría de la plataforma va en el paquete?** (incluye IP de superadministradores).
 9. **Exportación cancelada o fallida**: ¿se conserva o se elimina? Contiene datos personales.
 
@@ -237,6 +239,9 @@ normalizar UNIQ.
 
 1. **Protección del estado** — **HECHA**: `ResolverInstitucion` en lista blanca (`Institucion::ESTADOS_OPERATIVOS`),
    rechazo de activar o suspender un estado no reconocido, pruebas. Sin migraciones ni interfaz.
+1b. **Inventario y normalización del almacenamiento** — **HERRAMIENTA HECHA, SIN EJECUTAR SOBRE DATOS REALES**:
+   `InventarioArchivos`, `NormalizacionAlmacenamiento` y `plataforma:normalizar-almacenamiento` (sección 10). La
+   normalización de UNIQ sigue pendiente de las decisiones de la sección 10.8.
 2. **Exportación por comando**: funciones comunes, `exportar.sh` (sin `-h`, inventario, manifiesto, `.parcial`),
    verificación estricta, tabla `exportaciones_institucion`, comandos. Pruebas en entorno aislado. Depende de 3, 7, 9.
 3. **Panel: solicitud y seguimiento**, sin descarga.
@@ -244,3 +249,138 @@ normalizar UNIQ.
    Depende de 4, 5, 6.
 5. **Cifrado y entrega o descarga autorizada**. Depende de 2 y 3.
 6. **Eliminación definitiva**: solo con la decisión 1 confirmada, como operación aparte.
+
+## 10. Normalización del almacenamiento (UNIQ y modo unica)
+
+### 10.1 Comprobación de solo lectura (2026-10-17, equipo de desarrollo de Willian)
+
+Consultas de solo lectura (`BEGIN TRANSACTION READ ONLY`) y recorrido del disco sin leer contenidos; el cruce se hizo
+con huellas md5 de las rutas para no mostrarlas.
+
+| Comprobación | Resultado |
+|---|---|
+| `archivos_documento` de UNIQ (base `escalafon`) | 8, todos en el disco `documentos`, todos con huella, cada uno de un solo documento |
+| `usuarios.foto_path` de UNIQ | 2 |
+| `pdf_path` antiguos (certificados y declaraciones) | 0 en las tres bases |
+| Referencias en las bases de uno y dos | 0 |
+| Referencias de UNIQ / archivos en las carpetas comunes | 10 / 10 |
+| Referencias sin archivo / archivos sin referencia | 0 / 0 |
+| PDF con tamaño distinto al registrado | 0 |
+| PDF en la carpeta de un legajo que no es de su base | 0 |
+
+En ese equipo, los 10 archivos de las carpetas comunes son de UNIQ. `fotos-personal/.gitignore` y
+`storage/app/private/.gitignore` están versionados en git: son marcadores, no archivos de ninguna institución.
+
+### 10.2 Dónde guarda archivos la aplicación
+
+| Disco | Qué guarda | Ruta en la base | Notas |
+|---|---|---|---|
+| `documentos` (`legajo.disco_documentos`) | PDF del legajo | `archivos_documento.storage_path` = `legajos/{legajo}/seccion-NN/{uuid}.pdf`, con `tamano_bytes` y `hash_sha256` | `CargaDocumento` escribe; solo borra el archivo recién subido si falla la transacción |
+| `personal_photos` | Fotos | `usuarios.foto_path` = `{usuario}/{uuid}/img_{dni}.jpg`, **sin huella** | Al reemplazar una foto se **borra** la anterior. La ruta lleva el DNI |
+| `local` (raíz de `storage/app/private`) | PDF anteriores a los folios | `certificados_discapacidad.pdf_path` y `declaraciones_verificaciones.pdf_path` = `{tipo}/{usuario}/{hash}.pdf` | Ya no se escriben; solo se descargan |
+| `public` | Nada | — | Fuera de `private`: `ConexionInstitucion` no lo reubica |
+
+Las rutas de la base son **relativas al disco**. `ConexionInstitucion::entrar()` cambia la raíz de todo disco local de
+`storage/app/private/X` a `storage/app/private/{almacenamiento}/X`: si `instituciones/uniq/documentos` pasa de enlace a
+carpeta real con el mismo contenido, la aplicación sigue igual **sin cambiar la base**.
+
+Hallazgos de paso (fuera de este trabajo): el nombre de las fotos lleva el DNI y `UsuarioResource` devuelve
+`foto_path`; el disco `local` tiene `serve => true` (Laravel registra `GET`/`PUT storage/{path}` con URL firmada; ningún
+código las genera).
+
+### 10.3 Riesgo: dividir las rutas entre los modos subdominio y unica
+
+- Con `PLATAFORMA_MODO=subdominio`, una petición de UNIQ usa `instituciones/uniq/...`.
+- Con `PLATAFORMA_MODO=unica` no se identifica la institución: los discos usan las **carpetas comunes**
+  (`storage/app/private/documentos`, ...).
+- Hoy los enlaces de UNIQ hacen que las dos rutas sean la misma carpeta. **Después de normalizar**, si este equipo
+  vuelve a modo `unica`, las cargas nuevas irían a las carpetas comunes y las de subdominio a la carpeta propia: la
+  misma institución con archivos en dos lugares. Por eso el comando rechaza toda etapa en modo `unica`, y **no se debe
+  ejecutar el cambio** hasta aprobar la solución de 10.7.
+
+### 10.4 Equipos de los compañeros
+
+`InstitucionesPruebaSeeder` registra la institución principal con `instituciones/{slug}` como carpeta real **vacía**
+(sin enlaces). Si alguien subió PDF o fotos en modo `unica`, siguen en las carpetas comunes y **no se ven en modo
+subdominio** (no se pierden: la aplicación no los encuentra). El inventario lo detecta como estado `comun` y el plan
+los copia a la carpeta propia igual que en el caso de los enlaces. Cada compañero debe correr el inventario (sin
+opciones, no cambia nada) en su equipo.
+
+### 10.5 Herramienta (implementada; probada solo en entornos aislados)
+
+- **`App\Support\Plataforma\InventarioArchivos`** (solo lectura):
+  - Referencias de todas las fuentes (`FUENTES`: `archivos_documento`, `usuarios.foto_path` y los dos `pdf_path`),
+    buscadas como las buscaría la aplicación (carpeta propia y carpeta común).
+  - Estados: `propio`, `enlazado`, `comun`, `faltante`, `ambiguo` (ruta insegura, disco desconocido, fuera de
+    `storage/app/private`, en la zona `instituciones/` por el disco local, o en la carpeta de otra institución).
+  - Marcas: `compartido` (el mismo archivo físico —dispositivo e inodo— lo referencia otra institución aprovisionada o
+    la base principal), `alterado` (tamaño o SHA-256 distintos de los registrados), `duplicado_identico` /
+    `duplicado_distinto` (copia propia y común).
+  - Recorre su carpeta **sin seguir enlaces**: enlaces `comun` (de primer nivel, a una carpeta común) o `ajeno`;
+    huérfanos `propia`, `enlazada` (en una carpeta común a la que enlaza), `comun` y `ajeno`.
+  - Bloquean: faltante, ambiguo, compartido, alterado, duplicado distinto, enlace ajeno, huérfano enlazado, bases que
+    no se pudieron leer y carpeta propia que es un enlace.
+  - `resumen()` da solo cifras, códigos y una huella agregada del inventario.
+- **`App\Support\Plataforma\NormalizacionAlmacenamiento`**: plan y etapas (10.6).
+- **`php artisan plataforma:normalizar-almacenamiento {slug}`**:
+  - **Sin opciones: inventario y simulación. No escribe nada** (ni manifiesto ni auditoría).
+  - `--preparar`, `--verificar`, `--cambiar`, `--revertir` (una por vez; `--preparacion=` elige una preparación,
+    `--confirmar=` evita la pregunta). Todas exigen `PLATAFORMA_MODO=subdominio`, la institución **suspendida** y
+    escribir su slug.
+  - Salida y auditoría: cifras, códigos, nombres de carpeta de primer nivel y huellas agregadas; **nunca rutas de
+    archivos** ni nombres de documentos.
+
+### 10.6 Procedimiento
+
+1. **Inventario** (sin opciones). Si hay bloqueos, se resuelven a mano antes; nada se asigna solo.
+2. **Preparación** (`--preparar`): exige inventario sin bloqueos, el doble de espacio libre y el mismo sistema de
+   archivos que la carpeta de la institución (el cambio es un `rename`). Crea
+   `storage/app/normalizacion/{slug}-{AAAAMMDD-HHMMSS}/` (0700, fuera de `private/`, de `instituciones/`, de git y de
+   todo respaldo) con `manifiesto.json` y `estado.json` (0600) y copia en `preparacion/` cada carpeta de primer nivel
+   que hay que normalizar: los archivos reales que ya tuviera y los que hoy se leen de una carpeta común. Copia **sin
+   sobrescribir** (`fopen x`), conserva permisos y comprueba tamaño y SHA-256 de cada copia. **Nunca escribe en los
+   originales.** Si se interrumpe, queda `preparacion_fallida` y no se puede usar.
+3. **Verificación** (`--verificar`): cada archivo copiado con su tamaño y SHA-256, nada de más, y el inventario actual
+   igual al de la preparación (si alguien subió algo después, falla).
+4. **Cambio** (`--cambiar`, solo con la preparación verificada; vuelve a verificar): por carpeta, aparta la actual
+   (enlace o carpeta) en `anteriores/` y pone la preparada en su lugar. Después, inventario: todas las referencias
+   `propio`, sin enlaces y con las mismas huellas. Si se interrumpe o no coincide, **revierte solo**.
+5. **Reversión** (`--revertir`): devuelve cada carpeta según lo que hay en el disco (sirve tras un corte a mitad).
+   **No revierte** si una carpeta normalizada tiene archivos nuevos que no estaban en la preparación: hay que
+   revisarlos antes.
+6. Los originales de las carpetas comunes **se conservan**: quitarlos es otra decisión (10.8).
+
+**Criterio para dejar de depender de los enlaces** (todos): ningún enlace en `instituciones/*`; inventario igual antes
+y después; lectura, descarga y carga probadas; un `respaldar.sh` y un `restaurar.sh verificar` correctos con la
+estructura nueva; el plazo de observación cumplido. Solo entonces se puede quitar `-h` de `respaldar.sh`.
+
+### 10.7 Propuesta para el modo unica (NO implementada)
+
+Hacer explícito qué carpeta usa el modo `unica`:
+
+- Una variable nueva, por ejemplo `PLATAFORMA_ALMACENAMIENTO_UNICA=instituciones/uniq`. **Vacía (por defecto): todo
+  sigue como hoy** (carpetas comunes), en todos los equipos y en las pruebas.
+- Con valor, en modo `unica` se reubican **solo los discos** con la misma regla que `ConexionInstitucion::entrar()`,
+  sin tocar base, caché ni sesiones. Validaciones: que cumpla `PATRON_ALMACENAMIENTO`, que la carpeta exista y que
+  pertenezca a la institución cuya base es `DB_DATABASE`; si no, error al arrancar (no un cambio silencioso).
+- `--cambiar` indicaría al terminar la línea a agregar si ese equipo usa modo `unica`.
+- `produccion:verificar` (o una comprobación propia) avisaría si la carpeta de la institución principal ya no tiene
+  enlaces y la variable está vacía.
+- Pruebas: sin la variable, las pruebas actuales (que fuerzan `unica`) no cambian; con ella, los discos apuntan a la
+  carpeta y el modo subdominio no se ve afectado.
+
+Alternativa descartada: activar la reubicación en `unica` siempre que la base esté vinculada a una institución.
+Rompería los equipos de los compañeros (carpeta propia vacía y archivos en las carpetas comunes).
+
+### 10.8 Decisiones pendientes de la normalización (NO aprobadas)
+
+1. Si se normaliza el equipo de desarrollo de Willian (en producción el aprovisionamiento ya crea carpetas propias).
+2. Ventana de mantenimiento y suspensión de UNIQ durante la preparación y el cambio.
+3. El modo `unica` después: la variable de 10.7, prohibirlo en ese equipo o aceptar que se divida.
+4. Los originales de las carpetas comunes: cuánto se conservan y qué se hace después (archivo cifrado o borrado con
+   aprobación expresa). Mientras tanto, ningún respaldo los cubre (el objetivo `principal` no figura en el plan).
+5. Si se ofrece la herramienta a los compañeros para su caso (carpeta vacía y archivos en las carpetas comunes).
+6. Cuánto se conservan las preparaciones y el manifiesto (contiene rutas con DNI).
+7. Plazo de observación antes de quitar `-h` de `respaldar.sh`.
+8. El DNI en el nombre de las fotos y `foto_path` en la API: aparte, nunca en la misma operación (cambiar nombres
+   obliga a tocar la base).

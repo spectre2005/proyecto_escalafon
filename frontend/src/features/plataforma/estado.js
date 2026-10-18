@@ -216,6 +216,11 @@ const ACCIONES = {
   'administrador.desactivado': 'Desactivó a un superadministrador',
   'administrador.reactivado': 'Reactivó a un superadministrador',
   'administrador.clave_cambiada': 'Cambió su propia contraseña',
+  'almacenamiento.normalizacion_preparar': 'Preparó la copia para normalizar su almacenamiento',
+  'almacenamiento.normalizacion_verificar': 'Verificó la copia de normalización',
+  'almacenamiento.normalizacion_cambiar': 'Normalizó su almacenamiento (carpetas propias en lugar de enlaces)',
+  'almacenamiento.normalizacion_revertir': 'Revirtió la normalización de su almacenamiento',
+  'almacenamiento.normalizacion_fallida': 'Falló una etapa de la normalización de su almacenamiento',
 }
 export const etiquetaAccion = accion => ACCIONES[accion] || accion
 

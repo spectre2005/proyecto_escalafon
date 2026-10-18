@@ -171,6 +171,9 @@ migraciones y verificación. Respaldos (17/10/2026): uno por institución, copia
    Diseño propuesto, sin aprobar: docs/DISENO_BAJA_EXPORTACION_INSTITUCIONES.md (9 decisiones pendientes). Hecha solo
    la entrega 1: ResolverInstitucion en lista blanca (solo `activa` opera; un estado futuro o desconocido recibe 403) y
    un estado no reconocido no se activa ni se suspende. Pendiente: enlaces simbólicos de UNIQ (`tar -h`) antes de exportar.
+   Herramienta de inventario y normalización del almacenamiento (`plataforma:normalizar-almacenamiento`; sin opciones
+   solo inventaría): probada en entornos aislados, **no ejecutada** sobre UNIQ. Normalizar espera las decisiones de la
+   sección 10.8 del diseño, sobre todo el modo `unica`.
 5. ~~Uso por institución (personas, legajos, espacio, último ingreso) y estado técnico~~ hecho el 18/10/2026
    (UsoInstitucion, página «Estado técnico» y sección en el detalle): base de datos, migraciones, carpeta, respaldo y
    copia externa. Último ingreso = último inicio de sesión (usuarios.ultimo_acceso). El espacio no sigue enlaces

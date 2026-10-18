@@ -119,6 +119,7 @@ test('superadministrator actions never apply to the own account', () => {
   assert.match(ACCION_SUPERADMIN.reactivar.pregunta, /contraseña temporal nueva/)
   assert.equal(etiquetaAccion('administrador.desactivado'), 'Desactivó a un superadministrador')
   assert.equal(etiquetaAccion('administrador.clave_cambiada'), 'Cambió su propia contraseña')
+  assert.equal(etiquetaAccion('almacenamiento.normalizacion_fallida'), 'Falló una etapa de la normalización de su almacenamiento')
 })
 
 test('technical state is never shown as correct without a check', () => {
