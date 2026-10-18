@@ -30,7 +30,7 @@ class InstitucionController extends Controller
         $conteo = Institucion::query()->select('estado', DB::raw('count(*) as total'))->groupBy('estado')->pluck('total', 'estado');
         $porEstado = collect(Institucion::ESTADOS)->mapWithKeys(fn (string $estado): array => [$estado => (int) ($conteo[$estado] ?? 0)]);
 
-        $aprovisionadas = Institucion::query()->whereNotNull('aprovisionada_en')->with(['ultimoRespaldo', 'ultimoRespaldoCorrecto'])->orderBy('nombre')->get();
+        $aprovisionadas = Institucion::query()->whereNotNull('aprovisionada_en')->orderBy('nombre')->get();
         $plataforma = Respaldo::query()->where('objetivo', 'plataforma')->latest('created_at')->first();
 
         return response()->json(['data' => [
@@ -49,7 +49,7 @@ class InstitucionController extends Controller
     public function index(Request $request): JsonResponse
     {
         $filtros = $request->validate(['q' => 'nullable|string|max:150', 'estado' => ['nullable', Rule::in(Institucion::ESTADOS)], 'page' => 'sometimes|integer|min:1']);
-        $consulta = Institucion::query()->with(['periodos', 'ultimoRespaldo', 'ultimoRespaldoCorrecto'])->orderBy('nombre')->orderBy('id');
+        $consulta = Institucion::query()->with('periodos')->orderBy('nombre')->orderBy('id');
         if (! empty($filtros['q'])) {
             $texto = '%'.mb_strtolower(trim($filtros['q'])).'%';
             $consulta->where(fn ($q) => $q->whereRaw('LOWER(nombre) LIKE ?', [$texto])->orWhereRaw('LOWER(slug) LIKE ?', [$texto]));

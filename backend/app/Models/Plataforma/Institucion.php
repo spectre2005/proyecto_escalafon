@@ -5,7 +5,6 @@ namespace App\Models\Plataforma;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -56,27 +55,25 @@ class Institucion extends Model
         return $this->hasMany(Respaldo::class, 'institucion_id');
     }
 
-    public function ultimoRespaldo(): HasOne
-    {
-        return $this->hasOne(Respaldo::class, 'institucion_id')->latestOfMany();
-    }
-
-    public function ultimoRespaldoCorrecto(): HasOne
-    {
-        return $this->hasOne(Respaldo::class, 'institucion_id')->ofMany(['created_at' => 'max', 'id' => 'max'],
-            fn ($consulta) => $consulta->where('estado', Respaldo::CORRECTO));
-    }
+    /** @var array{ultimo: ?array<string, mixed>, ultimo_correcto_en: ?string, atrasado: bool}|null */
+    private ?array $estadoRespaldoCalculado = null;
 
     /**
      * Último respaldo y si está atrasado: aprovisionada y sin un respaldo correcto en las últimas Respaldo::HORAS_AVISO.
+     * Consultas simples por fecha: latestOfMany/ofMany desempatan con MAX(id), que PostgreSQL no tiene para uuid.
      *
      * @return array{ultimo: ?array<string, mixed>, ultimo_correcto_en: ?string, atrasado: bool}
      */
     public function estadoRespaldo(): array
     {
-        $correcto = $this->ultimoRespaldoCorrecto?->created_at;
+        if ($this->estadoRespaldoCalculado !== null) {
+            return $this->estadoRespaldoCalculado;
+        }
+        $ultimo = $this->respaldos()->latest('created_at')->latest('carpeta')->first();
+        $correcto = $this->respaldos()->where('estado', Respaldo::CORRECTO)->max('created_at');
+        $correcto = $correcto === null ? null : Carbon::parse($correcto);
 
-        return ['ultimo' => $this->ultimoRespaldo?->datos(), 'ultimo_correcto_en' => $correcto?->toIso8601String(),
+        return $this->estadoRespaldoCalculado = ['ultimo' => $ultimo?->datos(), 'ultimo_correcto_en' => $correcto?->toIso8601String(),
             'atrasado' => $this->aprovisionada() && ($correcto === null || $correcto->lt(now()->subHours(Respaldo::HORAS_AVISO)))];
     }
 
