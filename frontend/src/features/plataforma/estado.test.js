@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, COPIA_EXTERNA, VERIFICACION, accionesDisponibles, cambiosCliente, etiquetaAccion, tamano, cambios, etiquetaEstado, fechaCorta, proponerPeriodo, proponerSlug, proponerUbicacion, textoServicio } from './estado.js'
+import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, COPIA_EXTERNA, VERIFICACION, accionesDisponibles, cambiosCliente, importe, textoVencimiento, etiquetaAccion, tamano, cambios, etiquetaEstado, fechaCorta, proponerPeriodo, proponerSlug, proponerUbicacion, textoServicio } from './estado.js'
 import { esEscritura, mensajeError } from './api.js'
 
 test('state actions follow what the backend allows', () => {
@@ -89,4 +89,21 @@ test('only the changed client fields are sent, and emptying one removes it', () 
   assert.deepEqual(cambiosCliente(original, { ...original, razon_social: ' Universidad Uno ' }), {})
   assert.deepEqual(cambiosCliente(original, { ...original, contacto_email: ' orh@uno.test ', ruc: '' }), { contacto_email: 'orh@uno.test', ruc: null })
   assert.deepEqual(cambiosCliente(original, { ...original, contrato_inicio: '2026-04-01' }), { contrato_inicio: '2026-04-01' })
+})
+
+test('income amounts are shown with two decimals and thousands', () => {
+  assert.equal(importe('0.00'), 'S/ 0.00')
+  assert.equal(importe('185.5'), 'S/ 185.50')
+  assert.equal(importe('1234567.8'), 'S/ 1,234,567.80')
+  assert.equal(importe(null), 'S/ 0.00')
+})
+
+test('each due date is described from its group', () => {
+  assert.equal(textoVencimiento('por_vencer', { dias_restantes: 0, vence_el: '2026-12-31' }), 'Vence hoy (31/12/2026)')
+  assert.equal(textoVencimiento('por_vencer', { dias_restantes: 1, vence_el: '2027-01-01' }), 'Vence en 1 día, el 01/01/2027')
+  assert.match(textoVencimiento('en_gracia', { vence_el: '2026-12-28', gracia_hasta: '2027-01-02', dias_gracia_restantes: 2 }), /le quedan 2 días de gracia \(hasta el 02\/01\/2027\)/)
+  assert.match(textoVencimiento('en_gracia', { vence_el: '2026-12-28', gracia_hasta: '2026-12-31', dias_gracia_restantes: 0 }), /último día de gracia/)
+  assert.equal(textoVencimiento('vencidas', { vence_el: '2026-12-01', dias_vencida: 30 }), 'Venció el 01/12/2026, hace 30 días: sin acceso')
+  assert.match(textoVencimiento('vencidas', { vence_el: null, proximo_desde: '2027-02-01' }), /empieza el 01\/02\/2027/)
+  assert.match(textoVencimiento('vencidas', { vence_el: null, proximo_desde: null }), /Sin un periodo pagado vigente/)
 })

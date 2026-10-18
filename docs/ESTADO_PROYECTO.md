@@ -160,8 +160,10 @@ aprovisionar, activar/suspender, tiempo de uso, administradores, respaldos, audi
 migraciones y verificación. Respaldos (17/10/2026): uno por institución, copia externa cifrada opcional con rclone
 (Google Drive u otro; de quién es la cuenta: pendiente del cliente), verificación y restauración por institución
 (docker/produccion/respaldar.sh y restaurar.sh, docs/PRODUCCION.md). Falta, en el orden propuesto (sin decidir):
-1. Datos del cliente y del contrato: razón social, RUC, contacto, N.º de contrato y fecha de inicio.
-2. Resumen útil: vencimientos en los próximos 30 días, en gracia o vencidas, ingresos del mes y del año.
+1. ~~Datos del cliente y del contrato: razón social, RUC, contacto, N.º de contrato y fecha de inicio.~~ Hecho el
+   18/10/2026 (RUC con dígito verificador de SUNAT).
+2. ~~Resumen útil: vencimientos en los próximos 30 días, en gracia o vencidas, ingresos del mes y del año.~~ Hecho
+   el 18/10/2026 (ver «Tiempo de uso pagado»).
 3. Seguridad del superadmin: gestionarlos desde el panel, cambiar la propia contraseña y verificación en dos pasos.
 4. Dar de baja una institución y exportar sus datos (base y PDF) al terminar el contrato; luego archivarla.
 5. Uso por institución (personas, legajos, documentos, espacio, último ingreso) y estado técnico (salud, cola fallida,
@@ -419,6 +421,13 @@ migraciones y verificación. Respaldos (17/10/2026): uno por institución, copia
   (`PLATAFORMA_AVISO_VENCIMIENTO_DIAS`) y durante la gracia; el resto del personal no.
 - Pendiente de confirmar con el cliente: moneda (hoy S/), si hay planes con distintas funciones o
   solo tiempo, y quién en la institución recibe el aviso además de sus administradores.
+- Resumen del panel (18/10/2026, `App\Support\Plataforma\ResumenCobranza`): por vencer en 30 días, en gracia y
+  vencidas salen de `Institucion::servicio()`, así que cada institución está en un solo grupo. Ingresos del mes y
+  del año: pagos no anulados, por la **fecha en que se registraron** (`created_at`) en hora de Lima. Los pagos sin
+  monto no se suman, se cuentan aparte.
+  - Pendiente de confirmar con el cliente: la moneda (se muestra S/).
+  - Pendiente de decidir: si hará falta una **fecha de pago** propia, distinta de la fecha de registro (pagos
+    registrados tarde o por adelantado). Hoy no existe ese campo; añadirlo requiere una migración.
 
 ## Preparación para producción (13/10/2026)
 - `docker-compose.produccion.yml` con Caddy (HTTPS automático por subdominio, frontend compilado), app (php-fpm,

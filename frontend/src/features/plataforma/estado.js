@@ -47,6 +47,21 @@ export function tamano(bytes) {
   return `${texto} ${unidades[indice]}`
 }
 
+/** Importe con dos decimales y separador de miles: «S/ 12,345.50». Sin datos de idioma del entorno. */
+export function importe(total, moneda = 'S/') {
+  const [entero, decimales] = Number(total || 0).toFixed(2).split('.')
+  return `${moneda} ${entero.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.${decimales}`
+}
+
+/** Vencimientos del resumen (ResumenCobranza): una frase por institución según su grupo. */
+export function textoVencimiento(grupo, item) {
+  const dias = n => `${n} día${n === 1 ? '' : 's'}`
+  if (grupo === 'por_vencer') return item.dias_restantes === 0 ? `Vence hoy (${fechaCorta(item.vence_el)})` : `Vence en ${dias(item.dias_restantes)}, el ${fechaCorta(item.vence_el)}`
+  if (grupo === 'en_gracia') return `Venció el ${fechaCorta(item.vence_el)}; ${item.dias_gracia_restantes === 0 ? 'hoy es su último día de gracia' : `le quedan ${dias(item.dias_gracia_restantes)} de gracia`} (hasta el ${fechaCorta(item.gracia_hasta)})`
+  if (item.vence_el) return `Venció el ${fechaCorta(item.vence_el)}, hace ${dias(item.dias_vencida)}: sin acceso`
+  return item.proximo_desde ? `Su pago empieza el ${fechaCorta(item.proximo_desde)}: sin acceso hasta entonces` : 'Sin un periodo pagado vigente: sin acceso'
+}
+
 /** Fecha del backend (AAAA-MM-DD) como DD/MM/AAAA, sin pasar por zonas horarias. */
 export const fechaCorta = valor => /^\d{4}-\d{2}-\d{2}/.test(valor || '') ? valor.slice(0, 10).split('-').reverse().join('/') : '—'
 

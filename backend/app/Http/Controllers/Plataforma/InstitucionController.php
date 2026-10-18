@@ -10,6 +10,7 @@ use App\Rules\Ruc;
 use App\Support\Plataforma\Aprovisionamiento;
 use App\Support\Plataforma\AprovisionamientoRechazado;
 use App\Support\Plataforma\AuditoriaOperaciones;
+use App\Support\Plataforma\ResumenCobranza;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -43,6 +44,9 @@ class InstitucionController extends Controller
                 'plataforma' => $plataforma?->datos(),
                 'horas_aviso' => Respaldo::HORAS_AVISO,
             ],
+            // Tiempo de uso pagado: por vencer, en gracia y vencidas (Institucion::servicio()), e ingresos registrados.
+            'vencimientos' => ResumenCobranza::vencimientos(),
+            'ingresos' => ResumenCobranza::ingresos(),
             'recientes' => AuditoriaPlataforma::query()->with(['administrador:id,nombre', 'institucion:id,nombre'])->latest('created_at')->limit(8)->get()->map(fn (AuditoriaPlataforma $evento): array => $this->evento($evento)),
         ]]);
     }
