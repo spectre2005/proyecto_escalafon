@@ -19,6 +19,7 @@ class InstitutionSettingsController extends Controller
         // el registro no sugiere correos (no se inventa un dominio).
         'emailDomain' => '',
         'reportTitle' => 'Ficha de datos personales', 'reportFooter' => 'Documento de uso institucional.',
+        'pageColor' => '#0f766e', 'pageBackground' => '#f6f8fa',
         'reportColor' => '#0f766e', 'showLogo' => true, 'showEmissionDate' => true, 'showPageNumbers' => true,
     ];
 
@@ -43,6 +44,7 @@ class InstitutionSettingsController extends Controller
             'emailDomain' => ['nullable', 'string', 'max:100', 'regex:/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i'],
             'reportTitle' => 'required|string|max:100',
             'reportFooter' => 'nullable|string|max:180', 'reportColor' => 'required|string|regex:/^#[0-9a-fA-F]{6}$/',
+            'pageColor' => 'sometimes|string|regex:/^#[0-9a-fA-F]{6}$/', 'pageBackground' => 'sometimes|string|regex:/^#[0-9a-fA-F]{6}$/',
             'showLogo' => 'sometimes|boolean', 'showEmissionDate' => 'sometimes|boolean', 'showPageNumbers' => 'sometimes|boolean',
         ], ['emailDomain.regex' => 'Escribe solo el dominio, sin @ (por ejemplo, institucion.edu.pe).']);
         DB::transaction(function () use ($request, $data): void {

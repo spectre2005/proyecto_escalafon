@@ -26,11 +26,12 @@ class InstitutionSettingsTest extends TestCase
         $snapshot = $this->getJson('/api/v1/institucion')->assertOk()->json();
         $image = UploadedFile::fake()->image('logo.png', 120, 90);
         $settings = [...$snapshot['data'], 'name' => 'Institución de prueba', 'logo' => 'data:image/png;base64,'.base64_encode($image->get()),
-            'ruc' => '12345678901', 'email' => 'contacto@example.test', 'reportColor' => '#123456', 'showEmissionDate' => false];
+            'ruc' => '12345678901', 'email' => 'contacto@example.test', 'reportColor' => '#123456', 'pageColor' => '#654321', 'pageBackground' => '#faf5ff', 'showEmissionDate' => false];
         $this->putJson('/api/v1/institucion', $settings, ['If-Match' => $snapshot['version']])->assertOk()->assertJsonPath('configured', true);
         $this->actuarComo(Usuario::factory()->create(), 'asistente_legajo');
         $this->getJson('/api/v1/institucion')->assertOk()->assertJsonPath('data.name', $settings['name'])
-            ->assertJsonPath('data.logo', $settings['logo'])->assertJsonPath('data.showEmissionDate', false);
+            ->assertJsonPath('data.logo', $settings['logo'])->assertJsonPath('data.showEmissionDate', false)
+            ->assertJsonPath('data.pageColor', '#654321')->assertJsonPath('data.pageBackground', '#faf5ff')->assertJsonPath('data.reportColor', '#123456');
         $this->assertDatabaseCount('institution_settings', 1);
     }
 
@@ -70,7 +71,7 @@ class InstitutionSettingsTest extends TestCase
             ['logo' => 'data:image/svg+xml;base64,AAAA'],
             ['logo' => 'data:image/png;base64,'.base64_encode('not an image')],
             ['logo' => 'data:image/png;base64,'.base64_encode($largeImage->get())],
-            ['ruc' => '123'], ['email' => 'invalid'], ['website' => 'javascript:alert(1)'], ['reportColor' => 'blue'], ['unknown' => 'value'],
+            ['ruc' => '123'], ['email' => 'invalid'], ['website' => 'javascript:alert(1)'], ['reportColor' => 'blue'], ['pageColor' => 'red'], ['pageBackground' => 'url(evil)'], ['unknown' => 'value'],
             ['emailDomain' => '@institucion.edu.pe'], ['emailDomain' => 'persona@institucion.edu.pe'], ['emailDomain' => 'sin-punto'],
         ] as $invalid) {
             $this->putJson('/api/v1/institucion', [...$snapshot['data'], ...$invalid], ['If-Match' => $snapshot['version']])

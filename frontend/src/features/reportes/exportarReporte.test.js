@@ -37,3 +37,33 @@ test('Los filtros exportados usan etiquetas comprensibles', () => {
   })
   assert.equal(texto, 'Unidad: Recursos Humanos · Estado: Falta documento · Desde: 01/10/2026 · Horizonte: 30 días')
 })
+
+test('all table report pages use the configured institutional presentation', async () => {
+  const logo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAFklEQVQImWPkL8tjYGBgYmBgYGBgAAALLwD3dKaQQgAAAABJRU5ErkJggg=='
+  const pdf = await crearPdfReporte(reporte, { ...institucion, area: 'Equipo de escalafon', reportTitle: 'Reporte oficial', reportColor: '#123456', logo,
+    address: 'Direccion de prueba', ruc: '12345678901', email: 'equipo@example.test' }, 'Sin filtros')
+  assert.ok(pdf.output().includes('/Subtype /Image'))
+  assert.ok(pdf.getNumberOfPages() > 1)
+  for (let page = 1; page <= pdf.getNumberOfPages(); page++) {
+    const text = pdf.internal.pages[page].join('\n')
+    for (const expected of ['REPORTE OFICIAL', 'Equipo de escalafon', 'Personal', 'Uso institucional', 'Direccion de prueba', '12345678901', 'equipo@example.test']) assert.ok(text.includes(expected), `${expected} on page ${page}`)
+  }
+})
+
+test('table reports respect hidden logo, emission date and page numbers', async () => {
+  const pdf = await crearPdfReporte(reporte, { ...institucion, showLogo: false, showEmissionDate: false, showPageNumbers: false }, 'Sin filtros')
+  const output = pdf.output()
+  assert.ok(!output.includes('/Subtype /Image'))
+  assert.ok(!output.includes('Fecha de'))
+  assert.ok(!output.includes(' de 1'))
+  assert.ok(output.includes('Persona 75'))
+})
+
+
+test('long cells continue on branded pages without dropping the last text', async () => {
+  const pdf = await crearPdfReporte({ ...reporte, columnas: [{ key: 'detalle', label: 'Detalle', type: 'text' }],
+    data: [{ detalle: `${'Detalle de prueba. '.repeat(6000)}FIN_LARGO` }], meta: { ...reporte.meta, total: 1 } }, institucion, 'Sin filtros')
+  assert.ok(pdf.getNumberOfPages() > 3)
+  assert.ok(pdf.output().includes('FIN_LARGO'))
+  for (let page = 1; page <= pdf.getNumberOfPages(); page++) assert.ok(pdf.internal.pages[page].join('\n').includes('Uso institucional'))
+})

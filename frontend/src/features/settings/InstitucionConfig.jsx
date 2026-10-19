@@ -1,17 +1,25 @@
 import { useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import Icon from '../../components/ui/Icon'
-import { normalizeInstitution } from '../../config/institution'
+import { institutionPageTheme } from '../../config/pageTheme'
+import { defaultInstitution, normalizeInstitution } from '../../config/institution'
 import { apiErrorMessage } from '../../axios'
 
 const inputClass = 'mt-2 block w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 font-normal text-slate-800 outline-none focus:ring-2 focus:ring-teal-600'
-const cardClass = 'rounded-2xl border border-slate-200 bg-white p-6 sm:p-8'
+const apartados = [
+  { id: 'identidad', nombre: 'Identidad y logo', ayuda: 'Nombre, siglas y logo' },
+  { id: 'contacto', nombre: 'Dirección y contacto', ayuda: 'Dirección, correo y teléfono' },
+  { id: 'pdf', nombre: 'Presentación de los PDF', ayuda: 'Diseño de todos los reportes' },
+  { id: 'apariencia', nombre: 'Apariencia de la página', ayuda: 'Colores del sistema' },
+]
 
 // Identidad institucional y presentación de los PDF (permiso sistema.administrar, lo comprueba SettingsPage).
 export default function InstitucionConfig() {
   const { institution, updateInstitution, institutionLoading, institutionError, institutionUpdatedAt, reloadInstitution } = useOutletContext()
+  const [apartado, setApartado] = useState(null)
   const [localDraft, setDraft] = useState(null)
-  const draft = localDraft || institution
+  const draft = normalizeInstitution(localDraft || institution)
+  const pageTheme = institutionPageTheme(draft)
   const [saving, setSaving] = useState(false)
   const [logoBusy, setLogoBusy] = useState(false)
   const [previewBusy, setPreviewBusy] = useState(false)
@@ -54,6 +62,12 @@ export default function InstitucionConfig() {
   async function submit(event) {
     event.preventDefault()
     if (saving || logoBusy || institutionLoading || institutionError || conflict) return
+    const invalido = event.currentTarget.querySelector('input:invalid, select:invalid, textarea:invalid')
+    if (invalido) {
+      setApartado(invalido.closest('[data-apartado]').dataset.apartado)
+      requestAnimationFrame(() => { invalido.focus(); invalido.reportValidity() })
+      return
+    }
     if (['name', 'initials', 'area', 'reportTitle'].some(key => !draft[key].trim())) {
       setNotice({ error: true, text: 'Completa el nombre, las siglas, el área responsable y el título del reporte.' })
       return
@@ -91,14 +105,20 @@ export default function InstitucionConfig() {
     await reloadInstitution()
   }
   return <div>
-    <p className="max-w-2xl text-sm leading-relaxed text-slate-500">Define la identidad de tu institución y la presentación de las fichas PDF. Los cambios se comparten con todo el equipo.</p>
+    <p className="max-w-2xl text-sm leading-relaxed text-slate-500">Define la identidad de tu institución y la presentación de todos los reportes PDF y los colores de la página. Los cambios se comparten con todo el equipo.</p>
     {institutionLoading && <p role="status" className="mt-5 text-sm text-slate-500">Cargando configuración…</p>}
     {institutionError && <div role="alert" className="mt-5 rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{institutionError}<button type="button" onClick={reload} className="ml-2 font-semibold underline">Reintentar</button></div>}
-    <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-      <form onSubmit={submit} className="space-y-6" aria-busy={saving || logoBusy}>
-        <fieldset disabled={saving || logoBusy || institutionLoading || !!institutionError || conflict} className="space-y-6 disabled:opacity-70">
-          <section className={cardClass}>
-            <div className="mb-6 flex items-center gap-3"><span className="grid size-11 place-items-center rounded-xl bg-teal-50 text-teal-700"><Icon name="building" /></span><div><h2 className="font-semibold text-slate-800">Identidad y logo</h2><p className="mt-1 text-xs text-slate-500">Identificación del panel y encabezado de los reportes.</p></div></div>
+    <form noValidate onSubmit={submit} className="mt-6 space-y-4" aria-busy={saving || logoBusy}>
+      <fieldset disabled={saving || logoBusy || institutionLoading || !!institutionError || conflict} className="space-y-3 disabled:opacity-70">
+        <details open={apartado === 'identidad'} className="group/config overflow-hidden rounded-xl border border-slate-200 bg-white open:border-teal-200">
+          <summary id="config-tab-identidad" aria-controls="config-panel-identidad" aria-expanded={apartado === 'identidad'}
+            onClick={event => { event.preventDefault(); setApartado(previous => previous === 'identidad' ? null : 'identidad') }}
+            className="flex cursor-pointer list-none items-center gap-3 rounded-xl px-4 py-4 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 [&::-webkit-details-marker]:hidden">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-teal-50 text-sm font-semibold text-teal-800">01</span>
+            <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-slate-800">{apartados[0].nombre}</span><span className="mt-1 block text-xs text-slate-500">{apartados[0].ayuda}</span></span>
+            <span className="shrink-0 text-teal-700 transition-transform group-open/config:rotate-90"><Icon name="arrow" size={18} /></span>
+          </summary>
+          <section id="config-panel-identidad" role="region" aria-labelledby="config-tab-identidad" data-apartado="identidad" hidden={apartado !== 'identidad'} className="border-t border-slate-100 p-5 sm:p-6">
             <div className="mb-6 flex flex-wrap items-center gap-5">
               <div className="grid size-24 shrink-0 place-items-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-2">{draft.logo ? <img src={draft.logo} alt="Vista previa del logo institucional" className="size-full object-contain" /> : <Icon name="building" size={36} />}</div>
               <div><div className="flex flex-wrap gap-3"><button type="button" onClick={() => logoInput.current?.click()} className="rounded-xl border border-teal-200 px-4 py-2 text-sm font-semibold text-teal-800">{logoBusy ? 'Procesando…' : draft.logo ? 'Cambiar logo' : 'Subir logo'}</button>{draft.logo && <button type="button" onClick={() => change('logo', '')} className="text-sm font-medium text-slate-500">Quitar logo</button>}</div><p className="mt-3 text-xs text-slate-500">PNG, JPG o WebP · Hasta 2 MB. Se conserva la proporción.</p><input ref={logoInput} type="file" accept="image/png,image/jpeg,image/webp" aria-label="Seleccionar logo institucional" hidden onChange={selectLogo} /></div>
@@ -107,32 +127,73 @@ export default function InstitucionConfig() {
               ['name', 'Nombre de la institución', 150, true], ['initials', 'Siglas', 12, true], ['area', 'Área responsable', 150, true], ['ruc', 'RUC', 11, false],
             ].map(([key, label, max, required]) => <label key={key} className="text-sm font-medium text-slate-600">{label}{required ? ' *' : ''}<input required={required} maxLength={max} inputMode={key === 'ruc' ? 'numeric' : undefined} pattern={key === 'ruc' ? '[0-9]{11}' : undefined} title={key === 'ruc' ? 'El RUC debe contener 11 dígitos.' : undefined} value={draft[key]} onChange={event => change(key, event.target.value)} className={inputClass} /></label>)}</div>
           </section>
-          <section className={cardClass}>
-            <h2 className="font-semibold text-slate-800">Dirección y contacto</h2><p className="mt-1 mb-6 text-xs text-slate-500">Datos opcionales que acompañarán los reportes institucionales.</p>
+        </details>
+        <details open={apartado === 'contacto'} className="group/config overflow-hidden rounded-xl border border-slate-200 bg-white open:border-teal-200">
+          <summary id="config-tab-contacto" aria-controls="config-panel-contacto" aria-expanded={apartado === 'contacto'}
+            onClick={event => { event.preventDefault(); setApartado(previous => previous === 'contacto' ? null : 'contacto') }}
+            className="flex cursor-pointer list-none items-center gap-3 rounded-xl px-4 py-4 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 [&::-webkit-details-marker]:hidden">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-teal-50 text-sm font-semibold text-teal-800">02</span>
+            <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-slate-800">{apartados[1].nombre}</span><span className="mt-1 block text-xs text-slate-500">{apartados[1].ayuda}</span></span>
+            <span className="shrink-0 text-teal-700 transition-transform group-open/config:rotate-90"><Icon name="arrow" size={18} /></span>
+          </summary>
+          <section id="config-panel-contacto" role="region" aria-labelledby="config-tab-contacto" data-apartado="contacto" hidden={apartado !== 'contacto'} className="border-t border-slate-100 p-5 sm:p-6">
+            <p className="mt-1 mb-6 text-xs text-slate-500">Datos opcionales que acompañarán los reportes institucionales.</p>
             <div className="grid gap-5 sm:grid-cols-2">{[
               ['address', 'Dirección institucional', 'text', 250], ['email', 'Correo de contacto', 'email', 255], ['phone', 'Teléfono de contacto', 'tel', 20], ['website', 'Sitio web', 'url', 255],
             ].map(([key, label, type, max]) => <label key={key} className="text-sm font-medium text-slate-600">{label}<input type={type} maxLength={max} placeholder={key === 'website' ? 'https://www.institucion.edu.pe' : undefined} value={draft[key]} onChange={event => change(key, event.target.value)} className={inputClass} /></label>)}
               <label className="text-sm font-medium text-slate-600 sm:col-span-2">Dominio del correo del personal<input maxLength={100} placeholder="institucion.edu.pe" pattern="(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}" title="Escribe solo el dominio, sin @ (por ejemplo, institucion.edu.pe)." value={draft.emailDomain} onChange={event => change('emailDomain', event.target.value.trim())} className={inputClass} /><span className="mt-1.5 block text-xs font-normal text-slate-500">Opcional. Con él, el registro de personal sugiere el correo institucional (nombre-apellido@dominio). Sin él, el correo se escribe a mano.</span></label></div>
           </section>
-          <section className={cardClass}>
-            <h2 className="font-semibold text-slate-800">Presentación de los PDF</h2><p className="mt-1 mb-6 text-xs text-slate-500">Personaliza el encabezado y el pie de las fichas generadas.</p>
+        </details>
+        <details open={apartado === 'pdf'} className="group/config overflow-hidden rounded-xl border border-slate-200 bg-white open:border-teal-200">
+          <summary id="config-tab-pdf" aria-controls="config-panel-pdf" aria-expanded={apartado === 'pdf'}
+            onClick={event => { event.preventDefault(); setApartado(previous => previous === 'pdf' ? null : 'pdf') }}
+            className="flex cursor-pointer list-none items-center gap-3 rounded-xl px-4 py-4 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 [&::-webkit-details-marker]:hidden">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-teal-50 text-sm font-semibold text-teal-800">03</span>
+            <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-slate-800">{apartados[2].nombre}</span><span className="mt-1 block text-xs text-slate-500">{apartados[2].ayuda}</span></span>
+            <span className="shrink-0 text-teal-700 transition-transform group-open/config:rotate-90"><Icon name="arrow" size={18} /></span>
+          </summary>
+          <section id="config-panel-pdf" role="region" aria-labelledby="config-tab-pdf" data-apartado="pdf" hidden={apartado !== 'pdf'} className="border-t border-slate-100 p-5 sm:p-6">
+            <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
+              <div>
+            <p className="mt-1 mb-6 text-xs text-slate-500">Esta presentación se aplica a todos los reportes PDF: fichas personales y reportes de consulta.</p>
             <div className="space-y-5"><label className="block text-sm font-medium text-slate-600">Título del reporte *<input required maxLength={100} value={draft.reportTitle} onChange={event => change('reportTitle', event.target.value)} className={inputClass} /></label><label className="block text-sm font-medium text-slate-600">Pie de página<textarea rows={2} maxLength={180} value={draft.reportFooter} onChange={event => change('reportFooter', event.target.value)} className={inputClass} /></label><label className="flex items-center justify-between gap-4 text-sm font-medium text-slate-600">Color institucional de los reportes<span className="flex items-center gap-3"><span className="text-xs font-normal text-slate-500">{draft.reportColor.toUpperCase()}</span><input type="color" value={draft.reportColor} onChange={event => change('reportColor', event.target.value)} className="h-10 w-14 cursor-pointer rounded-lg border border-slate-200" /></span></label>
               {[
                 ['showLogo', 'Mostrar logo en los reportes'], ['showEmissionDate', 'Mostrar fecha de emisión'], ['showPageNumbers', 'Numerar las páginas'],
               ].map(([key, label]) => <label key={key} className="flex items-center gap-3 text-sm text-slate-600"><input type="checkbox" checked={draft[key]} onChange={event => change(key, event.target.checked)} className="size-4 accent-teal-700" />{label}</label>)}
             </div>
+              </div>
+      <aside className="rounded-xl border border-slate-200 bg-white p-5">
+        <h2 className="font-semibold text-slate-800">Vista previa institucional</h2><p className="mt-2 text-xs leading-relaxed text-slate-500">Descarga una ficha de muestra con los cambios de este borrador.</p>
+        <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4"><div className="min-h-64 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">{draft.showLogo && draft.logo && <img src={draft.logo} alt="Logo en el reporte" className="mx-auto mb-3 h-14 max-w-full object-contain" />}<p className="break-words text-center text-xs font-bold" style={{ color: draft.reportColor }}>{draft.name}</p><p className="mt-1 text-center text-[10px] text-slate-500">{draft.area}</p><div className="my-3 border-t-2" style={{ borderColor: draft.reportColor }} /><p className="text-center text-[10px] font-semibold uppercase text-slate-700">{draft.reportTitle}</p><div className="mt-5 grid grid-cols-2 gap-2" aria-hidden="true">{Array.from({ length: 6 }, (_, index) => <div key={index} className="h-8 rounded border border-slate-200 bg-slate-50" />)}</div><p className="mt-6 break-words text-center text-[9px] text-slate-500">{draft.reportFooter}</p>{draft.showPageNumbers && <p className="mt-2 text-right text-[9px] text-slate-400">Página 1 de 1</p>}</div></div>
+        <button type="button" onClick={preview} disabled={previewBusy || logoBusy || institutionLoading} className="mt-5 w-full rounded-xl border border-teal-200 px-4 py-3 text-sm font-semibold text-teal-800 disabled:opacity-50">{previewBusy ? 'Generando…' : 'Descargar vista previa PDF'}</button>
+      </aside>
+            </div>
           </section>
+        </details>
+        <details open={apartado === 'apariencia'} className="group/config overflow-hidden rounded-xl border border-slate-200 bg-white open:border-teal-200">
+          <summary id="config-tab-apariencia" aria-controls="config-panel-apariencia" aria-expanded={apartado === 'apariencia'}
+            onClick={event => { event.preventDefault(); setApartado(previous => previous === 'apariencia' ? null : 'apariencia') }}
+            className="flex cursor-pointer list-none items-center gap-3 rounded-xl px-4 py-4 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 [&::-webkit-details-marker]:hidden">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-teal-50 text-sm font-semibold text-teal-800">04</span>
+            <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-slate-800">{apartados[3].nombre}</span><span className="mt-1 block text-xs text-slate-500">{apartados[3].ayuda}</span></span>
+            <span className="shrink-0 text-teal-700 transition-transform group-open/config:rotate-90"><Icon name="arrow" size={18} /></span>
+          </summary>
+          <section id="config-panel-apariencia" role="region" aria-labelledby="config-tab-apariencia" data-apartado="apariencia" hidden={apartado !== 'apariencia'} className="border-t border-slate-100 p-5 sm:p-6">
+
+            <p className="mt-1 mb-6 text-xs text-slate-500">Personaliza los botones, enlaces y el fondo para todo el equipo de esta institución. Los colores se aplican al guardar y son independientes de los PDF.</p>
+            <div className="space-y-5">
+              {[['pageColor', 'Color principal de la página'], ['pageBackground', 'Color de fondo de la página']].map(([key, label]) => <label key={key} className="flex flex-wrap items-center justify-between gap-4 text-sm font-medium text-slate-600">{label}<span className="flex items-center gap-3"><span className="text-xs font-normal text-slate-500">{draft[key].toUpperCase()}</span><input type="color" value={draft[key]} onChange={event => change(key, event.target.value)} className="h-10 w-14 cursor-pointer rounded-lg border border-slate-200" /></span></label>)}
+              <p className="text-xs text-slate-500">Para el fondo, elige un tono claro que permita leer cómodamente los títulos.</p>
+              <div className="rounded-xl border border-slate-200 p-4" style={{ backgroundColor: draft.pageBackground }} aria-label="Vista previa de los colores de la página"><div className="rounded-xl bg-white p-4"><p className="text-sm font-semibold text-slate-800">Vista previa de la página</p><div className="mt-3 flex flex-wrap gap-3"><span className="rounded-lg px-3 py-2 text-xs font-semibold text-white" style={{ backgroundColor: pageTheme['--color-teal-700'] }}>Botón principal</span><span className="rounded-lg px-3 py-2 text-xs font-semibold" style={{ color: pageTheme['--color-teal-700'], backgroundColor: pageTheme['--color-teal-50'] }}>Opción seleccionada</span></div></div></div>
+              <button type="button" className="text-xs font-semibold text-teal-700 underline" onClick={() => { change('pageColor', defaultInstitution.pageColor); change('pageBackground', defaultInstitution.pageBackground) }}>Restablecer colores predeterminados</button>
+            </div>
+          </section>
+        </details>
           <div className="flex flex-wrap items-center gap-3"><button type="submit" className="rounded-xl bg-teal-700 px-5 py-3 text-sm font-semibold text-white hover:bg-teal-800">{saving ? 'Guardando…' : 'Guardar configuración'}</button><button type="button" onClick={() => { setDraft(null); setNotice(null) }} disabled={!localDraft} className="rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-600 disabled:opacity-40">Descartar cambios</button>{localDraft && <span className="text-xs text-amber-700">Cambios sin guardar</span>}</div>
         </fieldset>
         {notice && <p role={notice.error ? 'alert' : 'status'} className={`rounded-xl p-4 text-sm ${notice.error ? 'bg-rose-50 text-rose-700' : 'bg-teal-50 text-teal-800'}`}>{notice.text}</p>}
         {conflict && <button type="button" onClick={reload} className="text-sm font-semibold text-teal-700 underline">Recargar configuración y descartar este borrador</button>}
         {institutionUpdatedAt && <p className="text-xs text-slate-500">Última actualización: {new Date(institutionUpdatedAt).toLocaleString('es-PE', { timeZone: 'America/Lima' })}</p>}
-      </form>
-      <aside className={`${cardClass} xl:sticky xl:top-6`}>
-        <h2 className="font-semibold text-slate-800">Vista previa institucional</h2><p className="mt-2 text-xs leading-relaxed text-slate-500">Descarga una ficha de muestra con los cambios de este borrador.</p>
-        <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4"><div className="min-h-64 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">{draft.showLogo && draft.logo && <img src={draft.logo} alt="Logo en el reporte" className="mx-auto mb-3 h-14 max-w-full object-contain" />}<p className="break-words text-center text-xs font-bold" style={{ color: draft.reportColor }}>{draft.name}</p><p className="mt-1 text-center text-[10px] text-slate-500">{draft.area}</p><div className="my-3 border-t-2" style={{ borderColor: draft.reportColor }} /><p className="text-center text-[10px] font-semibold uppercase text-slate-700">{draft.reportTitle}</p><div className="mt-5 grid grid-cols-2 gap-2" aria-hidden="true">{Array.from({ length: 6 }, (_, index) => <div key={index} className="h-8 rounded border border-slate-200 bg-slate-50" />)}</div><p className="mt-6 break-words text-center text-[9px] text-slate-500">{draft.reportFooter}</p>{draft.showPageNumbers && <p className="mt-2 text-right text-[9px] text-slate-400">Página 1 de 1</p>}</div></div>
-        <button type="button" onClick={preview} disabled={previewBusy || logoBusy || institutionLoading} className="mt-5 w-full rounded-xl border border-teal-200 px-4 py-3 text-sm font-semibold text-teal-800 disabled:opacity-50">{previewBusy ? 'Generando…' : 'Descargar vista previa PDF'}</button>
-      </aside>
-    </div>
+    </form>
   </div>
 }

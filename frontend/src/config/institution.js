@@ -2,6 +2,7 @@ export const defaultInstitution = {
   name: 'Mi instituci\u00f3n', area: 'Gesti\u00f3n de personas', initials: 'MI',
   logo: '', ruc: '', address: '', email: '', phone: '', website: '', emailDomain: '',
   reportTitle: 'Ficha de datos personales', reportFooter: 'Documento de uso institucional.',
+  pageColor: '#0f766e', pageBackground: '#f6f8fa',
   reportColor: '#0f766e', showLogo: true, showEmissionDate: true, showPageNumbers: true,
 }
 
@@ -23,7 +24,9 @@ export function normalizeInstitution(value = {}) {
     const dominio = source.emailDomain.trim().toLowerCase()
     result.emailDomain = dominio.length <= 100 && dominioValido.test(dominio) ? dominio : ''
   }
-  if (typeof source.reportColor === 'string' && /^#[0-9a-f]{6}$/i.test(source.reportColor)) result.reportColor = source.reportColor
+  for (const key of ['reportColor', 'pageColor', 'pageBackground']) {
+    if (typeof source[key] === 'string' && /^#[0-9a-f]{6}$/i.test(source[key])) result[key] = source[key]
+  }
   for (const key of ['showLogo', 'showEmissionDate', 'showPageNumbers']) {
     if (typeof source[key] === 'boolean') result[key] = source[key]
   }
