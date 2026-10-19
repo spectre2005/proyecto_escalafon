@@ -69,6 +69,11 @@ trait SubeDocumentos
 
     protected function subir(Usuario $persona, array $datos): TestResponse
     {
+        // Como el formulario: con relación «servidor», el titular es la persona a la que se sube (el backend lo exige).
+        if (($datos['relacion_titular'] ?? null) === 'servidor' && ($datos['titular_documento'] ?? null) === '99000201') {
+            $datos['titular_documento'] = $persona->numero_doc_identidad;
+        }
+
         return $this->post('/api/v1/expedientes/'.$persona->id.'/documentos', array_filter($datos, fn ($valor) => $valor !== null), ['Accept' => 'application/json']);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditoriaEvento;
 use App\Models\Induccion;
 use App\Models\Legajo;
 use App\Models\PerfilAdministrativo;
@@ -32,6 +33,23 @@ class Seccion02ApiTest extends TestCase
             'tiene_periodo_prueba' => true, 'proceso_seleccion' => 'CAS 001-2025', 'fecha_resultado_seleccion' => '2025-01-20',
             'numero_documento_vinculo' => 'CONTRATO 010-2025', 'fecha_inicio' => '2025-02-01', 'fecha_fin_prevista' => '2025-12-31',
         ], ...$cambios];
+    }
+
+    public function test_a_new_link_takes_the_person_law_and_type_when_omitted_and_is_audited(): void
+    {
+        $actor = $this->actuarComo();
+        $ley = RegimenNormativo::factory()->create(['aplica_a' => 'administrativo']);
+        $persona = Usuario::factory()->create(['tipo_personal' => 'administrativo', 'regimen_normativo_id' => $ley->id]);
+        Legajo::factory()->create(['usuario_id' => $persona->id]);
+        $id = $this->postJson($this->url($persona, 'vinculos-laborales'), collect($this->vinculoValido())->except(['tipo_personal', 'regimen_normativo_id'])->all())
+            ->assertCreated()->assertJsonPath('data.regimen_normativo_id', $ley->id)->assertJsonPath('data.tipo_personal', 'administrativo')->json('data.id');
+        $evento = AuditoriaEvento::query()->where('accion', 'vinculo.registrar')->where('entidad_id', $id)->sole();
+        $this->assertSame([$actor->id, $persona->id], [$evento->actor_usuario_id, $evento->usuario_titular_id]);
+        // Una corrección guarda solo lo que cambió.
+        $this->patchJson($this->url($persona, 'vinculos-laborales').'/'.$id, ['nombre_puesto' => 'Especialista II'])->assertOk();
+        $cambio = AuditoriaEvento::query()->where('accion', 'vinculo.corregir')->where('entidad_id', $id)->sole();
+        $this->assertSame([['nombre_puesto' => 'Especialista'], ['nombre_puesto' => 'Especialista II']], [json_decode($cambio->datos_antes, true), json_decode($cambio->datos_despues, true)]);
+        $this->assertSame($evento->hash_registro, $cambio->hash_previo);
     }
 
     public function test_section_lists_four_subsections_with_document_state_and_requirement(): void
@@ -73,7 +91,9 @@ class Seccion02ApiTest extends TestCase
         Legajo::factory()->create(['usuario_id' => $persona->id]);
         $url = $this->url($persona, 'vinculos-laborales');
 
-        $this->postJson($url, [])->assertUnprocessable()->assertJsonValidationErrors(['tipo_personal', 'regimen_laboral', 'regimen_normativo_id', 'nombre_puesto', 'fecha_inicio']);
+        // El tipo de personal se toma de la persona; la ley también, si la persona la tiene (esta no).
+        $this->postJson($url, [])->assertUnprocessable()->assertJsonValidationErrors(['regimen_laboral', 'regimen_normativo_id', 'nombre_puesto', 'fecha_inicio'])
+            ->assertJsonMissingValidationErrors('tipo_personal')->assertJsonPath('errors.regimen_laboral.0', 'El campo tipo de vínculo es obligatorio.');
         $this->postJson($url, $this->vinculoValido(['regimen_laboral' => '276']))->assertUnprocessable()->assertJsonValidationErrors('regimen_laboral');
         $this->postJson($url, $this->vinculoValido(['fecha_fin_prevista' => '2024-01-01']))->assertUnprocessable()->assertJsonValidationErrors('fecha_fin_prevista');
         $this->postJson($url, $this->vinculoValido(['usuario_id' => Usuario::factory()->create()->id]))->assertUnprocessable()->assertJsonValidationErrors('usuario_id');

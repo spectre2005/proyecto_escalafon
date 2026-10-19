@@ -57,6 +57,7 @@ use App\Models\UsuarioRol;
 use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
 use App\Support\AplicacionDocumental;
+use App\Support\Auditoria;
 use App\Support\CambioDiscapacidad;
 use App\Support\PerfilPendiente;
 use App\Support\PuestoActual;
@@ -68,6 +69,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -261,7 +263,8 @@ class ExpedienteController extends Controller
                 ->when(! $veSensibles, fn (Builder $query): Builder => $query->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES))
                 ->distinct()->orderBy('estado')->pluck('estado'),
             'legajos' => $person->legajos()->orderByDesc('fecha_apertura')->get()->map(fn (Model $row): array => $this->present($row)),
-            'sections' => collect(self::SECTIONS)->map(fn (array $section, string $key): array => [
+            // Sin datos sensibles no se ofrecen sus listados (responden 403): ni siquiera su nombre.
+            'sections' => collect(self::SECTIONS)->when(! $veSensibles, fn ($secciones) => $secciones->except(self::SENSIBLES))->map(fn (array $section, string $key): array => [
                 'key' => $key, 'label' => $section['label'], 'group' => $section['group'],
                 'scope' => in_array($section['scope'], ['persona', 'vinculo'], true) ? 'persona' : ($section['scope'] === 'catalogo' ? 'catalogo' : 'legajo'),
             ])->values(),
@@ -309,7 +312,13 @@ class ExpedienteController extends Controller
                 if (! empty($data['regimen_normativo_id'])) {
                     $data['regimen_laboral'] = RegimenesLaborales::codigoRespaldo(RegimenNormativo::query()->findOrFail($data['regimen_normativo_id']));
                 }
+                $antes = $person->getAttributes();
                 $person->update($data);
+                // La discapacidad tiene su propio evento (CambioDiscapacidad); aquí, el resto de lo que cambió en la ficha.
+                [$previo, $nuevo] = Auditoria::diferencia(Arr::except($antes, [CambioDiscapacidad::CAMPO, 'updated_at']), Arr::except($person->getAttributes(), [CambioDiscapacidad::CAMPO, 'updated_at']));
+                if ($nuevo !== []) {
+                    Auditoria::registrar($request, 'persona.editar', 'usuarios', $person->id, $person->id, $previo, $nuevo);
+                }
                 if ($discapacidad) {
                     CambioDiscapacidad::auditar($person->id, $discapacidad[0], $discapacidad[1], $request->user(), $request);
                 }

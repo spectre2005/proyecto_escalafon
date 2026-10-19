@@ -7,6 +7,7 @@ use App\Models\AuditoriaEvento;
 use App\Models\Legajo;
 use App\Models\Usuario;
 use App\Support\AperturaLegajo;
+use App\Support\Auditoria;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -75,7 +76,15 @@ class AperturaLegajoController extends Controller
     public function store(Request $request, string $usuario): JsonResponse
     {
         abort_if($request->all() !== [], 422, 'La apertura no recibe datos: el número y la fecha los asigna el sistema.');
-        $legajo = AperturaLegajo::abrir($usuario);
+        // La apertura y su evento en una sola transacción (AperturaLegajo::abrir se anida en ella).
+        $legajo = DB::transaction(function () use ($usuario, $request): ?Legajo {
+            $legajo = AperturaLegajo::abrir($usuario);
+            if ($legajo) {
+                Auditoria::registrar($request, 'legajo.abrir', 'legajos', $legajo->id, $usuario, null, $legajo->getAttributes());
+            }
+
+            return $legajo;
+        });
         if (! $legajo) {
             return response()->json(['message' => 'La persona ya tiene un legajo activo.'], 409);
         }

@@ -126,13 +126,21 @@ class DocumentoLegajoController extends Controller
         if (! ArchivoPdf::esPdf($request->file('pdf'))) {
             throw ValidationException::withMessages(['pdf' => 'El archivo no es un PDF válido (se comprueba su contenido, no solo la extensión).']);
         }
+        // Con relación «servidor», el titular es la persona del legajo: un documento de otra persona no entra a su legajo.
+        if ($data['relacion_titular'] === 'servidor') {
+            $persona = Usuario::query()->findOrFail($usuario);
+            if (trim((string) $data['titular_documento']) !== (string) $persona->numero_doc_identidad) {
+                throw ValidationException::withMessages(['titular_documento' => 'El titular no coincide con la persona del legajo (documento '.$persona->numero_doc_identidad.'). Si el documento es de un familiar, indica su relación.']);
+            }
+        }
         if (! empty($data['enlace_id']) && ! FormulariosDatos::soportado($tipo->formulario_datos)) {
             throw ValidationException::withMessages(['enlace_id' => 'Este tipo de documento no tiene formulario de datos que enlazar.']);
         }
 
         $metadatos = collect($data)->except(['pdf', 'subsana_a_documento_id', 'enlace_id'])->map(fn ($valor) => is_string($valor) ? trim($valor) : $valor)->all();
         $documento = CargaDocumento::registrar($legajo, $tipo, $request->file('pdf'), $metadatos, $request->user()->getAuthIdentifier(), $request->ip(),
-            $data['subsana_a_documento_id'] ?? null, $data['enlace_id'] ?? null, foliosAutomaticos: $esDni);
+            $data['subsana_a_documento_id'] ?? null, $data['enlace_id'] ?? null, foliosAutomaticos: $esDni,
+            completar: fn (DocumentoUsuario $doc) => AuditoriaDocumento::registrar($doc, $request, 'documento.creado'));
 
         return response()->json(['data' => [
             ...$documento->only(['id', 'tipo_documento_id', 'seccion_legajo_id', 'estado', 'folio_inicio', 'folio_fin', 'num_resolucion', 'subsana_a_documento_id', 'vinculo_laboral_id', 'archivo_id']),
@@ -189,8 +197,14 @@ class DocumentoLegajoController extends Controller
         $registro = $this->documentoDe($request, $usuario, $documento);
         $recepcionado = DB::transaction(function () use ($registro, $request): bool {
             // Actualización condicionada: de dos recepciones simultáneas solo una se registra.
-            return DocumentoUsuario::query()->whereKey($registro->id)->whereNull('fecha_recepcion')
+            $hecho = DocumentoUsuario::query()->whereKey($registro->id)->whereNull('fecha_recepcion')
                 ->update(['fecha_recepcion' => today(), 'recepcionado_por' => $request->user()->getAuthIdentifier(), 'updated_at' => now()]) === 1;
+            if ($hecho) {
+                AuditoriaDocumento::registrar($registro, $request, 'documento.recepcionado', ['fecha_recepcion' => null, 'recepcionado_por' => null],
+                    ['fecha_recepcion' => today()->toDateString(), 'recepcionado_por' => $request->user()->getAuthIdentifier()]);
+            }
+
+            return $hecho;
         });
         if (! $recepcionado) {
             return response()->json(['message' => 'El documento ya tiene la recepción registrada.'], 409);

@@ -172,6 +172,13 @@ final class AplicacionDocumental
         if ($this->noAplica($tipo) !== null) {
             return null;
         }
+        // Tipo que solo corresponde a algunos tipos de vínculo, sin vínculo registrado o con uno Sin definir: se ofrece
+        // (no se oculta nada por régimen), pero avisando que falta saberlo.
+        $aplica = array_filter(PerfilDocumental::APLICA, fn (string $columna): bool => (bool) $tipo->{$columna});
+        if (count($aplica) < count(PerfilDocumental::APLICA) && ($this->regimenes === [] || array_diff($this->regimenes, array_keys(PerfilDocumental::APLICA)) !== [])) {
+            return $this->regimenes === [] ? 'Falta definir si corresponde: depende del tipo de vínculo y aún no hay un vínculo laboral registrado en 2.2.'
+                : 'Falta definir si corresponde: depende del tipo de vínculo y hay un vínculo con el tipo Sin definir en 2.2.';
+        }
         foreach (self::REQUIERE as $columna => [$bandera, , $pregunta]) {
             if ($tipo->{$columna} && $this->banderas[$bandera] === null) {
                 return "Falta definir si corresponde: «{$pregunta}» está sin responder en {$this->donde($bandera)}.";

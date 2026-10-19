@@ -11,7 +11,8 @@ use Symfony\Component\HttpFoundation\Response;
  * (API_HABILITADA=true). En producción, además, el contenedor no arranca si la configuración no pasa
  * produccion:verificar (HTTPS, sin depuración, cookies seguras, claves).
  *
- * Con «crud» (CRUD genérico por tabla): fuera de local y pruebas es de solo lectura. Su escritura salta las reglas de
+ * Con «crud» (CRUD genérico por tabla): fuera de las pruebas es de solo lectura, también en local (donde se trabaja con
+ * datos reales de la institución). Su escritura salta las reglas de
  * cada sección (anular en vez de borrar, auditoría, folios) y el frontend no la usa: todas sus escrituras pasan por
  * las rutas de /expedientes. Solo se abre con API_CRUD_GENERICO_ESCRITURA=true.
  */
@@ -21,7 +22,7 @@ class ApiHabilitada
     {
         $local = app()->environment(['local', 'testing']);
         abort_unless($local || config('app.api_habilitada'), 403, 'La API no está habilitada en este entorno.');
-        abort_if($alcance === 'crud' && ! $local && ! $request->isMethodSafe() && ! config('app.crud_generico_escritura'), 403,
+        abort_if($alcance === 'crud' && ! app()->environment('testing') && ! $request->isMethodSafe() && ! config('app.crud_generico_escritura'), 403,
             'En este entorno, el acceso genérico por tabla es de solo lectura. Usa las pantallas de cada sección.');
 
         return $next($request);

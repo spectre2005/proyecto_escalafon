@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditoriaEvento;
 use App\Models\Legajo;
 use App\Models\Ubigeo;
 use App\Models\Usuario;
@@ -185,8 +186,17 @@ class UsuariosApiTest extends TestCase
         $other = Usuario::factory()->create();
         $this->patchJson($uri, ['email_institucional' => strtoupper($other->email_institucional)])
             ->assertUnprocessable();
-        $this->deleteJson($uri)->assertNoContent();
-        $this->getJson($uri)->assertNotFound();
+        // Con cambios auditados (persona.editar) la persona se conserva: su historia la referencia.
+        $this->deleteJson($uri)->assertConflict();
+        $this->assertDatabaseHas('auditoria_eventos', ['accion' => 'persona.editar', 'usuario_titular_id' => $usuario->id]);
+        // Sin historia se puede borrar, y el borrado queda auditado con los datos que tenía.
+        $sinHistoria = Usuario::factory()->create();
+        $this->deleteJson('/api/v1/usuarios/'.$sinHistoria->id)->assertNoContent();
+        $this->getJson('/api/v1/usuarios/'.$sinHistoria->id)->assertNotFound();
+        $evento = AuditoriaEvento::query()->where('accion', 'persona.eliminar')->sole();
+        $this->assertSame([$sinHistoria->id, null], [$evento->entidad_id, $evento->usuario_titular_id]);
+        $this->assertSame($sinHistoria->numero_doc_identidad, json_decode($evento->datos_antes, true)['numero_doc_identidad']);
+        $this->assertArrayNotHasKey('password', json_decode($evento->datos_antes, true));
     }
 
     public function test_user_with_related_records_cannot_be_deleted(): void

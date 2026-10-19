@@ -9,6 +9,7 @@ use App\Http\Resources\UsuarioResource;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
 use App\Support\AperturaLegajo;
+use App\Support\Auditoria;
 use App\Support\CambioDiscapacidad;
 use App\Support\ConfiguracionFuncionalidades;
 use App\Support\RegimenesLaborales;
@@ -18,6 +19,7 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -76,7 +78,13 @@ class UsuarioController extends Controller
         }
         try {
             DB::transaction(function () use ($usuario, $data, $discapacidad, $request): void {
+                $antes = $usuario->getAttributes();
                 $usuario->update($data);
+                // La discapacidad tiene su propio evento (CambioDiscapacidad); aquí, el resto de lo que cambió.
+                [$previo, $nuevo] = Auditoria::diferencia(Arr::except($antes, [CambioDiscapacidad::CAMPO, 'updated_at']), Arr::except($usuario->getAttributes(), [CambioDiscapacidad::CAMPO, 'updated_at']));
+                if ($nuevo !== []) {
+                    Auditoria::registrar($request, 'persona.editar', 'usuarios', $usuario->id, $usuario->id, $previo, $nuevo);
+                }
                 if ($discapacidad) {
                     CambioDiscapacidad::auditar($usuario->id, $discapacidad[0], $discapacidad[1], $request->user(), $request);
                 }
@@ -100,11 +108,17 @@ class UsuarioController extends Controller
         return ['regimen_normativo_id' => $ley->id, 'regimen_laboral' => RegimenesLaborales::codigoRespaldo($ley)];
     }
 
-    public function destroy(string $record): JsonResponse
+    public function destroy(Request $request, string $record): JsonResponse
     {
         $usuario = Usuario::query()->findOrFail($record);
         try {
-            $usuario->delete();
+            // Solo se borra quien no tiene registros relacionados ni historia en la auditoría (sus eventos la referencian):
+            // quien ya tiene altas o cambios auditados se conserva. El borrado queda en la auditoría con los datos que
+            // tenía; sin usuario_titular_id, que ya no existiría (entidad_id guarda su id).
+            DB::transaction(function () use ($usuario, $request): void {
+                Auditoria::registrar($request, 'persona.eliminar', 'usuarios', $usuario->id, null, $usuario->getAttributes());
+                $usuario->delete();
+            });
         } catch (QueryException $exception) {
             if (! str_starts_with((string) $exception->getCode(), '23')) {
                 throw $exception;
@@ -147,7 +161,11 @@ class UsuarioController extends Controller
             // El tipo de personal y la ley del vínculo son los de la persona; el tipo de vínculo, el que se indicó.
             $vinculo = VinculoLaboral::query()->create([...$request->vinculo(), 'usuario_id' => $registro['id'], 'tipo_personal' => $registro['tipo_personal'],
                 'regimen_normativo_id' => $registro['regimen_normativo_id'], 'registrado_por' => $actor->getAuthIdentifier()]);
-            ($registro['tipo_personal'] === 'docente' ? $vinculo->perfilDocente() : $vinculo->perfilAdministrativo())->create($request->datosPuesto());
+            // Sin datos del puesto (todos opcionales en el administrativo) no se crea un perfil vacío: se registra después en 2.2.
+            $perfil = $request->datosPuesto() === [] ? null
+                : ($registro['tipo_personal'] === 'docente' ? $vinculo->perfilDocente() : $vinculo->perfilAdministrativo())->create($request->datosPuesto());
+            Auditoria::registrar($request, 'legajo.abrir', 'legajos', $legajo->id, $registro['id'], null, $legajo->getAttributes());
+            Auditoria::registrar($request, 'vinculo.registrar', 'vinculos_laborales', $vinculo->id, $registro['id'], null, [...$vinculo->getAttributes(), 'datos_puesto' => $perfil?->getAttributes()]);
 
             return [$legajo, $vinculo];
         });
@@ -218,6 +236,7 @@ class UsuarioController extends Controller
                     Usuario::query()->insert($chunk);
                 }
                 foreach ($records as $record) {
+                    Auditoria::registrar($request, 'persona.alta', 'usuarios', $record['id'], $record['id'], null, Arr::except($record, ['created_at', 'updated_at']));
                     CambioDiscapacidad::auditar($record['id'], null, $record['con_discapacidad'], $request->user(), $request);
                 }
             });

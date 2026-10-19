@@ -29,7 +29,8 @@ class StoreUsuarioConVinculoRequest extends StoreUsuariosRequest
             ...parent::rules(),
             'usuarios' => ['required', 'array', 'list', 'size:1'],
             'vinculo' => ['required', 'array'],
-            'datos_puesto' => ['required', 'array'],
+            // Puede venir vacío (los datos del puesto administrativo son todos opcionales); el docente exige su condición.
+            'datos_puesto' => ['present', 'array'],
         ];
     }
 
@@ -57,7 +58,7 @@ class StoreUsuarioConVinculoRequest extends StoreUsuariosRequest
             $validator->errors()->add("$clave.$campo", in_array($campo, ReglasVinculo::NO_EN_ALTA, true)
                 ? 'En el alta se toma de los datos de la persona (el primer vínculo es el vigente).' : 'Campo no permitido.');
         }
-        $parcial = Validacion::make($datos, $reglas);
+        $parcial = Validacion::make($datos, $reglas, [], ReglasVinculo::ATRIBUTOS);
         foreach ($parcial->errors()->messages() as $campo => $mensajes) {
             foreach ($mensajes as $mensaje) {
                 $validator->errors()->add("$clave.$campo", $mensaje);

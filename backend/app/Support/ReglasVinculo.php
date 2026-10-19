@@ -46,6 +46,12 @@ final class ReglasVinculo
         ],
     ];
 
+    /**
+     * Nombres de los campos en los mensajes: en el vínculo, regimen_laboral es el tipo de vínculo (no la ley, como en la
+     * importación de personal).
+     */
+    public const ATRIBUTOS = ['regimen_laboral' => 'tipo de vínculo', 'regimen_normativo_id' => 'ley (régimen normativo)'];
+
     /** En el alta, el tipo de personal y la ley del vínculo son los de la persona, y el primer vínculo es el vigente. */
     public const NO_EN_ALTA = ['tipo_personal', 'regimen_normativo_id', 'fecha_cese'];
 }

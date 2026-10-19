@@ -14,6 +14,7 @@ use App\Models\Usuario;
 use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
 use App\Support\AplicacionDocumental;
+use App\Support\Auditoria;
 use App\Support\Documentos\EstadoDocumento;
 use App\Support\Documentos\FormulariosDatos;
 use App\Support\Parametros;
@@ -27,6 +28,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -141,6 +143,10 @@ class Seccion02Controller extends Controller
     public function storeVinculo(Request $request, string $usuario): JsonResponse
     {
         $this->exigirLegajo($usuario);
+        // Sin tipo de personal o sin ley, el vínculo toma los de la persona (no se piden dos veces); si se envían, se
+        // validan igual contra el tipo (exigirLeyDelTipo).
+        $persona = Usuario::query()->findOrFail($usuario);
+        $request->mergeIfMissing(array_filter(['tipo_personal' => $persona->tipo_personal, 'regimen_normativo_id' => $persona->regimen_normativo_id]));
         $data = $this->validar($request, [...self::REGLAS_VINCULO, 'documento_id' => 'nullable|uuid']);
         $this->exigirLeyDelTipo($data);
         $documento = $this->documento($usuario, $data, 'vinculos_laborales');
@@ -152,6 +158,7 @@ class Seccion02Controller extends Controller
             if ($documento && DocumentoUsuario::query()->whereKey($documento->id)->whereNull('vinculo_laboral_id')->update(['vinculo_laboral_id' => $vinculo->id]) !== 1) {
                 throw ValidationException::withMessages(['documento_id' => 'El documento ya está enlazado a otro vínculo.']);
             }
+            Auditoria::registrar($request, 'vinculo.registrar', 'vinculos_laborales', $vinculo->id, $usuario, null, $vinculo->getAttributes());
 
             return $vinculo;
         }));
@@ -166,11 +173,13 @@ class Seccion02Controller extends Controller
         }
         $cambios = $this->validarCambios($request, $registro, self::REGLAS_VINCULO);
         $this->exigirLeyDelTipo($cambios, $registro);
-        DB::transaction(function () use ($registro, $cambios): void {
+        DB::transaction(function () use ($registro, $cambios, $request, $usuario): void {
             // Bloqueo del vínculo: los datos del puesto no se registran a la vez que se cambia su tipo de personal.
             $actual = VinculoLaboral::query()->whereKey($registro->id)->lockForUpdate()->firstOrFail();
             $this->exigirTipoSinDatosPuesto($actual, $cambios);
+            $antes = $actual->getAttributes();
             $actual->update($cambios);
+            $this->auditarCambio($request, 'vinculo.corregir', $actual, $usuario, $antes);
         });
 
         return new JsonResource($registro->refresh());
@@ -228,14 +237,19 @@ class Seccion02Controller extends Controller
         $docente = $registro->tipo_personal === 'docente';
         $data = $this->validar($request, self::REGLAS_PERFIL[$docente ? 'docente' : 'administrativo']);
         $perfiles = $docente ? $registro->perfilDocente() : $registro->perfilAdministrativo();
-        $perfil = $perfiles->orderBy('created_at')->orderBy('id')->first();
-        if ($perfil) {
-            $perfil->update($data);
 
-            return new JsonResource($perfil->refresh());
-        }
+        return DB::transaction(function () use ($perfiles, $data, $request, $usuario): JsonResource|JsonResponse {
+            $perfil = $perfiles->orderBy('created_at')->orderBy('id')->first();
+            if ($perfil) {
+                $antes = $perfil->getAttributes();
+                $perfil->update($data);
+                $this->auditarCambio($request, 'puesto.corregir', $perfil, $usuario, $antes);
 
-        return $this->creado($perfiles->create($data));
+                return new JsonResource($perfil->refresh());
+            }
+
+            return $this->creadoAuditado($request, 'puesto.registrar', $perfiles->create($data), $usuario);
+        });
     }
 
     public function storeAdenda(Request $request, string $usuario): JsonResponse
@@ -251,7 +265,8 @@ class Seccion02Controller extends Controller
         ]);
         $this->documento($usuario, $data, 'vinculo_adendas');
 
-        return $this->creado(VinculoAdenda::query()->create([...$data, 'registrado_por' => $request->user()->getAuthIdentifier()]));
+        return DB::transaction(fn (): JsonResponse => $this->creadoAuditado($request, 'adenda.registrar',
+            VinculoAdenda::query()->create([...$data, 'registrado_por' => $request->user()->getAuthIdentifier()]), $usuario));
     }
 
     public function storeInduccion(Request $request, string $usuario): JsonResponse
@@ -266,7 +281,8 @@ class Seccion02Controller extends Controller
         ]);
         $this->documento($usuario, $data, 'inducciones');
 
-        return $this->creado(Induccion::query()->create([...$data, 'usuario_id' => $usuario, 'registrado_por' => $request->user()->getAuthIdentifier()]));
+        return DB::transaction(fn (): JsonResponse => $this->creadoAuditado($request, 'induccion.registrar',
+            Induccion::query()->create([...$data, 'usuario_id' => $usuario, 'registrado_por' => $request->user()->getAuthIdentifier()]), $usuario));
     }
 
     public function storePeriodo(Request $request, string $usuario): JsonResponse
@@ -277,7 +293,8 @@ class Seccion02Controller extends Controller
         $this->exigirPeriodoPrueba($usuario);
         $this->documento($usuario, $data, 'periodos_prueba');
 
-        return $this->creado(PeriodoPrueba::query()->create([...$data, 'usuario_id' => $usuario, 'registrado_por' => $request->user()->getAuthIdentifier()]));
+        return DB::transaction(fn (): JsonResponse => $this->creadoAuditado($request, 'periodo_prueba.registrar',
+            PeriodoPrueba::query()->create([...$data, 'usuario_id' => $usuario, 'registrado_por' => $request->user()->getAuthIdentifier()]), $usuario));
     }
 
     /** Registrar el resultado de un período pendiente. Corregir fechas = anular y registrar de nuevo. */
@@ -298,7 +315,11 @@ class Seccion02Controller extends Controller
         }
         $data = Validator::make(['fecha_inicio' => $registro->fecha_inicio->format('Y-m-d'), ...$request->all()], $reglas,
             ['fecha_resultado.after_or_equal' => 'La fecha del resultado no puede ser anterior al inicio del período.'])->validate();
-        $registro->update($data);
+        DB::transaction(function () use ($registro, $data, $request, $usuario): void {
+            $antes = $registro->getAttributes();
+            $registro->update($data);
+            $this->auditarCambio($request, 'periodo_prueba.resultado', $registro, $usuario, $antes);
+        });
 
         return new JsonResource($registro->refresh());
     }
@@ -447,7 +468,7 @@ class Seccion02Controller extends Controller
             throw ValidationException::withMessages(array_fill_keys($desconocidos, 'Campo no permitido.'));
         }
 
-        return $request->validate($reglas, ['vinculo_laboral_id.exists' => 'Selecciona un vínculo laboral abierto (sin fecha de cese) de esta persona.']);
+        return $request->validate($reglas, ['vinculo_laboral_id.exists' => 'Selecciona un vínculo laboral abierto (sin fecha de cese) de esta persona.'], ReglasVinculo::ATRIBUTOS);
     }
 
     /** Corrección parcial: valida solo los campos enviados, comparando con los valores guardados. */
@@ -459,12 +480,29 @@ class Seccion02Controller extends Controller
         }
         $actual = $this->fila($registro, array_keys($reglas))['values'];
 
-        return Validator::make([...$actual, ...$request->all()], array_intersect_key($reglas, $request->all()))->validate();
+        return Validator::make([...$actual, ...$request->all()], array_intersect_key($reglas, $request->all()), [], ReglasVinculo::ATRIBUTOS)->validate();
     }
 
     private function creado(Model $registro): JsonResponse
     {
         return (new JsonResource($registro->refresh()))->response()->setStatusCode(201);
+    }
+
+    /** Alta de un registro de la 02 y su evento de auditoría (dentro de la transacción del llamador). */
+    private function creadoAuditado(Request $request, string $accion, Model $registro, string $usuario): JsonResponse
+    {
+        Auditoria::registrar($request, $accion, $registro->getTable(), $registro->getKey(), $usuario, null, $registro->getAttributes());
+
+        return $this->creado($registro);
+    }
+
+    /** Corrección de un registro de la 02: el evento guarda solo los campos que cambiaron. */
+    private function auditarCambio(Request $request, string $accion, Model $registro, string $usuario, array $antes): void
+    {
+        [$previo, $nuevo] = Auditoria::diferencia(Arr::except($antes, ['updated_at']), Arr::except($registro->getAttributes(), ['updated_at']));
+        if ($nuevo !== []) {
+            Auditoria::registrar($request, $accion, $registro->getTable(), $registro->getKey(), $usuario, $previo, $nuevo);
+        }
     }
 
     /** @return array{id: string, values: array<string, mixed>} */

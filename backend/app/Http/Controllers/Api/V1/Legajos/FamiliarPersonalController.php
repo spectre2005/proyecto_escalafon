@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\ResourceController;
 use App\Models\DocumentoUsuario;
 use App\Models\Familiar;
 use App\Models\Usuario;
+use App\Support\Auditoria;
 use App\Support\Catalogos;
 use App\Support\CondicionesRegistro;
 use App\Support\Documentos\FormulariosDatos;
@@ -14,6 +15,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -48,7 +51,14 @@ class FamiliarPersonalController extends ResourceController
         CondicionesRegistro::familiar($usuario, (bool) ($data['es_derechohabiente'] ?? false));
         $record = new Familiar([...collect($data)->except('documento_id')->all(), 'usuario_id' => $usuario, 'registrado_por' => $request->user()->getAuthIdentifier()]);
 
-        return (new JsonResource(FormulariosDatos::crearEnlazado('familiares', $usuario, $data['documento_id'] ?? null, $record)))->response()->setStatusCode(201);
+        $creado = DB::transaction(function () use ($usuario, $data, $record, $request): Model {
+            $creado = FormulariosDatos::crearEnlazado('familiares', $usuario, $data['documento_id'] ?? null, $record);
+            Auditoria::registrar($request, 'familiar.registrar', 'familiares', $creado->getKey(), $usuario, null, $creado->getAttributes());
+
+            return $creado;
+        });
+
+        return (new JsonResource($creado))->response()->setStatusCode(201);
     }
 
     public function updateForPerson(Request $request, string $usuario, string $familiar): JsonResource|JsonResponse
@@ -68,7 +78,16 @@ class FamiliarPersonalController extends ResourceController
             }
         }
 
-        return parent::update($request, $familiar);
+        return DB::transaction(function () use ($request, $familiar, $record, $usuario): JsonResource|JsonResponse {
+            $antes = $record->getAttributes();
+            $respuesta = parent::update($request, $familiar);
+            [$previo, $nuevo] = Auditoria::diferencia(Arr::except($antes, ['updated_at']), Arr::except($record->refresh()->getAttributes(), ['updated_at']));
+            if ($nuevo !== []) {
+                Auditoria::registrar($request, 'familiar.corregir', 'familiares', $record->getKey(), $usuario, $previo, $nuevo);
+            }
+
+            return $respuesta;
+        });
     }
 
     protected function validatedData(Request $request, bool $updating = false): array
