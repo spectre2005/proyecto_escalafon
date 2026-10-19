@@ -56,13 +56,10 @@ class InstitucionesPruebaSeeder extends Seeder
             return;
         }
 
-        $principal = Institucion::query()->create([
+        Institucion::query()->create([
             'nombre' => $nombre, 'slug' => $slug, 'estado' => Institucion::ACTIVA, 'base_datos' => $base,
             'almacenamiento' => 'instituciones/'.$slug, 'aprovisionada_en' => now(),
         ]);
-        if ($slug === 'uniq') {
-            $principal->forceFill(['modulos_sistema' => ['evaluaciones' => ['activa' => false, 'motivo' => 'UNIQ no utiliza la consulta general de evaluaciones.', 'por' => 'Configuración inicial', 'fecha' => now()->toIso8601String(), 'origen' => 'inicial']]])->save();
-        }
         // Su carpeta de archivos, como la crea el aprovisionamiento: el respaldo la exige.
         File::ensureDirectoryExists(storage_path('app/private/instituciones/'.$slug));
         if (! DB::table('institution_settings')->where('id', 1)->exists()) {

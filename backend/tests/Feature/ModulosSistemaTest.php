@@ -103,20 +103,22 @@ class ModulosSistemaTest extends TestCase
         $this->patchJson($url.'/evaluaciones', $this->cambio(true, false))->assertOk()->assertJsonPath('data.activa', true);
     }
 
-    public function test_the_initial_uniq_setting_is_data_and_can_be_changed_like_any_other_institution(): void
+    public function test_existing_institutions_start_with_every_module_active_and_each_one_can_change_it(): void
     {
         $migracion = require database_path('migrations/plataforma/2026_10_18_044507_add_modulos_sistema_to_instituciones_table.php');
         $migracion->down();
-        $uniq = $this->institucion(['slug' => 'uniq']);
-        $otra = $this->institucion(['slug' => 'otra']);
+        $uno = $this->institucion(['slug' => 'uno']);
+        $dos = $this->institucion(['slug' => 'dos']);
         $migracion->up();
-        $this->assertFalse(ModulosSistema::estados($uniq->refresh())[0]['activa']);
-        $this->assertTrue(ModulosSistema::estados($otra->refresh())[0]['activa']);
+        $this->assertTrue(ModulosSistema::estados($uno->refresh())[0]['activa']);
+        $this->assertTrue(ModulosSistema::estados($dos->refresh())[0]['activa']);
+        $this->assertNull($uno->modulos_sistema);
         $this->actuarComo();
-        app()->instance(Institucion::class, $uniq);
+        app()->instance(Institucion::class, $uno);
         try {
-            $this->patchJson('/api/v1/configuracion/modulos-sistema/evaluaciones', $this->cambio(true, false))->assertOk()->assertJsonPath('data.activa', true);
-            $this->getJson('/api/v1/funcionalidades')->assertOk()->assertJsonPath('data.modulos_sistema.evaluaciones', true);
+            $this->patchJson('/api/v1/configuracion/modulos-sistema/evaluaciones', $this->cambio())->assertOk()->assertJsonPath('data.activa', false);
+            $this->getJson('/api/v1/funcionalidades')->assertOk()->assertJsonPath('data.modulos_sistema.evaluaciones', false);
+            $this->assertTrue(ModulosSistema::estados($dos->refresh())[0]['activa']);
         } finally {
             app()->forgetInstance(Institucion::class);
         }
