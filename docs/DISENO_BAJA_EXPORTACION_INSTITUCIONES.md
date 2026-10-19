@@ -241,7 +241,8 @@ normalizar UNIQ.
    rechazo de activar o suspender un estado no reconocido, pruebas. Sin migraciones ni interfaz.
 1b. **Inventario y normalización del almacenamiento** — **HERRAMIENTA HECHA, SIN EJECUTAR SOBRE DATOS REALES**:
    `InventarioArchivos`, `NormalizacionAlmacenamiento` y `plataforma:normalizar-almacenamiento` (sección 10). La
-   normalización de UNIQ sigue pendiente de las decisiones de la sección 10.8.
+   normalización de UNIQ sigue pendiente de ejecutar el procedimiento de la sección 10.9; las decisiones 1, 2, 4 y 6
+   de la sección 10.8 ya están aprobadas.
 2. **Exportación por comando**: funciones comunes, `exportar.sh` (sin `-h`, inventario, manifiesto, `.parcial`),
    verificación estricta, tabla `exportaciones_institucion`, comandos. Pruebas en entorno aislado. Depende de 3, 7, 9.
 3. **Panel: solicitud y seguimiento**, sin descarga.
