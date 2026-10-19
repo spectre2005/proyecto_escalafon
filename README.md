@@ -1,4 +1,14 @@
-# Sistema de escalafón y legajos
+<p align="center">
+  <img src="frontend/public/favicon.svg" alt="Logo del sistema de escalafón y legajos" width="100" height="125" />
+</p>
+
+<h1 align="center">Sistema de escalafón y legajos</h1>
+
+---
+
+**Contenido:** [Propósito](#propósito) · [Instalación en Windows](#1-instalación-en-windows) · [Instalación en Linux](#2-instalación-en-linux) · [Configuración](#3-referencia-de-configuración) · [Cuentas de acceso](#4-direcciones-y-cuentas-de-acceso) · [Trabajo diario y actualizaciones](#5-trabajo-diario-y-actualizaciones) · [Estructura del proyecto](#6-estructura-del-proyecto) · [Arquitectura general](#7-arquitectura-general) · [Desarrollo y pruebas](#8-cómo-continuar-el-desarrollo) · [Problemas frecuentes](#9-problemas-frecuentes) · [Datos y respaldos](#10-datos-respaldos-y-límites-de-esta-instalación) · [Mantenimiento](#11-mantenimiento-e-incremento-actual)
+
+## Propósito
 
 Aplicación para gestionar expedientes del personal docente y administrativo: datos personales, trayectoria laboral, documentos organizados por las secciones del legajo y evaluaciones. Incluye acceso por roles, configuración institucional, registros de auditoría y un panel de plataforma para atender varias instituciones, cada una con su propia base de datos.
 
