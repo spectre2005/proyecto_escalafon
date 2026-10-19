@@ -41,7 +41,6 @@ export default function DashboardPage() {
   const conAcceso = users.filter(user => user.activo).length
   const conVinculo = users.filter(user => user.situacion === 'vinculo_vigente').length
   const withEmail = users.filter(user => user.email_institucional?.trim()).length
-  const withPhone = users.filter(user => user.telefono?.trim()).length
   const ready = !loading && !loadError
   const show = value => loading ? '…' : loadError ? '—' : value.toLocaleString('es')
   const percent = count => ready && users.length ? Math.round(count / users.length * 100) : 0
@@ -91,15 +90,6 @@ export default function DashboardPage() {
         <div className="mt-5 max-h-72 space-y-4 overflow-y-auto">{!ready ? <p className="text-sm text-slate-500">{loading ? 'Consultando registros…' : 'Datos no disponibles'}</p> : !regimes.length ? <p className="text-sm text-slate-500">Aún no hay personal registrado.</p> : regimes.map(([name, count]) => <div key={name}><div className="mb-2 flex justify-between gap-4 text-xs"><span className={name === SIN_DEFINIR ? 'text-amber-700' : 'text-slate-600'}>{name}</span><span className="shrink-0 font-semibold text-slate-700">{count} · {percent(count)}%</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100" aria-hidden="true"><div className="h-full rounded-full bg-violet-400" style={{ width: `${percent(count)}%` }} /></div></div>)}</div>
       </section>
       {administra && <BanderasSinResponder panel={panel} />}
-      <section className={`${panel} lg:col-span-2`} aria-busy={loading}>
-        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-sm font-semibold text-slate-800">Cobertura de contacto</h2><p className="mt-1 text-xs text-slate-500">Disponibilidad de información para contactar al personal</p></div><Link to="/personal" className="text-xs font-semibold text-teal-700 hover:underline">Consultar directorio →</Link></div>
-        <div className="mt-5 grid gap-4 sm:grid-cols-3">
-          {[{ label: 'Correo institucional', count: withEmail, to: '/personal?correo=con', detail: 'Personal con correo registrado' }, { label: 'Teléfono registrado', count: withPhone, detail: 'Personal con número de contacto' }, { label: 'Sin correo institucional', count: users.length - withEmail, to: '/personal?correo=sin', detail: 'Consultar registros sin correo' }].map(item => {
-            const Tag = item.to ? Link : 'div'
-            return <Tag key={item.label} {...(item.to ? { to: item.to } : {})} className={`rounded-xl bg-slate-50 p-5 ${item.to ? 'hover:bg-teal-50 focus-visible:outline-teal-600' : ''}`}><p className="text-xs font-medium text-slate-600">{item.label}</p><p className="mt-3 text-2xl font-semibold text-slate-800">{show(item.count)} <span className="text-sm font-normal text-slate-500">{ready ? `${percent(item.count)}%` : '—'}</span></p><p className="mt-2 text-[11px] text-slate-500">{item.detail}</p></Tag>
-          })}
-        </div>
-      </section>
     </div>
     {ready && !users.length && <p className="mt-6 rounded-xl border border-teal-100 bg-teal-50 p-4 text-sm text-teal-800">Aún no hay personal registrado. <Link to="/personal" className="font-semibold underline">Ir a registrar personal</Link></p>}
   </>
