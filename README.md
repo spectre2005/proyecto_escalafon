@@ -4,6 +4,14 @@ Aplicación para gestionar expedientes del personal docente y administrativo: da
 
 Esta guía es el punto de entrada para instalar el proyecto y continuar su desarrollo. Todos los comandos se ejecutan **desde la raíz del repositorio**, donde están `docker-compose.yml` e `iniciar.ps1`, salvo que se indique otra ubicación.
 
+## Elegir cómo instalar
+
+| Tu equipo | Ruta de instalación |
+| --- | --- |
+| Windows/macOS con Docker Desktop | Requisitos y primera instalación de las secciones 1 a 3. |
+| Linux sin Docker Desktop | Docker Engine y el plugin Compose; se usan los mismos comandos de las secciones 2 y 3. |
+| Equipo sin ningún Docker | Instalación nativa de la sección «Sin Docker»; necesitas instalar PHP, Composer, Node y PostgreSQL. |
+
 ## 1. Requisitos
 
 - Git.
@@ -13,7 +21,7 @@ Esta guía es el punto de entrada para instalar el proyecto y continuar su desar
 - En Windows, PowerShell para utilizar `iniciar.ps1`.
 - Un navegador que abra subdominios de `localhost` sin configuración (Chrome, Edge o Firefox): cada institución se abre en `{nombre}.localhost:5173`.
 
-PHP, Composer, Node y pnpm se ejecutan dentro de Docker; no hace falta instalarlos en tu computadora.
+En la instalación con Docker, PHP, Composer, Node y pnpm se ejecutan dentro de los contenedores; no hace falta instalarlos en tu computadora.
 
 | Componente | Versión del proyecto | Ubicación |
 | --- | --- | --- |
@@ -35,6 +43,22 @@ docker compose version
 docker info
 ```
 
+### Si no tienes Docker Desktop
+
+**Linux no necesita Docker Desktop.** Instala [Docker Engine para tu distribución](https://docs.docker.com/engine/install/) y el [plugin Docker Compose](https://docs.docker.com/compose/install/linux/). Usa `docker compose` (con espacio), como en esta guía. En Windows/macOS, Docker Desktop proporciona el motor y Compose; tener solo el comando `docker` no significa que el motor esté funcionando.
+
+En Linux con systemd, comprueba el servicio:
+
+```sh
+sudo systemctl status docker
+# Si está detenido:
+sudo systemctl start docker
+```
+
+Si `docker info` indica `permission denied` sobre `docker.sock`, revisa la [configuración oficial de permisos](https://docs.docker.com/engine/install/linux-postinstall/). El grupo `docker` concede privilegios equivalentes a root; usa esa opción solo en equipos donde corresponda. Tras cambiar grupos, cierra y vuelve a abrir la sesión. No cambies los permisos del socket a `777`.
+
+Si aparece `Cannot connect to the Docker daemon`, abre Docker Desktop y espera a que termine de iniciar, o inicia el servicio Docker Engine. Revisa `docker context ls` si tienes varios motores configurados. Continúa solo cuando `docker info` y `docker compose version` funcionen.
+
 ## 2. Descargar y configurar
 
 ```sh
@@ -47,15 +71,15 @@ Crea los archivos de configuración solo si todavía no existen. **No sobrescrib
 Linux/macOS:
 
 ```sh
-cp .env.example .env
-cp backend/.env.example backend/.env
+test -f .env || cp .env.example .env
+test -f backend/.env || cp backend/.env.example backend/.env
 ```
 
 PowerShell:
 
 ```powershell
-Copy-Item .env.example .env
-Copy-Item backend/.env.example backend/.env
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
+if (!(Test-Path backend/.env)) { Copy-Item backend/.env.example backend/.env }
 ```
 
 ### Los dos archivos `.env`
@@ -191,6 +215,63 @@ El frontend instala sus dependencias antes de iniciar Vite. Espera el mensaje `V
 | PostgreSQL desde tu computadora | `localhost:5433` |
 
 `http://localhost:5173` sin subdominio responde "No existe una institución activa en esta dirección": es lo esperado, porque cada institución tiene su propia dirección.
+
+### Sin Docker: instalación nativa
+
+Esta alternativa requiere administrar los servicios en tu equipo. El procedimiento está basado en la configuración del repositorio; consulta el alcance de las pruebas al final de la sección 7. No ejecutes `iniciar.ps1` en esta modalidad.
+
+1. Instala Git, **PHP 8.4**, Composer 2, **Node 22.13 o posterior dentro de la rama 22**, pnpm y **PostgreSQL 16**. Habilita en PHP las extensiones de Laravel y PHPUnit (`ctype`, `dom`, `fileinfo`, `filter`, `iconv`, `mbstring`, `openssl`, `pdo`, `session`, `tokenizer`, `xml`, `xmlwriter`), además de `pdo_pgsql`, `pgsql`, `zip`, `gd` y `bcmath`; para las pruebas también `pdo_sqlite`. Comprueba qué PHP usa la terminal con `php --ini` y `php -m`. Instala pnpm con `npm install -g pnpm`.
+2. Descarga el repositorio y copia **solo los archivos que falten**, como en la sección 2. El `.env` de la raíz solo lo utiliza Compose; la instalación nativa usa `backend/.env`.
+3. Inicia PostgreSQL. En una base local nueva, conéctate como administrador mediante `psql -U postgres -d postgres` (en Linux puede ser `sudo -u postgres psql`) y ejecuta:
+
+   ```sql
+   CREATE ROLE app WITH LOGIN PASSWORD 'secret' CREATEDB;
+   CREATE DATABASE escalafon OWNER app;
+   ```
+
+   Son credenciales locales de ejemplo. Si el usuario o la base ya existen, revisa su configuración en lugar de repetir estas sentencias. `CREATEDB` permite crear la base de plataforma y las instituciones demo; no se necesita `SUPERUSER`.
+
+4. En `backend/.env`, cambia la conexión a tu PostgreSQL local:
+
+   ```dotenv
+   DB_CONNECTION=pgsql
+   DB_HOST=127.0.0.1
+   DB_PORT=5432
+   DB_DATABASE=escalafon
+   DB_USERNAME=app
+   DB_PASSWORD=secret
+   PLATAFORMA_DB_DATABASE=escalafon_plataforma
+   ```
+
+   Si definiste `PLATAFORMA_DB_HOST`, `PLATAFORMA_DB_PORT`, `PLATAFORMA_DB_USERNAME` o `PLATAFORMA_DB_PASSWORD`, ajústalos también; si quedan comentados heredan `DB_*`. Conserva las variables de sesión, subdominios y cuentas demo de la plantilla. El puerto nativo suele ser **5432**, mientras que **5433** corresponde al puerto publicado por Compose.
+
+5. Desde `backend/`, instala y prepara Laravel en este orden:
+
+   ```sh
+   composer install --no-interaction --prefer-dist
+   composer check-platform-reqs
+   php artisan config:clear --no-interaction
+   # Solo en una instalación nueva con APP_KEY vacía:
+   php artisan key:generate --no-interaction
+   php artisan migrate --no-interaction
+   php artisan plataforma:migrar-instituciones --crear-base --no-interaction
+   php artisan db:seed --no-interaction
+   php artisan serve --host=127.0.0.1 --port=8000
+   ```
+
+   Mantén esa terminal abierta. No uses `composer run setup`: el frontend de este proyecto está en `frontend/`, separado de los assets del esqueleto Laravel.
+
+6. Para que Vite encuentre el backend nativo, en `frontend/vite.config.js` cambia **ambos** `target: 'http://nginx'` por `target: 'http://127.0.0.1:8000'`, en `/api` y `/sanctum`. Conserva `changeOrigin: false`: el subdominio identifica a la institución. Es un ajuste local; restáuralo a `http://nginx` antes de volver a ejecutar el frontend dentro de Docker.
+7. En otra terminal, desde `frontend/`:
+
+   ```sh
+   pnpm install --frozen-lockfile
+   pnpm dev --host 127.0.0.1 --port 5173 --strictPort
+   ```
+
+   Abre las mismas direcciones y cuentas de la tabla siguiente. No hace falta definir `VITE_API_URL`: el proxy mantiene la API en el mismo origen y permite las cookies de sesión.
+
+Para detener esta instalación, usa `Ctrl+C` en cada terminal. Para iniciarla otra vez basta con PostgreSQL activo, `php artisan serve` en `backend/` y `pnpm dev` en `frontend/`. Las pruebas nativas se ejecutan con `php artisan test --compact` en `backend/` y `pnpm test`, `pnpm lint`, `pnpm build` en `frontend/`.
 
 ### Cuentas e instituciones de demostración
 
@@ -405,7 +486,43 @@ PHPUnit está configurado para SQLite en memoria. Si aparece `could not find dri
 
 Antes de entregar, comprueba además el flujo modificado desde la interfaz con el rol correspondiente. Compilar el frontend no publica el sistema ni sustituye la revisión funcional.
 
+### Alcance de la verificación de esta guía
+
+Verificación realizada el **19 de octubre de 2026**, en Linux con Docker Engine, PHP 8.4.26 y Node 22.23.3:
+
+| Comprobación | Resultado |
+| --- | --- |
+| Configuración de Compose (`docker compose config --quiet`) | Correcta. |
+| Requisitos PHP (`composer check-platform-reqs`) | Cumplidos; PDO dispone de PostgreSQL y SQLite. |
+| Instalación sobre PostgreSQL 16 vacío y temporal | Migraciones y seeders correctos; se crearon las cuatro bases y las instituciones `uniq`, `uno` y `dos`, con sus cuentas demo. |
+| Backend (`php artisan test --compact`) | 792 pruebas aprobadas, 9062 aserciones. |
+| Frontend (`pnpm test`) | 141 pruebas aprobadas. |
+| Frontend (`pnpm lint` y `pnpm build`) | Correctos; Vite advierte de chunks mayores de 500 kB, sin impedir la compilación. |
+| HTTP de la instalación activa | Página HTML: 200; API institucional y de plataforma sin sesión: 401; CSRF de plataforma: 200; CSRF de Sanctum: 204, ambos con cookies. |
+
+La prueba sobre PostgreSQL vacío reutilizó el contenedor PHP y las dependencias instaladas, con conexión y almacenamiento temporal separados de la instalación de trabajo; no fue una instalación completa desde un clon limpio. El PostgreSQL temporal se retiró al terminar. Las comprobaciones HTTP enviaron el subdominio y el origen correspondientes; no sustituyen una prueba de inicio de sesión y carga de documentos desde el navegador. No se ejecutó Docker Desktop, el script PowerShell en Windows, una instalación nativa completa ni una reconstrucción de todas las imágenes desde cero. La alternativa nativa se documenta a partir de los manifiestos y la configuración revisados, sin presentarla como probada en esos sistemas.
+
+En la instalación existente se detectó pendiente `2026_10_19_164657_aceptar_documentos_anteriores_por_registro_directo`. Se conservó su estado para no modificar datos de trabajo: antes de actualizar, respalda los datos y aplica las migraciones institucionales y de plataforma de la sección 3. Esta migración regulariza documentos anteriores y registra su historial; conviene revisar ese cambio antes de aplicarlo a una base con datos.
+
 ## 8. Problemas frecuentes
+
+### Docker o Compose no están instalados
+
+- `docker: command not found` / «docker no se reconoce»: instala el motor y la CLI, o usa la instalación nativa. Reinicia la terminal después de instalar.
+- `docker: 'compose' is not a docker command`: falta el plugin Compose; revisa los enlaces de la sección 1.
+- Windows: si Docker Desktop informa que falta WSL2 o virtualización, completa sus requisitos y selecciona contenedores Linux antes de iniciar el proyecto.
+- Un error al descargar imágenes o paquetes puede ser de conexión, DNS o proxy. Revisa los logs y vuelve a ejecutar el paso fallido; no borres los volúmenes de PostgreSQL para resolver una descarga.
+
+### Fallos de la instalación nativa
+
+| Síntoma | Qué comprobar |
+| --- | --- |
+| `getaddrinfo for db failed` | Laravel sigue usando `DB_HOST=db`; usa `127.0.0.1` y limpia la configuración. |
+| `ENOTFOUND nginx` o error de proxy de Vite | Cambia los dos targets del proxy a `http://127.0.0.1:8000` y reinicia Vite. |
+| `could not find driver` | Habilita `pdo_pgsql` para la aplicación y `pdo_sqlite` para PHPUnit en el PHP de la terminal. |
+| `permission denied to create database` | El usuario local de PostgreSQL necesita `CREATEDB` para plataforma y aprovisionamiento. |
+| Composer rechaza una extensión o versión | Ejecuta `php -v`, `php --ini`, `php -m` y `composer check-platform-reqs`; no uses `--ignore-platform-reqs`. |
+| Vite rechaza la versión de Node | Usa Node 22.13+ de la rama 22; verifica `node -v` y reinstala con `pnpm install --frozen-lockfile`. |
 
 ### El puerto 5173 devuelve una página vacía o `NS_ERROR_NET_EMPTY_RESPONSE`
 
