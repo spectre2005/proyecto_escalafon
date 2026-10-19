@@ -32,9 +32,25 @@ class DocumentoRecepcionVisorTest extends TestCase
         return '/api/v1/expedientes/'.$documento->usuario_id.'/documentos/'.$documento->id.'/'.$accion;
     }
 
+    public function test_direct_acceptance_is_internal_and_never_approves_an_infected_or_missing_file(): void
+    {
+        $documento = $this->documentoSubido();
+        $documento->tipoDocumento->update(['acredita_perfil_puesto' => true]);
+        $this->assertSame('aceptado', $documento->estado);
+        $this->assertTrue(EstadoDocumento::aprobado($documento, $documento->tipoDocumento));
+        $this->assertFalse($documento->fiscalizado);
+        $this->assertNull($documento->fecha_recepcion);
+        $documento->archivo->update(['estado_antivirus' => 'infectado']);
+        $this->assertFalse(EstadoDocumento::aprobado($documento->fresh(), $documento->tipoDocumento));
+        $documento->update(['archivo_id' => null]);
+        $this->assertFalse(EstadoDocumento::aprobado($documento->fresh(), $documento->tipoDocumento));
+    }
+
     public function test_reception_records_who_and_when_and_is_required_for_approval(): void
     {
         $documento = $this->documentoSubido();
+        $this->documentoAnteriorPendiente($documento->id, 'cargado');
+        $documento->refresh();
         $this->assertFalse(EstadoDocumento::aprobado($documento, $documento->tipoDocumento));
         $persona = $this->personaDemo();
         $this->getJson('/api/v1/expedientes/'.$persona->id.'/seccion-02')->assertOk()
@@ -60,6 +76,8 @@ class DocumentoRecepcionVisorTest extends TestCase
     public function test_types_that_accredit_the_job_profile_also_need_audit_to_be_approved(): void
     {
         $documento = $this->documentoSubido();
+        $this->documentoAnteriorPendiente($documento->id, 'cargado');
+        $documento->refresh();
         $documento->tipoDocumento->acredita_perfil_puesto = true;
         $documento->update(['fecha_recepcion' => today(), 'recepcionado_por' => $documento->created_by]);
 

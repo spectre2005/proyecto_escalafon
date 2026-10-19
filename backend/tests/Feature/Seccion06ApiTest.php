@@ -83,18 +83,18 @@ class Seccion06ApiTest extends TestCase
 
     public function test_recognition_upload_links_resolution_time_pdf_history_and_audit_atomically(): void
     {
-        $id = $this->cargar()->assertCreated()->assertJsonPath('data.estado', 'pendiente')->json('data.id');
+        $id = $this->cargar()->assertCreated()->assertJsonPath('data.estado', 'aceptado')->json('data.id');
         $doc = DocumentoUsuario::query()->with('archivo')->findOrFail($id);
         $this->assertDatabaseHas('tiempo_servicios_reconocidos', ['documento_id' => $id, 'usuario_id' => $this->persona->id, 'registrado_por' => $this->autor->id,
             'numero_resolucion' => 'RES-001', 'anios' => 12, 'meses' => 3, 'dias' => 15]);
         $tiempo = TiempoServicioReconocido::query()->where('documento_id', $id)->firstOrFail();
         $this->assertSame($doc->fecha_emision->toDateString(), $tiempo->fecha_resolucion->toDateString());
-        $this->assertDatabaseHas('historial_estados_documento', ['documento_usuario_id' => $id, 'estado_nuevo' => 'pendiente']);
+        $this->assertDatabaseHas('historial_estados_documento', ['documento_usuario_id' => $id, 'estado_nuevo' => 'aceptado']);
         $this->assertDatabaseHas('auditoria_eventos', ['entidad_id' => $id, 'accion' => 'compensaciones.documento.creado']);
         $this->assertSame('pendiente', $doc->archivo->estado_antivirus);
         $this->assertSame(hash('sha256', Storage::disk(config('legajo.disco_documentos'))->get($doc->archivo->storage_path)), $doc->archivo->hash_sha256);
         $this->assertSame($this->persona->numero_doc_identidad, $doc->titular_documento);
-        $this->getJson($this->url())->assertOk()->assertJsonPath('data.items.0.documentos.0.tiempos_reconocidos.0.anios', 12)->assertJsonPath('data.resumen.pendientes', 1);
+        $this->getJson($this->url())->assertOk()->assertJsonPath('data.items.0.documentos.0.tiempos_reconocidos.0.anios', 12)->assertJsonPath('data.resumen.pendientes', 0)->assertJsonPath('data.resumen.aceptados', 1);
     }
 
     public function test_economic_and_non_economic_compensations_use_existing_table(): void
@@ -103,7 +103,7 @@ class Seccion06ApiTest extends TestCase
             $id = $this->cargar('COMP_PAGO_COMPENSACION', ['tipo' => $tipo])->assertCreated()->json('data.id');
             $this->assertDatabaseHas('compensaciones_beneficios', ['usuario_id' => $this->persona->id, 'documento_id' => $id, 'tipo' => $tipo, 'registrado_por' => $this->autor->id]);
         }
-        $this->getJson($this->url())->assertOk()->assertJsonPath('data.items.1.cantidad', 2)->assertJsonPath('data.resumen.pendientes', 2);
+        $this->getJson($this->url())->assertOk()->assertJsonPath('data.items.1.cantidad', 2)->assertJsonPath('data.resumen.pendientes', 0)->assertJsonPath('data.resumen.aceptados', 2);
         $this->assertDatabaseCount('tiempo_servicios_reconocidos', 0);
     }
 
@@ -111,6 +111,7 @@ class Seccion06ApiTest extends TestCase
     {
         foreach (['COMP_RETENCION_TRIBUTARIA', 'COMP_LIQUIDACION_BENEFICIOS', 'COMP_OTROS'] as $codigo) {
             $id = $this->cargar($codigo)->assertCreated()->json('data.id');
+            $this->documentoAnteriorPendiente($id);
             $this->actuarComo();
             $this->aceptar($id)->assertOk();
         }
@@ -174,6 +175,7 @@ class Seccion06ApiTest extends TestCase
     {
         TipoDocumento::query()->where('codigo', 'COMP_RECONOCIMIENTO_TIEMPO')->update(['requiere_fedateo' => true]);
         $id = $this->cargar()->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $this->aceptar($id)->assertForbidden();
         $this->actuarComo();
         $this->aceptar($id, ['recepcion_confirmada' => false])->assertUnprocessable()->assertJsonValidationErrors('recepcion_confirmada');
@@ -187,6 +189,7 @@ class Seccion06ApiTest extends TestCase
     public function test_observation_requires_reason_deadline_and_new_subsanation_before_acceptance(): void
     {
         $id = $this->cargar()->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $this->actuarComo();
         $url = $this->url('/documentos/'.$id.'/estado');
         $base = ['estado' => 'observado', 'estado_anterior' => 'pendiente'];
@@ -196,6 +199,7 @@ class Seccion06ApiTest extends TestCase
         $this->postJson($url, [...$base, 'descripcion' => 'Revisar tiempo', 'plazo_subsanacion' => '2026-10-30'])->assertOk();
         $this->aceptar($id, ['estado_anterior' => 'observado'])->assertConflict();
         $nuevo = $this->cargar(cambios: ['subsana_a_documento_id' => $id, 'dias' => 16])->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($nuevo);
         $this->actuarComo();
         $this->aceptar($nuevo)->assertOk();
         $this->assertDatabaseHas('observaciones_documento', ['documento_id' => $id, 'estado' => 'subsanada', 'documento_subsanacion_id' => $nuevo]);
@@ -207,6 +211,7 @@ class Seccion06ApiTest extends TestCase
     public function test_annulment_preserves_evidence_does_not_reuse_folios_and_excludes_current_counts(): void
     {
         $id = $this->cargar()->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $this->actuarComo();
         $url = $this->url('/documentos/'.$id.'/estado');
         $this->postJson($url, ['estado' => 'anulado', 'estado_anterior' => 'pendiente'])->assertUnprocessable();
@@ -236,6 +241,7 @@ class Seccion06ApiTest extends TestCase
     public function test_read_review_and_file_queries_do_not_cross_legajos_or_persons(): void
     {
         $id = $this->cargar()->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $otra = Usuario::factory()->create();
         Legajo::factory()->create(['usuario_id' => $otra->id]);
         $this->getJson('/api/v1/expedientes/'.$otra->id.'/seccion-06')->assertOk()->assertJsonPath('data.resumen.registrados', 0);
@@ -248,6 +254,7 @@ class Seccion06ApiTest extends TestCase
     public function test_missing_permission_blocks_read_upload_and_review_on_server(): void
     {
         $id = $this->cargar()->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $this->actuarComo(codigo: 'sin_permisos');
         $this->getJson($this->url())->assertForbidden();
         $this->cargar()->assertForbidden();
@@ -258,6 +265,7 @@ class Seccion06ApiTest extends TestCase
     {
         $this->actuarComo(codigo: 'asistente_legajo');
         $id = $this->cargar()->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $this->getJson($this->url())->assertOk();
         $this->aceptar($id)->assertForbidden();
     }
@@ -281,6 +289,7 @@ class Seccion06ApiTest extends TestCase
     public function test_infected_and_missing_files_block_acceptance_and_infected_visor(): void
     {
         $id = $this->cargar()->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $doc = DocumentoUsuario::query()->findOrFail($id);
         $doc->archivo->update(['estado_antivirus' => 'infectado']);
         $this->actuarComo();
@@ -293,10 +302,12 @@ class Seccion06ApiTest extends TestCase
     public function test_acceptance_rejects_inconsistent_structured_recognition_and_compensation(): void
     {
         $id = $this->cargar()->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         TiempoServicioReconocido::query()->where('documento_id', $id)->update(['numero_resolucion' => 'Otra resolución']);
         $this->actuarComo();
         $this->aceptar($id)->assertUnprocessable();
         $id = $this->cargar('COMP_PAGO_COMPENSACION')->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         CompensacionBeneficio::query()->where('documento_id', $id)->update(['usuario_id' => Usuario::factory()->create()->id]);
         $this->actuarComo();
         $this->aceptar($id)->assertUnprocessable();
@@ -368,6 +379,7 @@ class Seccion06ApiTest extends TestCase
     public function test_sensitive_generic_admin_reads_do_not_bypass_sensitive_permission(): void
     {
         $id = $this->cargar('COMP_PAGO_COMPENSACION')->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $doc = DocumentoUsuario::query()->findOrFail($id);
         $registro = CompensacionBeneficio::query()->where('documento_id', $id)->firstOrFail();
         Rol::query()->where('codigo', 'ADMIN')->update(['ve_datos_sensibles' => false]);
@@ -384,7 +396,9 @@ class Seccion06ApiTest extends TestCase
     public function test_generic_person_lists_exclude_annulled_and_subsaned_section06_data(): void
     {
         $id = $this->cargar()->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $nuevo = $this->cargar(cambios: ['subsana_a_documento_id' => $id])->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($nuevo);
         $base = '/api/v1/expedientes/'.$this->persona->id.'/tiempo-servicios-reconocidos';
         $this->getJson($base)->assertOk()->assertJsonPath('total', 1)->assertJsonPath('data.0.id', TiempoServicioReconocido::query()->where('documento_id', $nuevo)->firstOrFail()->id);
         $this->actuarComo();
@@ -395,6 +409,7 @@ class Seccion06ApiTest extends TestCase
     public function test_missing_physical_file_and_closed_legajo_block_review(): void
     {
         $id = $this->cargar()->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $doc = DocumentoUsuario::query()->findOrFail($id);
         Storage::disk(config('legajo.disco_documentos'))->delete($doc->archivo->storage_path);
         $this->actuarComo();
@@ -408,6 +423,7 @@ class Seccion06ApiTest extends TestCase
     public function test_stale_state_and_failed_audit_do_not_partially_accept_document(): void
     {
         $id = $this->cargar()->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $this->actuarComo();
         $this->aceptar($id, ['estado_anterior' => 'observado'])->assertConflict();
         Event::listen('eloquent.creating: '.AuditoriaEvento::class, fn () => throw new \RuntimeException('Auditoría no disponible'));
@@ -429,6 +445,7 @@ class Seccion06ApiTest extends TestCase
         $this->getJson($this->url())->assertOk()->assertJsonPath('data.fecha_actual', '2026-10-05');
         $this->cargar(cambios: ['fecha_emision' => '2026-10-06'])->assertUnprocessable();
         $id = $this->cargar()->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $this->assertSame('2026-10-05', DocumentoUsuario::query()->findOrFail($id)->fecha_incorporacion->toDateString());
         $this->actuarComo();
         $this->aceptar($id)->assertOk();

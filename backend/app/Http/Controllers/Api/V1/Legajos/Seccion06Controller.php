@@ -105,7 +105,7 @@ class Seccion06Controller extends Controller
         $meta += ['fecha_incorporacion' => $hoy, 'titular_nombre' => mb_substr(trim($persona->nombres.' '.$persona->apellido_paterno.' '.$persona->apellido_materno), 0, 200),
             'titular_documento' => $persona->numero_doc_identidad, 'relacion_titular' => 'servidor'];
         $doc = CargaDocumento::registrar($legajo, $tipo, $request->file('pdf'), $meta, $request->user()->getAuthIdentifier(), $request->ip(), $datos['subsana_a_documento_id'] ?? null,
-            estadoInicial: 'pendiente', completar: function (DocumentoUsuario $doc) use ($datos, $tipo, $request): void {
+            completar: function (DocumentoUsuario $doc) use ($datos, $tipo, $request): void {
                 abort_unless($doc->legajo->estado_legajo === 'activo', 409, 'El legajo se cerró durante la carga. Actualiza la ficha.');
                 if ($tipo->codigo === 'COMP_RECONOCIMIENTO_TIEMPO') {
                     TiempoServicioReconocido::query()->create([

@@ -79,28 +79,26 @@ class Seccion04ApiTest extends TestCase
         $this->getJson($this->url())->assertOk()->assertJsonPath('data.resumen.exigidos', 1);
     }
 
-    public function test_upload_is_pending_atomic_and_links_period_hash_history_and_audit(): void
+    public function test_upload_is_accepted_directly_and_links_period_hash_history_and_audit(): void
     {
-        $id = $this->cargar()->assertCreated()->assertJsonPath('data.estado', 'pendiente')->json('data.id');
+        $id = $this->cargar()->assertCreated()->assertJsonPath('data.estado', 'aceptado')->json('data.id');
         $doc = DocumentoUsuario::query()->with('archivo')->findOrFail($id);
         $this->assertDatabaseHas('experiencia_laboral', ['documento_id' => $id, 'registrado_por' => $this->autor->id, 'sector' => 'publico', 'tipo_vinculo' => 'planilla']);
-        $this->assertDatabaseHas('historial_estados_documento', ['documento_usuario_id' => $id, 'estado_nuevo' => 'pendiente']);
+        $this->assertDatabaseHas('historial_estados_documento', ['documento_usuario_id' => $id, 'estado_nuevo' => 'aceptado']);
         $this->assertDatabaseHas('auditoria_eventos', ['entidad_id' => $id, 'accion' => 'experiencia.documento.creado']);
         $this->assertSame('pendiente', $doc->archivo->estado_antivirus);
         $this->assertSame(hash('sha256', Storage::disk(config('legajo.disco_documentos'))->get($doc->archivo->storage_path)), $doc->archivo->hash_sha256);
-        $this->getJson($this->url())->assertOk()->assertJsonPath('data.numero_folios', 1)->assertJsonPath('data.folio_sugerido', 2)->assertJsonPath('data.tiempo.total.dias_totales', 0);
+        $this->getJson($this->url())->assertOk()->assertJsonPath('data.numero_folios', 1)->assertJsonPath('data.folio_sugerido', 2)->assertJsonPath('data.tiempo.total.dias_totales', 10);
         ParametroSistema::query()->where('clave', 'exp_incluir_pendientes')->update(['valor' => '1']);
         $this->getJson($this->url())->assertOk()->assertJsonPath('data.tiempo.total.dias_totales', 10);
     }
 
-    public function test_multiple_certificates_count_each_required_document_and_prioritize_pending_state(): void
+    public function test_multiple_certificates_are_accepted_and_count_each_required_document(): void
     {
-        $id = $this->cargar()->assertCreated()->json('data.id');
-        $this->actuarComo();
-        $this->aceptar($id)->assertOk();
+        $this->cargar()->assertCreated();
         $this->cargar(cambios: ['fecha_inicio' => '2024-02-01', 'fecha_fin' => '2024-02-10'])->assertCreated();
-        $this->getJson($this->url())->assertOk()->assertJsonPath('data.items.0.estado', 'pendiente')
-            ->assertJsonPath('data.resumen.exigidos', 2)->assertJsonPath('data.resumen.aceptados', 1)->assertJsonPath('data.resumen.porcentaje', 50);
+        $this->getJson($this->url())->assertOk()->assertJsonPath('data.items.0.estado', 'aceptado')
+            ->assertJsonPath('data.resumen.exigidos', 2)->assertJsonPath('data.resumen.aceptados', 2)->assertJsonPath('data.resumen.porcentaje', 100);
     }
 
     public function test_resolution_and_other_documents_do_not_create_artificial_periods(): void
@@ -140,6 +138,7 @@ class Seccion04ApiTest extends TestCase
     public function test_review_cannot_be_own_and_requires_reception_fedateo_and_correct_owner(): void
     {
         $id = $this->cargar()->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $this->aceptar($id)->assertForbidden();
         $this->actuarComo();
         $this->postJson($this->url('/documentos/'.$id.'/estado'), ['estado' => 'aceptado', 'estado_anterior' => 'pendiente', 'recepcion_confirmada' => true, 'fedateado' => false])->assertUnprocessable()->assertJsonValidationErrors('fedateado');
@@ -154,10 +153,12 @@ class Seccion04ApiTest extends TestCase
     public function test_observation_subsanation_and_annulment_keep_evidence_and_update_time(): void
     {
         $id = $this->cargar()->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $this->actuarComo();
         $this->postJson($this->url('/documentos/'.$id.'/estado'), ['estado' => 'observado', 'estado_anterior' => 'pendiente', 'descripcion' => 'Revisar fechas del servicio', 'plazo_subsanacion' => '2026-10-30'])->assertOk();
         $this->getJson($this->url())->assertOk()->assertJsonPath('data.items.0.estado', 'observado');
         $nuevo = $this->cargar(cambios: ['subsana_a_documento_id' => $id, 'fecha_fin' => '2024-01-15'])->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($nuevo);
         $this->actuarComo();
         $this->aceptar($nuevo)->assertOk();
         $this->assertDatabaseHas('observaciones_documento', ['documento_id' => $id, 'estado' => 'subsanada', 'documento_subsanacion_id' => $nuevo]);
@@ -172,6 +173,7 @@ class Seccion04ApiTest extends TestCase
     public function test_open_periods_blocked_files_and_unclassified_periods_are_handled(): void
     {
         $id = $this->cargar(cambios: ['fecha_fin' => null])->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $this->assertDatabaseHas('experiencia_laboral', ['documento_id' => $id, 'fecha_fin' => null]);
         $this->actuarComo();
         $periodo = ExperienciaLaboral::query()->where('documento_id', $id)->firstOrFail();
@@ -199,6 +201,7 @@ class Seccion04ApiTest extends TestCase
     {
         $this->actuarComo(codigo: 'asistente_legajo');
         $id = $this->cargar()->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $this->getJson($this->url())->assertOk();
         $this->aceptar($id)->assertForbidden();
     }

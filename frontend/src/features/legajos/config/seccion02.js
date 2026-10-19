@@ -38,9 +38,9 @@ export const resultadosPeriodo = { pendiente: 'Pendiente', aprobado: 'Aprobado',
 
 // Estado visible del documento (backend: App\Support\Documentos\EstadoDocumento::visible). "Recepcionado" es un
 // documento cargado con recepción registrada. Los estados de fiscalización quedan preparados, sin acciones todavía.
-export const estadosDocumento = { pendiente: 'Pendiente', cargado: 'Cargado', recepcionado: 'Recepcionado', en_fiscalizacion: 'En fiscalización', verificado: 'Verificado', observado: 'Observado', falso: 'Falso' }
+export const estadosDocumento = { aceptado: 'Aceptado', pendiente: 'Pendiente', cargado: 'Cargado', recepcionado: 'Recepcionado', en_fiscalizacion: 'En fiscalización', verificado: 'Verificado', observado: 'Observado', falso: 'Falso' }
 
-export const coloresEstadoDocumento = { pendiente: 'bg-slate-100 text-slate-600', cargado: 'bg-slate-100 text-slate-600', recepcionado: 'bg-teal-50 text-teal-800' }
+export const coloresEstadoDocumento = { aceptado: 'bg-teal-50 text-teal-800', pendiente: 'bg-slate-100 text-slate-600', cargado: 'bg-slate-100 text-slate-600', recepcionado: 'bg-teal-50 text-teal-800' }
 
 // Estado de cada subsección en el resumen (backend: App\Support\ResumenSeccion02).
 export const estadosSubseccion = {

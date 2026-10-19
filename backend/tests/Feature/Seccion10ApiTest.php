@@ -228,6 +228,7 @@ class Seccion10ApiTest extends TestCase
     public function test_pending_process_can_be_completed_without_overwriting_history_or_allocating_empty_folios(): void
     {
         $id = $this->cargar(cambios: ['pdf' => null, 'numero_folios' => null])->assertCreated()->assertJsonPath('data.estado', 'pendiente')->json('data.id');
+        $this->documentoAnteriorPendiente($id, 'cargado');
         $this->assertDatabaseCount('archivos_documento', 0);
         $this->assertSame('pendiente', $this->item('S10_REGLAMENTO')['estado']);
         $this->getJson($this->url())->assertJsonPath('data.folios.total', 0)->assertJsonPath('data.folio_sugerido', 1);
@@ -235,6 +236,7 @@ class Seccion10ApiTest extends TestCase
             ->assertOk()->assertJsonPath('data.estado', 'pendiente');
         $this->assertDatabaseCount('documentos_usuario', 1);
         $nuevo = $this->cargar(cambios: ['subsana_a_documento_id' => $id])->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($nuevo, 'cargado');
         $this->assertSame('si', $this->item('S10_REGLAMENTO')['estado']);
         $this->getJson($this->url())->assertJsonPath('data.folios.total', 2)->assertJsonPath('data.folio_sugerido', 3);
         $this->assertDatabaseHas('documentos_usuario', ['id' => $id, 'archivo_id' => null, 'estado' => 'pendiente']);
@@ -257,15 +259,17 @@ class Seccion10ApiTest extends TestCase
 
     public function test_real_pdf_cannot_be_marked_pending_by_a_client_flag(): void
     {
-        $this->cargar(cambios: ['pendiente' => 1])->assertCreated()->assertJsonPath('data.estado', 'cargado');
+        $this->cargar(cambios: ['pendiente' => 1])->assertCreated()->assertJsonPath('data.estado', 'aceptado');
         $this->assertSame('si', $this->item('S10_REGLAMENTO')['estado']);
     }
 
     public function test_folios_are_summed_by_subsection_excluding_annulled_and_superseded_documents(): void
     {
         $viejo = $this->cargar(cambios: ['numero_folios' => 3])->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($viejo, 'cargado');
         $this->cargar(cambios: ['subsana_a_documento_id' => $viejo, 'numero_folios' => 5])->assertCreated();
         $bienestar = $this->cargar('S10_SEGURO', ['numero_folios' => 4])->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($bienestar, 'cargado');
         $this->getJson($this->url())->assertJsonPath('data.folios.sst', 5)->assertJsonPath('data.folios.bienestar', 4)
             ->assertJsonPath('data.folios.total', 9)->assertJsonPath('data.folio_sugerido', 13);
         $this->postJson($this->url('/documentos/'.$bienestar.'/anular'), ['estado_anterior' => 'cargado', 'motivo' => 'Registro duplicado.'])->assertOk();
@@ -306,6 +310,7 @@ class Seccion10ApiTest extends TestCase
     public function test_metadata_edits_are_audited_and_validated_evidence_requires_a_new_version(): void
     {
         $id = $this->cargar('S10_DESCANSO_MEDICO')->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id, 'cargado');
         $this->patchJson($this->url('/documentos/'.$id), $this->datos('S10_DESCANSO_MEDICO', ['estado_anterior' => 'cargado', 'fecha_fin' => '2026-10-04']))->assertOk();
         $this->assertSame(4, $this->item('S10_DESCANSO_MEDICO')['documentos'][0]['numero_dias']);
         $evento = AuditoriaEvento::query()->where('entidad_id', $id)->where('accion', 'ACTUALIZAR_DOCUMENTO')->firstOrFail();
@@ -316,6 +321,7 @@ class Seccion10ApiTest extends TestCase
         $this->postJson($this->url('/documentos/'.$id.'/estado'), ['estado' => 'aceptado', 'estado_anterior' => 'cargado', 'recepcion_confirmada' => true])->assertOk();
         $this->patchJson($this->url('/documentos/'.$id), $this->datos('S10_DESCANSO_MEDICO', ['estado_anterior' => 'aceptado', 'nombre' => 'Alterado']))->assertConflict();
         $nuevo = $this->cargar('S10_DESCANSO_MEDICO', ['subsana_a_documento_id' => $id])->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($nuevo, 'cargado');
         $this->assertDatabaseHas('documentos_usuario', ['id' => $id, 'estado' => 'aceptado', 'nombre' => 'Evidencia administrativa']);
         $this->assertDatabaseHas('auditoria_eventos', ['entidad_id' => $nuevo, 'accion' => 'REEMPLAZAR_ARCHIVO']);
     }
@@ -323,11 +329,13 @@ class Seccion10ApiTest extends TestCase
     public function test_observed_document_is_pending_and_absent_or_infected_files_cannot_be_accepted(): void
     {
         $id = $this->cargar()->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id, 'cargado');
         $this->actuarComo();
         $this->postJson($this->url('/documentos/'.$id.'/estado'), ['estado' => 'observado', 'estado_anterior' => 'cargado',
             'descripcion' => 'La constancia está incompleta.', 'plazo_subsanacion' => '2026-10-10'])->assertOk();
         $this->assertSame('pendiente', $this->item('S10_REGLAMENTO')['estado']);
         $otro = $this->cargar('S10_SIMULACROS')->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($otro, 'cargado');
         $doc = DocumentoUsuario::query()->with('archivo')->findOrFail($otro);
         $doc->archivo->update(['estado_antivirus' => 'infectado']);
         $this->actuarComo();
@@ -341,6 +349,7 @@ class Seccion10ApiTest extends TestCase
     public function test_view_download_and_history_validate_person_and_record_actor_time_and_action(): void
     {
         $id = $this->cargar()->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id, 'cargado');
         $archivo = '/api/v1/expedientes/'.$this->persona->id.'/documentos/'.$id.'/archivo';
         $this->get($archivo.'?accion=descargar')->assertOk()->assertHeader('Content-Type', 'application/pdf')->assertHeader('X-Content-Type-Options', 'nosniff');
         $this->assertDatabaseHas('bitacora_accesos_legajo', ['documento_id' => $id, 'usuario_id' => $this->autor->id, 'accion' => 'descargar']);

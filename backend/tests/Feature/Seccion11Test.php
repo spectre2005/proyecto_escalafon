@@ -210,7 +210,7 @@ class Seccion11Test extends TestCase
 
         // Recepción y visor comunes, con bitácora.
         $base = '/api/v1/expedientes/'.$this->persona->id.'/documentos/'.$doc['id'];
-        $this->postJson($base.'/recepcionar')->assertOk()->assertJsonPath('data.estado_visible', 'recepcionado');
+        $this->postJson($base.'/recepcionar')->assertOk()->assertJsonPath('data.estado_visible', 'aceptado');
         $this->get($base.'/archivo')->assertOk()->assertHeader('Content-Type', 'application/pdf');
         $this->assertDatabaseHas('bitacora_accesos_legajo', ['documento_id' => $doc['id'], 'accion' => 'ver']);
     }

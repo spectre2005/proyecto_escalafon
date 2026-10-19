@@ -16,7 +16,7 @@ final class ResumenSeccion02
      * TODO pendiente de confirmar con el cliente: qué estados cuentan como "cargado". Observado se
      * incluye porque el documento está en el legajo; falso no.
      */
-    public const ESTADOS_CARGADO = ['cargado', 'en_fiscalizacion', 'verificado', 'observado'];
+    public const ESTADOS_CARGADO = ['aceptado', 'cargado', 'en_fiscalizacion', 'verificado', 'observado'];
 
     /**
      * @param  list<array{exigido: ?bool, cargado: bool, recepcionado: bool, verificado: bool}>  $tipos

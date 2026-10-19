@@ -183,7 +183,7 @@ class Seccion05ApiTest extends TestCase
         $response = $this->getJson($this->url($persona))->assertOk();
         $tipos = collect($response->json('data.tipos'))->keyBy('codigo');
         $this->assertSame(1, $tipos['S05_A_APRUEBA_LICENCIA_PERMISO']['documentos']);
-        $this->assertSame('cargado', $tipos['S05_D_ROL_VACACIONES']['lista'][0]['estado_visible']);
+        $this->assertSame('aceptado', $tipos['S05_D_ROL_VACACIONES']['lista'][0]['estado_visible']);
         $this->assertSame(['permiso', ...Seccion05::LICENCIAS_OTORGADAS], $tipos['S05_A_APRUEBA_LICENCIA_PERMISO']['registros']);
 
         // Visualización: el PDF se sirve con sesión y queda en la bitácora.

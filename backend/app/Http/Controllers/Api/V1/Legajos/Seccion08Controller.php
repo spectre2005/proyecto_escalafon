@@ -174,7 +174,7 @@ class Seccion08Controller extends Controller
         $meta += ['fecha_incorporacion' => $hoy, 'titular_nombre' => mb_substr(trim($persona->nombres.' '.$persona->apellido_paterno.' '.$persona->apellido_materno), 0, 200),
             'titular_documento' => $persona->numero_doc_identidad, 'relacion_titular' => 'servidor'];
         $documento = CargaDocumento::registrar($legajo, $tipo, $request->file('pdf'), $meta, $request->user()->getAuthIdentifier(), $request->ip(),
-            $datos['subsana_a_documento_id'] ?? null, estadoInicial: 'pendiente', completar: function (DocumentoUsuario $doc) use ($datos, $codigo, $request): void {
+            $datos['subsana_a_documento_id'] ?? null, completar: function (DocumentoUsuario $doc) use ($datos, $codigo, $request): void {
                 if (in_array($codigo, self::TIPOS_RECONOCIMIENTO, true)) {
                     Reconocimiento::query()->create(['usuario_id' => $doc->usuario_id, 'documento_id' => $doc->id, 'tipo' => $datos['tipo'],
                         'fecha' => $doc->fecha_emision, 'motivo' => trim($datos['motivo']), 'otorgado_por' => $doc->emisor,

@@ -119,7 +119,7 @@ class Seccion03Controller extends Controller
             'titular_documento' => $persona->numero_doc_identidad, 'relacion_titular' => 'servidor',
         ];
         $documento = CargaDocumento::registrar($legajo, $tipo, $request->file('pdf'), $metadatos, $request->user()->getAuthIdentifier(), $request->ip(),
-            $datos['subsana_a_documento_id'] ?? null, estadoInicial: 'pendiente', completar: function (DocumentoUsuario $doc) use ($datos, $letra, $request): void {
+            $datos['subsana_a_documento_id'] ?? null, completar: function (DocumentoUsuario $doc) use ($datos, $letra, $request): void {
                 abort_unless($doc->legajo->estado_legajo === 'activo', 409, 'El legajo se cerró durante la carga. Actualiza la ficha.');
                 $this->registrarDatos($doc, $datos, $letra);
                 AuditoriaDocumento::registrar($doc, $request, 'formacion.documento.creado');

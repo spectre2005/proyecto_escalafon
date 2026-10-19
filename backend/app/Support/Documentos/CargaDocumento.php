@@ -6,6 +6,7 @@ use App\Models\ArchivoDocumento;
 use App\Models\DocumentoUsuario;
 use App\Models\HistorialEstadoDocumento;
 use App\Models\Legajo;
+use App\Models\ObservacionDocumento;
 use App\Models\TipoDocumento;
 use App\Support\AplicacionDocumental;
 use Closure;
@@ -20,12 +21,12 @@ use Throwable;
 /**
  * Carga de un documento al legajo, común a todas las secciones (Directiva, arts. 2.3 y 5.3: nada se
  * elimina ni se reemplaza). Guarda el PDF en el disco privado con nombre aleatorio y, en una transacción:
- * reserva los folios, crea archivos_documento, documentos_usuario (estado "cargado") y el primer registro
+ * reserva los folios, crea archivos_documento, documentos_usuario (estado "aceptado") y el primer registro
  * de historial_estados_documento, y enlaza el registro de datos si se indicó.
  */
 final class CargaDocumento
 {
-    public const ESTADO_INICIAL = 'cargado';
+    public const ESTADO_INICIAL = 'aceptado';
 
     /**
      * @param  array<string, mixed>  $metadatos  ya validados (folios, fechas, emisor, titular, etc.)
@@ -79,8 +80,15 @@ final class CargaDocumento
                 HistorialEstadoDocumento::query()->create([
                     'documento_usuario_id' => $documento->id, 'estado_anterior' => null, 'estado_nuevo' => $estadoInicial,
                     'cambiado_por' => $autor, 'ip_origen' => $ip, 'fecha_cambio' => now(),
-                    'motivo' => $subsanaA ? 'Carga que subsana al documento '.$subsanaA.'.' : 'Carga inicial.',
+                    'motivo' => $subsanaA ? 'Carga que subsana al documento '.$subsanaA.'.' : 'Carga inicial aceptada directamente por el responsable del registro.',
                 ]);
+                if ($estadoInicial === 'aceptado' && $subsanaA !== null) {
+                    ObservacionDocumento::query()->where('documento_id', $subsanaA)->where('estado', 'abierta')->update([
+                        'estado' => 'subsanada', 'documento_subsanacion_id' => $documento->id,
+                        'fecha_subsanacion' => now(), 'verificada_por' => $autor,
+                        'comentario_cierre' => 'Subsanación aceptada directamente por el responsable del registro.',
+                    ]);
+                }
                 if ($enlaceId !== null) {
                     FormulariosDatos::enlazarRegistro($documento, (string) $tipo->formulario_datos, $enlaceId);
                 }

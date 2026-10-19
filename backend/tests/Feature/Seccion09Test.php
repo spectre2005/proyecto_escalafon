@@ -168,7 +168,7 @@ class Seccion09Test extends TestCase
         // Relación trabajador → legajo → sección 09 → tipo; folios correlativos de la sección.
         $documentos = DocumentoUsuario::query()->where('usuario_id', $this->persona->id)->get();
         $this->assertCount(4, $documentos);
-        $this->assertTrue($documentos->every(fn (DocumentoUsuario $d): bool => $d->seccion_legajo_id === 9 && $d->legajo_id === Legajo::query()->value('id') && $d->estado === 'cargado'));
+        $this->assertTrue($documentos->every(fn (DocumentoUsuario $d): bool => $d->seccion_legajo_id === 9 && $d->legajo_id === Legajo::query()->value('id') && $d->estado === 'aceptado'));
         $this->assertSame([1, 2, 3, 4], $documentos->pluck('folio_inicio')->sort()->values()->all());
         $this->getJson($this->url())->assertOk()->assertJsonPath('data.tipos.0.documentos', 1)->assertJsonPath('data.tipos.1.documentos', 1);
     }
@@ -179,10 +179,10 @@ class Seccion09Test extends TestCase
         $doc = $this->subirTipo('S09_C_AFILIACION_SINDICATO')->assertCreated()->json('data');
         $base = '/api/v1/expedientes/'.$this->persona->id.'/documentos/'.$doc['id'];
 
-        $this->postJson($base.'/recepcionar')->assertOk()->assertJsonPath('data.estado_visible', 'recepcionado');
+        $this->postJson($base.'/recepcionar')->assertOk()->assertJsonPath('data.estado_visible', 'aceptado');
         $this->get($base.'/archivo')->assertOk()->assertHeader('Content-Type', 'application/pdf');
         $this->assertDatabaseHas('bitacora_accesos_legajo', ['documento_id' => $doc['id'], 'accion' => 'ver']);
-        $this->getJson($this->url())->assertOk()->assertJsonPath('data.tipos.2.estado', 'recepcionado');
+        $this->getJson($this->url())->assertOk()->assertJsonPath('data.tipos.2.estado', 'aceptado');
     }
 
     public function test_sensitive_access_is_required_for_every_action(): void

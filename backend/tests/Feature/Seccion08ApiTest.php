@@ -76,11 +76,11 @@ class Seccion08ApiTest extends TestCase
         $this->cargar('SAN_RESOLUCION_SANCION')->assertForbidden();
     }
 
-    public function test_recognition_upload_is_fictitious_and_stores_pending_document_with_audit_and_folio(): void
+    public function test_recognition_upload_is_accepted_directly_with_audit_and_folio(): void
     {
-        $id = $this->cargar('REC_CARTA_FELICITACION')->assertCreated()->assertJsonPath('data.estado', 'pendiente')->json('data.id');
+        $id = $this->cargar('REC_CARTA_FELICITACION')->assertCreated()->assertJsonPath('data.estado', 'aceptado')->json('data.id');
         $this->assertDatabaseHas('reconocimientos', ['documento_id' => $id, 'usuario_id' => $this->persona->id, 'tipo' => 'carta']);
-        $this->assertDatabaseHas('historial_estados_documento', ['documento_usuario_id' => $id, 'estado_nuevo' => 'pendiente']);
+        $this->assertDatabaseHas('historial_estados_documento', ['documento_usuario_id' => $id, 'estado_nuevo' => 'aceptado']);
         $this->assertDatabaseHas('auditoria_eventos', ['entidad_id' => $id, 'accion' => 'seccion08.documento.creado']);
         $this->getJson($this->url())->assertOk()->assertJsonPath('data.grupos.reconocimientos.0.documentos.0.id', $id)
             ->assertJsonPath('data.numero_folios', 1)->assertJsonPath('data.resumen.reconocimientos', 1);
@@ -132,6 +132,7 @@ class Seccion08ApiTest extends TestCase
         $this->cargar('SAN_RESOLUCION_SANCION', ['tipo' => 'SUSPENSION', 'dias_suspension' => null])->assertUnprocessable()->assertJsonValidationErrors('dias_suspension');
         $this->cargar('SAN_RESOLUCION_SANCION', ['tipo' => 'DESTITUCION', 'dias_suspension' => 3])->assertUnprocessable()->assertJsonValidationErrors('dias_suspension');
         $id = $this->cargar('SAN_RESOLUCION_SANCION')->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $this->postJson($this->url('/documentos/'.$id.'/estado'), ['estado' => 'aceptado', 'estado_anterior' => 'pendiente', 'recepcion_confirmada' => true])->assertForbidden();
         $revisor = $this->actuarComo();
         $this->assertNotSame($this->autor->id, $revisor->id);
@@ -160,6 +161,7 @@ class Seccion08ApiTest extends TestCase
     public function test_admin_can_annul_a_section08_document_with_a_reason_and_keeps_its_history(): void
     {
         $id = $this->cargar('REC_CARTA_FELICITACION')->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $revisor = $this->actuarComo(null, 'ADMIN');
         $this->postJson($this->url('/documentos/'.$id.'/estado'), [
             'estado' => 'anulado', 'estado_anterior' => 'pendiente', 'descripcion' => 'Duplicado ficticio para prueba',

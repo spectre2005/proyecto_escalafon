@@ -110,17 +110,40 @@ class Seccion03ApiTest extends TestCase
         $this->getJson($this->url())->assertOk()->assertJsonPath('data.resumen.exigidos', 2);
     }
 
-    public function test_upload_creates_pending_evidence_academic_data_history_hash_and_audit(): void
+    public function test_upload_accepts_evidence_directly_with_academic_data_history_hash_and_audit(): void
     {
-        $id = $this->cargar(cambios: ['numero_registro' => 'REG-001'])->assertCreated()->assertJsonPath('data.estado', 'pendiente')->json('data.id');
+        $id = $this->cargar(cambios: ['numero_registro' => 'REG-001'])->assertCreated()->assertJsonPath('data.estado', 'aceptado')->json('data.id');
         $doc = DocumentoUsuario::query()->with('archivo')->findOrFail($id);
         $this->assertDatabaseHas('formacion_academica', ['documento_id' => $id, 'numero_registro_sunedu' => 'REG-001', 'registrado_por' => $this->autor->id]);
-        $this->assertDatabaseHas('historial_estados_documento', ['documento_usuario_id' => $id, 'estado_nuevo' => 'pendiente', 'cambiado_por' => $this->autor->id]);
+        $this->assertDatabaseHas('historial_estados_documento', ['documento_usuario_id' => $id, 'estado_nuevo' => 'aceptado', 'cambiado_por' => $this->autor->id]);
         $this->assertDatabaseHas('auditoria_eventos', ['entidad_id' => $id, 'accion' => 'formacion.documento.creado', 'actor_usuario_id' => $this->autor->id]);
         $this->assertSame('pendiente', $doc->archivo->estado_antivirus);
         $this->assertSame(hash('sha256', Storage::disk(config('legajo.disco_documentos'))->get($doc->archivo->storage_path)), $doc->archivo->hash_sha256);
         $this->assertDatabaseHas('legajo_secciones', ['legajo_id' => $this->legajo->id, 'seccion_legajo_id' => 3, 'ultimo_folio' => 1]);
         $this->assertSame($this->persona->numero_doc_identidad, $doc->titular_documento);
+    }
+
+    public function test_direct_acceptance_does_not_certify_external_verification_and_closes_corrected_observations(): void
+    {
+        $id = $this->cargar()->assertCreated()->assertJsonPath('data.estado', 'aceptado')->json('data.id');
+        $doc = DocumentoUsuario::query()->findOrFail($id);
+        $this->assertFalse($doc->fiscalizado);
+        $this->assertFalse($doc->fedateado);
+        $this->assertNull($doc->fecha_recepcion);
+        $this->assertDatabaseHas('historial_estados_documento', [
+            'documento_usuario_id' => $id, 'estado_anterior' => null, 'estado_nuevo' => 'aceptado', 'cambiado_por' => $this->autor->id,
+        ]);
+        $this->actuarComo();
+        $this->revisar($id, ['estado' => 'observado', 'estado_anterior' => 'aceptado', 'descripcion' => 'Copia ilegible',
+            'plazo_subsanacion' => today()->addDays(10)->toDateString()])->assertOk();
+        $this->actuarComo($this->autor);
+        $nuevo = $this->cargar(cambios: ['subsana_a_documento_id' => $id])->assertCreated()
+            ->assertJsonPath('data.estado', 'aceptado')->json('data.id');
+        $this->assertDatabaseHas('observaciones_documento', [
+            'documento_id' => $id, 'estado' => 'subsanada', 'documento_subsanacion_id' => $nuevo, 'verificada_por' => $this->autor->id,
+        ]);
+        $this->assertDatabaseHas('documentos_usuario', ['id' => $id, 'estado' => 'observado']);
+        $this->getJson($this->url())->assertOk()->assertJsonPath('data.resumen.aceptados', 1)->assertJsonPath('data.resumen.pendientes', 0);
     }
 
     public function test_correlative_folios_reject_gaps_overlaps_and_reversed_ranges_without_orphans(): void
@@ -169,6 +192,7 @@ class Seccion03ApiTest extends TestCase
     public function test_author_and_assistant_cannot_review_but_another_admin_can(): void
     {
         $id = $this->cargar()->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $this->revisar($id)->assertForbidden();
         $this->actuarComo(codigo: 'asistente_legajo');
         $this->revisar($id)->assertForbidden();
@@ -185,6 +209,7 @@ class Seccion03ApiTest extends TestCase
     public function test_acceptance_requires_receipt_fedateo_and_rejects_infected_file(): void
     {
         $id = $this->cargar()->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $this->actuarComo();
         $this->revisar($id, ['recepcion_confirmada' => false])->assertUnprocessable();
         $this->revisar($id, ['fedateado' => false])->assertUnprocessable();
@@ -197,12 +222,14 @@ class Seccion03ApiTest extends TestCase
     public function test_observation_subsanation_and_acceptance_preserve_original_evidence(): void
     {
         $id = $this->cargar()->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $this->actuarComo();
         $this->revisar($id, ['estado' => 'observado', 'descripcion' => 'Copia ilegible', 'plazo_subsanacion' => today()->addDays(10)->toDateString()])->assertOk();
         $this->assertDatabaseHas('observaciones_documento', ['documento_id' => $id, 'estado' => 'abierta', 'descripcion' => 'Copia ilegible']);
         $this->revisar($id, ['estado_anterior' => 'observado'])->assertConflict();
         $this->actuarComo($this->autor);
         $nuevo = $this->cargar(cambios: ['subsana_a_documento_id' => $id])->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($nuevo);
         $items = collect($this->getJson($this->url())->assertOk()->json('data.items'))->keyBy('letra');
         $this->assertSame('pendiente', $items['b']['estado']);
         $this->assertCount(2, $items['b']['documentos']);
@@ -224,6 +251,7 @@ class Seccion03ApiTest extends TestCase
     public function test_stale_review_is_rejected_without_duplicate_history(): void
     {
         $id = $this->cargar()->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $this->actuarComo();
         $this->revisar($id)->assertOk();
         $this->revisar($id, ['estado' => 'observado', 'descripcion' => 'Revisar', 'plazo_subsanacion' => today()->toDateString()])->assertConflict();
@@ -247,6 +275,7 @@ class Seccion03ApiTest extends TestCase
     public function test_review_cannot_target_another_person_and_non_privileged_roles_cannot_upload(): void
     {
         $id = $this->cargar()->assertCreated()->json('data.id');
+        $this->documentoAnteriorPendiente($id);
         $otra = Usuario::factory()->create();
         Legajo::factory()->create(['usuario_id' => $otra->id]);
         $this->actuarComo();

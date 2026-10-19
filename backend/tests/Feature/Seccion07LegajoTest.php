@@ -218,7 +218,7 @@ class Seccion07LegajoTest extends TestCase
 
         $this->assertNull($doc['formulario_datos']);
         $this->assertFalse($doc['enlazado']);
-        $this->assertDatabaseHas('documentos_usuario', ['id' => $doc['id'], 'seccion_legajo_id' => 7, 'estado' => 'cargado']);
+        $this->assertDatabaseHas('documentos_usuario', ['id' => $doc['id'], 'seccion_legajo_id' => 7, 'estado' => 'aceptado']);
         $this->assertSame($antes, EvaluacionDesempeno::query()->count());
         $this->postJson($this->url($carrera, '/evaluaciones-desempeno'), $this->evaluacion(['documento_id' => $doc['id']]))->assertUnprocessable()->assertJsonValidationErrors('documento_id');
         $evaluacion = EvaluacionDesempeno::query()->where('usuario_id', $carrera->id)->firstOrFail();

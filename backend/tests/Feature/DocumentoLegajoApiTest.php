@@ -38,7 +38,7 @@ class DocumentoLegajoApiTest extends TestCase
         $tipo = $this->tipo02('a');
 
         $id = $this->subir($persona, $this->metadatos($tipo, 1, 2))->assertCreated()
-            ->assertJsonPath('data.estado', 'cargado')->assertJsonPath('data.formulario_datos', null)->json('data.id');
+            ->assertJsonPath('data.estado', 'aceptado')->assertJsonPath('data.formulario_datos', null)->json('data.id');
 
         $documento = DocumentoUsuario::query()->findOrFail($id);
         $archivo = ArchivoDocumento::query()->findOrFail($documento->archivo_id);
@@ -52,7 +52,7 @@ class DocumentoLegajoApiTest extends TestCase
         $this->assertStringNotContainsString('documento.pdf', $archivo->storage_path);
         $this->assertSame(hash('sha256', $disco->get($archivo->storage_path)), $archivo->hash_sha256);
         $this->assertNull(config('filesystems.disks.documentos.url'));
-        $this->assertDatabaseHas('historial_estados_documento', ['documento_usuario_id' => $id, 'estado_anterior' => null, 'estado_nuevo' => 'cargado', 'cambiado_por' => $autor->id]);
+        $this->assertDatabaseHas('historial_estados_documento', ['documento_usuario_id' => $id, 'estado_anterior' => null, 'estado_nuevo' => 'aceptado', 'cambiado_por' => $autor->id]);
     }
 
     public function test_rejects_files_that_are_not_pdf_even_with_pdf_extension(): void

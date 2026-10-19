@@ -160,10 +160,10 @@ class Seccion02CierreTest extends TestCase
         $respuesta = $this->getJson($url)->assertOk()
             ->assertJsonPath('data.resumen.exigidos_cargados', 2)->assertJsonPath('data.resumen.exigidos_recepcionados', 1)
             ->assertJsonPath('data.subsecciones.0.exigidos_cargados', 2)->assertJsonPath('data.subsecciones.0.exigidos_recepcionados', 1)
-            ->assertJsonPath('data.subsecciones.0.tipos.0.estado', 'recepcionado')->assertJsonPath('data.subsecciones.0.tipos.1.estado', 'cargado');
+            ->assertJsonPath('data.subsecciones.0.tipos.0.estado', 'aceptado')->assertJsonPath('data.subsecciones.0.tipos.1.estado', 'aceptado');
         // Cada documento en su tipo, con metadatos, folios, estado y archivo (sin rutas de almacenamiento).
         $documento = $respuesta->json('data.subsecciones.0.tipos.1.lista.0');
-        $this->assertSame([2, 3, 'cargado', 'Oficina de Recursos Humanos', 2], [$documento['values']['folio_inicio'], $documento['values']['folio_fin'],
+        $this->assertSame([2, 3, 'aceptado', 'Oficina de Recursos Humanos', 2], [$documento['values']['folio_inicio'], $documento['values']['folio_fin'],
             $documento['estado_visible'], $documento['values']['emisor'], $documento['archivo']['num_paginas']]);
         $this->assertArrayNotHasKey('storage_path', $documento['archivo']);
         // Los datos enlazados viajan con el documento (vínculo de c a f).

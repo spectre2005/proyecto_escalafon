@@ -2,6 +2,8 @@
 
 namespace Tests\Concerns;
 
+use App\Models\DocumentoUsuario;
+use App\Models\HistorialEstadoDocumento;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use Database\Seeders\Seccion02CatalogoSeeder;
@@ -13,6 +15,18 @@ use Illuminate\Testing\TestResponse;
 /** Ayudas para subir documentos de la sección 02 con las personas de Seccion02DemoSeeder y un disco falso. */
 trait SubeDocumentos
 {
+    /** Prepara un documento del flujo anterior para probar revisiones de registros históricos. */
+    protected function documentoAnteriorPendiente(string $id, string $estado = 'pendiente'): void
+    {
+        $documento = DocumentoUsuario::query()->findOrFail($id);
+        if ($documento->archivo_id === null) {
+            return;
+        }
+        $this->assertSame('aceptado', $documento->estado);
+        $documento->update(['estado' => $estado]);
+        HistorialEstadoDocumento::query()->where('documento_usuario_id', $id)->whereNull('estado_anterior')->update(['estado_nuevo' => $estado]);
+    }
+
     protected function prepararDemo(): void
     {
         Storage::fake((string) config('legajo.disco_documentos'));
