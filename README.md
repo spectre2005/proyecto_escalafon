@@ -10,7 +10,7 @@
 
 ## Propósito
 
-Aplicación para gestionar expedientes del personal docente y administrativo: datos personales, trayectoria laboral, documentos organizados por las secciones del legajo y evaluaciones. Incluye acceso por roles, configuración institucional, registros de auditoría y un panel de plataforma para atender varias instituciones, cada una con su propia base de datos.
+Aplicación para gestionar expedientes del personal docente y administrativo: datos personales, trayectoria laboral, documentos organizados por las secciones del legajo. Incluye acceso por roles, configuración institucional, registros de auditoría y un panel de plataforma para atender varias instituciones, cada una con su propia base de datos.
 
 Esta guía explica la **instalación local para desarrollo**, primero en Windows y después en Linux. Sigue únicamente la sección de tu sistema operativo, en el orden indicado. Al terminar, consulta las cuentas de acceso de la sección 4.
 
