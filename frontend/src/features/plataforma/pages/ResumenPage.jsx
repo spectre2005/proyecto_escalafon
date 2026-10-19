@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { mensajeError, resumen, sesionTerminada } from '../api'
 import { Aviso } from '../componentes'
 import { COPIA_EXTERNA, ESTADOS, etiquetaAccion, etiquetaEstado, fecha, fechaCorta, importe, textoVencimiento } from '../estado'
+import { boton } from '../estilos'
 import { useSesionPlataforma } from '../sesion'
 
 /** Ingresos registrados (pagos no anulados, por fecha de registro en hora de Lima). Los pagos sin monto no se suman. */
@@ -78,7 +79,7 @@ export default function ResumenPage() {
     <h1 id="titulo-resumen" className="text-2xl font-bold text-slate-900">Resumen</h1>
     <p className="mt-1 text-sm text-slate-500">Instituciones registradas en la plataforma por estado, ingresos, tiempo de uso pagado, respaldos y últimas operaciones.</p>
     {estado.loading && <p role="status" className="mt-6 text-sm text-slate-500">Cargando…</p>}
-    {estado.error && <div className="mt-6 space-y-3"><Aviso>{estado.error}</Aviso><button type="button" onClick={() => { setEstado({ loading: true }); setIntento(intento + 1) }} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm">Reintentar</button></div>}
+    {estado.error && <div className="mt-6 space-y-3"><Aviso>{estado.error}</Aviso><button type="button" onClick={() => { setEstado({ loading: true }); setIntento(intento + 1) }} className={boton('secundario')}>Reintentar</button></div>}
     {data && <>
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Link to="/plataforma/instituciones" className="rounded-2xl border border-slate-200 bg-white p-5 hover:border-slate-300"><p className="text-xs text-slate-500">Total</p><p className="mt-2 text-3xl font-bold text-slate-900">{data.total}</p></Link>

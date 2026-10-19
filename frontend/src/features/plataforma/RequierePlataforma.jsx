@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import Icon from '../../components/ui/Icon'
 import { cerrarSesion, sesionActual } from './api'
@@ -59,7 +59,9 @@ export default function RequierePlataforma() {
       setSaliendo(false)
     }
   }
-  const terminada = () => navigate('/plataforma/login', { replace: true })
+  // Estable: las páginas la ponen en las dependencias de sus cargas, y este layout se vuelve a dibujar con cada cambio de
+  // URL (p. ej. ?seccion= del detalle de una institución): una función nueva repetiría todas las peticiones.
+  const terminada = useCallback(() => navigate('/plataforma/login', { replace: true }), [navigate])
   if (sesion.loading) return <p role="status" className="p-8 text-sm text-slate-600">Comprobando sesión…</p>
   if (sesion.error) return <div role="alert" className="p-8 text-sm">No se pudo comprobar la sesión. <button type="button" className="underline" onClick={() => { setSesion({ loading: true }); setIntento(intento + 1) }}>Reintentar</button></div>
   if (!sesion.data) return <Navigate to="/plataforma/login" replace />

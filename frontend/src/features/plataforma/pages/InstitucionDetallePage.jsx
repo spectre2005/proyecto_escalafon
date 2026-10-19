@@ -1,51 +1,29 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import ModulosSistemaConfig from '../../settings/ModulosSistemaConfig'
-import { consultarModulosInstitucion, guardarModuloInstitucion, activarInstitucion, aprovisionarInstitucion, editarInstitucion, mensajeError, sesionTerminada, suspenderInstitucion, verInstitucion } from '../api'
-import { Aviso, Credenciales, EstadoInstitucion, EstadoRespaldo, EstadoServicio, SinAprovisionar } from '../componentes'
+import { consultarModulosInstitucion, guardarModuloInstitucion, activarInstitucion, aprovisionarInstitucion, mensajeError, sesionTerminada, suspenderInstitucion, verInstitucion } from '../api'
+import { Aviso, Credenciales, EstadoInstitucion, EstadoServicio, SinAprovisionar } from '../componentes'
 import AdministradoresInstitucion from './AdministradoresInstitucion'
+import AuditoriaInstitucion from './AuditoriaInstitucion'
 import ServicioInstitucion from './ServicioInstitucion'
 import ClienteContrato from './ClienteContrato'
+import IdentificacionInstitucion from './IdentificacionInstitucion'
+import RespaldosInstitucion from './RespaldosInstitucion'
+import ResumenInstitucion from './ResumenInstitucion'
 import UsoTecnico from './UsoTecnico'
-import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, COPIA_EXTERNA, VERIFICACION, accionesDisponibles, cambios, etiquetaAccion, fecha, tamano } from '../estado'
+import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, accionesDisponibles, fecha } from '../estado'
+import { ENTRADA, boton } from '../estilos'
+import { PARAMETRO, PESTANAS, conSeccion, idPanel, idPestana, pestanaDe } from '../pestanas'
 import { useSesionPlataforma } from '../sesion'
-
-const entrada = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 disabled:bg-slate-50 disabled:text-slate-500'
-
-function Dato({ etiqueta, children }) {
-  return <div><dt className="text-xs text-slate-500">{etiqueta}</dt><dd className="mt-1 break-all text-sm text-slate-800">{children || '—'}</dd></div>
-}
-
-/** Últimos respaldos de la institución (docker/produccion/respaldar.sh): solo metadatos, el contenido no pasa por el panel. */
-function Respaldos({ institucion }) {
-  const lista = institucion.respaldos || []
-  return <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
-    <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold text-slate-800">Respaldos</h2><EstadoRespaldo institucion={institucion} /></div>
-    {lista.length === 0 ? <p className="mt-3 text-sm text-slate-500">Todavía no hay respaldos. Se generan en el servidor con docker/produccion/respaldar.sh (cada noche, con cron).</p> : <ol className="mt-3 divide-y divide-slate-100">
-      {lista.map(respaldo => <li key={respaldo.id} className="grid gap-1 py-3 text-sm">
-        <div className="flex flex-wrap justify-between gap-2">
-          <span><strong className={respaldo.estado === 'correcto' ? 'text-slate-700' : 'text-rose-700'}>{respaldo.estado === 'correcto' ? 'Correcto' : 'Fallido'}</strong>
-            <span className="text-slate-500"> · base {tamano(respaldo.base_bytes)}{respaldo.archivos_bytes !== null && ` · archivos ${tamano(respaldo.archivos_bytes)}`}</span></span>
-          <span className="text-xs text-slate-500">{fecha(respaldo.created_at)}</span>
-        </div>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-          <span className={COPIA_EXTERNA[respaldo.copia_externa]?.clase}>{COPIA_EXTERNA[respaldo.copia_externa]?.etiqueta || respaldo.copia_externa}</span>
-          {respaldo.verificacion && <span className={VERIFICACION[respaldo.verificacion]?.clase}>{VERIFICACION[respaldo.verificacion]?.etiqueta} {fecha(respaldo.verificado_en)}</span>}
-        </div>
-        {respaldo.detalle && <p className="text-xs text-rose-700">{respaldo.detalle}</p>}
-        {respaldo.verificacion === 'fallida' && respaldo.detalle_verificacion && <p className="text-xs text-rose-700">{respaldo.detalle_verificacion}</p>}
-      </li>)}
-    </ol>}
-  </div>
-}
+import { Campo, Dialogo, PanelPestana, Pestanas } from '../ui'
+import { useEdicionIdentificacion } from '../useEdicionIdentificacion'
+import { useUso } from '../useUso'
 
 /** Confirmación de suspender o activar. Suspender exige motivo; los datos y archivos de la institución se conservan. */
 function ConfirmarEstado({ accion, institucion, onConfirmar, onCerrar }) {
-  const ref = useRef(null)
   const [motivo, setMotivo] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  useEffect(() => { ref.current?.showModal() }, [])
   const suspender = accion === 'suspender'
   async function confirmar(event) {
     event.preventDefault()
@@ -59,16 +37,13 @@ function ConfirmarEstado({ accion, institucion, onConfirmar, onCerrar }) {
       setBusy(false)
     }
   }
-  return <dialog ref={ref} onClose={onCerrar} aria-labelledby="titulo-confirmar" className="m-auto w-full max-w-md rounded-2xl p-0 backdrop:bg-slate-900/40">
-    <form onSubmit={confirmar} aria-busy={busy} className="space-y-4 p-6">
-      <h2 id="titulo-confirmar" className="text-lg font-bold text-slate-900">{suspender ? 'Suspender' : accionesDisponibles(institucion).textoActivar} «{institucion.nombre}»</h2>
-      <p className="text-sm text-slate-600">{suspender ? `Su base de datos, sus archivos y sus datos se conservan: nada se borra.${institucion.suspension_bloquea_acceso ? ` ${AVISO_SUSPENSION_BLOQUEA}` : ''}` : 'La institución quedará activa. Solo es posible porque su aprovisionamiento está verificado.'}</p>
-      {suspender && !institucion.suspension_bloquea_acceso && <Aviso tipo="info">{AVISO_SUSPENSION}</Aviso>}
-      <Aviso>{error}</Aviso>
-      <label className="grid gap-2 text-xs font-medium text-slate-600">{suspender ? 'Motivo *' : 'Motivo (opcional)'}<textarea required={suspender} minLength={suspender ? 5 : undefined} maxLength={500} rows={3} value={motivo} onChange={event => setMotivo(event.target.value)} disabled={busy} className={entrada} /></label>
-      <div className="flex justify-end gap-3"><button type="button" onClick={() => ref.current.close()} disabled={busy} className="rounded-xl border border-slate-200 px-4 py-2 text-sm">Cancelar</button><button type="submit" disabled={busy} className={`rounded-xl px-4 py-2 text-sm font-semibold text-white ${suspender ? 'bg-rose-700' : 'bg-teal-700'}`}>{busy ? 'Guardando…' : suspender ? 'Suspender' : 'Confirmar'}</button></div>
-    </form>
-  </dialog>
+  return <Dialogo titulo={`${suspender ? 'Suspender' : accionesDisponibles(institucion).textoActivar} «${institucion.nombre}»`} onCerrar={onCerrar} onEnviar={confirmar} busy={busy}
+    textoBoton={suspender ? 'Suspender' : 'Confirmar'} peligro={suspender}>
+    <p className="text-sm text-slate-600">{suspender ? `Su base de datos, sus archivos y sus datos se conservan: nada se borra.${institucion.suspension_bloquea_acceso ? ` ${AVISO_SUSPENSION_BLOQUEA}` : ''}` : 'La institución quedará activa. Solo es posible porque su aprovisionamiento está verificado.'}</p>
+    {suspender && !institucion.suspension_bloquea_acceso && <Aviso tipo="info">{AVISO_SUSPENSION}</Aviso>}
+    <Aviso>{error}</Aviso>
+    <Campo etiqueta={suspender ? 'Motivo *' : 'Motivo (opcional)'}><textarea required={suspender} minLength={suspender ? 5 : undefined} maxLength={500} rows={3} value={motivo} onChange={event => setMotivo(event.target.value)} disabled={busy} className={ENTRADA} /></Campo>
+  </Dialogo>
 }
 
 /**
@@ -76,11 +51,9 @@ function ConfirmarEstado({ accion, institucion, onConfirmar, onCerrar }) {
  * segundos; mientras tanto no se puede cerrar. Un 500 trae un mensaje propio (se retiró lo creado).
  */
 function Aprovisionar({ institucion, onAprovisionada, onSesionTerminada, onCerrar }) {
-  const ref = useRef(null)
   const [datos, setDatos] = useState({ nombres: '', apellido_paterno: '', email: '' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  useEffect(() => { ref.current?.showModal() }, [])
   async function confirmar(event) {
     event.preventDefault()
     if (busy) return
@@ -94,34 +67,54 @@ function Aprovisionar({ institucion, onAprovisionada, onSesionTerminada, onCerra
       if (sesionTerminada(failure)) onSesionTerminada()
     }
   }
-  const campo = (nombre, etiqueta, props = {}) => <label className="grid gap-2 text-xs font-medium text-slate-600">{etiqueta}<input value={datos[nombre]} onChange={event => setDatos({ ...datos, [nombre]: event.target.value })} disabled={busy} required className={entrada} {...props} /></label>
-  return <dialog ref={ref} onClose={onCerrar} onCancel={event => busy && event.preventDefault()} aria-labelledby="titulo-aprovisionar" className="m-auto w-full max-w-md rounded-2xl p-0 backdrop:bg-slate-900/40">
-    <form onSubmit={confirmar} aria-busy={busy} className="space-y-4 p-6">
-      <h2 id="titulo-aprovisionar" className="text-lg font-bold text-slate-900">Aprovisionar «{institucion.nombre}»</h2>
-      <p className="text-sm text-slate-600">Se crea la base <strong>{institucion.base_datos}</strong> con los catálogos (sin datos de ejemplo), la carpeta <strong>{institucion.almacenamiento}</strong> y su primer administrador. La institución no se activa todavía.</p>
-      <Aviso>{error}</Aviso>
-      {campo('nombres', 'Nombres del primer administrador *', { minLength: 2, maxLength: 100, autoComplete: 'off' })}
-      {campo('apellido_paterno', 'Apellido paterno *', { minLength: 2, maxLength: 100, autoComplete: 'off' })}
-      {campo('email', 'Correo de acceso *', { type: 'email', maxLength: 255, autoComplete: 'off' })}
-      <div className="flex justify-end gap-3"><button type="button" onClick={() => ref.current.close()} disabled={busy} className="rounded-xl border border-slate-200 px-4 py-2 text-sm">Cancelar</button><button type="submit" disabled={busy} className="rounded-xl bg-teal-700 px-4 py-2 text-sm font-semibold text-white">{busy ? 'Creando base y catálogos…' : 'Aprovisionar'}</button></div>
-    </form>
-  </dialog>
+  const campo = (nombre, etiqueta, props = {}) => <Campo etiqueta={etiqueta}><input value={datos[nombre]} onChange={event => setDatos({ ...datos, [nombre]: event.target.value })} disabled={busy} required className={ENTRADA} {...props} /></Campo>
+  return <Dialogo titulo={`Aprovisionar «${institucion.nombre}»`} onCerrar={onCerrar} onEnviar={confirmar} busy={busy} bloquearCierre
+    textoBoton="Aprovisionar" textoOcupado="Creando base y catálogos…">
+    <p className="text-sm text-slate-600">Se crea la base <strong>{institucion.base_datos}</strong> con los catálogos (sin datos de ejemplo), la carpeta <strong>{institucion.almacenamiento}</strong> y su primer administrador. La institución no se activa todavía.</p>
+    <Aviso>{error}</Aviso>
+    {campo('nombres', 'Nombres del primer administrador *', { minLength: 2, maxLength: 100, autoComplete: 'off' })}
+    {campo('apellido_paterno', 'Apellido paterno *', { minLength: 2, maxLength: 100, autoComplete: 'off' })}
+    {campo('email', 'Correo de acceso *', { type: 'email', maxLength: 255, autoComplete: 'off' })}
+  </Dialogo>
 }
 
+/**
+ * Con key={id}: al pasar directamente a otra institución, todo empieza de cero (estado, ediciones, resumen) y no se ven
+ * como actuales los datos de la anterior; sus peticiones en curso se cancelan al desmontarse.
+ */
 export default function InstitucionDetallePage() {
   const { id } = useParams()
+  return <DetalleInstitucion key={id} id={id} />
+}
+
+/**
+ * Detalle de una institución: cabecera con sus acciones, franja de resumen y pestañas (parámetro «seccion»). Los cinco
+ * paneles están siempre montados (el inactivo, oculto): al volver a una pestaña conserva su estado, sus ediciones y sus
+ * contraseñas temporales, y cada sección hace sus peticiones una sola vez.
+ */
+function DetalleInstitucion({ id }) {
+  const [params, setParams] = useSearchParams()
+  const valorSeccion = params.get(PARAMETRO)
+  const seccion = pestanaDe(valorSeccion)
+  // Un valor desconocido se corrige sin añadir una entrada al historial; sin parámetro, la URL no cambia.
+  useEffect(() => {
+    if (valorSeccion !== null && valorSeccion !== seccion) setParams(conSeccion(params, seccion), { replace: true })
+  }, [valorSeccion, seccion, params, setParams])
+  const cambiarSeccion = clave => { if (clave !== seccion) setParams(conSeccion(params, clave)) }
+  const irA = clave => { cambiarSeccion(clave); document.getElementById(idPestana(clave))?.focus() }
   const consultarModulos = useCallback(signal => consultarModulosInstitucion(id, signal), [id])
   const guardarModulo = useCallback((codigo, datos) => guardarModuloInstitucion(id, codigo, datos), [id])
   const { state } = useLocation()
   const { terminada } = useSesionPlataforma()
   const [estado, setEstado] = useState({ loading: true })
   const [intento, setIntento] = useState(0)
-  const [borrador, setBorrador] = useState(null)
-  const [guardando, setGuardando] = useState(false)
-  const [error, setError] = useState('')
   const [aviso, setAviso] = useState(state?.aviso || '')
   const [confirmar, setConfirmar] = useState(null)
   const [credenciales, setCredenciales] = useState(null)
+  // Para la franja de resumen, sin peticiones propias: la medición de uso (la misma que muestra UsoTecnico; como antes,
+  // se pide una vez cargada la institución) y lo que cargó AdministradoresInstitucion.
+  const uso = useUso(estado.data ? id : null)
+  const [administradores, setAdministradores] = useState({ loading: true })
   useEffect(() => {
     const controller = new AbortController()
     verInstitucion(id, controller.signal).then(data => { setEstado({ data }); document.title = `${data.nombre} · Plataforma` }).catch(failure => {
@@ -133,28 +126,13 @@ export default function InstitucionDetallePage() {
   }, [id, intento, terminada])
   const recargar = () => setIntento(valor => valor + 1)
   const institucion = estado.data
+  const edicion = useEdicionIdentificacion(institucion, () => {
+    setAviso('Datos guardados.')
+    recargar()
+  })
   if (estado.loading) return <p role="status" className="text-sm text-slate-500">Cargando…</p>
-  if (estado.error) return <div className="space-y-3"><Link to="/plataforma/instituciones" className="text-sm text-teal-700 underline">Volver a instituciones</Link><Aviso>{estado.error}</Aviso><button type="button" onClick={() => { setEstado({ loading: true }); recargar() }} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm">Reintentar</button></div>
+  if (estado.error) return <div className="space-y-3"><Link to="/plataforma/instituciones" className="text-sm text-teal-700 underline">Volver a instituciones</Link><Aviso>{estado.error}</Aviso><button type="button" onClick={() => { setEstado({ loading: true }); recargar() }} className={boton('secundario')}>Reintentar</button></div>
   const acciones = accionesDisponibles(institucion)
-  const editable = institucion.ubicacion_editable
-  async function guardar(event) {
-    event.preventDefault()
-    const datos = cambios(institucion, borrador)
-    if (Object.keys(datos).length === 0) { setBorrador(null); return }
-    setGuardando(true)
-    setError('')
-    try {
-      await editarInstitucion(institucion.id, datos)
-      setBorrador(null)
-      setAviso('Datos guardados.')
-      recargar()
-    } catch (failure) {
-      if (sesionTerminada(failure)) terminada()
-      else setError(mensajeError(failure))
-    } finally {
-      setGuardando(false)
-    }
-  }
   async function cambiarEstado(motivo) {
     try {
       if (confirmar === 'suspender') await suspenderInstitucion(institucion.id, motivo)
@@ -167,17 +145,16 @@ export default function InstitucionDetallePage() {
     setConfirmar(null)
     recargar()
   }
-  const campo = (nombre, etiqueta, props = {}) => <label className="grid gap-2 text-xs font-medium text-slate-600">{etiqueta}<input value={borrador[nombre] ?? ''} onChange={event => setBorrador({ ...borrador, [nombre]: event.target.value })} disabled={guardando || (nombre !== 'nombre' && !editable)} className={entrada} {...props} /></label>
   return <section aria-labelledby="titulo-institucion">
     <Link to="/plataforma/instituciones" className="text-sm text-teal-700 underline">Volver a instituciones</Link>
     <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
       <div><h1 id="titulo-institucion" className="text-2xl font-bold text-slate-900">{institucion.nombre}</h1><div className="mt-2 flex flex-wrap gap-2"><EstadoInstitucion estado={institucion.estado} /><EstadoServicio servicio={institucion.servicio} /><SinAprovisionar institucion={institucion} /></div></div>
       <div className="grid justify-items-end gap-2">
         <div className="flex flex-wrap justify-end gap-2">
-          {acciones.aprovisionar && <button type="button" onClick={() => { setAviso(''); setConfirmar('aprovisionar') }} className="rounded-xl bg-teal-700 px-4 py-2 text-sm font-semibold text-white">Aprovisionar</button>}
-          {!borrador && <button type="button" onClick={() => { setAviso(''); setError(''); setBorrador({ nombre: institucion.nombre, slug: institucion.slug, base_datos: institucion.base_datos, almacenamiento: institucion.almacenamiento }) }} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm">Editar datos</button>}
-          <button type="button" disabled={!acciones.activar} title={institucion.motivo_no_activable || ''} onClick={() => { setAviso(''); setConfirmar('activar') }} className="rounded-xl bg-teal-700 px-4 py-2 text-sm font-semibold text-white">{acciones.textoActivar}</button>
-          <button type="button" disabled={!acciones.suspender} title={institucion.motivo_no_suspendible || ''} onClick={() => { setAviso(''); setConfirmar('suspender') }} className="rounded-xl border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-700">Suspender</button>
+          {acciones.aprovisionar && <button type="button" onClick={() => { setAviso(''); setConfirmar('aprovisionar') }} className={boton('principal')}>Aprovisionar</button>}
+          {!edicion.borrador && <button type="button" onClick={() => { setAviso(''); edicion.editar() }} className={boton('secundario')}>Editar datos</button>}
+          <button type="button" disabled={!acciones.activar} title={institucion.motivo_no_activable || ''} onClick={() => { setAviso(''); setConfirmar('activar') }} className={boton('principal')}>{acciones.textoActivar}</button>
+          <button type="button" disabled={!acciones.suspender} title={institucion.motivo_no_suspendible || ''} onClick={() => { setAviso(''); setConfirmar('suspender') }} className={boton('peligroContorno')}>Suspender</button>
         </div>
         {!institucion.suspension_bloquea_acceso && <p role="note" className="max-w-xs rounded-lg bg-amber-50 px-3 py-2 text-right text-xs text-amber-900">{AVISO_SUSPENSION}</p>}
       </div>
@@ -188,34 +165,27 @@ export default function InstitucionDetallePage() {
       {!institucion.aprovisionada && <Aviso tipo="info">{institucion.motivo_no_activable} Usa «Aprovisionar» para crear su base, sus catálogos, su primer administrador y su carpeta.</Aviso>}
       {institucion.estado === 'suspendida' && <Aviso tipo="info">Suspendida {fecha(institucion.suspendida_en)}{institucion.motivo_suspension ? `: ${institucion.motivo_suspension}` : ''}. Sus datos y archivos se conservan.</Aviso>}
     </div>
-    {borrador ? <form onSubmit={guardar} aria-busy={guardando} className="mt-6 space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
-      <Aviso>{error}</Aviso>
-      {campo('nombre', 'Nombre *', { required: true, minLength: 3, maxLength: 150 })}
-      {campo('slug', 'Identificador *', { required: true, maxLength: 40 })}
-      {campo('base_datos', 'Base de datos *', { required: true, maxLength: 63 })}
-      {campo('almacenamiento', 'Almacenamiento *', { required: true, maxLength: 120 })}
-      {!editable && <p className="text-xs text-slate-500">Ya aprovisionada o en operación: el identificador, la base de datos y el almacenamiento no se cambian desde el panel.</p>}
-      <div className="flex justify-end gap-3"><button type="button" onClick={() => { setBorrador(null); setError('') }} disabled={guardando} className="rounded-xl border border-slate-200 px-4 py-2 text-sm">Cancelar</button><button type="submit" disabled={guardando} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white">{guardando ? 'Guardando…' : 'Guardar'}</button></div>
-    </form> : <dl className="mt-6 grid gap-5 rounded-2xl border border-slate-200 bg-white p-6 sm:grid-cols-2">
-      <Dato etiqueta="Identificador">{institucion.slug}</Dato>
-      <Dato etiqueta="Base de datos">{institucion.base_datos}</Dato>
-      <Dato etiqueta="Almacenamiento">{institucion.almacenamiento}</Dato>
-      <Dato etiqueta="Aprovisionamiento verificado">{institucion.aprovisionada ? fecha(institucion.aprovisionada_en) : 'Pendiente'}</Dato>
-      <Dato etiqueta="Registrada">{fecha(institucion.created_at)}</Dato>
-      <Dato etiqueta="Última modificación">{fecha(institucion.updated_at)}</Dato>
-    </dl>}
-    <div className="mt-6"><ModulosSistemaConfig consultar={consultarModulos} guardar={guardarModulo} onCambio={recargar} /></div>
-    <ClienteContrato institucion={institucion} onCambio={recargar} />
-    <ServicioInstitucion institucion={institucion} onCambio={recargar} />
-    {institucion.aprovisionada && <AdministradoresInstitucion institucion={institucion} onCambio={recargar} />}
-    <UsoTecnico institucion={institucion} />
-    {institucion.aprovisionada && <Respaldos institucion={institucion} />}
-    <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
-      <h2 className="font-semibold text-slate-800">Auditoría</h2>
-      {institucion.auditoria.length === 0 ? <p className="mt-3 text-sm text-slate-500">Sin operaciones registradas.</p> : <ol className="mt-3 divide-y divide-slate-100">
-        {institucion.auditoria.map(evento => <li key={evento.id} className="flex flex-wrap justify-between gap-2 py-3 text-sm"><span><strong className="text-slate-700">{etiquetaAccion(evento.accion)}</strong>{evento.datos_despues?.email && <span className="text-slate-500"> ({evento.datos_despues.email})</span>}{evento.motivo && <span className="text-slate-500"> — {evento.motivo}</span>}</span><span className="text-xs text-slate-500">{evento.administrador || 'Sistema'} · {fecha(evento.created_at)}</span></li>)}
-      </ol>}
-    </div>
+    <ResumenInstitucion institucion={institucion} uso={uso} administradores={administradores} onIr={irA} />
+    <Pestanas pestanas={PESTANAS} activa={seccion} onCambiar={cambiarSeccion} etiqueta="Apartados de la institución" idPestana={idPestana} idPanel={idPanel} />
+    <PanelPestana id={idPanel('servicio')} idPestana={idPestana('servicio')} activo={seccion === 'servicio'}>
+      <ServicioInstitucion institucion={institucion} onCambio={recargar} />
+    </PanelPestana>
+    <PanelPestana id={idPanel('administradores')} idPestana={idPestana('administradores')} activo={seccion === 'administradores'}>
+      {institucion.aprovisionada ? <AdministradoresInstitucion institucion={institucion} onCambio={recargar} onLista={setAdministradores} />
+        : <p className="mt-6 text-sm text-slate-500">Los administradores se crean al aprovisionar la institución: el primero se indica en «Aprovisionar».</p>}
+    </PanelPestana>
+    <PanelPestana id={idPanel('datos')} idPestana={idPestana('datos')} activo={seccion === 'datos'}>
+      <IdentificacionInstitucion institucion={institucion} edicion={edicion} />
+      <ClienteContrato institucion={institucion} onCambio={recargar} />
+      <div className="mt-6"><ModulosSistemaConfig consultar={consultarModulos} guardar={guardarModulo} onCambio={recargar} /></div>
+    </PanelPestana>
+    <PanelPestana id={idPanel('tecnico')} idPestana={idPestana('tecnico')} activo={seccion === 'tecnico'}>
+      <UsoTecnico uso={uso} />
+      {institucion.aprovisionada && <RespaldosInstitucion institucion={institucion} />}
+    </PanelPestana>
+    <PanelPestana id={idPanel('auditoria')} idPestana={idPestana('auditoria')} activo={seccion === 'auditoria'}>
+      <AuditoriaInstitucion institucion={institucion} />
+    </PanelPestana>
     {confirmar === 'aprovisionar' && <Aprovisionar institucion={institucion} onCerrar={() => setConfirmar(null)} onSesionTerminada={terminada} onAprovisionada={data => {
       setCredenciales(data.administrador_inicial)
       setAviso('Institución aprovisionada. Ya se puede activar.')

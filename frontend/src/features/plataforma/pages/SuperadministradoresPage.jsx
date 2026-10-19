@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { accionSuperadmin, crearSuperadmin, listarSuperadmins, mensajeError, sesionTerminada } from '../api'
 import { Aviso, Credenciales } from '../componentes'
 import { ACCION_SUPERADMIN, accionesSuperadmin, fecha } from '../estado'
+import { ENTRADA, TARJETA, boton } from '../estilos'
 import { useSesionPlataforma } from '../sesion'
-
-const entrada = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 disabled:bg-slate-50 disabled:text-slate-500'
+import { Campo, Seccion } from '../ui'
 
 /** Alta de un superadministrador: el backend le da una contraseña temporal, que se muestra una sola vez. */
 function NuevaCuenta({ onCreada, onSesionTerminada }) {
@@ -26,14 +26,14 @@ function NuevaCuenta({ onCreada, onSesionTerminada }) {
       setBusy(false)
     }
   }
-  return <form onSubmit={enviar} aria-busy={busy} className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
+  return <form onSubmit={enviar} aria-busy={busy} className={`${TARJETA} mt-6`}>
     <h2 className="font-semibold text-slate-800">Nueva cuenta</h2>
     <p className="mt-1 text-xs text-slate-500">Se crea con una contraseña temporal que deberá cambiar al ingresar.</p>
     <div className="mt-3"><Aviso>{error}</Aviso></div>
     <div className="mt-3 grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-      <label className="grid gap-2 text-xs font-medium text-slate-600">Nombre *<input required minLength={3} maxLength={150} value={datos.nombre} onChange={event => setDatos({ ...datos, nombre: event.target.value })} disabled={busy} autoComplete="off" className={entrada} /></label>
-      <label className="grid gap-2 text-xs font-medium text-slate-600">Correo de acceso *<input required type="email" maxLength={255} value={datos.email} onChange={event => setDatos({ ...datos, email: event.target.value })} disabled={busy} autoComplete="off" className={entrada} /></label>
-      <button type="submit" disabled={busy} className="rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white">{busy ? 'Creando…' : 'Crear cuenta'}</button>
+      <Campo etiqueta="Nombre *"><input required minLength={3} maxLength={150} value={datos.nombre} onChange={event => setDatos({ ...datos, nombre: event.target.value })} disabled={busy} autoComplete="off" className={ENTRADA} /></Campo>
+      <Campo etiqueta="Correo de acceso *"><input required type="email" maxLength={255} value={datos.email} onChange={event => setDatos({ ...datos, email: event.target.value })} disabled={busy} autoComplete="off" className={ENTRADA} /></Campo>
+      <button type="submit" disabled={busy} className={boton('principal', 'campo')}>{busy ? 'Creando…' : 'Crear cuenta'}</button>
     </div>
   </form>
 }
@@ -84,10 +84,9 @@ export default function SuperadministradoresPage() {
       {credenciales && <Credenciales titulo={credenciales.titulo} credenciales={credenciales} onCerrar={() => setCredenciales(null)} />}
     </div>
     <NuevaCuenta onSesionTerminada={terminada} onCreada={data => { setAviso('Cuenta creada.'); setCredenciales({ email: data.email, clave_temporal: data.clave_temporal, titulo: 'Cuenta creada.' }); recargar() }} />
-    <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
-      <h2 className="font-semibold text-slate-800">Cuentas</h2>
+    <Seccion titulo="Cuentas">
       {estado.loading && <p role="status" className="mt-3 text-sm text-slate-500">Cargando…</p>}
-      {estado.error && <div className="mt-3 space-y-3"><Aviso>{estado.error}</Aviso><button type="button" onClick={() => { setEstado({ loading: true }); recargar() }} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm">Reintentar</button></div>}
+      {estado.error && <div className="mt-3 space-y-3"><Aviso>{estado.error}</Aviso><button type="button" onClick={() => { setEstado({ loading: true }); recargar() }} className={boton('secundario')}>Reintentar</button></div>}
       {estado.data && <ul className="mt-3 divide-y divide-slate-100">
         {lista.map(cuenta => <li key={cuenta.id} className="grid gap-2 py-4 text-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -101,15 +100,15 @@ export default function SuperadministradoresPage() {
             </div>
             <div className="flex flex-wrap gap-2">{accionesSuperadmin(cuenta).map(accion => <button key={accion} type="button" disabled={busy}
               onClick={() => { setAviso(''); setError(''); setConfirmar({ cuenta, accion }) }}
-              className={`rounded-xl border px-3 py-2 text-xs font-semibold ${accion === 'desactivar' ? 'border-rose-200 text-rose-700' : 'border-slate-200 text-slate-700'} bg-white`}>{ACCION_SUPERADMIN[accion].boton}</button>)}</div>
+              className={boton(accion === 'desactivar' ? 'peligroContorno' : 'secundario', 'pequeno')}>{ACCION_SUPERADMIN[accion].boton}</button>)}</div>
           </div>
           {confirmar?.cuenta.id === cuenta.id && <div role="alertdialog" aria-label={`${ACCION_SUPERADMIN[confirmar.accion].boton}: ${cuenta.nombre}`} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-sm text-slate-700"><strong>{ACCION_SUPERADMIN[confirmar.accion].boton}</strong> a {cuenta.nombre}. {ACCION_SUPERADMIN[confirmar.accion].pregunta}</p>
             <div className="mt-2"><Aviso>{error}</Aviso></div>
-            <div className="mt-3 flex justify-end gap-3"><button type="button" onClick={() => setConfirmar(null)} disabled={busy} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm">Cancelar</button><button type="button" onClick={ejecutar} disabled={busy} className={`rounded-xl px-4 py-2 text-sm font-semibold text-white ${confirmar.accion === 'desactivar' ? 'bg-rose-700' : 'bg-teal-700'}`}>{busy ? 'Aplicando…' : 'Confirmar'}</button></div>
+            <div className="mt-3 flex justify-end gap-3"><button type="button" onClick={() => setConfirmar(null)} disabled={busy} className={boton('secundario')}>Cancelar</button><button type="button" onClick={ejecutar} disabled={busy} className={boton(confirmar.accion === 'desactivar' ? 'peligro' : 'principal')}>{busy ? 'Aplicando…' : 'Confirmar'}</button></div>
           </div>}
         </li>)}
       </ul>}
-    </div>
+    </Seccion>
   </section>
 }

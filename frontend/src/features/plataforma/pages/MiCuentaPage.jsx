@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { cambiarMiPassword, mensajeError, sesionTerminada } from '../api'
 import { Aviso } from '../componentes'
+import { ENTRADA, TARJETA, boton } from '../estilos'
 import { useSesionPlataforma } from '../sesion'
-
-const entrada = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 disabled:bg-slate-50 disabled:text-slate-500'
+import { Campo } from '../ui'
 const vacio = { password_actual: '', password: '', password_confirmation: '' }
 
 /**
@@ -36,13 +36,13 @@ export default function MiCuentaPage({ obligatorio = false }) {
       setBusy(false)
     }
   }
-  const campo = (nombre, etiqueta, autoComplete) => <label className="grid gap-2 text-xs font-medium text-slate-600">{etiqueta}
-    <input type="password" required maxLength={255} value={datos[nombre]} onChange={event => setDatos({ ...datos, [nombre]: event.target.value })} disabled={busy} autoComplete={autoComplete} className={entrada} /></label>
+  const campo = (nombre, etiqueta, autoComplete) => <Campo etiqueta={etiqueta}>
+    <input type="password" required maxLength={255} value={datos[nombre]} onChange={event => setDatos({ ...datos, [nombre]: event.target.value })} disabled={busy} autoComplete={autoComplete} className={ENTRADA} /></Campo>
   return <section aria-labelledby="titulo-cuenta">
     <h1 id="titulo-cuenta" className="text-2xl font-bold text-slate-900">Mi cuenta</h1>
     <p className="mt-1 text-sm text-slate-500">{administrador.nombre} · {administrador.email}</p>
     {obligatorio && <div className="mt-5"><Aviso tipo="info">Tu contraseña es temporal. Cámbiala para usar el panel.</Aviso></div>}
-    <form onSubmit={enviar} aria-busy={busy} className="mt-6 max-w-lg space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
+    <form onSubmit={enviar} aria-busy={busy} className={`${TARJETA} mt-6 max-w-lg space-y-4`}>
       <h2 className="font-semibold text-slate-800">Cambiar contraseña</h2>
       <Aviso>{error}</Aviso>
       <Aviso tipo="exito">{aviso}</Aviso>
@@ -50,7 +50,7 @@ export default function MiCuentaPage({ obligatorio = false }) {
       {campo('password', 'Nueva contraseña *', 'new-password')}
       {campo('password_confirmation', 'Repite la nueva contraseña *', 'new-password')}
       <p className="text-xs text-slate-500">Al menos 12 caracteres, con letras y números. Distinta de la actual.</p>
-      <div className="flex justify-end"><button type="submit" disabled={busy} className="rounded-xl bg-teal-700 px-4 py-2 text-sm font-semibold text-white">{busy ? 'Guardando…' : 'Cambiar contraseña'}</button></div>
+      <div className="flex justify-end"><button type="submit" disabled={busy} className={boton('principal')}>{busy ? 'Guardando…' : 'Cambiar contraseña'}</button></div>
     </form>
   </section>
 }

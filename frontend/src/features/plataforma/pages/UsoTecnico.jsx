@@ -1,18 +1,18 @@
 import { Aviso, EstadoTecnico } from '../componentes'
 import { COMPROBACION, cifra, fecha, resumenTecnico, textoEspacio } from '../estado'
-import { useUso } from '../useUso'
+import { boton } from '../estilos'
+import { Seccion } from '../ui'
 
-/** Sección del detalle de la institución: cifras de uso y cada comprobación técnica con su estado. */
-export default function UsoTecnico({ institucion }) {
-  const uso = useUso(institucion.id)
+/**
+ * Sección del detalle de la institución: cifras de uso y cada comprobación técnica con su estado. uso: useUso() de la
+ * página (una sola medición, que también usa la franja de resumen).
+ */
+export default function UsoTecnico({ uso }) {
   const { data } = uso
   const espacio = textoEspacio(data?.almacenamiento)
   const dato = (etiqueta, valor, nota) => <div><dt className="text-xs text-slate-500">{etiqueta}</dt><dd className="mt-1 text-sm text-slate-800">{valor}</dd>{nota && <dd className="text-xs text-slate-500">{nota}</dd>}</div>
-  return <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6" aria-busy={Boolean(uso.loading)}>
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <h2 className="font-semibold text-slate-800">Uso y estado técnico</h2>
-      <div className="flex items-center gap-3">{data && <EstadoTecnico {...resumenTecnico(data)} />}<button type="button" onClick={uso.actualizar} disabled={uso.loading} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">{uso.loading ? 'Midiendo…' : 'Actualizar'}</button></div>
-    </div>
+  return <Seccion titulo="Uso y estado técnico" aria-busy={Boolean(uso.loading)}
+    acciones={<>{data && <EstadoTecnico {...resumenTecnico(data)} />}<button type="button" onClick={uso.actualizar} disabled={uso.loading} className={boton('secundario', 'pequeno')}>{uso.loading ? 'Midiendo…' : 'Actualizar'}</button></>}>
     {uso.loading && <p role="status" className="mt-3 text-sm text-slate-500">Midiendo uso y estado técnico…</p>}
     {uso.error && <div className="mt-3"><Aviso>{uso.error}</Aviso></div>}
     {data && <>
@@ -31,5 +31,5 @@ export default function UsoTecnico({ institucion }) {
         </li>)}
       </ul>
     </>}
-  </div>
+  </Seccion>
 }
