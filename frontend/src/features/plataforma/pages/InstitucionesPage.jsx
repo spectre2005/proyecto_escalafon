@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import Icon from '../../../components/ui/Icon'
 import { listarInstituciones, mensajeError, sesionTerminada } from '../api'
 import { Aviso, EstadoInstitucion, EstadoRespaldo, EstadoServicio, SinAprovisionar } from '../componentes'
-import { ESTADOS, fecha } from '../estado'
+import { ESTADOS, fecha, siguienteFiltro } from '../estado'
 import { boton } from '../estilos'
 import { useSesionPlataforma } from '../sesion'
 
@@ -27,9 +27,10 @@ export default function InstitucionesPage() {
     return () => controller.abort()
   }, [q, estadoFiltro, pagina, intento, terminada])
   function filtrar(cambio) {
-    const siguiente = { q, estado: estadoFiltro, ...cambio }
+    const { siguiente, igual } = siguienteFiltro(params, cambio)
     setEstado({ loading: true })
-    setParams(Object.fromEntries(Object.entries(siguiente).filter(([, valor]) => valor)))
+    if (igual) setIntento(valor => valor + 1)
+    else setParams(siguiente)
   }
   const { data } = estado
   return <section aria-labelledby="titulo-instituciones" aria-busy={Boolean(estado.loading)}>

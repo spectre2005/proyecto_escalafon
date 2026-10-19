@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, COPIA_EXTERNA, VERIFICACION, ACCION_SUPERADMIN, ESTADO_TECNICO, cifra, resumenTecnico, textoEspacio, accionesDisponibles, accionesSuperadmin, cambiosCliente, importe, textoVencimiento, etiquetaAccion, tamano, cambios, etiquetaEstado, fechaCorta, proponerPeriodo, proponerSlug, proponerUbicacion, textoServicio } from './estado.js'
+import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, COPIA_EXTERNA, VERIFICACION, ACCION_SUPERADMIN, ESTADO_TECNICO, cifra, siguienteFiltro, resumenTecnico, textoEspacio, accionesDisponibles, accionesSuperadmin, cambiosCliente, importe, textoVencimiento, etiquetaAccion, tamano, cambios, etiquetaEstado, fechaCorta, proponerPeriodo, proponerSlug, proponerUbicacion, textoServicio } from './estado.js'
 import { esEscritura, mensajeError } from './api.js'
 
 test('state actions follow what the backend allows', () => {
@@ -146,4 +146,13 @@ test('an incomplete storage measure says so in the figure itself', () => {
   assert.match(textoEspacio({ bytes: 2048, archivos: 9, parcial: true, enlaces_externos: 0 }).nota, /recuento parcial/)
   assert.deepEqual(textoEspacio({ bytes: 1536, archivos: 2, parcial: false, enlaces_externos: 0 }), { texto: '1,5 KB', completo: true, nota: '2 archivos' })
   assert.deepEqual(textoEspacio(null), { texto: '—', completo: false, nota: 'No se pudo medir.' })
+})
+
+test('searching again without changes is detected so the list reloads instead of waiting forever', () => {
+  assert.deepEqual(siguienteFiltro(new URLSearchParams(''), { q: '', page: '' }), { siguiente: {}, igual: true })
+  assert.deepEqual(siguienteFiltro(new URLSearchParams('q=uno'), { q: 'uno', page: '' }), { siguiente: { q: 'uno' }, igual: true })
+  assert.equal(siguienteFiltro(new URLSearchParams('estado=activa&q=uno'), { q: 'uno', page: '' }).igual, true)
+  assert.deepEqual(siguienteFiltro(new URLSearchParams('q=uno&page=2'), { q: 'uno', page: '' }), { siguiente: { q: 'uno' }, igual: false })
+  assert.deepEqual(siguienteFiltro(new URLSearchParams('q=uno'), { estado: 'activa', page: '' }), { siguiente: { q: 'uno', estado: 'activa' }, igual: false })
+  assert.deepEqual(siguienteFiltro(new URLSearchParams('q=uno'), { q: '', page: '' }), { siguiente: {}, igual: false })
 })

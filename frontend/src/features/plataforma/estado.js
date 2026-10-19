@@ -231,3 +231,14 @@ export function fecha(iso) {
   const valor = new Date(iso)
   return Number.isNaN(valor.getTime()) ? '—' : valor.toLocaleString('es-PE', { dateStyle: 'medium', timeStyle: 'short' })
 }
+
+/**
+ * Parámetros de la URL tras cambiar un filtro del listado. `igual` indica que no cambian (por ejemplo, Buscar sin
+ * tocar nada): la URL no se mueve y la página debe recargar por su cuenta, o se quedaría en «Cargando…».
+ */
+export function siguienteFiltro(actuales, cambio) {
+  const siguiente = Object.fromEntries(Object.entries({ ...Object.fromEntries(actuales), ...cambio }).filter(([, valor]) => valor))
+  const clave = valores => [...new URLSearchParams(valores)].sort(([a], [b]) => a.localeCompare(b)).join('&')
+
+  return { siguiente, igual: clave(siguiente) === clave(actuales) }
+}
