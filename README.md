@@ -1,6 +1,16 @@
-# Sistema de escalafón y legajos
+<p align="center">
+  <img src="frontend/public/favicon.svg" alt="Logo del sistema de escalafón y legajos" width="100" height="125" />
+</p>
 
-Aplicación para gestionar expedientes del personal docente y administrativo: datos personales, trayectoria laboral, documentos organizados por las secciones del legajo y evaluaciones. Incluye acceso por roles, configuración institucional, registros de auditoría y un panel de plataforma para atender varias instituciones, cada una con su propia base de datos.
+<h1 align="center">Sistema de escalafón y legajos</h1>
+
+---
+
+**Contenido:** [Propósito](#propósito) · [Requisitos](#1-requisitos) · [Descargar y configurar](#2-descargar-y-configurar) · [Primera instalación](#3-primera-instalación) · [Trabajo diario y actualizaciones](#4-trabajo-diario-y-actualizaciones) · [Estructura del proyecto](#5-estructura-del-proyecto) · [Arquitectura general](#6-arquitectura-general) · [Cómo continuar el desarrollo](#7-cómo-continuar-el-desarrollo) · [Problemas frecuentes](#8-problemas-frecuentes) · [Datos, respaldos y límites de esta instalación](#9-datos-respaldos-y-límites-de-esta-instalación) · [Mantenimiento e incremento actual](#10-mantenimiento-e-incremento-actual)
+
+## Propósito
+
+Aplicación para gestionar expedientes del personal docente y administrativo: datos personales, trayectoria laboral, documentos organizados por las secciones del legajo. Incluye acceso por roles, configuración institucional, registros de auditoría y un panel de plataforma para atender varias instituciones, cada una con su propia base de datos.
 
 Esta guía es el punto de entrada para instalar el proyecto y continuar su desarrollo. Todos los comandos se ejecutan **desde la raíz del repositorio**, donde están `docker-compose.yml` e `iniciar.ps1`, salvo que se indique otra ubicación.
 
