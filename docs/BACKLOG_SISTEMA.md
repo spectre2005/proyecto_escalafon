@@ -2,6 +2,13 @@
 
 **Revisión:** 17/10/2026, America/Lima. **Base local revisada:** `main`, `95e3a75`. Sustituye el backlog anterior basado en `d4c3906`.
 
+## Prueba integral pendiente (19/10/2026)
+
+- **Pendiente de ejecución y aceptación:** recorrer en navegador personal → vínculo → legajo → carga PDF → revisión → reportes; requerimientos completos (incluidas observación, subsanación, prórroga y cancelación); custodia hasta devolución; vencimientos y avisos con fechas controladas; exportaciones y restauración de respaldos. Registrar resultado, evidencia e incidencias. Las pruebas automáticas no sustituyen esta aceptación.
+- **Roles:** verificar cuentas distintas de administrador y asistente, recepción permitida de la propia carga y revisión propia prohibida. La comprobación automatizada se mantiene separada de la demostración manual con cuentas reales.
+
+**Comprobación automatizada de roles (19/10/2026):** cuentas ficticias distintas de administrador y asistente en pruebas aisladas; asistente sin acceso a la bandeja ni aceptación/observación, recepción propia permitida, administrador acepta carga ajena y no puede aceptar ni observar la propia. Bandeja y formación: 23 pruebas, 188 aserciones correctas. No se han cambiado cuentas reales; el recorrido manual de inicio de sesión sigue pendiente.
+
 ## Avance de implementación (18/10/2026)
 
 Los apartados 1–9 conservan el inventario y diagnóstico de `95e3a75`. Esta tabla describe los cambios actuales, todavía sin commit ni publicación; el inventario histórico no implica que las 55 tareas estén terminadas.

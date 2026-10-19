@@ -176,11 +176,11 @@ function TipoDocumento({ usuario, data, tipo, sinLegajo, ofrecer }) {
     </div>
     {aviso && <p role="status" className="mt-3 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
     {subiendo && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={11} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo, data)} precarga={id => precargaDe(tipo, data, id)} onSaved={subido} onCancel={() => setSubiendo(false)} /></div>}
-    {recuperando && <EnZona titulo={tituloPaso('Enlazar', tipo, recuperando)}><EnlazarDocumento usuario={usuario} documento={recuperando} opciones={enlacesDe(tipo, data)}
+    {recuperando && <EnZona onCancel={() => setRecuperando(null)} titulo={tituloPaso('Enlazar', tipo, recuperando)}><EnlazarDocumento usuario={usuario} documento={recuperando} opciones={enlacesDe(tipo, data)}
       onRegistrarNuevo={tipo.principal ? () => { setRegistrando(recuperando.id); setRecuperando(null) } : null}
       onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} /></EnZona>}
     {subsanando && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={11} tipo={tipo} titular={data.titular} subsanar={subsanando} onSaved={subido} onCancel={() => setSubsanando(null)} /></div>}
-    {registrando && <EnZona titulo={tituloPaso('Registrar la desvinculación que acredita', tipo)}>{libres.length
+    {registrando && <EnZona onCancel={() => setRegistrando(null)} titulo={tituloPaso('Registrar la desvinculación que acredita', tipo)}>{libres.length
       ? <div className="mt-4"><DesvinculacionForm usuario={usuario} vinculos={libres} motivos={tipo.motivos} documentoId={registrando} onSaved={() => { setRegistrando(null); setAviso('Desvinculación registrada y acreditada por el documento.') }} onCancel={() => { setRegistrando(null); setAviso('El documento quedó cargado sin desvinculación enlazada.') }} /></div>
       : <div className="mt-4"><Aviso accion={<button onClick={() => setRegistrando(null)} className={enlace}>Entendido</button>}>El documento quedó cargado, pero no hay vínculos con cese registrado pendientes de desvinculación{tipo.solo_plazo_determinado ? ' de plazo determinado' : ''}. Registra el cese en la sección 02.</Aviso></div>}</EnZona>}
   </li>

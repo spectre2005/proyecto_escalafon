@@ -203,7 +203,7 @@ function Documentos({ usuario, data, subseccion, sinLegajo, aplica = true }) {
           </div>
         </div>
         {/* Los documentos del vínculo admiten varios: la subsanación se agrupa con el mismo vínculo (editable). */}
-        {recuperando?.tipoId === tipo.id && <EnZona titulo={`Enlazar: ${tipo.literal ? `${tipo.literal}) ` : ''}${tipo.nombre} (folios ${folios(recuperando.documento.values.folio_inicio, recuperando.documento.values.folio_fin)})`}><EnlazarDocumento usuario={usuario} documento={recuperando.documento} opciones={enlacesDe(tipo.formulario_datos, data)}
+        {recuperando?.tipoId === tipo.id && <EnZona onCancel={() => setRecuperando(null)} titulo={`Enlazar: ${tipo.literal ? `${tipo.literal}) ` : ''}${tipo.nombre} (folios ${folios(recuperando.documento.values.folio_inicio, recuperando.documento.values.folio_fin)})`}><EnlazarDocumento usuario={usuario} documento={recuperando.documento} opciones={enlacesDe(tipo.formulario_datos, data)}
           onRegistrarNuevo={() => { setEnlazando({ tipoId: tipo.id, formulario: tipo.formulario_datos, documentoId: recuperando.documento.id, confirmar: tipo.formulario_datos === 'vinculos_laborales' && vigentes.length > 0 }); setRecuperando(null) }}
           onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} /></EnZona>}
         {subsanando?.tipoId === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={2} tipo={tipo} titular={data.titular} subsanar={subsanando.documento}
@@ -211,7 +211,7 @@ function Documentos({ usuario, data, subseccion, sinLegajo, aplica = true }) {
           precarga={id => precargaDe(tipo, data, id)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubsanando(null)} /></div>}
         {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={2} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo.formulario_datos, data)}
           enlaceInicial={vinculoPropuesto(tipo, data)} precarga={id => precargaDe(tipo, data, id)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}
-        {enlazando?.tipoId === tipo.id && <EnZona titulo={`Datos que acredita: ${tipo.literal ? `${tipo.literal}) ` : ''}${tipo.nombre}`}>{enlazando.confirmar
+        {enlazando?.tipoId === tipo.id && <EnZona onCancel={() => setEnlazando(null)} titulo={`Datos que acredita: ${tipo.literal ? `${tipo.literal}) ` : ''}${tipo.nombre}`}>{enlazando.confirmar
           ? <div className="mt-4"><Aviso accion={<div className="flex flex-wrap gap-3"><button onClick={() => setEnlazando({ ...enlazando, confirmar: false })} className={enlace}>Sí, registrar otro vínculo</button><button onClick={() => enlazado(false)} className="text-sm text-slate-600">No, dejarlo sin vínculo</button></div>}>
             El documento quedó cargado sin vínculo elegido y la persona ya tiene un vínculo vigente ({vigentes.map(v => v.values.nombre_puesto).join(', ')}). ¿El documento corresponde a otro vínculo nuevo?</Aviso></div>
           : <div className="mt-4"><FormularioEnlazado usuario={usuario} data={data} formulario={enlazando.formulario} documentoId={enlazando.documentoId} onDone={enlazado} /></div>}</EnZona>}
@@ -418,7 +418,7 @@ function Formalizacion({ usuario, data, sinLegajo }) {
       La persona ya tiene {vigentes.length === 1 ? 'un vínculo vigente' : `${vigentes.length} vínculos vigentes`}: {vigentes.map(v => v.values.nombre_puesto).join(', ')}. Para corregirlo usa «Corregir» en su tarjeta; registra otro solo si es un vínculo distinto (por ejemplo, simultáneo).</Aviso>}
     {aviso && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
     {error && <p role="alert" className="mb-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
-    {formulario && <EnZona titulo={form.tipo === 'adenda' ? `Registrar adenda: ${form.vinculo.values.nombre_puesto}` : form.tipo === 'puesto' ? `Datos del puesto: ${form.vinculo.values.nombre_puesto}` : form.record ? `Corregir vínculo: ${form.record.values.nombre_puesto}` : 'Registrar vínculo'}>{formulario}</EnZona>}
+    {formulario && <EnZona onCancel={() => cerrar(false)} titulo={form.tipo === 'adenda' ? `Registrar adenda: ${form.vinculo.values.nombre_puesto}` : form.tipo === 'puesto' ? `Datos del puesto: ${form.vinculo.values.nombre_puesto}` : form.record ? `Corregir vínculo: ${form.record.values.nombre_puesto}` : 'Registrar vínculo'}>{formulario}</EnZona>}
     <p className="mb-4 text-xs text-slate-500">Vínculos y adendas no se eliminan: si hay un error, se anulan con motivo (administración) y se registran de nuevo. Las adendas no se corrigen.</p>
     {data.vinculos.length === 0 && <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">No hay vínculos laborales registrados. {sinLegajo ? 'Primero se debe abrir el legajo.' : 'Registra el vínculo (resolución o contrato) para habilitar adendas, inducciones y período de prueba.'}</p>}
     {data.vinculos.length > 0 && vigentes.length === 0 && <Aviso>La persona no tiene un vínculo vigente: todos están cesados, vencidos o aún no inician. Revisa el historial.</Aviso>}

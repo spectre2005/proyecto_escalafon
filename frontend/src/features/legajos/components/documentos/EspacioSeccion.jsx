@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createContext, useContext } from 'react'
+import DocumentoModal from './DocumentoModal'
 import { etiqueta } from '../../config/seccion01'
 import { coloresEstadoDocumento, estadosDocumento, estadosSubseccion } from '../../config/seccion02'
 import { folios } from '../../config/documentos'
@@ -10,7 +10,7 @@ import { buscarDocumento, documentosSinAsociar, idBloque, idTipo, irA } from '..
  *
  *   Cabecera     sección › subsección, cambio de subsección y cifras en una línea (el resumen completo, plegado)
  *   Atajos       Registros · Documentos · Sin registro asociado (saltan a cada bloque)
- *   Zona         el paso en curso (registrar, completar datos, enlazar…) siempre en el mismo sitio, con su contexto
+ *   Formularios  registrar, corregir y enlazar en ventanas superpuestas, conservando la posición de la página
  *   Registros    cada registro con su documento, o «Adjuntar documento» si no tiene
  *   Documentos   primero los que quedaron sin registro; luego los tipos documentales
  *
@@ -30,8 +30,7 @@ function Chip({ activo, children, onClick }) {
  * atajos: [{ id, texto }] a los bloques de la página.
  */
 export default function EspacioSeccion({ seccion, subseccion, subsecciones = [], cifras, resumen, etiquetaResumen = 'Ver resumen de la sección', atajos = [], children }) {
-  const [zona, setZona] = useState(null)
-  return <Contexto.Provider value={{ zona, contexto: subseccion ? `${seccion} › ${subseccion}` : seccion }}>
+  return <Contexto.Provider value={{ contexto: subseccion ? `${seccion} › ${subseccion}` : seccion }}>
     <section aria-label={subseccion || seccion}>
       <header className="mb-4 rounded-2xl border border-slate-200 bg-white p-4">
         <p className="text-[11px] text-slate-500">{seccion}</p>
@@ -52,40 +51,18 @@ export default function EspacioSeccion({ seccion, subseccion, subsecciones = [],
           {atajos.map(atajo => <button key={atajo.id} type="button" onClick={() => irA(atajo.id)} className={`font-semibold hover:underline ${atajo.alerta ? 'text-amber-800' : 'text-teal-700'}`}>{atajo.texto}</button>)}
         </nav>}
       </header>
-      {/* Zona de trabajo: aquí aparece el paso en curso (EnZona). */}
-      <div ref={setZona} className="empty:hidden mb-4 space-y-3" />
       {children}
     </section>
   </Contexto.Provider>
 }
 
-/**
- * Muestra un paso (formulario, enlace, confirmación) en la zona de trabajo de la sección, con el contexto y lo que se
- * está haciendo. Al abrirse lleva la vista a la zona; al cerrarse devuelve el foco y la vista a donde empezó.
- * Fuera de EspacioSeccion se muestra en su lugar, como antes.
- */
-export function EnZona({ titulo, children }) {
+/** Paso compartido de registro, corrección o enlace, sin desplazar la sección. */
+export function EnZona({ titulo, onCancel, children }) {
   const espacio = useContext(Contexto)
-  const zona = espacio?.zona
-  const marco = useRef(null)
-  // Botón que abrió el paso: se toma en el primer render (los formularios ponen el foco en su primer campo antes de que
-  // corra el efecto de este marco).
-  const [origen] = useState(() => typeof document !== 'undefined' && document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null)
-  useEffect(() => {
-    if (!zona) return undefined
-    marco.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    return () => {
-      if (origen?.isConnected) {
-        origen.focus({ preventScroll: true })
-        origen.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }
-    }
-  }, [zona, origen])
-  if (!zona) return children
-  return createPortal(<div ref={marco} className="scroll-mt-4 rounded-2xl border border-teal-200 bg-teal-50/40 p-3">
-    <p className="mb-2 px-1 text-[11px] text-teal-900"><span className="text-teal-700">{espacio.contexto}</span>{titulo ? <> · <strong>{titulo}</strong></> : null}</p>
+  return <DocumentoModal titulo={titulo || 'Registrar datos'} onCancel={onCancel}>
+    {espacio && <p className="mb-3 text-xs text-slate-600">{espacio.contexto}</p>}
     {children}
-  </div>, zona)
+  </DocumentoModal>
 }
 
 const nombreTipo = tipo => `${tipo.literal ? `${tipo.literal}) ` : ''}${tipo.nombre}`

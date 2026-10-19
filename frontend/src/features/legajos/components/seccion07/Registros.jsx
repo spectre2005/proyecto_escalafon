@@ -16,7 +16,7 @@ const PERMISOS_07 = { registrar: ['seccion07.registrar'], anular: ['seccion07.re
  * bloqueo: texto que explica por qué no se puede registrar; deshabilita el botón y se muestra.
  * adjuntar(record): «Adjuntar documento» del registro (AdjuntarDocumento), si puede acreditarse con algún tipo.
  * documento(record): el documento que lo acredita (DocumentoDelRegistro), en lugar de «Enlazado / Sin documento».
- * El formulario de registrar o corregir se abre en la zona de trabajo de la sección (EnZona).
+ * El formulario de registrar o corregir se abre en una ventana superpuesta (EnZona).
  */
 export default function Registros({ titulo, agregar, vacio, registros, bloqueo, tituloRegistro, subtitulo, campos, renderForm, onAnular, aviso, permisos = PERMISOS_07, adjuntar, documento }) {
   const sesion = useSesion()
@@ -55,7 +55,7 @@ export default function Registros({ titulo, agregar, vacio, registros, bloqueo, 
     {aviso}
     {notice && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{notice}</p>}
     {error && <p role="alert" className="mb-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
-    {editing && !(bloqueo && !editing.id) && <EnZona titulo={editing.id ? `Corregir: ${tituloRegistro(editing)}` : agregar}>{renderForm({ record: editing.id ? editing : null, onCancel: () => setEditing(null), onSaved: () => { setEditing(null); setNotice('Registro guardado.') } })}</EnZona>}
+    {editing && !(bloqueo && !editing.id) && <EnZona onCancel={() => setEditing(null)} titulo={editing.id ? `Corregir: ${tituloRegistro(editing)}` : agregar}>{renderForm({ record: editing.id ? editing : null, onCancel: () => setEditing(null), onSaved: () => { setEditing(null); setNotice('Registro guardado.') } })}</EnZona>}
     {registros.length === 0 && <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">{vacio}</p>}
     <div className="space-y-4">{registros.map(record => <article key={record.id} className="rounded-2xl border border-slate-200 bg-white p-5">
       <div className="min-w-0"><h4 className="font-semibold text-slate-800">{tituloRegistro(record)}</h4>{subtitulo && <p className="mt-1 text-xs text-slate-500">{subtitulo(record)}</p>}</div>

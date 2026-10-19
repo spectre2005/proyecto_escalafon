@@ -56,6 +56,21 @@ export default function Seccion04Panel({ usuario }) {
     </div>
     </div>}>
     <div className="min-w-0 space-y-5">
+    <section aria-label="Resumen de experiencia laboral" className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <dl className="grid divide-y divide-slate-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        {[['Experiencia total', data.tiempo.total], ['Sector público', data.tiempo.publico], ['Sector privado', data.tiempo.privado]].map(([label, t], index) => <div key={label} className={`px-4 py-3 ${index === 0 ? 'bg-teal-50/70' : ''}`}>
+          <dt className="text-xs font-medium text-slate-600">{label}</dt>
+          <dd className={`mt-1 text-sm font-semibold tabular-nums ${index === 0 ? 'text-teal-900' : 'text-slate-800'}`}>{t.anios} años · {t.meses} meses · {t.dias} días</dd>
+        </div>)}
+      </dl>
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-t border-slate-100 px-4 py-2 text-xs text-slate-500">
+        <p>Corte: {fecha(data.tiempo.fecha_corte)} · {data.tiempo.configuracion.incluir_pendientes ? 'Aceptados y en revisión' : 'Solo documentos aceptados'}</p>
+        <details className="min-w-0"><summary className="cursor-pointer font-semibold text-teal-800">Detalle del cálculo</summary>
+          <dl className="mt-2 space-y-1">{[['Total', data.tiempo.total], ['Público', data.tiempo.publico], ['Privado', data.tiempo.privado]].map(([label, t]) => <div key={label} className="flex flex-wrap gap-x-2"><dt>{label}:</dt><dd>{t.dias_totales} días calendario · {t.anios_decimal.toFixed(2)} años</dd></div>)}</dl>
+          <p className="mt-2 max-w-lg leading-relaxed">Mes de {data.tiempo.configuracion.dias_por_mes} días y año de {data.tiempo.configuracion.dias_por_anio} días. Los subtotales por sector pueden sumar más que el total si hay periodos simultáneos.</p>
+        </details>
+      </div>
+    </section>
     {error}
     {!data.legajo && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p className="mb-3">Primero abre el legajo para agregar documentos.</p><AbrirLegajo usuario={usuario} /></div>}
     {aviso && <p role="status" className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">{aviso}</p>}
@@ -97,10 +112,6 @@ export default function Seccion04Panel({ usuario }) {
         </div>
       </details>)}
     </section>)}</div>}</VistasDocumentales>
-    <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-3">
-      {[['Experiencia total', data.tiempo.total], ['Sector público', data.tiempo.publico], ['Sector privado', data.tiempo.privado]].map(([label, t]) => <div key={label}><p className="text-xs text-slate-500">{label}</p><p className="mt-2 text-lg font-semibold text-slate-800">{t.anios} años, {t.meses} meses y {t.dias} días</p><p className="mt-1 text-xs text-slate-500">{t.dias_totales} días calendario · {t.anios_decimal.toFixed(2)} años</p></div>)}
-      <p className="col-span-full text-xs text-slate-500">Corte: {fecha(data.tiempo.fecha_corte)}. Mes de {data.tiempo.configuracion.dias_por_mes} días y año de {data.tiempo.configuracion.dias_por_anio} días. {data.tiempo.configuracion.incluir_pendientes ? 'Incluye documentos aceptados y en revisión.' : 'Solo cuenta documentos aceptados.'} Los subtotales por sector pueden sumar más que el total si hay periodos simultáneos.</p>
-    </div>
     <LineaTiempoExperiencia tiempo={data.tiempo} />
     <p className="text-sm font-semibold text-slate-800">Número de folios: {data.numero_folios}</p>
     <details className="rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-500"><summary className="cursor-pointer font-semibold text-slate-600">Cómo se conservan los documentos</summary><p className="mt-2 leading-relaxed">Los documentos se conservan sin editar ni eliminar. Los folios son correlativos por sección. La aceptación de RR. HH., el fedateo, la fiscalización posterior y el análisis antivirus se muestran por separado.</p></details>

@@ -18,7 +18,7 @@ export function Bloqueo({ children }) {
  * adjuntar(record): «Adjuntar documento» del registro (AdjuntarDocumento), si puede acreditarse con algún tipo.
  * corregir: { etiqueta, puede(record), motivo } — motivo se muestra cuando el registro ya no se corrige.
  * documento(record): el documento que lo acredita (DocumentoDelRegistro), dentro de la tarjeta.
- * El formulario de registrar o corregir se abre en la zona de trabajo de la sección (EnZona).
+ * El formulario de registrar o corregir se abre en una ventana superpuesta (EnZona).
  */
 export default function Registros({ titulo, agregar, vacio, registros, bloqueo, tituloRegistro, subtitulo, campos, renderForm, corregir, onAnular, detalle, adjuntar, documento }) {
   const puedeRegistrar = usePuede('legajo.editar')
@@ -55,7 +55,7 @@ export default function Registros({ titulo, agregar, vacio, registros, bloqueo, 
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h3 className="text-base font-semibold text-slate-800">{titulo}</h3>{puedeRegistrar && agregar && <div className="flex flex-wrap items-center gap-3">{bloqueo && <Bloqueo>{bloqueo}</Bloqueo>}<button disabled={ocupado || !!bloqueo} onClick={() => start({}, setEditing)} className={button}>{agregar}</button></div>}</div>
     {notice && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{notice}</p>}
     {error && <p role="alert" className="mb-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
-    {editing && !bloqueo && <EnZona titulo={editing.id ? `Corregir: ${tituloRegistro(editing)}` : agregar}>{renderForm({ record: editing.id ? editing : null, onCancel: () => setEditing(null), onSaved: () => { setEditing(null); setNotice('Registro guardado.') } })}</EnZona>}
+    {editing && !bloqueo && <EnZona onCancel={() => setEditing(null)} titulo={editing.id ? `Corregir: ${tituloRegistro(editing)}` : agregar}>{renderForm({ record: editing.id ? editing : null, onCancel: () => setEditing(null), onSaved: () => { setEditing(null); setNotice('Registro guardado.') } })}</EnZona>}
     {registros.length === 0 && <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">{vacio}</p>}
     <div className="space-y-4">{registros.map(record => {
       const values = record.values
