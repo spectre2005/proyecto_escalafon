@@ -22,6 +22,36 @@ services:
       db:
         condition: service_healthy
 
+  scheduler:
+    build: ./docker/php
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+    environment:
+      SESSION_DRIVER: file
+      CACHE_STORE: file
+    volumes:
+      - ./backend:/var/www/html
+      - vendor:/var/www/html/vendor
+    command: ["php", "artisan", "schedule:work"]
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+
+  worker:
+    build: ./docker/php
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+    environment:
+      SESSION_DRIVER: file
+      CACHE_STORE: file
+    volumes:
+      - ./backend:/var/www/html
+      - vendor:/var/www/html/vendor
+    command: ["php", "artisan", "queue:work", "--queue=avisos,default", "--tries=3", "--timeout=60", "--max-time=3600", "--sleep=3"]
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+
   nginx:
     image: nginx:alpine
     ports:
@@ -55,6 +85,12 @@ services:
         condition: service_completed_successfully
     command: sh -c "pnpm install && pnpm dev --host"
 
+  clamav:
+    image: clamav/clamav:1.4
+    volumes:
+      - firmas_antivirus:/var/lib/clamav
+    restart: unless-stopped
+
   db:
     image: postgres:16-alpine
     healthcheck:
@@ -72,6 +108,7 @@ services:
       - dbdata:/var/lib/postgresql/data
 
 volumes:
+  firmas_antivirus:
   dbdata:
   vendor:
   frontend_node_modules:

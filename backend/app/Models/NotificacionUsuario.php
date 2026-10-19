@@ -22,6 +22,8 @@ class NotificacionUsuario extends Model
     protected $fillable = [
         'usuario_id',
         'tipo',
+        'clave_deduplicacion',
+        'enlace',
         'titulo',
         'mensaje',
         'documento_id',
@@ -36,7 +38,7 @@ class NotificacionUsuario extends Model
     {
         return [
             'leida' => 'boolean',
-            'fecha_lectura' => 'datetime',
+            'fecha_lectura' => 'datetime', 'correo_intento_en' => 'datetime', 'correo_enviado_en' => 'datetime',
             'created_at' => 'datetime',
         ];
     }

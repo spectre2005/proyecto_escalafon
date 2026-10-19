@@ -11,7 +11,7 @@ use Illuminate\Support\Collection;
  * Perfil de una persona por dos ejes (régimen laboral y banderas) y su cruce con las columnas
  * aplica_* y requiere_* de tipos_documento para saber qué documentos se le exigen.
  *
- * Fuente: los vínculos laborales vigentes (sin fecha_cese); si no hay ninguno, los datos de la persona.
+ * Fuente: los vínculos laborales vigentes según inicio, cese y fin efectivo de la última adenda válida; si no hay ninguno, los datos de la persona.
  * Las banderas (tres estados: Sí, No, Sin responder) las decide AplicacionDocumental, la única fuente.
  */
 final class PerfilDocumental
@@ -32,7 +32,7 @@ final class PerfilDocumental
     public static function de(Usuario $usuario, Collection $vinculos): self
     {
         // Los vínculos anulados no cuentan para el perfil.
-        $vigentes = $vinculos->whereNull('fecha_cese')->reject(fn (VinculoLaboral $vinculo): bool => (bool) $vinculo->anulado);
+        $vigentes = $vinculos->filter(fn (VinculoLaboral $vinculo): bool => VigenciaLaboral::vigente($vinculo));
         $origen = $vigentes->isEmpty() ? collect([$usuario]) : $vigentes;
         $aplicacion = AplicacionDocumental::de($usuario, $vinculos);
 

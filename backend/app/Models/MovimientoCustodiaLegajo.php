@@ -40,6 +40,9 @@ class MovimientoCustodiaLegajo extends Model
     protected function casts(): array
     {
         return [
+            'version' => 'integer',
+            'devuelto_en' => 'datetime',
+            'fecha_devolucion_prevista' => 'date',
             'fecha_movimiento' => 'date',
             'fecha_retorno' => 'date',
             'servidor_comunicado' => 'boolean',

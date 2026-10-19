@@ -5,15 +5,19 @@ namespace App\Http\Controllers\Plataforma;
 use App\Http\Controllers\Controller;
 use App\Models\Plataforma\AuditoriaPlataforma;
 use App\Models\Plataforma\Institucion;
+use App\Models\Plataforma\PeriodoServicio;
 use App\Support\Plataforma\Aprovisionamiento;
 use App\Support\Plataforma\AprovisionamientoRechazado;
 use App\Support\Plataforma\AuditoriaOperaciones;
+use App\Support\Plataforma\ExportacionInstitucion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
 
 /**
@@ -29,8 +33,15 @@ class InstitucionController extends Controller
         $conteo = Institucion::query()->select('estado', DB::raw('count(*) as total'))->groupBy('estado')->pluck('total', 'estado');
         $porEstado = collect(Institucion::ESTADOS)->mapWithKeys(fn (string $estado): array => [$estado => (int) ($conteo[$estado] ?? 0)]);
 
+        $servicios = Institucion::query()->with('periodos')->where('estado', Institucion::ACTIVA)->get()->map(fn (Institucion $i): array => ['id' => $i->id, 'nombre' => $i->nombre, ...$i->servicio()]);
+        $zona = (string) config('plataforma.zona_horaria');
+        $ahora = now($zona);
+        $suma = static fn ($inicio) => PeriodoServicio::query()->where('anulado', false)->where('created_at', '>=', $inicio->utc())->where('created_at', '<=', $ahora->copy()->utc())->sum('monto');
+
         return response()->json(['data' => [
             'total' => $porEstado->sum(), 'por_estado' => $porEstado,
+            'servicios' => ['proximos' => $servicios->filter(fn ($s) => $s['estado'] === 'vigente' && $s['dias_restantes'] <= 30)->sortBy('vence_el')->values(), 'en_gracia' => $servicios->where('estado', 'en_gracia')->values(), 'vencidos' => $servicios->where('estado', 'vencido')->values()],
+            'importes_registrados' => ['moneda' => 'PEN', 'mes' => (string) $suma($ahora->copy()->startOfMonth()), 'anio' => (string) $suma($ahora->copy()->startOfYear()), 'criterio' => 'Fecha de registro; periodos no anulados'],
             'recientes' => AuditoriaPlataforma::query()->with(['administrador:id,nombre', 'institucion:id,nombre'])->latest('created_at')->limit(8)->get()->map(fn (AuditoriaPlataforma $evento): array => $this->evento($evento)),
         ]]);
     }
@@ -106,6 +117,32 @@ class InstitucionController extends Controller
 
         return $this->transicion($request, $institucion, fn (Institucion $i): ?string => $i->motivoNoSuspendible(),
             ['estado' => Institucion::SUSPENDIDA, 'suspendida_en' => now(), 'motivo_suspension' => $motivo], 'institucion.suspendida', $motivo);
+    }
+
+    public function exportar(Request $request, string $institucion): BinaryFileResponse
+    {
+        $this->sinCamposAjenos($request, []);
+        $registro = Institucion::query()->findOrFail($institucion);
+        set_time_limit(300);
+        $exportacion = ExportacionInstitucion::generar($registro);
+        try {
+            AuditoriaOperaciones::registrar('institucion.exportada', $request, Auth::guard('plataforma')->id(), $registro->id, null,
+                collect($exportacion)->except('ruta')->all());
+        } catch (Throwable $error) {
+            File::delete($exportacion['ruta']);
+            throw $error;
+        }
+
+        return response()->download($exportacion['ruta'], $registro->slug.'-exportacion.zip', ['Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff'])->deleteFileAfterSend(true);
+    }
+
+    public function archivar(Request $request, string $institucion): JsonResponse
+    {
+        $this->sinCamposAjenos($request, ['motivo']);
+        $datos = $request->validate(['motivo' => 'required|string|min:5|max:500']);
+
+        return $this->transicion($request, $institucion, fn (Institucion $i): ?string => $i->estado !== Institucion::SUSPENDIDA ? 'Suspende primero la institución antes de archivarla.' : null,
+            ['estado' => Institucion::ARCHIVADA, 'archivada_en' => now(), 'motivo_archivo' => $datos['motivo']], 'institucion.archivada', $datos['motivo']);
     }
 
     /**
@@ -186,7 +223,7 @@ class InstitucionController extends Controller
     /** @return array<string, mixed> */
     private function huella(Institucion $institucion): array
     {
-        return $institucion->only(['nombre', 'slug', 'estado', 'base_datos', 'almacenamiento', 'motivo_suspension', 'dias_gracia']);
+        return $institucion->only(['nombre', 'slug', 'estado', 'base_datos', 'almacenamiento', 'motivo_suspension', 'dias_gracia', 'archivada_en', 'motivo_archivo']);
     }
 
     /** @return array<string, mixed> */

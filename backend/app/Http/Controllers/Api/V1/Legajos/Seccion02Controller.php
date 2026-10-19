@@ -14,6 +14,8 @@ use App\Models\Usuario;
 use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
 use App\Support\AplicacionDocumental;
+use App\Support\AuditoriaInstitucional;
+use App\Support\CierreLegajo;
 use App\Support\Documentos\EstadoDocumento;
 use App\Support\Documentos\FormulariosDatos;
 use App\Support\Parametros;
@@ -21,12 +23,14 @@ use App\Support\PerfilDocumental;
 use App\Support\RegimenesLaborales;
 use App\Support\ReglasVinculo;
 use App\Support\ResumenSeccion02;
+use App\Support\VigenciaLaboral;
 use Database\Seeders\Seccion02CatalogoSeeder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -147,11 +151,15 @@ class Seccion02Controller extends Controller
 
         // vinculos_laborales no tiene documento_id: el documento (c a f) apunta al vínculo.
         return $this->creado(DB::transaction(function () use ($data, $usuario, $documento, $request): VinculoLaboral {
+            Usuario::query()->whereKey($usuario)->lockForUpdate()->firstOrFail();
+            $this->exigirLegajo($usuario);
             $vinculo = VinculoLaboral::query()->create([...collect($data)->except('documento_id')->all(), 'usuario_id' => $usuario, 'registrado_por' => $request->user()->getAuthIdentifier()]);
             // Enlace de una sola vez: si otra carga ya lo enlazó entre tanto, no se pisa.
             if ($documento && DocumentoUsuario::query()->whereKey($documento->id)->whereNull('vinculo_laboral_id')->update(['vinculo_laboral_id' => $vinculo->id]) !== 1) {
                 throw ValidationException::withMessages(['documento_id' => 'El documento ya está enlazado a otro vínculo.']);
             }
+
+            AuditoriaInstitucional::registrar('vinculos_laborales', $vinculo->id, 'vinculo.registrado', $request, $usuario, null, $vinculo->getAttributes());
 
             return $vinculo;
         }));
@@ -166,11 +174,18 @@ class Seccion02Controller extends Controller
         }
         $cambios = $this->validarCambios($request, $registro, self::REGLAS_VINCULO);
         $this->exigirLeyDelTipo($cambios, $registro);
-        DB::transaction(function () use ($registro, $cambios): void {
+        DB::transaction(function () use ($registro, $cambios, $request): void {
+            Usuario::query()->whereKey($registro->usuario_id)->lockForUpdate()->firstOrFail();
             // Bloqueo del vínculo: los datos del puesto no se registran a la vez que se cambia su tipo de personal.
             $actual = VinculoLaboral::query()->whereKey($registro->id)->lockForUpdate()->firstOrFail();
+            abort_if($actual->anulado || $actual->fecha_cese !== null, 409, 'El vínculo fue cerrado o anulado. Actualiza la ficha.');
             $this->exigirTipoSinDatosPuesto($actual, $cambios);
+            $antes = $actual->getAttributes();
             $actual->update($cambios);
+            AuditoriaInstitucional::registrar('vinculos_laborales', $actual->id, 'vinculo.corregido', $request, $actual->usuario_id, $antes, $actual->getAttributes());
+            if (array_key_exists('fecha_cese', $cambios)) {
+                CierreLegajo::actualizar($actual->usuario_id, $request);
+            }
         });
 
         return new JsonResource($registro->refresh());
@@ -216,7 +231,7 @@ class Seccion02Controller extends Controller
     /**
      * Registrar o corregir los datos del puesto (perfil_docente o perfil_administrativo) de un vínculo. Igual que el
      * vínculo: solo mientras no tenga fecha de cese ni esté anulado. Las tablas de perfil no tienen anulación.
-     * TODO pendiente de confirmar con el cliente: si el perfil debe conservar historial (hoy se corrige en el mismo registro).
+     * Cada creación o corrección conserva una instantánea anterior/posterior en la auditoría del vínculo.
      */
     public function guardarDatosPuesto(Request $request, string $usuario, string $vinculo): JsonResource|JsonResponse
     {
@@ -225,17 +240,27 @@ class Seccion02Controller extends Controller
         if ($registro->anulado || $registro->fecha_cese !== null) {
             return response()->json(['message' => 'El vínculo está cerrado (con fecha de cese) o anulado: sus datos del puesto no se corrigen.'], 409);
         }
-        $docente = $registro->tipo_personal === 'docente';
-        $data = $this->validar($request, self::REGLAS_PERFIL[$docente ? 'docente' : 'administrativo']);
-        $perfiles = $docente ? $registro->perfilDocente() : $registro->perfilAdministrativo();
-        $perfil = $perfiles->orderBy('created_at')->orderBy('id')->first();
-        if ($perfil) {
-            $perfil->update($data);
 
-            return new JsonResource($perfil->refresh());
-        }
+        return DB::transaction(function () use ($request, $usuario, $vinculo): JsonResource|JsonResponse {
+            Usuario::query()->whereKey($usuario)->lockForUpdate()->firstOrFail();
+            $this->exigirLegajo($usuario);
+            $actual = VinculoLaboral::query()->where('usuario_id', $usuario)->lockForUpdate()->findOrFail($vinculo);
+            abort_if($actual->anulado || $actual->fecha_cese !== null, 409, 'El vínculo está cerrado o anulado.');
+            $docente = $actual->tipo_personal === 'docente';
+            $data = $this->validar($request, self::REGLAS_PERFIL[$docente ? 'docente' : 'administrativo']);
+            $perfiles = $docente ? $actual->perfilDocente() : $actual->perfilAdministrativo();
+            $perfil = $perfiles->orderBy('created_at')->orderBy('id')->lockForUpdate()->first();
+            $antes = $perfil?->getAttributes();
+            if ($perfil) {
+                $perfil->update($data);
+            } else {
+                $perfil = $perfiles->create($data);
+            }
+            AuditoriaInstitucional::registrar('vinculos_laborales', $actual->id, $antes ? 'vinculo.perfil_corregido' : 'vinculo.perfil_registrado', $request, $usuario, $antes,
+                [...$perfil->refresh()->getAttributes(), 'tipo_perfil' => $docente ? 'docente' : 'administrativo']);
 
-        return $this->creado($perfiles->create($data));
+            return $antes ? new JsonResource($perfil) : $this->creado($perfil);
+        });
     }
 
     public function storeAdenda(Request $request, string $usuario): JsonResponse
@@ -251,7 +276,16 @@ class Seccion02Controller extends Controller
         ]);
         $this->documento($usuario, $data, 'vinculo_adendas');
 
-        return $this->creado(VinculoAdenda::query()->create([...$data, 'registrado_por' => $request->user()->getAuthIdentifier()]));
+        return $this->creado(DB::transaction(function () use ($request, $usuario, $data): VinculoAdenda {
+            Usuario::query()->whereKey($usuario)->lockForUpdate()->firstOrFail();
+            $this->exigirLegajo($usuario);
+            $vinculo = VinculoLaboral::query()->where('usuario_id', $usuario)->lockForUpdate()->findOrFail($data['vinculo_laboral_id']);
+            abort_if($vinculo->anulado || $vinculo->fecha_cese !== null, 409, 'El vínculo está cerrado o anulado.');
+            $adenda = VinculoAdenda::query()->create([...$data, 'registrado_por' => $request->user()->getAuthIdentifier()]);
+            AuditoriaInstitucional::registrar('vinculos_laborales', $vinculo->id, 'vinculo.adenda_registrada', $request, $usuario, null, $adenda->getAttributes());
+
+            return $adenda;
+        }));
     }
 
     public function storeInduccion(Request $request, string $usuario): JsonResponse
@@ -312,7 +346,28 @@ class Seccion02Controller extends Controller
 
         // TODO pendiente de confirmar con el cliente: anular un vínculo no anula sus adendas, inducciones ni
         // períodos de prueba (quedan registrados; el vínculo ya no recibe registros nuevos).
-        return $this->anular($request, $query->findOrFail($registro));
+        return DB::transaction(function () use ($request, $usuario, $query, $registro, $modelo): JsonResource|JsonResponse {
+            Usuario::query()->whereKey($usuario)->lockForUpdate()->firstOrFail();
+            $actual = $query->lockForUpdate()->findOrFail($registro);
+            if ($actual->anulado) {
+                return response()->json(['message' => 'El registro ya está anulado.'], 409);
+            }
+            $vinculoId = $modelo === VinculoLaboral::class ? $actual->id : $actual->vinculo_laboral_id;
+            if ($vinculoId) {
+                VinculoLaboral::query()->whereKey($vinculoId)->lockForUpdate()->firstOrFail();
+            }
+            $antes = $actual->getAttributes();
+            $respuesta = $this->anular($request, $actual);
+            $accion = match ($modelo) {
+                VinculoLaboral::class => 'vinculo.anulado',
+                VinculoAdenda::class => 'vinculo.adenda_anulada',
+                Induccion::class => 'vinculo.induccion_anulada',
+                default => 'vinculo.prueba_anulada',
+            };
+            AuditoriaInstitucional::registrar($vinculoId ? 'vinculos_laborales' : $actual->getTable(), $vinculoId ?? $actual->id, $accion, $request, $usuario, $antes, $actual->getAttributes());
+
+            return $respuesta;
+        });
     }
 
     private function nivel(bool $completo, bool $alguno): string
@@ -329,12 +384,12 @@ class Seccion02Controller extends Controller
      */
     private function vinculo(VinculoLaboral $vinculo, int $aviso, Collection $inducciones): array
     {
-        $hoy = today();
+        $hoy = now('America/Lima')->startOfDay();
         $adendas = $vinculo->vinculoAdendas;
-        $fin = $adendas->last()?->fecha_fin ?? $vinculo->fecha_fin_prevista;
-        $dias = $fin ? (int) $hoy->diffInDays($fin, false) : null;
+        $fin = VigenciaLaboral::fin($vinculo);
+        $dias = $fin ? (int) $hoy->diffInDays(Carbon::parse($fin->format('Y-m-d'), 'America/Lima'), false) : null;
         $estado = match (true) {
-            $vinculo->fecha_cese !== null => 'cesado',
+            $vinculo->fecha_cese !== null && $vinculo->fecha_cese->format('Y-m-d') < $hoy->toDateString() => 'cesado',
             $vinculo->fecha_inicio->gt($hoy) => 'por_iniciar',
             $fin === null => 'sin_fin',
             $dias < 0 => 'vencido',
@@ -351,7 +406,7 @@ class Seccion02Controller extends Controller
             'registrado_por' => $this->nombre($vinculo->registradoPor),
             'unidad_organica' => $vinculo->unidadOrganica?->nombre,
             'cerrado' => $vinculo->fecha_cese !== null,
-            'vigente' => in_array($estado, ['sin_fin', 'vigente', 'por_vencer'], true),
+            'vigente' => VigenciaLaboral::vigente($vinculo),
             'vencimiento' => ['estado' => $estado, 'fin_efectivo' => $fin?->format('Y-m-d'), 'por_adenda' => $adendas->isNotEmpty(), 'dias' => $dias],
             'adendas' => $this->filas($adendas, ['numero', 'motivo', 'fecha_inicio', 'fecha_fin', 'documento_id', 'created_at']),
             'inducciones_faltantes' => array_values(array_diff(['general', 'especifica'], $tiposInduccion)),
@@ -378,6 +433,7 @@ class Seccion02Controller extends Controller
             'cargado' => $documentos->contains(fn (DocumentoUsuario $documento): bool => in_array($documento->estado, ResumenSeccion02::ESTADOS_CARGADO, true)),
             'recepcionado' => $documentos->contains(fn (DocumentoUsuario $documento): bool => in_array($documento->estado, ResumenSeccion02::ESTADOS_CARGADO, true) && EstadoDocumento::recepcionado($documento)),
             'verificado' => $documentos->contains('estado', 'verificado'),
+            'completo' => $documentos->contains(fn (DocumentoUsuario $doc): bool => ! $doc->documentosUsuarioPorSubsanaADocumento()->exists() && EstadoDocumento::aprobado($doc, $tipo)),
             'documentos' => $documentos->count(),
             // Metadatos obligatorios del último documento (sin datos de almacenamiento).
             'documento' => $ultimo ? $this->fila($ultimo, ['estado', 'fecha_incorporacion', 'folio_inicio', 'folio_fin', 'emisor', 'fecha_emision', 'titular_nombre', 'titular_documento', 'num_resolucion', 'fecha_recepcion'])['values'] : null,

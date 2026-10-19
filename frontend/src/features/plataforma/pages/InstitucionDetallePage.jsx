@@ -1,8 +1,10 @@
+import OperacionInstitucion from './OperacionInstitucion'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { activarInstitucion, aprovisionarInstitucion, editarInstitucion, mensajeError, sesionTerminada, suspenderInstitucion, verInstitucion } from '../api'
+import { archivarInstitucion, activarInstitucion, aprovisionarInstitucion, editarInstitucion, mensajeError, sesionTerminada, suspenderInstitucion, verInstitucion } from '../api'
 import { Aviso, Credenciales, EstadoInstitucion, EstadoServicio, SinAprovisionar } from '../componentes'
 import AdministradoresInstitucion from './AdministradoresInstitucion'
+import ExportarInstitucion from './ExportarInstitucion'
 import ServicioInstitucion from './ServicioInstitucion'
 import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, accionesDisponibles, cambios, etiquetaAccion, fecha } from '../estado'
 import { useSesionPlataforma } from '../sesion'
@@ -20,7 +22,8 @@ function ConfirmarEstado({ accion, institucion, onConfirmar, onCerrar }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   useEffect(() => { ref.current?.showModal() }, [])
-  const suspender = accion === 'suspender'
+  const archivar = accion === 'archivar'
+  const suspender = accion === 'suspender' || archivar
   async function confirmar(event) {
     event.preventDefault()
     if (busy) return
@@ -35,12 +38,12 @@ function ConfirmarEstado({ accion, institucion, onConfirmar, onCerrar }) {
   }
   return <dialog ref={ref} onClose={onCerrar} aria-labelledby="titulo-confirmar" className="m-auto w-full max-w-md rounded-2xl p-0 backdrop:bg-slate-900/40">
     <form onSubmit={confirmar} aria-busy={busy} className="space-y-4 p-6">
-      <h2 id="titulo-confirmar" className="text-lg font-bold text-slate-900">{suspender ? 'Suspender' : accionesDisponibles(institucion).textoActivar} «{institucion.nombre}»</h2>
-      <p className="text-sm text-slate-600">{suspender ? `Su base de datos, sus archivos y sus datos se conservan: nada se borra.${institucion.suspension_bloquea_acceso ? ` ${AVISO_SUSPENSION_BLOQUEA}` : ''}` : 'La institución quedará activa. Solo es posible porque su aprovisionamiento está verificado.'}</p>
-      {suspender && !institucion.suspension_bloquea_acceso && <Aviso tipo="info">{AVISO_SUSPENSION}</Aviso>}
+      <h2 id="titulo-confirmar" className="text-lg font-bold text-slate-900">{archivar ? 'Archivar' : suspender ? 'Suspender' : accionesDisponibles(institucion).textoActivar} «{institucion.nombre}»</h2>
+      <p className="text-sm text-slate-600">{archivar ? 'Se cerrará el acceso y se conservarán la base y los archivos. No habrá borrado automático ni reactivación directa.' : suspender ? `Su base de datos, sus archivos y sus datos se conservan: nada se borra.${institucion.suspension_bloquea_acceso ? ` ${AVISO_SUSPENSION_BLOQUEA}` : ''}` : 'La institución quedará activa. Solo es posible porque su aprovisionamiento está verificado.'}</p>
+      {suspender && !archivar && !institucion.suspension_bloquea_acceso && <Aviso tipo="info">{AVISO_SUSPENSION}</Aviso>}
       <Aviso>{error}</Aviso>
       <label className="grid gap-2 text-xs font-medium text-slate-600">{suspender ? 'Motivo *' : 'Motivo (opcional)'}<textarea required={suspender} minLength={suspender ? 5 : undefined} maxLength={500} rows={3} value={motivo} onChange={event => setMotivo(event.target.value)} disabled={busy} className={entrada} /></label>
-      <div className="flex justify-end gap-3"><button type="button" onClick={() => ref.current.close()} disabled={busy} className="rounded-xl border border-slate-200 px-4 py-2 text-sm">Cancelar</button><button type="submit" disabled={busy} className={`rounded-xl px-4 py-2 text-sm font-semibold text-white ${suspender ? 'bg-rose-700' : 'bg-teal-700'}`}>{busy ? 'Guardando…' : suspender ? 'Suspender' : 'Confirmar'}</button></div>
+      <div className="flex justify-end gap-3"><button type="button" onClick={() => ref.current.close()} disabled={busy} className="rounded-xl border border-slate-200 px-4 py-2 text-sm">Cancelar</button><button type="submit" disabled={busy} className={`rounded-xl px-4 py-2 text-sm font-semibold text-white ${suspender ? 'bg-rose-700' : 'bg-teal-700'}`}>{busy ? 'Guardando…' : archivar ? 'Archivar conservando datos' : suspender ? 'Suspender' : 'Confirmar'}</button></div>
     </form>
   </dialog>
 }
@@ -129,13 +132,14 @@ export default function InstitucionDetallePage() {
   }
   async function cambiarEstado(motivo) {
     try {
-      if (confirmar === 'suspender') await suspenderInstitucion(institucion.id, motivo)
+      if (confirmar === 'archivar') await archivarInstitucion(institucion.id, motivo)
+      else if (confirmar === 'suspender') await suspenderInstitucion(institucion.id, motivo)
       else await activarInstitucion(institucion.id, motivo)
     } catch (failure) {
       if (sesionTerminada(failure)) terminada()
       throw failure
     }
-    setAviso(confirmar === 'suspender' ? 'Institución suspendida. Sus datos se conservan.' : 'Institución activa.')
+    setAviso(confirmar === 'archivar' ? 'Institución archivada. Se conserva toda su información.' : confirmar === 'suspender' ? 'Institución suspendida. Sus datos se conservan.' : 'Institución activa.')
     setConfirmar(null)
     recargar()
   }
@@ -176,7 +180,9 @@ export default function InstitucionDetallePage() {
       <Dato etiqueta="Registrada">{fecha(institucion.created_at)}</Dato>
       <Dato etiqueta="Última modificación">{fecha(institucion.updated_at)}</Dato>
     </dl>}
-    <ServicioInstitucion institucion={institucion} onCambio={recargar} />
+    {institucion.estado === 'suspendida' && <div className="rounded-2xl border border-slate-200 bg-white p-5"><h2 className="font-semibold">Baja y archivo</h2><p className="my-3 text-sm text-slate-600">Archivar cierra el acceso y conserva los registros y los archivos, sin borrado automático.</p><button type="button" onClick={() => { setAviso(''); setConfirmar('archivar') }} className="rounded-xl border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-800">Archivar institución</button></div>}
+    <ExportarInstitucion institucion={institucion} />
+    <OperacionInstitucion key={institucion.id} institucion={institucion} /><ServicioInstitucion institucion={institucion} onCambio={recargar} />
     {institucion.aprovisionada && <AdministradoresInstitucion institucion={institucion} onCambio={recargar} />}
     <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
       <h2 className="font-semibold text-slate-800">Auditoría</h2>

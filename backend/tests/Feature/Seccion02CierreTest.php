@@ -8,6 +8,7 @@ use App\Models\PerfilAdministrativo;
 use App\Models\PerfilDocente;
 use App\Models\RegimenNormativo;
 use App\Models\SeccionLegajo;
+use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
@@ -214,7 +215,7 @@ class Seccion02CierreTest extends TestCase
         $this->assertSame(1, LegajoSeccion::query()->where('legajo_id', $id)->where('seccion_legajo_id', 2)->value('ultimo_folio'));
     }
 
-    public function test_opening_does_not_touch_existing_legajos_and_passive_references_do_not_need_section_13_row(): void
+    public function test_opening_preserves_existing_legajos_and_generic_references_cannot_bypass_the_archive_flow(): void
     {
         $this->seed(SeccionesLegajoCatalogoSeeder::class);
         $admin = $this->actuarComo();
@@ -229,11 +230,11 @@ class Seccion02CierreTest extends TestCase
         $id = $this->postJson($this->url($persona, 'legajo'))->assertCreated()->assertJsonPath('data.secciones', 12)->json('data.id');
         $this->assertSame($filasAnteriores, LegajoSeccion::query()->where('legajo_id', $anterior->id)->orderBy('seccion_legajo_id')->get(['id', 'seccion_legajo_id', 'ultimo_folio'])->toArray());
 
-        // Una referencia a un legajo pasivo se registra sin que exista la fila 13 del legajo nuevo, y no la crea.
+        // El CRUD genérico no permite crear referencias sin comprobar el documento de origen.
         $vinculo = VinculoLaboral::factory()->create(['usuario_id' => $persona->id]);
         $this->postJson('/api/v1/referencias-legajo-pasivo', ['legajo_id' => $id, 'vinculo_laboral_id' => $vinculo->id,
             'tipo_documento_id' => $this->tipo02('a')->id, 'folio_inicio_pasivo' => 1, 'folio_fin_pasivo' => 3,
-            'responsable_legajo_id' => $admin->id])->assertCreated();
+            'responsable_legajo_id' => $admin->id])->assertConflict();
         $this->assertFalse(LegajoSeccion::query()->where('legajo_id', $id)->where('seccion_legajo_id', 13)->exists());
         $this->assertSame(range(1, 12), LegajoSeccion::query()->where('legajo_id', $id)->orderBy('seccion_legajo_id')->pluck('seccion_legajo_id')->all());
     }
@@ -245,6 +246,7 @@ class Seccion02CierreTest extends TestCase
         $this->postJson($this->url($persona, 'legajo'))->assertForbidden();
 
         $this->actuarComo();
+        TipoDocumento::query()->where('seccion_legajo_id', 12)->delete();
         SeccionLegajo::query()->whereKey(12)->delete();
         $this->postJson($this->url($persona, 'legajo'))->assertConflict();
         $this->assertSame(0, Legajo::query()->where('usuario_id', $persona->id)->count());

@@ -106,6 +106,12 @@ class AuthController extends Controller
     private function sesion(Usuario $usuario): JsonResponse
     {
         return response()->json(['data' => [
+            'entorno' => match (app()->environment()) {
+                'production' => 'Producción',
+                'staging' => 'Pruebas',
+                'local' => 'Local',
+                default => 'Institucional',
+            },
             'usuario' => $usuario->only(['id', 'nombres', 'apellido_paterno', 'apellido_materno', 'email_institucional']),
             'permisos' => $usuario->permisos(),
             've_datos_sensibles' => $usuario->veDatosSensibles(),

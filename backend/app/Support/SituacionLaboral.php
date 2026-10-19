@@ -5,12 +5,7 @@ namespace App\Support;
 use App\Models\Usuario;
 use Illuminate\Database\Eloquent\Builder;
 
-/**
- * Situación laboral de una persona en los listados, separada de su acceso al sistema (usuarios.activo, la cuenta).
- * Vínculo vigente con el mismo criterio de PuestoActual (no anulado y sin fecha de cese), y legajo activo como en la
- * apertura (AperturaLegajo). Un vínculo vigente manda: la persona no aparece sin vínculo por no tener legajo activo.
- * TODO pendiente de confirmar con el cliente: criterio único de vigencia (un vínculo vencido sin cese sigue vigente aquí).
- */
+/** Situación laboral por fechas efectivas incluidas, separada del acceso a la cuenta (usuarios.activo). */
 final class SituacionLaboral
 {
     public const VINCULO_VIGENTE = 'vinculo_vigente';
@@ -23,7 +18,7 @@ final class SituacionLaboral
     public static function cargar(Builder $query): Builder
     {
         return $query->withExists([
-            'vinculosLaborales as tiene_vinculo_vigente' => fn (Builder $vinculos) => $vinculos->where('anulado', false)->whereNull('fecha_cese'),
+            'vinculosLaborales as tiene_vinculo_vigente' => fn (Builder $vinculos) => $vinculos->vigente(),
             'legajos as tiene_legajo_activo' => fn (Builder $legajos) => $legajos->where('estado_legajo', 'activo'),
         ]);
     }

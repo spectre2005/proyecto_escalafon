@@ -38,6 +38,7 @@ class ProcesoFiscalizacion extends Model
     protected function casts(): array
     {
         return [
+            'version' => 'integer',
             'fecha_vinculacion' => 'date',
             'fecha_inicio' => 'date',
             'fecha_limite' => 'date',

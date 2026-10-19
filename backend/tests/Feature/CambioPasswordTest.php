@@ -86,6 +86,16 @@ class CambioPasswordTest extends TestCase
         $this->getJson('/api/v1/institucion')->assertOk();
     }
 
+    public function test_a_normal_account_can_change_password_without_being_temporary(): void
+    {
+        $this->postJson('/api/v1/auth/login', ['email' => self::EMAIL, 'password' => self::TEMPORAL])->assertOk();
+        $this->cambiar(['password_actual' => self::TEMPORAL, 'password' => self::NUEVA, 'password_confirmation' => self::NUEVA])
+            ->assertOk()->assertJsonPath('data.debe_cambiar_password', false)
+            ->assertJsonPath('data.entorno', 'Institucional');
+        $this->getJson('/api/v1/auth/me')->assertOk();
+        $this->assertTrue(Hash::check(self::NUEVA, Usuario::query()->where('email_institucional', self::EMAIL)->value('password')));
+    }
+
     public function test_the_production_password_policy_explains_what_is_missing(): void
     {
         $this->conTemporal();

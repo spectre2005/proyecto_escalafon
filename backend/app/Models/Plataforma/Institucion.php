@@ -25,7 +25,9 @@ class Institucion extends Model
 
     public const SUSPENDIDA = 'suspendida';
 
-    public const ESTADOS = [self::REGISTRADA, self::ACTIVA, self::SUSPENDIDA];
+    public const ARCHIVADA = 'archivada';
+
+    public const ESTADOS = [self::REGISTRADA, self::ACTIVA, self::SUSPENDIDA, self::ARCHIVADA];
 
     public const PATRON_SLUG = '/^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/';
 
@@ -41,12 +43,12 @@ class Institucion extends Model
 
     protected $table = 'instituciones';
 
-    protected $fillable = ['nombre', 'slug', 'estado', 'base_datos', 'almacenamiento', 'aprovisionada_en', 'suspendida_en', 'motivo_suspension', 'dias_gracia'];
+    protected $fillable = ['nombre', 'slug', 'estado', 'base_datos', 'almacenamiento', 'aprovisionada_en', 'suspendida_en', 'motivo_suspension', 'dias_gracia', 'archivada_en', 'motivo_archivo'];
 
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['aprovisionada_en' => 'datetime', 'suspendida_en' => 'datetime', 'dias_gracia' => 'integer'];
+        return ['fecha_inicio_contrato' => 'date', 'version_contrato' => 'integer', 'archivada_en' => 'datetime', 'aprovisionada_en' => 'datetime', 'suspendida_en' => 'datetime', 'dias_gracia' => 'integer'];
     }
 
     public function periodos(): HasMany
@@ -117,6 +119,7 @@ class Institucion extends Model
     public function motivoNoActivable(): ?string
     {
         return match (true) {
+            $this->estado === self::ARCHIVADA => 'La institución está archivada y conserva sus datos. No admite reactivación directa.',
             $this->estado === self::ACTIVA => 'La institución ya está activa.',
             ! $this->aprovisionada() => 'La institución aún no está aprovisionada: su base de datos, su almacenamiento y su configuración deben estar listos y verificados.',
             default => null,
@@ -126,6 +129,7 @@ class Institucion extends Model
     public function motivoNoSuspendible(): ?string
     {
         return match ($this->estado) {
+            self::ARCHIVADA => 'La institución ya está archivada y sin acceso.',
             self::SUSPENDIDA => 'La institución ya está suspendida.',
             self::REGISTRADA => 'Una institución aún no activa no se suspende: todavía no opera.',
             default => null,
@@ -136,7 +140,8 @@ class Institucion extends Model
     public function datos(): array
     {
         return [
-            ...$this->only(['id', 'nombre', 'slug', 'estado', 'base_datos', 'almacenamiento', 'motivo_suspension']),
+            ...$this->only(['id', 'nombre', 'slug', 'estado', 'base_datos', 'almacenamiento', 'motivo_suspension', 'motivo_archivo']),
+            'archivada_en' => $this->archivada_en?->toIso8601String(),
             'aprovisionada' => $this->aprovisionada(),
             'aprovisionada_en' => $this->aprovisionada_en?->toIso8601String(),
             'suspendida_en' => $this->suspendida_en?->toIso8601String(),

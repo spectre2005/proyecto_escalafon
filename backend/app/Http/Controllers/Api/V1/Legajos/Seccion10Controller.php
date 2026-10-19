@@ -15,6 +15,7 @@ use App\Support\Documentos\RegistroSeccion10;
 use App\Support\Documentos\RevisionDocumento;
 use App\Support\Parametros;
 use App\Support\ResumenSeccion10;
+use App\Support\VigenciaLaboral;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -40,8 +41,7 @@ class Seccion10Controller extends Controller
         $anteriores = $docs->reject(fn (array $doc): bool => isset(ResumenSeccion10::TIPOS[$doc['codigo_tipo']]))
             ->when($subseccion, fn ($docs) => $docs->filter(fn (array $doc): bool => ! in_array($doc['subseccion'], ['10.1', '10.2'], true) || $doc['subseccion'] === $subseccion))->values();
         $vinculos = $persona->vinculosLaborales->where('anulado', false);
-        $actual = $vinculos->filter(fn ($v): bool => $v->fecha_inicio->format('Y-m-d') <= $hoy
-            && (! $v->fecha_cese || $v->fecha_cese->format('Y-m-d') >= $hoy))->sortByDesc('fecha_inicio')->first();
+        $actual = $vinculos->filter(fn ($v): bool => VigenciaLaboral::vigente($v, $hoy))->sortByDesc('fecha_inicio')->first();
 
         return response()->json(['data' => [
             'persona' => [...$persona->only(['id', 'nombres', 'apellido_paterno', 'apellido_materno', 'numero_doc_identidad', 'tipo_doc_identidad',

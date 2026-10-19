@@ -21,7 +21,7 @@ class VinculoLaboralFactory extends Factory
             'regimen_laboral' => 'plazo_determinado',
             'regimen_normativo_id' => RegimenNormativo::factory(),
             'nombre_puesto' => substr(fake()->word(), 0, 150),
-            'fecha_inicio' => now(),
+            'fecha_inicio' => now('America/Lima')->startOfDay(),
         ];
     }
 }

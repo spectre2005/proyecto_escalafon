@@ -10,6 +10,7 @@ use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Support\AplicacionDocumental;
 use App\Support\ConfiguracionFuncionalidades;
+use App\Support\Documentos\AlmacenDocumento;
 use App\Support\Documentos\ArchivoPdf;
 use App\Support\Documentos\AuditoriaDocumento;
 use App\Support\Documentos\CargaDocumento;
@@ -214,11 +215,12 @@ class DocumentoLegajoController extends Controller
         $accion = $request->validate(['accion' => 'sometimes|in:ver,descargar'])['accion'] ?? 'ver';
         $registro = $this->documentoDe($request, $usuario, $documento);
         $archivo = $registro->archivo;
-        abort_if(in_array($registro->seccion_legajo_id, [3, 4, 6, 10], true) && $archivo?->estado_antivirus === 'infectado', 423,
+        abort_if($archivo?->estado_antivirus === 'infectado', 423,
             'El archivo está bloqueado por el antivirus. Registra un documento nuevo que lo subsane.');
         $disco = (string) config('legajo.disco_documentos');
         abort_unless($archivo && $archivo->almacenamiento === $disco && Storage::disk($disco)->exists($archivo->storage_path), 404, 'El documento no tiene un archivo disponible.');
 
+        $contenido = AlmacenDocumento::leer($archivo);
         BitacoraAccesoLegajo::query()->create([
             'legajo_id' => $registro->legajo_id, 'documento_id' => $registro->id, 'usuario_id' => $request->user()->getAuthIdentifier(),
             'accion' => $accion, 'ip_origen' => $request->ip(), 'user_agent' => mb_substr((string) $request->userAgent(), 0, 300), 'fecha_acceso' => now(),
@@ -231,7 +233,9 @@ class DocumentoLegajoController extends Controller
         }
         $cabeceras = ['Content-Type' => 'application/pdf', 'X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, no-store'];
 
-        return Storage::disk($disco)->response($archivo->storage_path, $archivo->nombre_original, $cabeceras, $accion === 'ver' ? 'inline' : 'attachment');
+        return response()->streamDownload(static function () use ($contenido): void {
+            echo $contenido;
+        }, $archivo->nombre_original, $cabeceras, $accion === 'ver' ? 'inline' : 'attachment');
     }
 
     /** Documento de la persona; si es de una sección o tipo sensible, exige datos_sensibles.ver. */

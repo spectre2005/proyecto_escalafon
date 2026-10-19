@@ -11,6 +11,7 @@ use App\Support\AplicacionDocumental;
 use Closure;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -38,22 +39,31 @@ final class CargaDocumento
         if ($noAplica !== null) {
             throw ValidationException::withMessages(['tipo_documento_id' => "Este tipo de documento no corresponde a la persona. {$noAplica}"]);
         }
+        $contenido = file_get_contents($pdf->getRealPath());
+        if ($contenido === false) {
+            throw new RuntimeException('No se pudo leer el PDF. Intenta nuevamente.');
+        }
+        try {
+            app(AnalizadorAntivirus::class)->analizar($contenido);
+        } catch (ValidationException $error) {
+            Log::warning('PDF rechazado por antivirus', ['actor_usuario_id' => $autor, 'usuario_titular_id' => $legajo->usuario_id,
+                'tipo_documento_id' => $tipo->id, 'hash_sha256' => hash('sha256', $contenido), 'ip_origen' => $ip]);
+            throw $error;
+        }
+        $protegido = AlmacenDocumento::cifrar($contenido);
         $disco = (string) config('legajo.disco_documentos');
         $ruta = sprintf('legajos/%s/seccion-%02d/%s.pdf', $legajo->id, $tipo->seccion_legajo_id, Str::uuid());
         $archivo = [
             'almacenamiento' => $disco, 'storage_path' => $ruta, 'nombre_original' => mb_substr($pdf->getClientOriginalName(), 0, 255),
             'mime_type' => 'application/pdf', 'tamano_bytes' => $pdf->getSize(), 'hash_sha256' => ArchivoPdf::hash($pdf),
             'num_paginas' => ArchivoPdf::paginas($pdf),
-            // TODO pendiente de confirmar con el cliente: cifrado en reposo. Hoy el archivo no se cifra.
-            'cifrado' => false,
-            // TODO: sin antivirus integrado todavía; queda pendiente de revisión.
-            'estado_antivirus' => 'pendiente',
+            'cifrado' => true, 'estado_antivirus' => 'limpio',
             'subido_por' => $autor,
         ];
         if ($foliosAutomaticos && (! $archivo['num_paginas'] || $archivo['num_paginas'] < 1)) {
             throw ValidationException::withMessages(['pdf' => 'No se pudo contar las páginas del PDF para asignar sus folios. Guarda una copia del PDF e intenta nuevamente.']);
         }
-        if (! Storage::disk($disco)->putFileAs(dirname($ruta), $pdf, basename($ruta))) {
+        if (! Storage::disk($disco)->put($ruta, $protegido)) {
             throw new RuntimeException('No se pudo almacenar el PDF. Intenta nuevamente.');
         }
 
@@ -69,6 +79,9 @@ final class CargaDocumento
                         ->whereDoesntHave('documentosUsuarioPorSubsanaADocumento')->orderByDesc('folio_fin')->value('id');
                 }
                 Folios::reservar($legajo, $tipo->seccion_legajo_id, $metadatos['folio_inicio'], $metadatos['folio_fin']);
+                if ($archivo['num_paginas'] !== $metadatos['folio_fin'] - $metadatos['folio_inicio'] + 1) {
+                    throw ValidationException::withMessages(['folio_fin' => 'El rango de folios debe coincidir con las '.$archivo['num_paginas'].' páginas reales del PDF (un folio por página).']);
+                }
                 self::validarSubsanacion($legajo, $tipo, $subsanaA);
                 $registroArchivo = ArchivoDocumento::query()->create([...$archivo, 'subido_en' => now()]);
                 $documento = DocumentoUsuario::query()->create([...$metadatos,

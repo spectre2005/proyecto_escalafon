@@ -9,6 +9,7 @@ use App\Models\Legajo;
 use App\Models\ParametroSistema;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
+use App\Support\Documentos\AlmacenDocumento;
 use Database\Seeders\Seccion04CatalogoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -51,7 +52,7 @@ class Seccion04ApiTest extends TestCase
         $tipo = TipoDocumento::query()->where('codigo', $codigo)->firstOrFail();
         $folio = (int) DocumentoUsuario::query()->where('legajo_id', $this->legajo->id)->where('seccion_legajo_id', 4)->max('folio_fin') + 1;
         $datos = ['tipo_documento_id' => $tipo->id, 'nombre' => 'Constancia de ejemplo', 'emisor' => 'Entidad de ejemplo', 'fecha_emision' => '2026-10-01',
-            'folio_inicio' => $folio, 'folio_fin' => $folio, 'modalidad_presentacion' => 'copia_fedateada', 'pdf' => $this->pdf()];
+            'folio_inicio' => $folio, 'folio_fin' => $folio, 'modalidad_presentacion' => 'copia_fedateada', 'pdf' => $this->pdf(paginas: max(1, ($cambios['folio_fin'] ?? $folio) - ($cambios['folio_inicio'] ?? $folio) + 1))];
         if ($codigo === 'EXP_CERTIFICADO_TRABAJO') {
             $datos += ['sector' => 'publico', 'cargo' => 'Docente', 'fecha_inicio' => '2024-01-01', 'fecha_fin' => '2024-01-10', 'tipo_vinculo' => 'planilla',
                 'es_ejercicio_profesional' => true, 'es_docencia_universitaria' => true];
@@ -86,8 +87,8 @@ class Seccion04ApiTest extends TestCase
         $this->assertDatabaseHas('experiencia_laboral', ['documento_id' => $id, 'registrado_por' => $this->autor->id, 'sector' => 'publico', 'tipo_vinculo' => 'planilla']);
         $this->assertDatabaseHas('historial_estados_documento', ['documento_usuario_id' => $id, 'estado_nuevo' => 'pendiente']);
         $this->assertDatabaseHas('auditoria_eventos', ['entidad_id' => $id, 'accion' => 'experiencia.documento.creado']);
-        $this->assertSame('pendiente', $doc->archivo->estado_antivirus);
-        $this->assertSame(hash('sha256', Storage::disk(config('legajo.disco_documentos'))->get($doc->archivo->storage_path)), $doc->archivo->hash_sha256);
+        $this->assertSame('limpio', $doc->archivo->estado_antivirus);
+        $this->assertSame(hash('sha256', AlmacenDocumento::leer($doc->archivo)), $doc->archivo->hash_sha256);
         $this->getJson($this->url())->assertOk()->assertJsonPath('data.numero_folios', 1)->assertJsonPath('data.folio_sugerido', 2)->assertJsonPath('data.tiempo.total.dias_totales', 0);
         ParametroSistema::query()->where('clave', 'exp_incluir_pendientes')->update(['valor' => '1']);
         $this->getJson($this->url())->assertOk()->assertJsonPath('data.tiempo.total.dias_totales', 10);

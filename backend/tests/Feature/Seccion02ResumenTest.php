@@ -94,7 +94,7 @@ class Seccion02ResumenTest extends TestCase
         $this->assertSame(10, count($data['resumen']['exigidos']));
         $this->assertSame([2, 1], [$data['resumen']['exigidos_cargados'], $data['resumen']['exigidos_verificados']]);
         $seleccion = $this->subseccion($data, '2.1');
-        $this->assertSame(['completa', 2, 2, 1], [$seleccion['estado'], $seleccion['exigidos'], $seleccion['exigidos_cargados'], $seleccion['exigidos_verificados']]);
+        $this->assertSame(['parcial', 2, 2, 1], [$seleccion['estado'], $seleccion['exigidos'], $seleccion['exigidos_cargados'], $seleccion['exigidos_verificados']]);
         $this->assertSame('ORH', $seleccion['tipos'][0]['documento']['emisor']);
         $this->assertNull($seleccion['tipos'][0]['documento']['titular_nombre']);
         $this->assertSame('parcial', $this->subseccion($data, '2.2')['estado']);

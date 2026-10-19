@@ -77,6 +77,17 @@ class RequerimientoDocumentoPanelTest extends TestCase
             ->assertJsonPath('data.0.id', $matching->id);
     }
 
+    public function test_search_matches_full_name_with_or_without_maternal_surname(): void
+    {
+        foreach (['Materno', null] as $materno) {
+            $person = Usuario::factory()->create(['nombres' => 'Ana Maria', 'apellido_paterno' => 'Prueba', 'apellido_materno' => $materno]);
+            $requirement = RequerimientoDocumento::factory()->create(['usuario_id' => $person->id]);
+            $name = trim('Ana Maria Prueba '.($materno ?? ''));
+            $this->getJson('/api/v1/requerimientos-documentos?q='.urlencode($name))
+                ->assertOk()->assertJsonFragment(['id' => $requirement->id]);
+        }
+    }
+
     public function test_index_paginates_results_and_preserves_the_filtered_total(): void
     {
         $person = Usuario::factory()->create();
@@ -115,43 +126,13 @@ class RequerimientoDocumentoPanelTest extends TestCase
             ->assertJsonValidationErrors('q');
     }
 
-    public function test_api_validates_and_persists_a_requirement_using_existing_fields(): void
+    public function test_generic_mutations_are_rejected_in_favor_of_the_audited_workflow(): void
     {
-        $person = Usuario::factory()->create();
-        $requester = Usuario::factory()->create();
-
-        $payload = [
-            'usuario_id' => $person->id,
-            'origen' => 'legajo',
-            'descripcion' => 'Solicitud de documento ficticia',
-            'fecha_requerimiento' => '2026-09-01',
-            'plazo_dias_habiles' => 5,
-            'fecha_limite' => '2026-09-08',
-            'estado' => 'abierto',
-            'solicitado_por' => $requester->id,
-        ];
-
-        $this->postJson('/api/v1/requerimientos-documentos', $payload)
-            ->assertCreated()
-            ->assertJsonPath('data.usuario_id', $person->id)
-            ->assertJsonPath('data.descripcion', 'Solicitud de documento ficticia');
-
-        $this->assertDatabaseHas('requerimientos_documentos', [
-            'usuario_id' => $person->id,
-            'solicitado_por' => $requester->id,
-            'descripcion' => 'Solicitud de documento ficticia',
-        ]);
-
-        $this->postJson('/api/v1/requerimientos-documentos', ['usuario_id' => $person->id])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors([
-                'origen',
-                'descripcion',
-                'fecha_requerimiento',
-                'plazo_dias_habiles',
-                'fecha_limite',
-                'solicitado_por',
-            ]);
+        $record = RequerimientoDocumento::factory()->create();
+        $this->postJson('/api/v1/requerimientos-documentos', [])->assertConflict();
+        $this->patchJson('/api/v1/requerimientos-documentos/'.$record->id, ['estado' => 'cumplido'])->assertConflict();
+        $this->deleteJson('/api/v1/requerimientos-documentos/'.$record->id)->assertConflict();
+        $this->assertModelExists($record);
     }
 
     public function test_fictional_seeder_creates_ten_repeatable_requirements_for_demo_people(): void

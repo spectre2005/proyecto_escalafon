@@ -2,21 +2,11 @@
 
 namespace App\Support;
 
-/**
- * Resumen de la sección 02: estado de cada subsección y conteo de tipos de documento.
- *
- * No es la fórmula de completitud del legajo (decisión abierta del cliente: ¿cuentan los cargados, los
- * recepcionados o solo los verificados?). Por eso se entregan los números por separado, calculados con los
- * documentos reales (documentos_usuario). El estado "completa" de una subsección usa los cargados.
- * TODO pendiente de confirmar con el cliente: si "completa" debe exigir documentos verificados.
- */
+/** Resumen por subsección: cargas, recepción y completitud se contabilizan por separado. */
 final class ResumenSeccion02
 {
-    /**
-     * TODO pendiente de confirmar con el cliente: qué estados cuentan como "cargado". Observado se
-     * incluye porque el documento está en el legajo; falso no.
-     */
-    public const ESTADOS_CARGADO = ['cargado', 'en_fiscalizacion', 'verificado', 'observado'];
+    /** Cargado incluye observados; completo requiere recepción y aceptación/verificación. */
+    public const ESTADOS_CARGADO = ['cargado', 'aceptado', 'en_fiscalizacion', 'verificado', 'observado'];
 
     /**
      * @param  list<array{exigido: ?bool, cargado: bool, recepcionado: bool, verificado: bool}>  $tipos
@@ -33,7 +23,7 @@ final class ResumenSeccion02
         $estado = match (true) {
             ! $aplica => 'no_aplica',
             $datos === 'ninguno' && ! $algunDocumento => 'sin_datos',
-            $datos === 'completo' && $cargados === count($exigidos) => 'completa',
+            $datos === 'completo' && count(array_filter($exigidos, fn (array $tipo): bool => ($tipo['completo'] ?? false))) === count($exigidos) => 'completa',
             default => 'parcial',
         };
 

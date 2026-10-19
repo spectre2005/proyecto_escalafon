@@ -7,7 +7,8 @@ cd "$(dirname "$0")/../.."
 dc() { docker compose --env-file .env.produccion -f docker-compose.produccion.yml "$@"; }
 
 dc build
-dc up -d --wait db
+dc up -d --wait db clamav
+dc run --rm --no-deps app php artisan documentos:clave
 # Antes de reemplazar la aplicación: si una migración falla, sigue corriendo la versión anterior.
 dc run --rm --no-deps app php artisan migrate --force
 dc run --rm --no-deps app php artisan plataforma:migrar-instituciones

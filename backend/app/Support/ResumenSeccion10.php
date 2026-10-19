@@ -31,6 +31,7 @@ final class ResumenSeccion10
             ? 'vencido' : ($vigentes->isNotEmpty() ? 'pendiente' : 'no'));
 
         return [...$tipo, 'subseccion' => $config[0], 'periodo' => $config[2], 'vigencia' => $config[3], 'entidad_eps' => $config[4],
+            'completos' => $actuales->filter(fn (array $doc): bool => in_array($doc['estado_original'], ['aceptado', 'verificado'], true) && ! empty($doc['fecha_recepcion']))->count(),
             'estado' => $estado, 'cantidad' => $presentes->count(), 'ultima_fecha' => $presentes->max('fecha_emision'),
             'numero_folios' => $vigentes->sum('numero_folios'), 'documentos' => $documentos->values()->all()];
     }

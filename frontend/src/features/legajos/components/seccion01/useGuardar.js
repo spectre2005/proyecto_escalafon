@@ -1,3 +1,4 @@
+import { todayLima } from '../../../../shared/dates'
 import { useState } from 'react'
 import { apiErrorMessage } from '../../../../axios'
 
@@ -33,4 +34,4 @@ export function useBorrador(inicial) {
   return [draft, set, poner]
 }
 
-export const hoy = () => new Date().toISOString().slice(0, 10)
+export const hoy = todayLima

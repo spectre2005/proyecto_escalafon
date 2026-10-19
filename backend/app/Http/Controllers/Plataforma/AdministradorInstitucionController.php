@@ -39,6 +39,26 @@ class AdministradorInstitucionController extends Controller
         return $this->conClave($admin, $clave, 201);
     }
 
+    public function candidato(Request $request, string $institucion): JsonResponse
+    {
+        $datos = $this->validar($request, ['email' => 'required|email|max:255']);
+        $registro = $this->institucion($institucion);
+
+        return response()->json(['data' => $this->enBase($registro, fn (): array => AdministradoresInstitucion::candidato($datos['email']))])->header('Cache-Control', 'no-store');
+    }
+
+    public function asignarExistente(Request $request, string $institucion): JsonResponse
+    {
+        $datos = $this->validar($request, ['usuario_id' => 'required|uuid', 'email_confirmado' => 'required|email|max:255', 'identidad_confirmada' => 'required|accepted', 'motivo' => 'required|string|min:5|max:500']);
+        $registro = $this->institucion($institucion);
+        abort_if($registro->estado === Institucion::ARCHIVADA, 409, 'La institución está archivada.');
+        $admin = $this->enBase($registro, fn (): Usuario => AdministradoresInstitucion::asignarExistente($datos['usuario_id'], $datos['email_confirmado']));
+        AuditoriaOperaciones::registrar('administrador_institucion.asignado_existente', $request, Auth::guard('plataforma')->id(), $registro->id, null,
+            ['usuario_id' => $admin->id, 'email' => $admin->email_institucional, 'identidad_confirmada' => true], $datos['motivo']);
+
+        return response()->json(['data' => AdministradoresInstitucion::datos($admin)])->header('Cache-Control', 'no-store');
+    }
+
     public function restablecer(Request $request, string $institucion, string $administrador): JsonResponse
     {
         $this->validar($request, []);

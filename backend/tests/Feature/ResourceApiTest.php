@@ -6,8 +6,8 @@ use App\Models\Afiliacion;
 use App\Models\ArchivoDocumento;
 use App\Models\ConfiguracionFuncionalidad;
 use App\Models\Controversia;
-use App\Models\Desvinculacion;
 use App\Models\Desplazamiento;
+use App\Models\Desvinculacion;
 use App\Models\DocumentoUsuario;
 use App\Models\EvaluacionDesempeno;
 use App\Models\Familiar;
@@ -157,11 +157,14 @@ class ResourceApiTest extends TestCase
             unset($payload['registrado_por']);
         }
         $uri = '/api/v1/'.str_replace('_', '-', $model->getTable());
-        $soloLectura = $model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento || in_array($class, [...self::SECCION_02, ...self::SECCION_05, ...self::SECCION_07, ...self::SECCION_08, ...self::SECCION_09, ...self::SECCION_10, ...self::SECCION_11], true);
+        $inmutable = in_array($model->getTable(), ['auditoria_eventos', 'historial_estados_documento', 'bitacora_accesos_legajo', 'observaciones_documento', 'referencias_legajo_pasivo'], true);
+        $operativo = $inmutable || in_array($model->getTable(), ['procesos_fiscalizacion', 'solicitudes_fiscalizacion', 'solicitudes_acceso_legajo', 'movimientos_custodia_legajo', 'notificaciones_usuario', 'requerimientos_documentos'], true);
+        $rechazo = $inmutable || $model->getTable() === 'requerimientos_documentos' ? 409 : 405;
+        $soloLectura = $operativo || $model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento || in_array($class, [...self::SECCION_02, ...self::SECCION_05, ...self::SECCION_07, ...self::SECCION_08, ...self::SECCION_09, ...self::SECCION_10, ...self::SECCION_11], true);
         if ($soloLectura) {
             // Documentos y archivos se crean únicamente por la carga del legajo (folios, hash y bitácora); los registros de
             // las secciones 02 y 05, solo desde Seccion02Controller y Seccion05Controller.
-            $this->postJson($uri, $payload)->assertStatus(405);
+            $this->postJson($uri, $payload)->assertStatus($rechazo);
             $model->save();
         }
         $id = $soloLectura ? $model->getKey() : $this->postJson($uri, $payload)->assertCreated()->json('data.id');
@@ -172,9 +175,9 @@ class ResourceApiTest extends TestCase
         if ($soloLectura) {
             // No se editan ni se eliminan por el CRUD genérico (Directiva, arts. 2.3 y 5.3). Los de la sección 02 se
             // corrigen y se anulan solo desde Seccion02Controller.
-            $this->patchJson($uri.'/'.$id, $payload)->assertStatus(405);
-            $this->putJson($uri.'/'.$id, $payload)->assertStatus(405);
-            $this->deleteJson($uri.'/'.$id)->assertStatus(405);
+            $this->patchJson($uri.'/'.$id, $payload)->assertStatus($rechazo);
+            $this->putJson($uri.'/'.$id, $payload)->assertStatus($rechazo);
+            $this->deleteJson($uri.'/'.$id)->assertStatus($rechazo);
             $this->assertDatabaseHas($model->getTable(), ['id' => $id]);
 
             return;
@@ -182,7 +185,7 @@ class ResourceApiTest extends TestCase
         $this->patchJson($uri.'/'.$id, $payload)->assertOk();
         if ($model instanceof Familiar) {
             // Los familiares se corrigen, pero no se eliminan (se anulan desde la ficha).
-            $this->deleteJson($uri.'/'.$id)->assertStatus(405);
+            $this->deleteJson($uri.'/'.$id)->assertStatus($rechazo);
             $this->assertDatabaseHas($model->getTable(), ['id' => $id]);
 
             return;

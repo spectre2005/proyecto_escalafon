@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { apiErrorMessage } from '../../axios'
 import { useLiveQuery } from '../../shared/queries/useLiveQuery'
@@ -12,6 +13,30 @@ const diasTexto = dias => dias < 0 ? `Venció hace ${-dias} día(s)` : dias === 
 
 function Campo({ label, children }) {
   return <label className="block text-sm font-medium text-slate-700"><span className="mb-2 block">{label}</span>{children}</label>
+}
+
+function MotivosCompletos({ persona, params }) {
+  const [open, setOpen] = useState(false)
+  return <details className="mt-4" onToggle={event => setOpen(event.currentTarget.open)}>
+    <summary className="cursor-pointer text-sm font-semibold text-teal-800">Ver los {persona.total_alertas} motivos</summary>
+    {open && <ListaMotivos key={params.toString()} usuario={persona.usuario_id} params={params} />}
+  </details>
+}
+
+function ListaMotivos({ usuario, params }) {
+  const [page, setPage] = useState(1)
+  const filtros = new URLSearchParams({ dias: params.get('dias') || '30', page: String(page) })
+  if (params.get('origen')) filtros.set('origen', params.get('origen'))
+  const request = useLiveQuery(`/vencimientos/${usuario}/motivos?${filtros}`)
+  return <div className="mt-3 space-y-3" aria-busy={request.loading}>
+    {request.error && <p role="alert">{apiErrorMessage(request.error)} <button className={button} onClick={request.retry}>Reintentar</button></p>}
+    {request.loading && !request.data && <p role="status">Cargando motivos…</p>}
+    {request.data && <>
+      {!request.data.data.length && <p>No hay alertas vigentes para estos criterios.</p>}
+      <ul className="space-y-3">{request.data.data.map((motivo, index) => <li key={index}><p>{fuentes[motivo.origen]}: {motivo.detalle}</p><p className={motivo.criticidad === 'rojo' ? 'text-rose-800' : 'text-amber-900'}>{fecha(motivo.fecha)} · {diasTexto(motivo.dias_restantes)}</p></li>)}</ul>
+      <nav aria-label="Paginación de motivos" className="flex flex-wrap items-center gap-2"><button className={button} disabled={request.loading || page <= 1} onClick={() => setPage(page - 1)}>Anterior</button><span role="status">{request.data.current_page} / {request.data.last_page}</span><button className={button} disabled={request.loading || page >= request.data.last_page} onClick={() => setPage(page + 1)}>Siguiente</button></nav>
+    </>}
+  </div>
 }
 
 function Resultados() {
@@ -48,7 +73,7 @@ function Resultados() {
     {request.error && <div role="alert" className="mb-5 rounded-xl bg-rose-50 p-4 text-sm text-rose-900">{apiErrorMessage(request.error)} <button onClick={request.retry} className={`${button} ml-3`}>Reintentar</button></div>}
     {request.loading && !result && <p role="status" className={`${panel} p-8`}>Consultando vencimientos…</p>}
     {result && <section aria-label="Personal con alertas de vencimiento" aria-busy={request.loading} className={`${panel} overflow-hidden`}><p role="status" className="border-b border-slate-200 p-5 text-sm text-slate-700">{result.total} persona(s) según filtros · Corte en Lima: {fecha(result.hoy)} · Orden por la fecha más antigua</p>
-      {result.data.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">Personal con alertas, una fila por persona y ordenado por fecha ascendente</caption><thead className="bg-slate-50 text-slate-700"><tr>{['Personal', 'Área', 'Estado', 'Motivos y fechas', 'Acción'].map(label => <th key={label} scope="col" className="px-5 py-4 font-semibold">{label}</th>)}</tr></thead><tbody>{result.data.map(persona => <tr key={persona.usuario_id} className="border-t border-slate-200 align-top"><th scope="row" className="px-5 py-5 font-semibold text-slate-800">{persona.nombre}<span className="mt-1 block text-xs font-normal text-slate-600">{persona.numero_doc_identidad} · {persona.tipo_personal}</span></th><td className="px-5 py-5 text-slate-700">{persona.area || 'Sin área registrada'}</td><td className="px-5 py-5"><span className={`inline-block rounded-xl px-3 py-2 text-xs font-semibold ${persona.estado === 'desactualizado' ? 'bg-rose-100 text-rose-900' : 'bg-amber-100 text-amber-900'}`}>{persona.estado === 'desactualizado' ? 'Desactualizado' : 'Por vencer'}</span><p className="mt-2 text-xs text-slate-600">{persona.total_alertas} alerta(s)</p></td><td className="min-w-72 px-5 py-5"><ul className="space-y-3">{persona.motivos.map((motivo, index) => <li key={index}><p className="font-medium text-slate-800">{fuentes[motivo.origen]}: {motivo.detalle}</p><p className={`mt-1 text-xs font-medium ${motivo.criticidad === 'rojo' ? 'text-rose-800' : 'text-amber-900'}`}><time dateTime={motivo.fecha}>{fecha(motivo.fecha)}</time> · {diasTexto(motivo.dias_restantes)}</p></li>)}</ul>{persona.total_alertas > persona.motivos.length && <p className="mt-3 text-xs text-slate-600">Se muestran los primeros {persona.motivos.length} motivos de {persona.total_alertas}. Revisa el legajo{admin ? ' y Requerimientos' : ''} para consultar el resto.</p>}</td><td className="px-5 py-5"><Link to={`/legajos/${persona.usuario_id}`} aria-label={`Revisar legajo de ${persona.nombre}`} className={`${button} inline-block`}>Ver legajo</Link>{admin && <Link to={`/requerimientos?q=${encodeURIComponent(persona.nombre)}`} className="mt-3 block text-xs font-semibold text-teal-800 underline">Ver requerimientos</Link>}</td></tr>)}</tbody></table></div> : <p className="p-10 text-center text-sm text-slate-600">No hay personas con alertas para estos filtros. Los documentos sin caducidad y los contratos sin fecha de fin no aparecen como vencimientos.</p>}
+      {result.data.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">Personal con alertas, una fila por persona y ordenado por fecha ascendente</caption><thead className="bg-slate-50 text-slate-700"><tr>{['Personal', 'Área', 'Estado', 'Motivos y fechas', 'Acción'].map(label => <th key={label} scope="col" className="px-5 py-4 font-semibold">{label}</th>)}</tr></thead><tbody>{result.data.map(persona => <tr key={persona.usuario_id} className="border-t border-slate-200 align-top"><th scope="row" className="px-5 py-5 font-semibold text-slate-800">{persona.nombre}<span className="mt-1 block text-xs font-normal text-slate-600">{persona.numero_doc_identidad} · {persona.tipo_personal}</span></th><td className="px-5 py-5 text-slate-700">{persona.area || 'Sin área registrada'}</td><td className="px-5 py-5"><span className={`inline-block rounded-xl px-3 py-2 text-xs font-semibold ${persona.estado === 'desactualizado' ? 'bg-rose-100 text-rose-900' : 'bg-amber-100 text-amber-900'}`}>{persona.estado === 'desactualizado' ? 'Desactualizado' : 'Por vencer'}</span><p className="mt-2 text-xs text-slate-600">{persona.total_alertas} alerta(s)</p></td><td className="min-w-72 px-5 py-5"><ul className="space-y-3">{persona.motivos.map((motivo, index) => <li key={index}><p className="font-medium text-slate-800">{fuentes[motivo.origen]}: {motivo.detalle}</p><p className={`mt-1 text-xs font-medium ${motivo.criticidad === 'rojo' ? 'text-rose-800' : 'text-amber-900'}`}><time dateTime={motivo.fecha}>{fecha(motivo.fecha)}</time> · {diasTexto(motivo.dias_restantes)}</p></li>)}</ul>{persona.total_alertas > persona.motivos.length && <MotivosCompletos persona={persona} params={params} />}</td><td className="px-5 py-5"><Link to={`/legajos/${persona.usuario_id}`} aria-label={`Revisar legajo de ${persona.nombre}`} className={`${button} inline-block`}>Ver legajo</Link>{admin && <Link to={`/requerimientos?q=${encodeURIComponent(persona.nombre)}`} className="mt-3 block text-xs font-semibold text-teal-800 underline">Ver requerimientos</Link>}</td></tr>)}</tbody></table></div> : <p className="p-10 text-center text-sm text-slate-600">No hay personas con alertas para estos filtros. Los documentos sin caducidad y los contratos sin fecha de fin no aparecen como vencimientos.</p>}
       {result.last_page > 1 && <nav aria-label="Paginación de vencimientos" className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 p-5"><span className="text-sm text-slate-700">Página {result.current_page} de {result.last_page}</span><div className="flex gap-3"><button className={button} disabled={result.current_page <= 1} onClick={() => pagina(result.current_page - 1)}>Anterior</button><button className={button} disabled={result.current_page >= result.last_page} onClick={() => pagina(result.current_page + 1)}>Siguiente</button></div></nav>}
     </section>}
   </>

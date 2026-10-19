@@ -9,6 +9,17 @@ use Illuminate\Http\Request;
 
 class VencimientosController extends Controller
 {
+    public function motivos(Request $request, string $usuario): JsonResponse
+    {
+        $filtros = $request->validate([
+            'dias' => 'sometimes|integer|min:1|max:365',
+            'origen' => 'nullable|in:documento,contrato,requerimiento',
+            'page' => 'sometimes|integer|min:1',
+        ]);
+
+        return response()->json(ConsultaVencimientos::motivos($request->user(), $usuario, $filtros));
+    }
+
     public function __invoke(Request $request): JsonResponse
     {
         $filtros = $request->validate([

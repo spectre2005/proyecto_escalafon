@@ -14,6 +14,7 @@ use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
+use App\Support\Documentos\AlmacenDocumento;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -44,13 +45,13 @@ class DocumentoLegajoApiTest extends TestCase
         $archivo = ArchivoDocumento::query()->findOrFail($documento->archivo_id);
         $this->assertSame([$persona->id, 2, 1, 2, $autor->id], [$documento->usuario_id, $documento->seccion_legajo_id, $documento->folio_inicio, $documento->folio_fin, $documento->created_by]);
         $this->assertSame('servidor', $documento->relacion_titular);
-        $this->assertSame([2, 'pendiente', 'application/pdf', $autor->id, false], [$archivo->num_paginas, $archivo->estado_antivirus, $archivo->mime_type, $archivo->subido_por, $archivo->cifrado]);
+        $this->assertSame([2, 'limpio', 'application/pdf', $autor->id, true], [$archivo->num_paginas, $archivo->estado_antivirus, $archivo->mime_type, $archivo->subido_por, $archivo->cifrado]);
         $this->assertSame('documento.pdf', $archivo->nombre_original);
         // Disco privado, nombre interno aleatorio y hash del contenido real.
         $disco = Storage::disk(config('legajo.disco_documentos'));
         $disco->assertExists($archivo->storage_path);
         $this->assertStringNotContainsString('documento.pdf', $archivo->storage_path);
-        $this->assertSame(hash('sha256', $disco->get($archivo->storage_path)), $archivo->hash_sha256);
+        $this->assertSame(hash('sha256', AlmacenDocumento::leer($archivo)), $archivo->hash_sha256);
         $this->assertNull(config('filesystems.disks.documentos.url'));
         $this->assertDatabaseHas('historial_estados_documento', ['documento_usuario_id' => $id, 'estado_anterior' => null, 'estado_nuevo' => 'cargado', 'cambiado_por' => $autor->id]);
     }
@@ -68,6 +69,20 @@ class DocumentoLegajoApiTest extends TestCase
         $this->assertDatabaseCount('documentos_usuario', 0);
         $this->assertDatabaseCount('archivos_documento', 0);
         $this->assertSame([], Storage::disk(config('legajo.disco_documentos'))->allFiles());
+    }
+
+    public function test_rejects_a_folio_range_different_from_real_pages_without_reserving_folios(): void
+    {
+        $this->actuarComo();
+        $persona = $this->personaDemo();
+        $datos = $this->metadatos($this->tipo02('a'), 1, 3, ['pdf' => $this->pdf()]);
+        $this->subir($persona, $datos)->assertUnprocessable()->assertJsonValidationErrors('folio_fin');
+        $this->assertDatabaseCount('documentos_usuario', 0);
+        $this->assertDatabaseCount('archivos_documento', 0);
+        $this->assertSame([], Storage::disk(config('legajo.disco_documentos'))->allFiles());
+        $this->getJson('/api/v1/expedientes/'.$persona->id.'/documentos/folio-sugerido?seccion=2')
+            ->assertOk()->assertJsonPath('data.folio_sugerido', 1);
+        $this->subir($persona, $this->metadatos($this->tipo02('a'), 1, 2))->assertCreated();
     }
 
     public function test_rejects_files_over_the_configured_size(): void

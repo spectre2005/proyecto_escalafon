@@ -1,6 +1,34 @@
+## Implementación local del backlog — 18/10/2026
+
+Los apartados históricos de este documento describen versiones anteriores. El estado actual y sus límites se encuentran en [BACKLOG_SISTEMA.md](BACKLOG_SISTEMA.md), tabla «Avance de implementación», y los recorridos de aceptación en [README](../README.md).
+
+Se añadieron gestión de requerimientos, revisión documental común, fedateo con sustento, fiscalización, custodia, avisos, auditoría, archivo pasivo/referencias, sección 12, reportes PDF/Excel, parámetros, cuentas y operaciones de plataforma. Se unificaron vigencia efectiva, completitud por recepción/aprobación y folios por página real. ClamAV y cifrado están implementados; la conversión histórica se ejecuta después de respaldar. El correo opcional permanece desactivado por defecto.
+
+Los importes de servicio son PEN por fecha de registro sin anulados. La exportación institucional entrega JSON y archivos en ZIP sin nuevas dependencias, con manifiesto y archivos cifrados cuya clave se custodia por separado; no es un restaurador automático. Las instituciones archivadas conservan sus datos.
+
+Cambios locales sin commit ni publicación. Las pruebas de navegador automatizadas no se incorporaron porque solo se autorizó Poppler. La aceptación con usuarios, la operación de respaldos/recuperación, las reglas institucionales aún no definidas y la CI remota siguen siendo pasos distintos de las pruebas automatizadas locales.
+
+---
+
 # ESTADO_PROYECTO.md
 
-Documento vivo. Se actualiza al cerrar cada tarea y se vuelve a subir al proyecto. Última actualización: 04/10/2026.
+Documento vivo. Se actualiza al cerrar cada tarea y se vuelve a subir al proyecto. Última actualización: 17/10/2026.
+
+## Incremento del backlog (17/10/2026)
+
+Base: `main`, `95e3a75`. Cambios actuales sin commit ni publicación. Este apartado prevalece sobre los TODO y diagnósticos históricos de abajo.
+
+- Requerimientos incorpora el flujo confirmado: abierto → en revisión → cumplido; observado permite subsanar; cancelación y prórroga con motivo. Fechas explícitas, evidencias del mismo legajo, historial y control de concurrencia.
+- Fiscalización y custodia tienen rutas y pantallas operativas: casos/comunicaciones/evidencias/resultados, solicitud/autorización, alcance, préstamo y devolución. La aprobación no crea una cuenta externa ni envía correos.
+- Accesos de apoyo desde Configuración con rol fijo de asistente; perfil y cambio de contraseña propios institucionales y de plataforma. La recepción de la propia carga se mantiene; la revisión requiere otra persona.
+- ClamAV y cifrado para nuevos PDF; clave independiente fuera del repositorio y conversión histórica verificada con retirada recuperable. Poppler valida el conteo y exige un folio por página. El barrido de archivos históricos no se da por ejecutado.
+- Bandeja de Revisión documental con estados separados: completos solo recepcionados y aceptados/verificados, observados y cargas pendientes. Conserva validaciones específicas y permisos sensibles.
+- Vigencia laboral compartida por fechas efectivas incluidas; pase automático a pasivo tras el último vínculo y reapertura conservando datos. Falta la vista de referencias a legajos pasivos.
+- Avisos internos administrativos con deduplicación persistente, bandeja propia y lectura. Procesos diarios por institución a las 00:05 y 08:00 de Lima. Correo desactivado; reintentos en cola pendientes.
+- Vencimientos permanece debajo de Requerimientos y ofrece todos los motivos paginados. CI y configuración PostgreSQL aislada añadidas; ejecución remota y protección de rama pendientes.
+- No se añadió Playwright: solo se autorizó Poppler en la consulta de dependencias. El intento final de lint/build del frontend fue rechazado; pruebas de navegador y aceptación visual pendientes.
+- Nuevas decisiones implementadas: calificaciones visibles solo para ADMIN; fedateo independiente con PDF obligatorio e historial; archivo de instituciones sin borrado y exportación JSON/ZIP exclusiva de superadministración. Los archivos conservan su cifrado y la clave se custodia por separado. No hay restauración automática ni nuevas dependencias de exportación.
+- El estado tarea por tarea y lo que resta se detallan en [BACKLOG_SISTEMA.md](BACKLOG_SISTEMA.md). No se consideran completadas las 55 tareas: faltan archivo/referencias, reportes, parámetros, administración SaaS y auditoría global, entre otras ampliaciones allí enumeradas.
 
 ## Estado del frontend
 

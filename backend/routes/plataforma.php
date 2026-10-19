@@ -1,10 +1,14 @@
 <?php
 
 use App\Http\Controllers\Plataforma\AdministradorInstitucionController;
+use App\Http\Controllers\Plataforma\AuditoriaController;
 use App\Http\Controllers\Plataforma\AuthController;
+use App\Http\Controllers\Plataforma\CuentasPlataformaController;
 use App\Http\Controllers\Plataforma\InstitucionController;
+use App\Http\Controllers\Plataforma\OperacionInstitucionController;
 use App\Http\Controllers\Plataforma\PeriodoServicioController;
 use App\Http\Middleware\ApiHabilitada;
+use App\Http\Middleware\AutenticarSesionPlataforma;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -17,7 +21,19 @@ Route::middleware(ApiHabilitada::class)->group(function (): void {
     Route::get('auth/csrf', [AuthController::class, 'csrf']);
     Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:20,1');
 
-    Route::middleware('auth:plataforma')->group(function (): void {
+    Route::middleware(['auth:plataforma', AutenticarSesionPlataforma::class])->group(function (): void {
+        Route::get('instituciones/{institucion}/contrato', [OperacionInstitucionController::class, 'contrato'])->whereUuid('institucion');
+        Route::put('instituciones/{institucion}/contrato', [OperacionInstitucionController::class, 'guardarContrato'])->whereUuid('institucion');
+        Route::get('instituciones/{institucion}/consumo', [OperacionInstitucionController::class, 'consumo'])->middleware('throttle:6,1')->whereUuid('institucion');
+        Route::get('cuentas', [CuentasPlataformaController::class, 'index']);
+        Route::post('cuentas', [CuentasPlataformaController::class, 'store'])->middleware('throttle:10,1');
+        Route::patch('cuentas/{cuenta}/estado', [CuentasPlataformaController::class, 'estado'])->whereUuid('cuenta');
+        Route::post('cuentas/{cuenta}/restablecer', [CuentasPlataformaController::class, 'restablecer'])->middleware('throttle:10,1')->whereUuid('cuenta');
+        Route::get('auditoria', [AuditoriaController::class, 'index']);
+        Route::get('auditoria/exportar', [AuditoriaController::class, 'exportar']);
+        Route::post('instituciones/{institucion}/exportar', [InstitucionController::class, 'exportar'])->middleware('throttle:3,1')->whereUuid('institucion');
+        Route::post('instituciones/{institucion}/archivar', [InstitucionController::class, 'archivar'])->whereUuid('institucion');
+        Route::put('auth/password', [AuthController::class, 'cambiarPassword'])->middleware('throttle:10,1');
         Route::get('auth/me', [AuthController::class, 'me']);
         Route::post('auth/logout', [AuthController::class, 'logout']);
         Route::get('dashboard', [InstitucionController::class, 'resumen']);
@@ -33,6 +49,8 @@ Route::middleware(ApiHabilitada::class)->group(function (): void {
         Route::post('instituciones/{institucion}/periodos', [PeriodoServicioController::class, 'store'])->whereUuid('institucion');
         Route::post('instituciones/{institucion}/periodos/{periodo}/anular', [PeriodoServicioController::class, 'anular'])->whereUuid(['institucion', 'periodo']);
         // Administradores de cada institución: solo cuentas de administración, nunca personas ni legajos.
+        Route::get('instituciones/{institucion}/administradores/persona-existente', [AdministradorInstitucionController::class, 'candidato'])->middleware('throttle:20,1')->whereUuid('institucion');
+        Route::post('instituciones/{institucion}/administradores/asignar-existente', [AdministradorInstitucionController::class, 'asignarExistente'])->whereUuid('institucion');
         Route::get('instituciones/{institucion}/administradores', [AdministradorInstitucionController::class, 'index'])->whereUuid('institucion');
         Route::post('instituciones/{institucion}/administradores', [AdministradorInstitucionController::class, 'store'])->whereUuid('institucion');
         Route::post('instituciones/{institucion}/administradores/{administrador}/restablecer', [AdministradorInstitucionController::class, 'restablecer'])->whereUuid(['institucion', 'administrador']);

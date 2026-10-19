@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Models\RequerimientoDocumento;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -34,7 +36,8 @@ class RequerimientoDocumentoController extends ResourceController
             $query->where(function (Builder $query) use ($term): void {
                 $query->whereRaw('LOWER(descripcion) LIKE ?', [$term])
                     ->orWhereHas('usuario', function (Builder $userQuery) use ($term): void {
-                        $userQuery->whereRaw('LOWER(nombres) LIKE ?', [$term])
+                        $userQuery->whereRaw("LOWER(nombres || ' ' || apellido_paterno || ' ' || COALESCE(apellido_materno, '')) LIKE ?", [$term])
+                            ->orWhereRaw('LOWER(nombres) LIKE ?', [$term])
                             ->orWhereRaw('LOWER(apellido_paterno) LIKE ?', [$term])
                             ->orWhereRaw('LOWER(apellido_materno) LIKE ?', [$term]);
                     });
@@ -51,18 +54,18 @@ class RequerimientoDocumentoController extends ResourceController
         ]);
     }
 
-    protected array $rules = [
-        'usuario_id' => 'required|uuid|exists:usuarios,id',
-        'tipo_documento_id' => 'nullable|uuid|exists:tipos_documento,id',
-        'origen' => 'required|string|max:15',
-        'descripcion' => 'required|string|max:300',
-        'fecha_requerimiento' => 'required|date',
-        'plazo_dias_habiles' => 'required|integer|between:-2147483648,2147483647',
-        'fecha_limite' => 'required|date',
-        'prorroga_hasta' => 'nullable|date',
-        'estado' => 'sometimes|string|max:15',
-        'documento_id' => 'nullable|uuid|exists:documentos_usuario,id',
-        'solicitado_por' => 'required|uuid|exists:usuarios,id',
-        'cerrado_en' => 'nullable|date',
-    ];
+    public function store(Request $request): JsonResponse
+    {
+        abort(409, 'Registra solicitudes mediante /api/v1/requerimientos para conservar autor e historial.');
+    }
+
+    public function update(Request $request, string $record): JsonResponse
+    {
+        abort(409, 'Usa las acciones de Requerimientos con control de versión.');
+    }
+
+    public function destroy(string $record): JsonResponse
+    {
+        abort(409, 'Los requerimientos se cancelan con motivo; no se eliminan.');
+    }
 }

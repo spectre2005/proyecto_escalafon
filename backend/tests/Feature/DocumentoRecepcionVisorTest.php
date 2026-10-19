@@ -45,7 +45,7 @@ class DocumentoRecepcionVisorTest extends TestCase
         $this->postJson($this->url($documento, 'recepcionar'))->assertOk()
             ->assertJsonPath('data.estado', 'cargado')->assertJsonPath('data.estado_visible', 'recepcionado')
             ->assertJsonPath('data.recepcionado_por', $recepciona->id)->assertJsonPath('data.fecha_recepcion', today()->toDateString())
-            ->assertJsonPath('data.aprobado', true);
+            ->assertJsonPath('data.aprobado', false);
         $documento->refresh();
         $this->assertSame([$recepciona->id, today()->toDateString()], [$documento->recepcionado_por, $documento->fecha_recepcion->toDateString()]);
         // Una sola vez: la segunda no pisa a quien recepcionó.

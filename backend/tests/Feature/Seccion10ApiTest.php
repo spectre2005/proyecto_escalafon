@@ -68,7 +68,7 @@ class Seccion10ApiTest extends TestCase
     private function cargar(string $codigo = 'S10_REGLAMENTO', array $cambios = []): TestResponse
     {
         $tipo = TipoDocumento::query()->where('seccion_legajo_id', 10)->where('codigo', $codigo)->firstOrFail();
-        $datos = $this->datos($codigo, ['tipo_documento_id' => $tipo->id, 'numero_folios' => 2, 'pdf' => $this->pdf(), ...$cambios]);
+        $datos = $this->datos($codigo, ['tipo_documento_id' => $tipo->id, 'numero_folios' => 2, 'pdf' => $this->pdf(paginas: min(100, max(1, $cambios['numero_folios'] ?? 2))), ...$cambios]);
 
         return $this->post($this->url('/documentos'), $datos, ['Accept' => 'application/json']);
     }

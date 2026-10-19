@@ -1,3 +1,4 @@
+import AsignarAdministradorExistente from './AsignarAdministradorExistente'
 import { useEffect, useRef, useState } from 'react'
 import { agregarAdministrador, cambiarActivoAdministrador, listarAdministradores, mensajeError, restablecerAdministrador, sesionTerminada } from '../api'
 import { Aviso, Credenciales } from '../componentes'
@@ -111,6 +112,7 @@ export default function AdministradoresInstitucion({ institucion, onCambio }) {
       <div><h2 className="font-semibold text-slate-800">Administradores de la institución</h2><p className="mt-1 text-xs text-slate-500">Cuentas con acceso de administración. Si alguien olvidó su contraseña, dale una temporal nueva.</p></div>
       <button type="button" onClick={() => { setAviso(''); setDialogo({ accion: 'agregar' }) }} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm">Agregar administrador</button>
     </div>
+    <AsignarAdministradorExistente institucion={institucion} onAssigned={() => { setIntento(value => value + 1); setAviso('Administración asignada a la persona existente. Su contraseña y sus datos se conservan.'); onCambio() }} />
     <div className="mt-4 space-y-3">
       <Aviso tipo="exito">{aviso}</Aviso>
       {credenciales && <Credenciales titulo={credenciales.titulo} credenciales={credenciales} onCerrar={() => setCredenciales(null)} />}

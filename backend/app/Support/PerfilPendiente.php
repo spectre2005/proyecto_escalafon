@@ -32,7 +32,7 @@ final class PerfilPendiente
         if ($aplicacion->sinVinculoVigente) {
             return $pendientes;
         }
-        $vigentes = $persona->vinculosLaborales()->where('anulado', false)->whereNull('fecha_cese')
+        $vigentes = $persona->vinculosLaborales()->vigente()
             ->orderByDesc('fecha_inicio')->orderBy('id')->get(['id', 'nombre_puesto', ...AplicacionDocumental::PUESTO]);
         foreach (AplicacionDocumental::PUESTO as $bandera) {
             if ($aplicacion->bandera($bandera) !== null) {

@@ -38,6 +38,7 @@ class RequerimientoDocumento extends Model
     {
         return [
             'fecha_requerimiento' => 'date',
+            'version' => 'integer',
             'plazo_dias_habiles' => 'integer',
             'fecha_limite' => 'date',
             'prorroga_hasta' => 'date',

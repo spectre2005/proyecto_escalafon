@@ -138,7 +138,7 @@ El script crea los `.env` faltantes, construye e inicia `db`, `app` y `nginx`, i
 1. Construye e inicia primero la base de datos y el backend:
 
    ```sh
-   docker compose up -d --build --wait db app nginx
+   docker compose up -d --build --wait db app nginx clamav
    ```
 
 2. Confirma las dependencias del backend y limpia la configuración:
@@ -146,6 +146,7 @@ El script crea los `.env` faltantes, construye e inicia `db`, `app` y `nginx`, i
    ```sh
    docker compose exec -e COMPOSER_HOME=/tmp/composer app composer install --no-interaction --prefer-dist
    docker compose exec app php artisan config:clear --no-interaction
+   docker compose exec app php artisan documentos:clave --no-interaction
    ```
 
 3. **Solo si `APP_KEY` está vacía**, genera la clave:
@@ -221,6 +222,7 @@ Las migraciones crean y actualizan el esquema. Algunas también cargan o corrige
 `migrate` solo migra la base de `DB_DATABASE`. La base de la plataforma y las de cada institución se migran con `plataforma:migrar-instituciones`. Para una instalación existente:
 
 ```sh
+docker compose exec app php artisan documentos:clave --no-interaction
 docker compose exec app php artisan migrate --no-interaction
 docker compose exec app php artisan plataforma:migrar-instituciones --no-interaction
 docker compose exec app php artisan migrate:status --no-interaction
@@ -304,12 +306,13 @@ docker compose down
 Después de incorporar cambios del equipo, revisa las modificaciones de los `.env.example` y agrega las variables nuevas a tus archivos locales. Luego:
 
 ```sh
-docker compose up -d --build db app nginx
+docker compose up -d --build db app nginx clamav
 docker compose exec -e COMPOSER_HOME=/tmp/composer app composer install --no-interaction --prefer-dist
 docker compose exec app php artisan migrate --no-interaction
 docker compose exec app php artisan plataforma:migrar-instituciones --no-interaction
 docker compose exec app php artisan optimize:clear --no-interaction
 docker compose up -d --build --force-recreate frontend
+docker compose up -d --build scheduler worker
 ```
 
 El arranque del frontend ejecuta `pnpm install`. Usa `composer install` para respetar el archivo de bloqueo; `composer update` y `pnpm update` son cambios de dependencias que deben revisarse con el equipo.
@@ -401,9 +404,77 @@ docker compose exec frontend pnpm lint
 docker compose exec frontend pnpm build
 ```
 
-PHPUnit está configurado para SQLite en memoria. Si aparece `could not find driver` al probar, comprueba `pdo_sqlite` con `docker compose exec app php -m`. La configuración de pruebas está en `backend/phpunit.xml`.
+PHPUnit está configurado para SQLite en memoria y usa almacenamiento temporal por proceso (`tests/bootstrap.php`); no reutiliza los PDF ni las sesiones de la instalación. Si aparece `could not find driver` al probar, comprueba `pdo_sqlite` con `docker compose exec app php -m`. La configuración de pruebas está en `backend/phpunit.xml`.
 
-Antes de entregar, comprueba además el flujo modificado desde la interfaz con el rol correspondiente. Compilar el frontend no publica el sistema ni sustituye la revisión funcional.
+El workflow `.github/workflows/calidad.yml` ejecuta pruebas backend, pruebas frontend, lint y build en pull requests y cambios de `main`. También prueba migraciones y consultas de Requerimientos/Vencimientos en un PostgreSQL desechable mediante `backend/phpunit.pgsql.xml` (credenciales exclusivas de CI). Su primera ejecución en GitHub debe revisarse; para impedir merges con fallos, configura los dos jobs como controles obligatorios de la rama.
+
+### Validación local del incremento (18/10/2026)
+
+- Backend: 710 pruebas correctas, 1 integración opcional omitida en la suite normal (8297 aserciones). La prueba real de ClamAV/EICAR pasó por separado.
+- PostgreSQL desechable: 72 pruebas correctas (716 aserciones), separado de la base real.
+- Frontend: 109 pruebas correctas, `pnpm lint` y `pnpm build` correctos. Vite advierte paquetes mayores de 500 kB; se debe medir rendimiento con el volumen objetivo.
+- Base y archivos de pruebas aislados; las pruebas no usan `migrate:fresh` en la base local real.
+- Las migraciones quedaron aplicadas en plataforma y las tres instituciones; los servicios HTTP, scheduler y worker están disponibles. El correo opcional sigue desactivado.
+- Las reglas institucionales sin definición, la aceptación manual, la primera CI remota y los ensayos externos de restauración siguen pendientes. Los cambios aún no están publicados.
+
+### Prueba manual de las tareas completadas del backlog
+
+Usa personas, PDF y cuentas ficticios; la revisión necesita una cuenta administrativa distinta de quien cargó el PDF.
+
+1. **Cuenta:** en Mi perfil cambia la contraseña primero con clave actual incorrecta y confirmación distinta; luego con datos válidos. Comprueba que la sesión actual continúa y las anteriores dejan de funcionar. Repite desde Mi cuenta de plataforma.
+2. **Accesos del personal:** Configuración → Accesos; concede el rol fijo de asistente, prueba fechas, restablecimiento y revocación con motivo. Comprueba que puede cargar/recepcionar y que no puede revisar, anular, administrar cuentas ni consultar datos sensibles.
+3. **Requerimientos:** crea uno con fecha explícita; enlaza un PDF de la misma persona/tipo; observa la respuesta, subsana con otro PDF y vuelve a presentar; completa tras revisión. Prueba prórroga, cancelación con motivo, historial y rechazo de cambios desde una pestaña desactualizada. «Ver ficha» y búsqueda por nombre completo deben funcionar.
+4. **PDF y revisión:** carga un PDF válido de tres páginas con folios 1–3; rechaza el mismo PDF con rango 1–2 sin consumir folios. En Revisión documental verifica que cargado/observado no cuenten como completos; acepta desde otra cuenta con recepción confirmada. La subsanación conserva el PDF anterior.
+5. **Vencimientos:** prueba hoy, 6, 7, 30 y 31 días, vencidos y requerimientos atrasados. Revisa filtros, orden y todas las páginas de motivos cuando hay más de cinco. No deben aparecer datos sensibles para el asistente.
+6. **Fiscalización:** abre caso con fechas; registra comunicación y PDF de sustento; respuesta con evidencia y resultado; cierra con informe. Prueba caso sin respuestas, fechas inválidas, prórroga, cancelación/reapertura e historial. Registrar la comunicación no envía un correo.
+7. **Custodia:** solicita un alcance documental, aprueba y comprueba que solo descarga los PDF autorizados. Rechaza entrega tras revocación/vencimiento; registra préstamo, intenta duplicarlo y devuelve sin borrar el movimiento. Documentos sensibles se restringen al titular identificado.
+8. **Vigencia y reingreso:** prueba inicio futuro, fin/adenda vigente, adenda anulada y cese. La fecha final está incluida. Al día siguiente del último fin efectivo, el proceso diario pasa el legajo a pasivo; abrir el nuevo conserva persona, documentos y legajo anterior.
+9. **Avisos:** ejecuta `docker compose exec app php artisan avisos:generar --todas` dos veces. Solo la primera debe crear avisos para los mismos asuntos y fechas. Cada administrador consulta sus propios avisos y puede marcarlos leídos. El correo permanece desactivado.
+10. **Fedateo:** desde Revisión documental elige un PDF distinto del mismo legajo como sustento; registra fecha y motivo. Rechaza sustento ajeno, fecha futura y propia carga. Sustituye el sustento con motivo y comprueba que el historial conserva los anteriores.
+11. **Calificaciones:** ADMIN ve puntajes y calificaciones; el asistente ve la evaluación sin esos campos, también en la respuesta de API.
+12. **Baja/exportación:** con una institución ficticia, suspende y archiva con motivo. Debe perder acceso conservando datos y archivos. Solo superadministración descarga el ZIP de datos JSON/archivos y la auditoría registra la operación. Comprueba el manifiesto, cantidades y hashes. Los archivos cifrados requieren la clave externa; no es una restauración automática.
+13. Comprueba teclado, foco, carga, consultas vacías, errores y reintentos. Las pruebas automatizadas de navegador siguen pendientes: no se añadió Playwright.
+
+### Nuevos recorridos de archivo, reportes y plataforma
+
+- **Sección 12:** incorpora un PDF complementario de tres páginas con tres folios. El asistente solo ve tipos sin datos sensibles; la revisión se hace en Revisión documental y se conserva cada subsanación.
+- **Sección 13:** en un reingreso referencia un PDF de un legajo pasivo de la misma persona y su vínculo anterior terminado. Comprueba origen, folios y responsable sin duplicar documentos. Una segunda referencia al mismo original se rechaza. Para registrar una transferencia, el legajo debe llevar más de tres años pasivo: adjunta inventario PDF, fecha, ubicación, destino, números de sustento y constancia de microforma si es digital/mixto. El inventario se cifra; el traslado físico y la microforma se realizan fuera del sistema.
+- **Reportes:** prueba carátula, matriz, incorporaciones documentales y referencias. Compara pantalla y PDF/Excel con filtros y más de 20 resultados; conserva ceros iniciales del DNI y verifica textos largos. La firma del responsable se completa manualmente.
+- **Configuración → Parámetros:** cambia tamaño PDF, días de aviso o formato de numeración con motivo. Prueba límites y dos pestañas con versiones distintas. Los números anteriores no cambian.
+- **Auditoría:** consulta cambios antes/después y bitácora de accesos; filtra fechas, actor y acción; compara el CSV con todos los resultados filtrados. El asistente no entra a estas pantallas administrativas.
+- **Plataforma → Cuentas:** crea una cuenta ficticia, restablece su clave y desactívala desde otra cuenta. No se admite desactivar la propia sesión ni dejar cero cuentas activas. Los secretos no aparecen en auditoría.
+- **Detalle de institución:** registra contacto/contrato con motivo, prueba conflicto entre pestañas y mide consumo agregado. Comprueba que la identidad visual institucional no cambia y que el estado de respaldo indica que requiere verificación del operador.
+- **Resumen de plataforma:** compara próximas expiraciones (30 días), gracia y vencidas con los periodos efectivos. Los totales se expresan en PEN, por fecha de registro del periodo y sin anulados; no sustituyen una conciliación bancaria.
+
+### Cola de avisos y correo opcional
+
+`AVISOS_CORREO_HABILITADO=false` es el valor por defecto. Configurar `MAIL_*` no habilita el canal: debe activarse expresamente y probarse primero con un transporte de pruebas. El correo no adjunta PDF ni incluye nombres, documentos o detalles del legajo.
+
+```sh
+docker compose up -d --build scheduler worker
+docker compose exec app php artisan avisos:generar --todas --cola
+docker compose logs --tail=100 worker scheduler
+```
+
+La bandeja muestra el estado del correo. Solo un error anterior al envío permite reintento con motivo; una entrega iniciada/interrumpida o incierta exige comprobar el proveedor y no se reenvía automáticamente. El generador marca como inciertos los envíos iniciados que llevan más de diez minutos sin confirmación. Los reintentos de generación conservan la deduplicación del aviso interno y el contexto institucional.
+
+### PDF, antivirus, cifrado y procesos diarios
+
+Las imágenes PHP incorporan Poppler (`pdfinfo`). ClamAV analiza las cargas; si está inaccesible o detecta infección, la carga se bloquea. Los PDF nuevos se almacenan cifrados y se entregan por endpoints autenticados.
+
+`documentos:clave` crea una clave independiente de `APP_KEY` en `backend/storage/app/keys/documentos.key` con permisos privados, sin mostrarla ni sobrescribirla. Está fuera de Git: conserva una copia segura junto al plan de restauración. También puede proporcionarse con las variables documentadas en `.env.example`. Perder la clave impide recuperar los PDF cifrados.
+
+Después de respaldar una instalación anterior, protege los PDF existentes:
+
+```sh
+docker compose exec app php artisan documentos:proteger
+docker compose exec app php artisan documentos:proteger --todas
+```
+
+El comando verifica la copia cifrada antes de retirar la anterior, registra el cambio y conserva una ruta pendiente para reintentar si falla la retirada. Los errores no se omiten. Las copias históricas de respaldo requieren la protección definida por sus responsables.
+
+El servicio `scheduler` ejecuta el pase a pasivo a las 00:05 y la generación de avisos a las 08:00, hora de Lima, para las instituciones activas con servicio no vencido. Los avisos se procesan en la cola `avisos`, atendida por `worker`; ambos servicios deben estar ejecutándose. En modo de una sola institución sin registro en plataforma, ejecuta/programa `legajos:actualizar` y `avisos:generar` sin `--todas`.
+
 
 ## 8. Problemas frecuentes
 
@@ -503,6 +574,6 @@ Para un 502, revisa `docker compose logs --tail=100 app nginx`: Nginx depende de
 
 Repositorio del equipo: [spectre2005/proyecto_escalafon](https://github.com/spectre2005/proyecto_escalafon). La autoría de los cambios puede consultarse en el historial de Git; no hay una lista formal de responsables en la configuración revisada.
 
-El código incluye gestión de personal y legajos, las secciones documentales 01 a 11, configuración institucional, régimen laboral por vínculo y el panel de plataforma con varias instituciones por subdominio. Hay trabajo del equipo en otras ramas pendiente de integrar (por ejemplo, incorporación de personal y control de vencimientos de legajos). Este estado describe funcionalidades presentes en el repositorio, no una certificación de que todos los flujos estén terminados.
+El código incluye gestión de personal y legajos, las secciones documentales 01 a 11, configuración institucional, régimen laboral por vínculo y el panel de plataforma con varias instituciones por subdominio. Vencimientos ya está integrado debajo de Requerimientos: agrupa por persona documentos vencidos/próximos a vencer, contratos próximos a vencer y requerimientos atrasados, con rango inicial de 30 días y detalle paginado. Mi perfil permite consultar la cuenta y cambiar su contraseña. Los pendientes se mantienen en `docs/BACKLOG_SISTEMA.md`. Este estado describe funcionalidades presentes en el repositorio, no una certificación de que todos los flujos estén terminados.
 
 Para continuar un incremento, acuerda el alcance con el equipo, revisa las pruebas del módulo y entrega cambios de código, migraciones y datos iniciales necesarios juntos. Actualiza esta guía si cambian el arranque, las variables o los requisitos.

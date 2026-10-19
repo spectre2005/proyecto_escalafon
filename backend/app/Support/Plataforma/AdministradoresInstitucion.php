@@ -72,6 +72,28 @@ final class AdministradoresInstitucion
         return [$admin, $clave];
     }
 
+    public static function candidato(string $email): array
+    {
+        $usuario = Usuario::query()->whereRaw('LOWER(email_institucional) = ?', [mb_strtolower(trim($email))])->firstOrFail();
+
+        return [...$usuario->only(['id', 'nombres', 'apellido_paterno', 'apellido_materno', 'email_institucional']),
+            'activo' => $usuario->activo, 'ya_administrador' => self::esAdministrador($usuario)];
+    }
+
+    public static function asignarExistente(string $id, string $email): Usuario
+    {
+        $usuario = Usuario::query()->lockForUpdate()->findOrFail($id);
+        abort_unless(mb_strtolower((string) $usuario->email_institucional) === mb_strtolower(trim($email)), 409, 'La identidad cambió. Vuelve a buscar a la persona.');
+        $rol = Rol::query()->firstOrCreate(['codigo' => 'ADMIN'], ['nombre' => 'Administrador', 've_datos_sensibles' => true, 'activo' => true]);
+        abort_unless($rol->activo, 409, 'El rol de administración no está activo.');
+        abort_if(UsuarioRol::query()->where('usuario_id', $usuario->id)->where('rol_id', $rol->id)
+            ->where(fn ($q) => $q->whereNull('vigente_hasta')->orWhereDate('vigente_hasta', '>=', today()->toDateString()))->exists(), 409, 'La persona ya tiene una asignación de administración vigente o prevista.');
+        UsuarioRol::query()->create(['usuario_id' => $usuario->id, 'rol_id' => $rol->id, 'ambito_tipo_personal' => 'ambos',
+            'vigente_desde' => today()->toDateString(), 'asignado_por' => $usuario->id]);
+
+        return $usuario->refresh();
+    }
+
     /** Contraseña temporal nueva para un administrador (olvido o entrega a otra persona). @return array{0: Usuario, 1: string} */
     public static function restablecer(string $usuarioId): array
     {

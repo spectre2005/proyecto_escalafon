@@ -5,11 +5,23 @@ namespace Tests;
 use App\Models\Rol;
 use App\Models\Usuario;
 use App\Models\UsuarioRol;
+use App\Support\Documentos\AnalizadorAntivirus;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\PdfValido;
 
 abstract class TestCase extends BaseTestCase
 {
+    use PdfValido;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config(['documentos.clave' => 'base64:'.base64_encode(str_repeat('t', 32))]);
+        $this->mock(AnalizadorAntivirus::class)
+            ->shouldReceive('analizar')->andReturnNull()->byDefault();
+    }
+
     /** Asigna un rol vigente al usuario (lo crea si no existe el rol). */
     protected function asignarRol(Usuario $usuario, string $codigo = 'ADMIN', array $asignacion = [], array $rol = []): Usuario
     {

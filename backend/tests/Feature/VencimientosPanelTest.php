@@ -108,8 +108,11 @@ class VencimientosPanelTest extends TestCase
         $this->getJson('/api/v1/vencimientos')->assertOk()->assertJsonPath('incluye_requerimientos', false)
             ->assertJsonPath('data.0.total_alertas', 1)->assertJsonPath('data.0.estado', 'por_vencer');
         $this->getJson('/api/v1/vencimientos?origen=requerimiento')->assertOk()->assertJsonPath('total', 0);
+        $url = '/api/v1/vencimientos/'.$legajo->usuario_id.'/motivos';
+        $this->getJson($url)->assertOk()->assertJsonPath('total', 1)->assertJsonPath('data.0.origen', 'documento');
         Sanctum::actingAs(Usuario::factory()->create());
         $this->getJson('/api/v1/vencimientos')->assertForbidden();
+        $this->getJson($url)->assertForbidden();
     }
 
     public function test_search_area_type_and_status_filters_match_summary_and_rows(): void
@@ -143,6 +146,27 @@ class VencimientosPanelTest extends TestCase
         foreach (['dias=0', 'dias=366', 'dias=abc', 'estado=otro', 'origen=otro', 'unidad_id=invalid', 'page=0'] as $filtro) {
             $this->getJson('/api/v1/vencimientos?'.$filtro)->assertUnprocessable();
         }
+    }
+
+    public function test_all_motives_are_paginated_and_scoped_to_person_source_and_horizon(): void
+    {
+        $legajo = $this->legajo();
+        foreach (range(1, 21) as $dia) {
+            $this->documento($legajo, $dia);
+        }
+        $this->documento($this->legajo(), 1);
+        $this->documento($legajo, 31);
+        $this->requerimiento($legajo, -1);
+        $url = '/api/v1/vencimientos/'.$legajo->usuario_id.'/motivos';
+        $this->getJson($url.'?origen=documento')->assertOk()->assertJsonPath('total', 21)
+            ->assertJsonCount(20, 'data')->assertJsonPath('data.0.dias_restantes', 1);
+        $this->getJson($url.'?origen=documento&page=2')->assertOk()->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.dias_restantes', 21);
+        $this->getJson($url.'?dias=6&origen=documento')->assertOk()->assertJsonPath('total', 6);
+        $this->getJson($url.'?page=0')->assertUnprocessable();
+        $this->getJson('/api/v1/vencimientos/no-uuid/motivos')->assertNotFound();
+        $this->actuarComo(null, 'asistente_legajo');
+        $this->getJson($url.'?origen=requerimiento')->assertOk()->assertJsonPath('total', 0);
     }
 
     private function legajo(?Usuario $persona = null): Legajo

@@ -1,6 +1,8 @@
 import { useSearchParams } from 'react-router-dom'
 import { usePuede } from '../auth/session'
 import FuncionalidadesConfig from './FuncionalidadesConfig'
+import ParametrosConfig from './ParametrosConfig'
+import AccesosPersonal from './AccesosPersonal'
 import InstitucionConfig from './InstitucionConfig'
 
 const cardClass = 'rounded-2xl border border-slate-200 bg-white p-6 sm:p-8'
@@ -13,6 +15,8 @@ export default function SettingsPage() {
   const canConfigure = usePuede('configuracion.modulos')
   const pestanas = [
     canEdit && { key: 'institucion', label: 'Institución' },
+    canEdit && { key: 'parametros', label: 'Parámetros' },
+    canEdit && { key: 'accesos', label: 'Usuarios y accesos' },
     canConfigure && { key: 'funcionalidades', label: 'Funcionalidades' },
   ].filter(Boolean)
   if (!pestanas.length) return <p role="alert" className={cardClass}>La configuración institucional requiere permisos de administración.</p>
@@ -32,6 +36,8 @@ export default function SettingsPage() {
       {pestanas.map(pestana => <button key={pestana.key} type="button" role="tab" id={`pestana-${pestana.key}`} aria-controls={`panel-${pestana.key}`} aria-selected={pestana.key === actual.key} onClick={() => cambiar(pestana.key)} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-medium ${pestana.key === actual.key ? 'bg-teal-700 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>{pestana.label}</button>)}
     </div>}
     {/* Institución queda montada y oculta para no perder un borrador sin guardar al cambiar de pestaña. */}
+    {canEdit && actual.key === 'parametros' && <div role="tabpanel" id="panel-parametros" aria-labelledby="pestana-parametros" className="mt-6"><ParametrosConfig /></div>}
+    {canEdit && actual.key === 'accesos' && <div role="tabpanel" id="panel-accesos" aria-labelledby="pestana-accesos" className="mt-6"><AccesosPersonal /></div>}
     {canEdit && <div role="tabpanel" id="panel-institucion" aria-labelledby={pestanas.length > 1 ? 'pestana-institucion' : undefined} hidden={actual.key !== 'institucion'} className="mt-6"><InstitucionConfig /></div>}
     {/* Funcionalidades solo se monta (y consulta) en su pestaña. */}
     {canConfigure && actual.key === 'funcionalidades' && <div role="tabpanel" id="panel-funcionalidades" aria-labelledby={pestanas.length > 1 ? 'pestana-funcionalidades' : undefined} className="mt-6"><FuncionalidadesConfig /></div>}

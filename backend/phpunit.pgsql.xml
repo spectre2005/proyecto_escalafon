@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="tests/bootstrap.php"
+         colors="true"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <file>tests/Feature/RequerimientoDocumentoPanelTest.php</file>
+            <file>tests/Feature/GestionRequerimientosTest.php</file>
+            <file>tests/Feature/FiscalizacionPanelTest.php</file>
+            <file>tests/Feature/CustodiaPanelTest.php</file>
+            <file>tests/Feature/AccesoPersonalTest.php</file>
+            <file>tests/Feature/DocumentoLegajoApiTest.php</file>
+            <file>tests/Feature/VencimientosPanelTest.php</file>
+            <file>tests/Feature/VigenciaLaboralTest.php</file>
+            <file>tests/Feature/AvisosAdministrativosTest.php</file>
+            <file>tests/Feature/BandejaDocumentalTest.php</file>
+            <file>tests/Feature/FedateoDocumentoTest.php</file>
+            <file>tests/Feature/AuditoriaPanelTest.php</file>
+            <file>tests/Feature/ConfiguracionParametrosTest.php</file>
+            <file>tests/Feature/ArchivoLegajoPanelTest.php</file>
+            <file>tests/Feature/ReportesPanelTest.php</file>
+            <file>tests/Feature/AvisosCorreoTest.php</file>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <php>
+        <!-- force="true": manda sobre las variables del contenedor (docker-compose.yml fija SESSION_DRIVER y CACHE_STORE
+             en file) y que, sin force, PHPUnit dejaría como están. Se fuerzan las que protegen datos y servicios reales. El storage de
+             las pruebas es temporal (tests/bootstrap.php, LARAVEL_STORAGE_PATH). -->
+        <env name="APP_ENV" value="testing" force="true"/>
+        <!-- Mismo idioma que la aplicación: los mensajes genéricos de validación en español (lang/es). -->
+        <env name="APP_LOCALE" value="es"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="BROADCAST_CONNECTION" value="null"/>
+        <env name="CACHE_STORE" value="array" force="true"/>
+        <env name="DB_CONNECTION" value="pgsql" force="true"/>
+        <env name="DB_DATABASE" value="escalafon_ci" force="true"/>
+        <env name="DB_HOST" value="127.0.0.1" force="true"/>
+        <env name="DB_PORT" value="5432" force="true"/>
+        <env name="DB_USERNAME" value="escalafon_ci" force="true"/>
+        <env name="DB_PASSWORD" value="ci-only-password" force="true"/>
+        <env name="DB_URL" value="" force="true"/>
+        <env name="PLATAFORMA_DB_DRIVER" value="sqlite" force="true"/>
+        <env name="PLATAFORMA_DB_DATABASE" value=":memory:" force="true"/>
+        <!-- Una sola institución aunque el .env use subdominios; ResolverInstitucionTest prueba el otro modo. -->
+        <env name="PLATAFORMA_MODO" value="unica"/>
+        <env name="MAIL_MAILER" value="array" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <env name="SESSION_DRIVER" value="array" force="true"/>
+        <env name="PULSE_ENABLED" value="false"/>
+        <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="NIGHTWATCH_ENABLED" value="false"/>
+    </php>
+</phpunit>

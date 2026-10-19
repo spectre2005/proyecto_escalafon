@@ -8,6 +8,10 @@ use App\Models\BitacoraAccesoLegajo;
 use App\Models\DocumentoUsuario;
 use App\Models\HistorialEstadoDocumento;
 use App\Models\ObservacionDocumento;
+use App\Models\ParametroSistema;
+use App\Models\ReferenciaLegajoPasivo;
+use App\Support\ConfiguracionParametros;
+use App\Support\Documentos\DocumentosOperativos;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
@@ -38,6 +42,9 @@ abstract class ResourceController extends Controller
 
     private function filtrarSst(Builder $query): Builder
     {
+        if ($this->model === ReferenciaLegajoPasivo::class) {
+            $query->whereIn('tipo_documento_id', DocumentosOperativos::tipos(request())->select('id'));
+        }
         if (! request()->user()->veDatosSensibles()) {
             foreach ($this->camposDocumentoSst() as $campo) {
                 $query->where(function (Builder $filtro) use ($campo): void {
@@ -147,9 +154,9 @@ abstract class ResourceController extends Controller
 
     private function protegerSst(array $datos): void
     {
-        if ($this->model === AuditoriaEvento::class && ($datos['entidad'] ?? null) !== 'documentos_usuario') {
-            return;
-        }
+        abort_if($this->model === ParametroSistema::class && in_array($datos['clave'] ?? null, ConfiguracionParametros::CLAVES, true), 409, 'Estos parámetros se modifican desde Configuración con motivo e historial.');
+        abort_if($this->model === ReferenciaLegajoPasivo::class, 409, 'Registra las referencias desde Archivo para comprobar origen, folios y responsable.');
+        abort_if(in_array($this->model, [AuditoriaEvento::class, HistorialEstadoDocumento::class, BitacoraAccesoLegajo::class, ObservacionDocumento::class], true), 409, 'La auditoría, bitácora e historial se registran mediante operaciones del sistema y se conservan sin alteraciones.');
         $ids = array_filter(array_map(fn (string $campo): mixed => $datos[$campo] ?? null, $this->camposDocumentoSst()));
         abort_if($ids !== [] && DocumentoUsuario::query()->where('seccion_legajo_id', 10)->whereIn('id', $ids)->exists(), 409,
             'El historial y la auditoría SST se registran mediante las operaciones de la Sección 10 y se conservan sin alteraciones.');

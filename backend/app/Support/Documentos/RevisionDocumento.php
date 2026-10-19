@@ -68,10 +68,11 @@ final class RevisionDocumento
                 if (! $doc->archivo || $doc->archivo->estado_antivirus === 'infectado') {
                     throw ValidationException::withMessages(['estado' => 'El documento no tiene un archivo disponible o el archivo está bloqueado. Registra una subsanación.']);
                 }
-                if (in_array($seccion, [6, 10], true) && ($doc->archivo->almacenamiento !== config('legajo.disco_documentos')
+                if (($doc->archivo->almacenamiento !== config('legajo.disco_documentos')
                     || ! Storage::disk(config('legajo.disco_documentos'))->exists($doc->archivo->storage_path))) {
                     throw ValidationException::withMessages(['estado' => 'El archivo PDF no está disponible. Registra una subsanación.']);
                 }
+                AlmacenDocumento::leer($doc->archivo);
                 if ($doc->tipoDocumento->requiere_fedateo && ! $doc->fedateado && ! ($datos['fedateado'] ?? false)) {
                     throw ValidationException::withMessages(['fedateado' => 'Este documento requiere fedateo. Confirma el fedateo antes de aceptarlo.']);
                 }

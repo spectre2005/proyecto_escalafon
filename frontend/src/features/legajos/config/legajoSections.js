@@ -16,6 +16,8 @@ export const legajoSections = [
   { number: '10', title: 'Seguridad y Salud en el Trabajo (SST) y bienestar social', categories: ['s10-sst', 's10-bienestar'], sinDocumentos: true },
   // Anexo 01, literales a) a g) y aceptación de renuncia (Anexo 05): la desvinculación de cada vínculo y sus documentos.
   { number: '11', title: 'Desvinculación', categories: ['s11-desvinculacion', 's11-documentos'], sinDocumentos: true },
+  { number: '12', title: 'Otros documentos institucionales', categories: ['seccion-12'], sinDocumentos: true },
+  { number: '13', title: 'Legajos pasivos y referencias', categories: ['referencias-legajo-pasivo'], sinDocumentos: true },
 ]
 
 export const subseccionesSeccion10 = {

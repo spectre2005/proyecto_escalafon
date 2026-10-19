@@ -22,12 +22,10 @@ class Seccion01SeguridadTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const PDF = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF";
-
     private function pdfAnterior(Model $registro): void
     {
         $path = $registro->getTable().'/'.$registro->usuario_id.'/registro.pdf';
-        Storage::disk('local')->put($path, self::PDF);
+        Storage::disk('local')->put($path, self::pdfValido());
         DB::table($registro->getTable())->where('id', $registro->id)->update(['pdf_path' => $path, 'pdf_nombre' => 'registro.pdf']);
     }
 

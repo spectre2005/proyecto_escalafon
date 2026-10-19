@@ -42,13 +42,14 @@ class EvaluacionDesempenoPanelTest extends TestCase
             'motivo_anulacion' => 'Texto interno ficticio',
         ]);
 
+        config(['permisos.roles.ADMIN' => ['*', 'configuracion.modulos']]);
         $this->getJson('/api/v1/evaluaciones-desempeno')
             ->assertOk()
             ->assertJsonPath('data.0.id', $evaluation->id)
             ->assertJsonPath('data.0.usuario.nombres', 'Persona Ficticia')
             ->assertJsonPath('data.0.evaluador.nombres', 'Evaluador Ficticio')
             ->assertJsonPath('data.0.ciclo_anio', 2025)
-            // Sin seccion07.ver_calificacion (nadie lo tiene todavía, ni ADMIN) la calificación y el puntaje no salen.
+            // Una cuenta sin permiso explícito no recibe calificación ni puntaje.
             ->assertJsonPath('data.0.puntaje', null)
             ->assertJsonPath('data.0.calificacion', null)
             ->assertJsonPath('data.0.plan_mejora', true)

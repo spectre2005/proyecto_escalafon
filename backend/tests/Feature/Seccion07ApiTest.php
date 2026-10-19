@@ -23,7 +23,7 @@ class Seccion07ApiTest extends TestCase
 
     public function test_lists_evaluations_without_annulled_with_person_and_hidden_score(): void
     {
-        $this->actuarComo();
+        $this->actuarComo(codigo: 'asistente_legajo');
         $unidad = UnidadOrganica::factory()->create(['nombre' => 'Oficina de Personal']);
         $ana = $this->persona(['unidad_organica_id' => $unidad->id]);
         EvaluacionDesempeno::factory()->create(['usuario_id' => $ana->id, 'ciclo_anio' => 2025, 'calificacion' => 'Buen rendimiento', 'puntaje' => 85.5, 'plan_mejora' => true, 'fecha_evaluacion' => '2025-12-10']);
@@ -38,7 +38,7 @@ class Seccion07ApiTest extends TestCase
             ->assertJsonPath('data.0.persona.nombre', 'Quispe Mamani, Ana')
             ->assertJsonPath('data.0.persona.documento', '40123456')
             ->assertJsonPath('data.0.persona.unidad', 'Oficina de Personal')
-            // Nadie tiene seccion07.ver_calificacion (pendiente del cliente), ni ADMIN.
+            // El asistente consulta la evaluación sin calificación ni puntaje.
             ->assertJsonPath('data.0.calificacion', null)
             ->assertJsonPath('data.0.puntaje', null)
             ->assertJsonPath('data.0.calificacion_oculta', true);
@@ -117,7 +117,7 @@ class Seccion07ApiTest extends TestCase
         $this->getJson('/api/v1/seccion07-opciones')->assertOk()
             ->assertJsonPath('data.anios.desplazamientos', [2026, 2025])
             ->assertJsonPath('data.anios.ratificaciones', [2023])
-            ->assertJsonPath('data.ve_calificacion', false)
+            ->assertJsonPath('data.ve_calificacion', true)
             ->assertJsonCount(2, 'data.unidades');
     }
 
@@ -159,5 +159,14 @@ class Seccion07ApiTest extends TestCase
 
         $this->app->instance('env', 'production');
         $this->getJson('/api/v1/seccion07/evaluaciones')->assertForbidden();
+    }
+
+    public function test_fixed_matrix_only_gives_grades_to_institutional_administrators(): void
+    {
+        $this->actuarComo();
+        EvaluacionDesempeno::factory()->create(['calificacion' => 'Buen rendimiento', 'puntaje' => 85.5]);
+        $this->getJson('/api/v1/seccion07/evaluaciones')->assertOk()->assertJsonPath('data.0.calificacion', 'Buen rendimiento')->assertJsonPath('data.0.puntaje', '85.50');
+        $this->actuarComo(codigo: 'asistente_legajo');
+        $this->getJson('/api/v1/seccion07/evaluaciones')->assertOk()->assertJsonPath('data.0.calificacion', null)->assertJsonPath('data.0.puntaje', null);
     }
 }

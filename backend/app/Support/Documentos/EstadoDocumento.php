@@ -5,13 +5,7 @@ namespace App\Support\Documentos;
 use App\Models\DocumentoUsuario;
 use App\Models\TipoDocumento;
 
-/**
- * Estado visible y condición de "aprobado" de un documento.
- *
- * Aprobado = presente (con archivo y no marcado falso) Y con recepción registrada (Directiva, art. 4.5) Y,
- * si el tipo acredita el perfil del puesto, fiscalizado conforme (art. 7). La fiscalización aún no se
- * registra desde el sistema, así que esos tipos no salen aprobados todavía.
- */
+/** Un documento completo exige PDF, recepción registrada y aceptación o verificación. */
 final class EstadoDocumento
 {
     public static function recepcionado(DocumentoUsuario $documento): bool
@@ -32,12 +26,11 @@ final class EstadoDocumento
         return $documento->estado;
     }
 
-    /** TODO pendiente de confirmar con el cliente: si un documento "observado" cuenta como presente. */
+    /** Un observado se conserva en el historial, pero no cuenta como completo. */
     public static function aprobado(DocumentoUsuario $documento, TipoDocumento $tipo): bool
     {
-        $presente = $documento->archivo_id !== null && ! in_array($documento->estado, ['pendiente', 'falso'], true);
-        $fiscalizado = ! $tipo->acredita_perfil_puesto || ($documento->fiscalizado && $documento->estado === 'verificado');
+        $presente = $documento->archivo_id !== null && in_array($documento->estado, ['aceptado', 'verificado'], true);
 
-        return $presente && self::recepcionado($documento) && $fiscalizado;
+        return $presente && self::recepcionado($documento);
     }
 }

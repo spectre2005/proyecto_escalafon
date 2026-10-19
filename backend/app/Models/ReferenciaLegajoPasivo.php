@@ -46,6 +46,16 @@ class ReferenciaLegajoPasivo extends Model
         ];
     }
 
+    public function legajoOrigen(): BelongsTo
+    {
+        return $this->belongsTo(Legajo::class, 'legajo_origen_id');
+    }
+
+    public function documentoOrigen(): BelongsTo
+    {
+        return $this->belongsTo(DocumentoUsuario::class, 'documento_origen_id');
+    }
+
     public function legajo(): BelongsTo
     {
         return $this->belongsTo(Legajo::class, 'legajo_id', 'id');

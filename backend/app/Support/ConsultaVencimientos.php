@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Usuario;
+use App\Models\VinculoLaboral;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
@@ -19,11 +20,13 @@ final class ConsultaVencimientos
             ->selectRaw('COUNT(*) as total_alertas, MIN(fecha) as primera_fecha')
             ->selectRaw('SUM(CASE WHEN DATE(fecha) < ? THEN 1 ELSE 0 END) as desactualizados', [$hoy->toDateString()])
             ->selectRaw('SUM(CASE WHEN DATE(fecha) >= ? THEN 1 ELSE 0 END) as por_vencer', [$hoy->toDateString()])->groupBy('usuario_id');
-        $unidad = 'COALESCE((SELECT unidad_organica_id FROM vinculos_laborales WHERE usuario_id = u.id AND anulado = ? AND fecha_cese IS NULL ORDER BY fecha_inicio DESC, id DESC LIMIT 1), u.unidad_organica_id)';
+        $puesto = VinculoLaboral::query()->vigente($hoy->toDateString())->whereColumn('usuario_id', 'u.id')
+            ->select('unidad_organica_id')->orderByDesc('fecha_inicio')->orderByDesc('id')->limit(1);
+        $unidad = 'COALESCE(('.$puesto->toSql().'), u.unidad_organica_id)';
         $personas = DB::query()->fromSub($agrupadas, 'a')->join('usuarios as u', 'u.id', '=', 'a.usuario_id')
             ->select('a.*', 'u.numero_doc_identidad', 'u.tipo_personal')
             ->selectRaw("TRIM(u.nombres || ' ' || u.apellido_paterno || ' ' || COALESCE(u.apellido_materno, '')) as nombre")
-            ->selectRaw("$unidad as unidad_id", [false]);
+            ->selectRaw("$unidad as unidad_id", $puesto->getBindings());
         $consulta = DB::query()->fromSub($personas, 'p')->leftJoin('unidades_organicas as area', 'area.id', '=', 'p.unidad_id')
             ->select('p.*', 'area.nombre as area');
         if (! empty($filtros['q'])) {
@@ -50,12 +53,8 @@ final class ConsultaVencimientos
             ->selectRaw('ROW_NUMBER() OVER (PARTITION BY usuario_id ORDER BY fecha, origen, alerta_id) as posicion');
         $motivos = DB::query()->fromSub($ordenadas, 'ordenadas')->where('posicion', '<=', 5)->orderBy('fecha')->get()->groupBy('usuario_id');
         $pagina->through(function ($persona) use ($motivos, $hoy): array {
-            $detalle = ($motivos->get($persona->usuario_id) ?? collect())->map(function ($alerta) use ($hoy): array {
-                $dias = (int) $hoy->diffInDays(CarbonImmutable::parse($alerta->fecha, 'America/Lima'), false);
-
-                return ['origen' => $alerta->origen, 'detalle' => $alerta->detalle, 'fecha' => substr($alerta->fecha, 0, 10),
-                    'dias_restantes' => $dias, 'criticidad' => $dias < 7 ? 'rojo' : 'amarillo'];
-            })->all();
+            $detalle = ($motivos->get($persona->usuario_id) ?? collect())
+                ->map(fn ($alerta): array => self::detalle($alerta, $hoy))->all();
 
             return [...(array) $persona, 'total_alertas' => (int) $persona->total_alertas, 'desactualizados' => (int) $persona->desactualizados, 'por_vencer' => (int) $persona->por_vencer,
                 'estado' => $persona->desactualizados > 0 ? 'desactualizado' : 'por_vencer', 'motivos' => $detalle];
@@ -66,7 +65,26 @@ final class ConsultaVencimientos
             'incluye_requerimientos' => $actor->can('sistema.administrar')];
     }
 
-    private static function alertas(Usuario $actor, CarbonImmutable $hoy, int $dias, ?string $origen): Builder
+    public static function motivos(Usuario $actor, string $usuario, array $filtros): array
+    {
+        $hoy = CarbonImmutable::now('America/Lima')->startOfDay();
+        $consulta = self::alertas($actor, $hoy, (int) ($filtros['dias'] ?? 30), $filtros['origen'] ?? null);
+        $pagina = DB::query()->fromSub($consulta, 'alertas')->where('usuario_id', $usuario)
+            ->orderBy('fecha')->orderBy('origen')->orderBy('alerta_id')->paginate(20)->withQueryString();
+        $pagina->through(fn ($alerta): array => self::detalle($alerta, $hoy));
+
+        return $pagina->toArray();
+    }
+
+    private static function detalle(object $alerta, CarbonImmutable $hoy): array
+    {
+        $dias = (int) $hoy->diffInDays(CarbonImmutable::parse($alerta->fecha, 'America/Lima'), false);
+
+        return ['origen' => $alerta->origen, 'detalle' => $alerta->detalle, 'fecha' => substr($alerta->fecha, 0, 10),
+            'dias_restantes' => $dias, 'criticidad' => $dias < 7 ? 'rojo' : 'amarillo'];
+    }
+
+    public static function alertas(Usuario $actor, CarbonImmutable $hoy, int $dias, ?string $origen): Builder
     {
         $documentos = DB::table('documentos_usuario as d')->join('legajos as l', 'l.id', '=', 'd.legajo_id')
             ->join('tipos_documento as t', 't.id', '=', 'd.tipo_documento_id')->whereColumn('d.usuario_id', 'l.usuario_id')
@@ -87,13 +105,16 @@ final class ConsultaVencimientos
         }
         $adenda = DB::table('vinculo_adendas')->select('fecha_fin')->whereColumn('vinculo_laboral_id', 'v.id')->where('anulado', false)
             ->orderByDesc('fecha_inicio')->orderByDesc('created_at')->orderByDesc('id')->limit(1);
-        $vinculos = DB::table('vinculos_laborales as v')->where('v.anulado', false)->whereNull('v.fecha_cese')
+        $fin = "COALESCE(({$adenda->toSql()}), v.fecha_fin_prevista)";
+        $efectivo = "CASE WHEN v.fecha_cese IS NOT NULL AND ({$fin} IS NULL OR v.fecha_cese < {$fin}) THEN v.fecha_cese ELSE {$fin} END";
+        $vinculos = DB::table('vinculos_laborales as v')->where('v.anulado', false)
+            ->where(fn (Builder $q) => $q->whereNull('v.fecha_cese')->orWhereDate('v.fecha_cese', '>=', $hoy->toDateString()))
             ->whereDate('v.fecha_inicio', '<=', $hoy->toDateString())
             ->whereExists(fn (Builder $q) => $q->selectRaw('1')->from('legajos as l')->whereColumn('l.usuario_id', 'v.usuario_id')->where('l.estado_legajo', 'activo'))
-            ->selectRaw("v.usuario_id, v.id as alerta_id, 'contrato' as origen, COALESCE(({$adenda->toSql()}), v.fecha_fin_prevista) as fecha, v.nombre_puesto as detalle", $adenda->getBindings());
+            ->selectRaw("v.usuario_id, v.id as alerta_id, 'contrato' as origen, {$efectivo} as fecha, v.nombre_puesto as detalle", [...$adenda->getBindings(), ...$adenda->getBindings(), ...$adenda->getBindings()]);
         $contratos = DB::query()->fromSub($vinculos, 'v')->whereDate('fecha', '>=', $hoy->toDateString())->whereDate('fecha', '<=', $hoy->addDays($dias)->toDateString());
         $requerimientos = DB::table('requerimientos_documentos as r')->whereNull('r.cerrado_en')
-            ->whereIn('r.estado', ['abierto', 'pendiente', 'vencido', 'prorrogado'])
+            ->whereIn('r.estado', GestionRequerimientos::ABIERTOS)
             ->whereRaw('DATE(COALESCE(r.prorroga_hasta, r.fecha_limite)) < ?', [$hoy->toDateString()])
             ->whereExists(fn (Builder $q) => $q->selectRaw('1')->from('legajos as l')->whereColumn('l.usuario_id', 'r.usuario_id')->where('l.estado_legajo', 'activo'))
             ->selectRaw("r.usuario_id, r.id as alerta_id, 'requerimiento' as origen, COALESCE(r.prorroga_hasta, r.fecha_limite) as fecha, r.descripcion as detalle");

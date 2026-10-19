@@ -15,6 +15,7 @@ use App\Models\Usuario;
 use App\Models\VinculoLaboral;
 use App\Support\Catalogos;
 use App\Support\CondicionesRegistro;
+use App\Support\Documentos\AlmacenDocumento;
 use App\Support\Documentos\EstadoDocumento;
 use App\Support\Documentos\FormulariosDatos;
 use App\Support\ExigenciasSeccion01;
@@ -180,12 +181,15 @@ class Seccion01Controller extends Controller
         $legajo = Legajo::query()->where('usuario_id', $usuario)
             ->orderByRaw("CASE WHEN estado_legajo = 'activo' THEN 0 ELSE 1 END")->orderByDesc('fecha_apertura')->value('id');
         abort_unless($legajo, 409, 'La persona no tiene legajo: no se puede registrar el acceso al PDF en la bitácora.');
+        $contenido = AlmacenDocumento::leerAnterior($disk->get($record->pdf_path));
         BitacoraAccesoLegajo::query()->create([
             'legajo_id' => $legajo, 'documento_id' => null, 'usuario_id' => $request->user()->getAuthIdentifier(),
             'accion' => 'descargar', 'ip_origen' => $request->ip(), 'user_agent' => mb_substr((string) $request->userAgent(), 0, 300), 'fecha_acceso' => now(),
         ]);
 
-        return $disk->download($record->pdf_path, $record->pdf_nombre, [
+        return response()->streamDownload(static function () use ($contenido): void {
+            echo $contenido;
+        }, $record->pdf_nombre, [
             'Content-Type' => 'application/pdf',
             'Cache-Control' => 'private, no-store',
             'X-Content-Type-Options' => 'nosniff',

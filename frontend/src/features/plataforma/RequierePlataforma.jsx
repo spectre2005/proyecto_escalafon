@@ -6,6 +6,9 @@ import { SesionPlataforma } from './sesion'
 
 const menu = [
   { to: '/plataforma', label: 'Resumen', icon: 'home', end: true },
+  { to: '/plataforma/mi-cuenta', label: 'Mi cuenta', icon: 'user' },
+  { to: '/plataforma/cuentas', label: 'Cuentas', icon: 'users' },
+  { to: '/plataforma/auditoria', label: 'Auditoría', icon: 'search' },
   { to: '/plataforma/instituciones', label: 'Instituciones', icon: 'building' },
 ]
 

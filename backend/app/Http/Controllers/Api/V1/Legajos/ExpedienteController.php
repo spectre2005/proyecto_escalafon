@@ -58,6 +58,7 @@ use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
 use App\Support\AplicacionDocumental;
 use App\Support\CambioDiscapacidad;
+use App\Support\Documentos\DocumentosOperativos;
 use App\Support\PerfilPendiente;
 use App\Support\PuestoActual;
 use App\Support\RegimenesLaborales;
@@ -327,7 +328,7 @@ class ExpedienteController extends Controller
      */
     private function regimen(Usuario $person): array
     {
-        $tipos = $person->vinculosLaborales()->where('anulado', false)->whereNull('fecha_cese')->pluck('regimen_laboral');
+        $tipos = $person->vinculosLaborales()->vigente()->pluck('regimen_laboral');
         $ley = $person->regimenNormativo;
 
         return [
@@ -404,6 +405,9 @@ class ExpedienteController extends Controller
         }
         $config = self::SECTIONS[$section];
         $query = $config['model']::query();
+        if ($config['model'] === ReferenciaLegajoPasivo::class) {
+            $query->whereIn('tipo_documento_id', DocumentosOperativos::tipos($request)->select('id'));
+        }
         $ids = match ($config['scope']) {
             'legajo' => (clone $legajos)->select('id'),
             'documento' => (clone $documents)->select('id'),

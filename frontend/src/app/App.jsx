@@ -1,4 +1,13 @@
+import ReportesPage from '../features/reportes/pages/ReportesPage'
+import CuentasPlataformaPage from '../features/plataforma/pages/CuentasPage'
 import { BrowserRouter, Link, Route, Routes } from 'react-router-dom'
+import AuditoriaPage from '../features/requirements/AuditoriaPage'
+import AuditoriaPlataformaPage from '../features/plataforma/pages/AuditoriaPage'
+import RevisionDocumentalPage from '../features/requirements/RevisionDocumentalPage'
+import AvisosPage from '../features/requirements/AvisosPage'
+import ProfilePage from '../features/auth/ProfilePage'
+import FiscalizacionPage from '../features/fiscalizacion/FiscalizacionPage'
+import CustodiaPage from '../features/custodia/CustodiaPage'
 import RequireSession from '../features/auth/RequireSession'
 import LoginPrincipal from '../features/auth/login_principal'
 import DashboardPage from '../features/dashboard/DashboardPage'
@@ -8,6 +17,7 @@ import SettingsPage from '../features/settings/SettingsPage'
 import EvaluacionesPage from '../features/evaluations/pages/EvaluacionesPage'
 import VencimientosPage from '../features/requirements/VencimientosPage'
 import RequirementsPage from '../features/requirements/RequirementsPage'
+import CuentaPlataformaPage from '../features/plataforma/pages/CuentaPage'
 import PlataformaLogin from '../features/plataforma/PlataformaLogin'
 import RequierePlataforma from '../features/plataforma/RequierePlataforma'
 import ResumenPlataforma from '../features/plataforma/pages/ResumenPage'
@@ -16,5 +26,5 @@ import InstitucionNuevaPage from '../features/plataforma/pages/InstitucionNuevaP
 import InstitucionDetallePage from '../features/plataforma/pages/InstitucionDetallePage'
 
 export default function App() {
-  return <BrowserRouter><Routes><Route path="login_principal" element={<LoginPrincipal />} /><Route path="plataforma/login" element={<PlataformaLogin />} /><Route path="plataforma" element={<RequierePlataforma />}><Route index element={<ResumenPlataforma />} /><Route path="instituciones" element={<InstitucionesPage />} /><Route path="instituciones/nueva" element={<InstitucionNuevaPage />} /><Route path="instituciones/:id" element={<InstitucionDetallePage />} /><Route path="*" element={<p className="rounded-2xl border border-slate-200 bg-white p-10 text-center">Página no encontrada.</p>} /></Route><Route element={<RequireSession />}><Route index element={<DashboardPage />} /><Route path="legajos" element={<LegajosPage />} /><Route path="legajos/:usuario" element={<LegajosPage />} /><Route path="personal" element={<UsersPage />} /><Route path="evaluaciones" element={<EvaluacionesPage />} /><Route path="vencimientos" element={<VencimientosPage />} /><Route path="requerimientos" element={<RequirementsPage />} /><Route path="configuracion" element={<SettingsPage />} /><Route path="*" element={<div className="rounded-2xl border border-slate-200 bg-white p-10 text-center"><h1 className="text-2xl font-bold">Página no encontrada</h1><Link to="/" className="mt-5 inline-block text-teal-700 underline">Volver al inicio</Link></div>} /></Route></Routes></BrowserRouter>
+  return <BrowserRouter><Routes><Route path="login_principal" element={<LoginPrincipal />} /><Route path="plataforma/login" element={<PlataformaLogin />} /><Route path="plataforma" element={<RequierePlataforma />}><Route index element={<ResumenPlataforma />} /><Route path="cuentas" element={<CuentasPlataformaPage />} /><Route path="auditoria" element={<AuditoriaPlataformaPage />} /><Route path="mi-cuenta" element={<CuentaPlataformaPage />} /><Route path="instituciones" element={<InstitucionesPage />} /><Route path="instituciones/nueva" element={<InstitucionNuevaPage />} /><Route path="instituciones/:id" element={<InstitucionDetallePage />} /><Route path="*" element={<p className="rounded-2xl border border-slate-200 bg-white p-10 text-center">Página no encontrada.</p>} /></Route><Route element={<RequireSession />}><Route index element={<DashboardPage />} /><Route path="reportes" element={<ReportesPage />} /><Route path="legajos" element={<LegajosPage />} /><Route path="legajos/:usuario" element={<LegajosPage />} /><Route path="auditoria" element={<AuditoriaPage />} /><Route path="revision-documental" element={<RevisionDocumentalPage />} /><Route path="avisos" element={<AvisosPage />} /><Route path="mi-perfil" element={<ProfilePage />} /><Route path="personal" element={<UsersPage />} /><Route path="evaluaciones" element={<EvaluacionesPage />} /><Route path="vencimientos" element={<VencimientosPage />} /><Route path="requerimientos" element={<RequirementsPage />} /><Route path="fiscalizacion" element={<FiscalizacionPage />} /><Route path="custodia" element={<CustodiaPage />} /><Route path="configuracion" element={<SettingsPage />} /><Route path="*" element={<div className="rounded-2xl border border-slate-200 bg-white p-10 text-center"><h1 className="text-2xl font-bold">Página no encontrada</h1><Link to="/" className="mt-5 inline-block text-teal-700 underline">Volver al inicio</Link></div>} /></Route></Routes></BrowserRouter>
 }

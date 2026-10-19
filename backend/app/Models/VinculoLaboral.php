@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Support\VigenciaLaboral;
 use Database\Factories\VinculoLaboralFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -56,6 +58,11 @@ class VinculoLaboral extends Model
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
+    }
+
+    public function scopeVigente(Builder $query, ?string $fecha = null): Builder
+    {
+        return VigenciaLaboral::consulta($query, $fecha);
     }
 
     public function usuario(): BelongsTo

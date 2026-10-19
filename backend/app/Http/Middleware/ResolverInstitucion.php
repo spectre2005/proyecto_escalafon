@@ -7,6 +7,7 @@ use App\Support\Plataforma\ConexionInstitucion;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -22,7 +23,14 @@ class ResolverInstitucion
     public function handle(Request $request, Closure $next): Response
     {
         // /up (salud) e /interno/tls (permiso de certificados de Caddy) no son de ninguna institución.
-        if (config('plataforma.modo') !== 'subdominio' || $request->is('up', 'interno/tls')) {
+        if ($request->is('up', 'interno/tls')) {
+            return $next($request);
+        }
+        if (config('plataforma.modo') !== 'subdominio') {
+            if (! $request->is('api/plataforma', 'api/plataforma/*') && Schema::connection('plataforma')->hasTable('instituciones') && Institucion::query()->where('base_datos', config('database.connections.'.config('database.default').'.database'))->where('estado', Institucion::ARCHIVADA)->exists()) {
+                return self::rechazo(403, 'institucion_archivada', 'La institución fue archivada y ya no admite acceso. Sus datos se conservan.');
+            }
+
             return $next($request);
         }
         $dominio = strtolower((string) config('plataforma.dominio'));
@@ -37,6 +45,9 @@ class ResolverInstitucion
             ? Institucion::query()->where('slug', $slug)->first() : null;
         if (! $institucion || $institucion->estado === Institucion::REGISTRADA || ! $institucion->aprovisionada()) {
             return self::rechazo(404, 'institucion_no_encontrada', 'No existe una institución activa en esta dirección.');
+        }
+        if ($institucion->estado === Institucion::ARCHIVADA) {
+            return self::rechazo(403, 'institucion_archivada', 'La institución fue archivada y ya no admite acceso. Sus datos se conservan.');
         }
         if ($institucion->estado === Institucion::SUSPENDIDA) {
             return self::rechazo(403, 'institucion_suspendida', 'El acceso de esta institución está suspendido. Comunícate con el soporte de la plataforma.');

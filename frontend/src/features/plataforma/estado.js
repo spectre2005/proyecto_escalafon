@@ -1,5 +1,6 @@
 /** Estados de una institución y lo que el panel ofrece en cada uno. La regla la valida el backend; esto solo la muestra. */
 export const ESTADOS = {
+  archivada: { etiqueta: 'Archivada', clase: 'bg-slate-100 text-slate-700 ring-slate-300' },
   registrada: { etiqueta: 'Registrada', clase: 'bg-amber-50 text-amber-800 ring-amber-200' },
   activa: { etiqueta: 'Activa', clase: 'bg-teal-50 text-teal-800 ring-teal-200' },
   suspendida: { etiqueta: 'Suspendida', clase: 'bg-rose-50 text-rose-700 ring-rose-200' },

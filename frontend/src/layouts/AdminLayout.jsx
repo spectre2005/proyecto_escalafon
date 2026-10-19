@@ -55,7 +55,7 @@ export default function AdminLayout({ user, avisoServicio = null }) {
   const drawerRef = useRef(null)
   const mainRef = useRef(null)
   const { pathname } = useLocation()
-  const title = navigation.find(item => item.to === pathname || (item.to && item.to !== '/' && pathname.startsWith(`${item.to}/`)))?.label || 'Página no encontrada'
+  const title = navigation.find(item => item.to === pathname || (item.to && item.to !== '/' && pathname.startsWith(`${item.to}/`)))?.label || (pathname === '/mi-perfil' ? 'Mi perfil' : 'Página no encontrada')
   useEffect(() => {
     document.title = `${title} · ${institution.name}`
     mainRef.current?.focus({ preventScroll: true })

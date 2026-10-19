@@ -102,9 +102,11 @@ class ConfiguracionBloqueoTest extends TestCase
 
         // El CRUD genérico de administración que recibe un tipo de documento no muta el legajo: no se bloquea por el tipo.
         $controversia = $this->tipo('S09_A_CONTROVERSIAS_INDIVIDUALES');
-        foreach (['requerimientos-documentos', 'compromiso-documentos', 'referencias-legajo-pasivo'] as $recurso) {
+        foreach (['compromiso-documentos', 'referencias-legajo-pasivo'] as $recurso) {
             $this->noBloqueada($this->postJson('/api/v1/'.$recurso, ['tipo_documento_id' => $controversia]));
         }
+
+        $this->noBloqueada($this->postJson('/api/v1/requerimientos', ['tipo_documento_id' => $controversia]));
 
         // Lectura, y anular (pendiente U8), no se bloquean.
         $this->getJson($url.'/seccion-09')->assertOk();

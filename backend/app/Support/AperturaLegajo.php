@@ -34,7 +34,7 @@ final class AperturaLegajo
                 return null;
             }
             $legajo = Legajo::query()->create([
-                'usuario_id' => $usuario, 'numero_legajo' => NumeroLegajo::siguiente(), 'estado_legajo' => 'activo', 'fecha_apertura' => today(),
+                'usuario_id' => $usuario, 'numero_legajo' => NumeroLegajo::siguiente(), 'estado_legajo' => 'activo', 'fecha_apertura' => now('America/Lima')->toDateString(),
             ]);
             foreach ($secciones as $seccion) {
                 LegajoSeccion::query()->create(['legajo_id' => $legajo->id, 'seccion_legajo_id' => $seccion, 'ultimo_folio' => 0]);

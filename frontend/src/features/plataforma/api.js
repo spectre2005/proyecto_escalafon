@@ -69,3 +69,17 @@ export function mensajeError(error) {
 }
 
 export const sesionTerminada = error => [401, 419].includes(error?.response?.status)
+
+export const cambiarPassword = datos => plataforma.put('/auth/password', datos).then(r => r.data.data)
+
+export const archivarInstitucion = (id, motivo) => plataforma.post(`/instituciones/${id}/archivar`, { motivo }).then(r => r.data.data)
+
+export const exportarInstitucion = id => plataforma.post(`/instituciones/${id}/exportar`, {}, { responseType: 'blob', timeout: 300000 })
+
+export const buscarPersonaAdministradora = (id, email) => plataforma.get(`/instituciones/${id}/administradores/persona-existente`, { params: { email } }).then(r => r.data.data)
+export const asignarAdministradorExistente = (id, datos) => plataforma.post(`/instituciones/${id}/administradores/asignar-existente`, datos).then(r => r.data.data)
+
+export const consultarAuditoria = (url, signal) => plataforma.get(url, { signal }).then(r => r.data)
+export const exportarAuditoria = url => plataforma.get(url, { responseType: 'blob', timeout: 120000 })
+
+export default plataforma

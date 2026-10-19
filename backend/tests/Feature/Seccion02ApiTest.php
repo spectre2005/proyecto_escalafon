@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditoriaEvento;
 use App\Models\Induccion;
 use App\Models\Legajo;
 use App\Models\PerfilAdministrativo;
@@ -189,5 +190,22 @@ class Seccion02ApiTest extends TestCase
             ->assertJsonPath('data.vinculos.0.values.tipo_personal', 'docente')->assertJsonPath('data.vinculos.0.datos_puesto.0.values.condicion_docente', 'ordinario')
             ->assertJsonPath('data.vinculos.1.datos_puesto.0.values.cargo_estructural', 'Jefe de unidad')
             ->assertJsonMissingPath('data.vinculos.1.datos_puesto.0.values.condicion_docente');
+    }
+
+    public function test_job_profile_corrections_preserve_before_after_and_actor(): void
+    {
+        $actor = $this->actuarComo();
+        $persona = Usuario::factory()->create();
+        Legajo::factory()->create(['usuario_id' => $persona->id, 'estado_legajo' => 'activo']);
+        $vinculo = VinculoLaboral::factory()->create(['usuario_id' => $persona->id, 'tipo_personal' => 'administrativo']);
+        $url = $this->url($persona, 'vinculos-laborales/'.$vinculo->id.'/datos-puesto');
+        $this->putJson($url, ['grupo_ocupacional' => 'profesional', 'cargo_estructural' => 'Analista I'])->assertCreated();
+        $this->putJson($url, ['grupo_ocupacional' => 'profesional', 'cargo_estructural' => 'Analista II'])->assertOk();
+        $evento = AuditoriaEvento::query()->where('entidad_id', $vinculo->id)->where('accion', 'vinculo.perfil_corregido')->sole();
+        $this->assertSame($actor->id, $evento->actor_usuario_id);
+        $this->assertSame('Analista I', json_decode($evento->datos_antes, true)['cargo_estructural']);
+        $this->assertSame('Analista II', json_decode($evento->datos_despues, true)['cargo_estructural']);
+        $this->getJson('/api/v1/operaciones/historial/vinculos_laborales/'.$vinculo->id)->assertOk()->assertJsonPath('total', 2);
+        $this->patchJson('/api/v1/auditoria-eventos/'.$evento->id, ['accion' => 'ALTERADO'])->assertConflict();
     }
 }

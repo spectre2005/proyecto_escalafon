@@ -41,14 +41,12 @@ return [
         'datos_sensibles.ver' => 've_datos_sensibles',
     ],
 
-    // Pendientes de decisión del cliente: no se asignan a ningún rol, ni siquiera ADMIN.
-    'pendientes' => [
-        'seccion07.ver_calificacion',
-    ],
+    'pendientes' => [],
 
     // Asignación explícita: no los da el comodín '*'; solo un rol que los nombre en su lista
     // (docs/decisiones-configuracion-secciones.md, sección 8).
     'explicitos' => [
+        'seccion07.ver_calificacion',
         'configuracion.modulos',
     ],
 
@@ -57,7 +55,7 @@ return [
     'roles' => [
         // El administrador de cada institución (jefe de la ORH) también configura sus funcionalidades
         // (decisión del 17/10/2026). Cada cambio exige motivo y queda auditado.
-        'ADMIN' => ['*', 'configuracion.modulos'],
+        'ADMIN' => ['*', 'configuracion.modulos', 'seccion07.ver_calificacion'],
 
         // Rol adicional para que otra persona, sin ser ADMIN, cambie la configuración de funcionalidades. No
         // existe en la base ni en los seeders: se asigna expresamente.
@@ -65,8 +63,7 @@ return [
             'configuracion.modulos',
         ],
 
-        // Pendiente de confirmar con el cliente: el rol no existe en la base
-        // ni en los seeders. Basado en la tabla "Límites del asistente".
+        // Matriz confirmada el 17/10/2026. Se crea al conceder el primer acceso desde Configuración.
         'asistente_legajo' => [
             'personal.ver',
             'legajo.ver',

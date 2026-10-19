@@ -33,11 +33,9 @@ trait SubeDocumentos
     }
 
     /** PDF mínimo válido de dos páginas (con relleno opcional para probar el tamaño). */
-    protected function pdf(string $nombre = 'documento.pdf', int $relleno = 0): UploadedFile
+    protected function pdf(string $nombre = 'documento.pdf', int $relleno = 0, int $paginas = 2): UploadedFile
     {
-        $contenido = "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R 4 0 R]/Count 2>>endobj\n"
-            ."3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>endobj\n4 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>endobj\n"
-            .($relleno ? '%'.str_repeat('x', $relleno)."\n" : '')."trailer<</Root 1 0 R>>\n%%EOF\n";
+        $contenido = self::pdfValido($paginas, $relleno);
 
         return UploadedFile::fake()->createWithContent($nombre, $contenido);
     }
@@ -45,7 +43,8 @@ trait SubeDocumentos
     protected function metadatos(TipoDocumento $tipo, int $inicio, int $fin, array $cambios = []): array
     {
         return [...[
-            'seccion_legajo_id' => $tipo->seccion_legajo_id, 'tipo_documento_id' => $tipo->id, 'pdf' => $this->pdf(),
+            'seccion_legajo_id' => $tipo->seccion_legajo_id, 'tipo_documento_id' => $tipo->id,
+            'pdf' => UploadedFile::fake()->createWithContent('documento.pdf', self::pdfValido(max(1, $fin - $inicio + 1))),
             'folio_inicio' => $inicio, 'folio_fin' => $fin, 'fecha_incorporacion' => today()->toDateString(),
             'emisor' => 'Oficina de Recursos Humanos', 'fecha_emision' => today()->subDays(3)->toDateString(),
             'titular_nombre' => 'Persona Demo', 'titular_documento' => '99000201', 'modalidad_presentacion' => 'copia_simple',

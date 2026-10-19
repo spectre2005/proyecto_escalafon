@@ -146,4 +146,19 @@ class AdministradoresInstitucionTest extends TestCase
         $this->postJson($this->url(), ['nombres' => 'Luis', 'apellido_paterno' => 'Huamán', 'email' => 'luis@uno.test', 'password' => 'x'])
             ->assertUnprocessable()->assertJsonValidationErrors('password');
     }
+
+    public function test_existing_person_receives_admin_role_without_duplicate_or_password_changes(): void
+    {
+        $antes = (array) $this->enBase()->table('usuarios')->where('id', $this->persona)->first();
+        $this->getJson($this->url('/persona-existente?email=rosa%40uno.test'))->assertOk()->assertJsonPath('data.id', $this->persona)->assertJsonPath('data.ya_administrador', false)->assertJsonMissingPath('data.password');
+        $datos = ['usuario_id' => $this->persona, 'email_confirmado' => 'rosa@uno.test', 'identidad_confirmada' => true, 'motivo' => 'Designación administrativa confirmada'];
+        $this->postJson($this->url('/asignar-existente'), [...$datos, 'identidad_confirmada' => false])->assertUnprocessable();
+        $this->postJson($this->url('/asignar-existente'), [...$datos, 'email_confirmado' => 'otra@uno.test'])->assertConflict();
+        $this->postJson($this->url('/asignar-existente'), $datos)->assertOk()->assertJsonPath('data.id', $this->persona)->assertJsonMissingPath('data.clave_temporal');
+        $this->assertSame($antes, (array) $this->enBase()->table('usuarios')->where('id', $this->persona)->first());
+        $this->assertSame(2, $this->enBase()->table('usuarios')->count());
+        $this->assertCount(2, $this->getJson($this->url())->assertOk()->json('data'));
+        $this->postJson($this->url('/asignar-existente'), $datos)->assertConflict();
+        $this->assertSame(1, AuditoriaPlataforma::query()->where('accion', 'administrador_institucion.asignado_existente')->count());
+    }
 }

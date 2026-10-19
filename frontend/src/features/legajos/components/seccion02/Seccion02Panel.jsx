@@ -1,3 +1,4 @@
+import { WorkflowHistory } from '../../../../shared/WorkflowControls'
 import Icon from '../../../../components/ui/Icon'
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -66,7 +67,7 @@ function Resumen({ data, onNavigate, compacto = false }) {
     })()}
     <details className="mt-2 text-xs text-slate-500">
       <summary className="cursor-pointer font-semibold text-slate-600">¿Cómo se cuenta?</summary>
-      <p className="mt-2">Cargados y recepcionados se muestran por separado: el criterio de completitud del legajo está pendiente de definir. Sin recepción un documento no cuenta como aprobado. Un tipo queda por determinar cuando falta definir una condición del puesto o el régimen laboral registrado no es carrera, plazo determinado ni designado.</p>
+      <p className="mt-2">Cargados y recepcionados se muestran por separado. Solo cuentan como completos los documentos recepcionados y aceptados o verificados; los observados requieren subsanación. Un tipo queda por determinar cuando falta definir una condición del puesto o el régimen laboral registrado no es carrera, plazo determinado ni designado.</p>
     </details>
     {!compacto && <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">{data.subsecciones.map(sub => {
       const [nombre, clase] = estadosSubseccion[sub.estado]
@@ -309,6 +310,7 @@ function CompletarTipo({ usuario, vinculo, disabled }) {
 // Tarjeta del vínculo: resumen siempre visible (puesto, tipo, fechas, unidad) y el detalle (condiciones, adendas y datos
 // del puesto) plegable. adjuntar: «Adjuntar documento» del vínculo; adjuntarAdenda(adenda): el de cada adenda sin documento.
 function VinculoCard({ vinculo, aviso, acciones, accionAdenda, destacado, corregir, completar, adjuntar, adjuntarAdenda, documentos = [] }) {
+  const administra = usePuede('sistema.administrar')
   const v = vinculo.values
   const [estadoTexto, estadoClase] = estadosVencimiento[vinculo.vencimiento.estado]
   return <article className={`rounded-2xl border bg-white p-5 ${destacado ? 'border-teal-300 ring-1 ring-teal-100' : 'border-slate-200'}`}>
@@ -339,6 +341,7 @@ function VinculoCard({ vinculo, aviso, acciones, accionAdenda, destacado, correg
     </details>
     {/* Documentos que acreditan el vínculo (resolución, contrato, renovaciones), sin ir a la lista de tipos. */}
     <div className="mt-4 space-y-2">{documentos.length ? documentos.map(encontrado => <DocumentoDelRegistro key={encontrado.documento.id} encontrado={encontrado} />) : <DocumentoDelRegistro encontrado={null} />}</div>
+    {administra && <WorkflowHistory entity="vinculos_laborales" id={vinculo.id} />}
     {acciones}
     {adjuntar}
   </article>

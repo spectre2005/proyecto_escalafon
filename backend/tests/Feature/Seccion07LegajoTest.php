@@ -254,6 +254,7 @@ class Seccion07LegajoTest extends TestCase
 
     public function test_grade_and_score_are_hidden_without_their_permission(): void
     {
+        config(['permisos.roles.ADMIN' => ['*', 'configuracion.modulos']]);
         $carrera = $this->persona('99000701');
         $this->actuarComo();
         $respuesta = $this->getJson($this->url($carrera))->assertOk()

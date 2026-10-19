@@ -51,7 +51,7 @@ class Seccion08ApiTest extends TestCase
         $folio = (int) DocumentoUsuario::query()->where('legajo_id', $this->legajo->id)->where('seccion_legajo_id', 8)->max('folio_fin') + 1;
         $datos = ['tipo_documento_id' => $tipo->id, 'nombre' => 'Registro ficticio de prueba', 'emisor' => 'Entidad ficticia',
             'fecha_emision' => '2026-10-01', 'folio_inicio' => $folio, 'folio_fin' => $folio,
-            'modalidad_presentacion' => 'copia_simple', 'pdf' => $this->pdf()];
+            'modalidad_presentacion' => 'copia_simple', 'pdf' => $this->pdf(paginas: max(1, ($cambios['folio_fin'] ?? $folio) - ($cambios['folio_inicio'] ?? $folio) + 1))];
         if (str_starts_with($codigo, 'REC_')) {
             $datos += ['tipo' => match ($codigo) {
                 'REC_CARTA_FELICITACION' => 'carta', 'REC_LABOR_DOCENTE' => 'labor_docente', default => 'tiempo_servicios',

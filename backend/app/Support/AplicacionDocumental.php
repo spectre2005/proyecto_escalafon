@@ -90,7 +90,7 @@ final class AplicacionDocumental
     public static function de(Usuario $persona, Collection $vinculos): self
     {
         $noAnulados = $vinculos->reject(fn (VinculoLaboral $vinculo): bool => (bool) $vinculo->anulado);
-        $vigentes = $noAnulados->whereNull('fecha_cese');
+        $vigentes = $noAnulados->filter(fn (VinculoLaboral $vinculo): bool => VigenciaLaboral::vigente($vinculo));
         $origen = $noAnulados->isEmpty() ? collect([$persona]) : $noAnulados;
         $banderas = [];
         $ofrecidas = [];
@@ -116,7 +116,7 @@ final class AplicacionDocumental
 
     public static function para(Usuario $persona): self
     {
-        return self::de($persona, $persona->vinculosLaborales()->get());
+        return self::de($persona, $persona->vinculosLaborales()->with('vinculoAdendas')->get());
     }
 
     /**

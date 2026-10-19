@@ -100,8 +100,8 @@ class AuthenticationTest extends TestCase
         foreach (['personal.ver', 'usuarios.gestionar', 'legajo.ver', 'legajo.editar', 'documento.subir', 'documento.recepcionar', 'seccion07.ver', 'sistema.administrar', 'datos_sensibles.ver'] as $permiso) {
             $this->assertContains($permiso, $permisos);
         }
-        // Pendiente de decisión del cliente: nadie lo recibe, ni ADMIN.
-        $this->assertNotContains('seccion07.ver_calificacion', $permisos);
+        // Matriz confirmada: las calificaciones se entregan solo al administrador institucional.
+        $this->assertContains('seccion07.ver_calificacion', $permisos);
         $this->assertNotNull($admin->fresh()->ultimo_acceso);
 
         $this->getJson('/api/v1/auth/me')->assertOk()->assertJsonPath('data.usuario.id', $admin->id)->assertJsonPath('data.permisos', $permisos);

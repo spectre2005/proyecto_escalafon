@@ -3,6 +3,11 @@
 namespace App\Support\Documentos;
 
 use Illuminate\Http\UploadedFile;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
+use Symfony\Component\Process\ExecutableFinder;
+use Symfony\Component\Process\Process;
 
 /**
  * Comprobaciones del PDF en el servidor: tipo real por contenido (no por extensión ni por el
@@ -28,35 +33,26 @@ final class ArchivoPdf
         return hash_file('sha256', $archivo->getRealPath());
     }
 
-    /**
-     * Número de páginas, lo mejor posible sin librería externa: /Count del árbol de páginas (el mayor es la
-     * raíz), buscando también en los object streams comprimidos. Si no se puede leer, null (columna opcional).
-     */
-    public static function paginas(UploadedFile $archivo): ?int
+    /** Poppler analiza el árbol PDF real, incluidos objetos y flujos comprimidos. */
+    public static function paginas(UploadedFile $archivo): int
     {
-        $contenido = (string) file_get_contents($archivo->getRealPath());
-        $paginas = self::contar($contenido);
-        if ($paginas === null && preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $contenido, $streams)) {
-            foreach ($streams[1] as $stream) {
-                $plano = @gzuncompress($stream);
-                if ($plano !== false && ($n = self::contar($plano)) !== null) {
-                    $paginas = max($paginas ?? 0, $n);
-                }
-            }
+        $binario = (new ExecutableFinder)->find((string) config('documentos.pdfinfo_binario', 'pdfinfo'));
+        if ($binario === null) {
+            throw new HttpException(503, 'El verificador de PDF no está disponible. Revisa la instalación de Poppler.');
+        }
+        $proceso = new Process([$binario, '-enc', 'UTF-8', $archivo->getRealPath()], env: ['LC_ALL' => 'C']);
+        $proceso->setTimeout(10);
+        try {
+            $proceso->run();
+        } catch (ProcessTimedOutException) {
+            throw ValidationException::withMessages(['pdf' => 'No se pudo analizar el PDF dentro del tiempo permitido. Guarda una copia simplificada e intenta nuevamente.']);
+        }
+        $salida = $proceso->getOutput();
+        if (! $proceso->isSuccessful() || preg_match('/^Encrypted:\s+yes/im', $salida)
+            || ! preg_match('/^Pages:\s+(\d+)\s*$/m', $salida, $paginas) || (int) $paginas[1] < 1) {
+            throw ValidationException::withMessages(['pdf' => 'No se pudo verificar el PDF. Debe ser un documento válido, sin contraseña ni cifrado interno.']);
         }
 
-        return $paginas;
-    }
-
-    private static function contar(string $contenido): ?int
-    {
-        if (preg_match_all('#/Type\s*/Pages\b[^>]*?/Count\s+(\d+)|/Count\s+(\d+)[^>]*?/Type\s*/Pages\b#s', $contenido, $m)) {
-            $conteos = array_map('intval', array_filter([...$m[1], ...$m[2]], 'strlen'));
-            if ($conteos !== []) {
-                return max($conteos);
-            }
-        }
-
-        return null;
+        return (int) $paginas[1];
     }
 }

@@ -16,7 +16,7 @@ final class ResumenSeccion04
         foreach ($items->where('exigido', true) as $item) {
             $vigentes = collect($item['documentos'])->filter(fn (array $doc): bool => ! $doc['subsanado'] && $doc['estado'] !== 'anulado');
             $exigidos += max(1, $vigentes->count());
-            $aceptados += $vigentes->where('estado', 'aceptado')->count();
+            $aceptados += $vigentes->filter(fn (array $doc): bool => $doc['estado'] === 'aceptado' && ! empty($doc['fecha_recepcion']))->count();
         }
 
         return [...ResumenSeccion03::total($items), 'exigidos' => $exigidos, 'aceptados' => $aceptados,

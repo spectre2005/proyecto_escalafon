@@ -21,11 +21,10 @@ class Seccion01ApiTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const PDF = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF";
-
     /** PDF guardado antes del sistema de folios: solo pdf_path y pdf_nombre, sin documento del legajo. */
-    private function pdfAnterior(Model $registro, string $nombre, string $contenido = self::PDF): string
+    private function pdfAnterior(Model $registro, string $nombre, ?string $contenido = null): string
     {
+        $contenido ??= self::pdfValido();
         $path = $registro->getTable().'/'.$registro->usuario_id.'/'.$nombre;
         Storage::disk('local')->put($path, $contenido);
         DB::table($registro->getTable())->where('id', $registro->id)->update(['pdf_path' => $path, 'pdf_nombre' => $nombre]);
@@ -114,14 +113,14 @@ class Seccion01ApiTest extends TestCase
         $path = $this->pdfAnterior($record, 'certificado.pdf');
         $this->getJson($url)->assertOk()->assertJsonPath('data.0.values.pdf_nombre', 'certificado.pdf')->assertJsonMissingPath('data.0.values.pdf_path');
         $download = $this->get($url.'/'.$record->id.'/pdf')->assertOk()->assertDownload('certificado.pdf')->assertHeader('Content-Type', 'application/pdf');
-        $this->assertSame(self::PDF, $download->streamedContent());
+        $this->assertSame(self::pdfValido(), $download->streamedContent());
 
         $this->patchJson($url.'/'.$record->id, ['numero_conadis' => 'C-CORREGIDO', 'registrado_por' => $persona->id] + $data)
             ->assertOk()->assertJsonPath('data.numero_conadis', 'C-CORREGIDO')->assertJsonPath('data.registrado_por', $autor->id);
         $this->assertSame($path, $record->refresh()->pdf_path);
 
         // El PDF ya no se adjunta en el formulario (se sube como documento del legajo) y el anterior no se toca.
-        $this->post($url.'/'.$record->id, $data + ['_method' => 'PATCH', 'numero_conadis' => 'C-OTRO', 'pdf' => UploadedFile::fake()->createWithContent('nuevo.pdf', self::PDF)], ['Accept' => 'application/json'])
+        $this->post($url.'/'.$record->id, $data + ['_method' => 'PATCH', 'numero_conadis' => 'C-OTRO', 'pdf' => UploadedFile::fake()->createWithContent('nuevo.pdf', self::pdfValido())], ['Accept' => 'application/json'])
             ->assertUnprocessable()->assertJsonValidationErrors('pdf');
         $record->refresh();
         $this->assertSame([$path, 'certificado.pdf', 'C-CORREGIDO'], [$record->pdf_path, $record->pdf_nombre, $record->numero_conadis]);
@@ -137,13 +136,13 @@ class Seccion01ApiTest extends TestCase
         $persona = Usuario::factory()->create();
         $url = $this->url($persona, 'certificados-discapacidad');
         $data = ['persona' => 'servidor', 'numero_conadis' => 'C-VALIDO'];
-        $this->post($url, $data + ['pdf' => UploadedFile::fake()->createWithContent('c.pdf', self::PDF)], ['Accept' => 'application/json'])
+        $this->post($url, $data + ['pdf' => UploadedFile::fake()->createWithContent('c.pdf', self::pdfValido())], ['Accept' => 'application/json'])
             ->assertUnprocessable()->assertJsonValidationErrors('pdf');
         $id = $this->postJson($url, $data)->assertCreated()->json('data.id');
         $this->getJson($url.'/'.$id.'/pdf')->assertNotFound();
-        $this->post($url.'/'.$id, ['_method' => 'PATCH', 'pdf' => UploadedFile::fake()->createWithContent('c.pdf', self::PDF), 'numero_conadis' => 'NO-GUARDAR'] + $data, ['Accept' => 'application/json'])
+        $this->post($url.'/'.$id, ['_method' => 'PATCH', 'pdf' => UploadedFile::fake()->createWithContent('c.pdf', self::pdfValido()), 'numero_conadis' => 'NO-GUARDAR'] + $data, ['Accept' => 'application/json'])
             ->assertUnprocessable()->assertJsonValidationErrors('pdf');
-        $this->post($this->url($persona, 'declaraciones-verificaciones'), ['tipo' => 'djbr', 'fecha' => '2025-01-10', 'resultado' => 'presentada', 'pdf' => UploadedFile::fake()->createWithContent('d.pdf', self::PDF)], ['Accept' => 'application/json'])
+        $this->post($this->url($persona, 'declaraciones-verificaciones'), ['tipo' => 'djbr', 'fecha' => '2025-01-10', 'resultado' => 'presentada', 'pdf' => UploadedFile::fake()->createWithContent('d.pdf', self::pdfValido())], ['Accept' => 'application/json'])
             ->assertUnprocessable()->assertJsonValidationErrors('pdf');
         $this->assertDatabaseHas('certificados_discapacidad', ['id' => $id, 'numero_conadis' => 'C-VALIDO', 'pdf_path' => null]);
         $this->assertDatabaseCount('declaraciones_verificaciones', 0);
@@ -211,10 +210,10 @@ class Seccion01ApiTest extends TestCase
         $path = $this->pdfAnterior($record, 'declaracion.pdf');
         $this->getJson($url)->assertOk()->assertJsonPath('data.0.values.pdf_nombre', 'declaracion.pdf')->assertJsonMissingPath('data.0.values.pdf_path');
         $download = $this->get($url.'/'.$record->id.'/pdf')->assertOk()->assertDownload('declaracion.pdf')->assertHeader('Content-Type', 'application/pdf');
-        $this->assertSame(self::PDF, $download->streamedContent());
+        $this->assertSame(self::pdfValido(), $download->streamedContent());
         $this->patchJson($url.'/'.$record->id, ['observacion' => 'Corregida', 'registrado_por' => $persona->id] + $data)
             ->assertOk()->assertJsonPath('data.observacion', 'Corregida')->assertJsonPath('data.registrado_por', $autor->id);
-        $this->post($url.'/'.$record->id, $data + ['_method' => 'PATCH', 'pdf' => UploadedFile::fake()->createWithContent('nueva.pdf', self::PDF)], ['Accept' => 'application/json'])
+        $this->post($url.'/'.$record->id, $data + ['_method' => 'PATCH', 'pdf' => UploadedFile::fake()->createWithContent('nueva.pdf', self::pdfValido())], ['Accept' => 'application/json'])
             ->assertUnprocessable()->assertJsonValidationErrors('pdf');
         $record->refresh();
         $this->assertSame([$path, 'declaracion.pdf', 'Corregida'], [$record->pdf_path, $record->pdf_nombre, $record->observacion]);

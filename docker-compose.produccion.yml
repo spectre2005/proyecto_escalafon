@@ -39,11 +39,27 @@ services:
     image: escalafon-php
     restart: unless-stopped
     env_file: .env.produccion
-    command: ["php", "artisan", "queue:work", "--tries=3", "--max-time=3600", "--sleep=3"]
+    command: ["php", "artisan", "queue:work", "--queue=avisos,default", "--tries=3", "--max-time=3600", "--sleep=3"]
     volumes:
       - storage:/var/www/html/storage
     depends_on:
       - app
+
+  scheduler:
+    image: escalafon-php
+    restart: unless-stopped
+    env_file: .env.produccion
+    command: ["php", "artisan", "schedule:work"]
+    volumes:
+      - storage:/var/www/html/storage
+    depends_on:
+      - app
+
+  clamav:
+    image: clamav/clamav:1.4
+    restart: unless-stopped
+    volumes:
+      - firmas_antivirus:/var/lib/clamav
 
   db:
     image: postgres:16-alpine
@@ -64,6 +80,7 @@ services:
       - ./docker/produccion/initdb:/docker-entrypoint-initdb.d:ro
 
 volumes:
+  firmas_antivirus:
   storage:
   postgres:
   caddy_datos:

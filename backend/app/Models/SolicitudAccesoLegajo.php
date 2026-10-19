@@ -41,6 +41,8 @@ class SolicitudAccesoLegajo extends Model
     protected function casts(): array
     {
         return [
+            'version' => 'integer',
+            'documentos_autorizados' => 'array',
             'incluye_datos_sensibles' => 'boolean',
             'compromiso_confidencialidad' => 'boolean',
             'fecha_resolucion' => 'datetime',

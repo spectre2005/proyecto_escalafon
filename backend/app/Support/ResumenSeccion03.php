@@ -33,7 +33,7 @@ final class ResumenSeccion03
         if ($vigentes->contains('estado', 'observado')) {
             return 'observado';
         }
-        if ($vigentes->contains('estado', 'pendiente')) {
+        if ($vigentes->contains('estado', 'pendiente') || $vigentes->contains(fn (array $doc): bool => in_array($doc['estado'], ['aceptado', 'verificado'], true) && empty($doc['fecha_recepcion']))) {
             return 'pendiente';
         }
 

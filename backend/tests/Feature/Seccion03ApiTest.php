@@ -8,6 +8,7 @@ use App\Models\Legajo;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
+use App\Support\Documentos\AlmacenDocumento;
 use App\Support\ResumenSeccion03;
 use Database\Seeders\Seccion03CatalogoSeeder;
 use Database\Seeders\SeccionesLegajoCatalogoSeeder;
@@ -52,7 +53,7 @@ class Seccion03ApiTest extends TestCase
         $datos = [
             'tipo_documento_id' => $tipo->id, 'nombre' => 'Título profesional de ejemplo', 'emisor' => 'Universidad de ejemplo',
             'fecha_emision' => today()->subDay()->toDateString(), 'folio_inicio' => $siguiente, 'folio_fin' => $siguiente,
-            'modalidad_presentacion' => 'copia_fedateada', 'pdf' => $this->pdf(),
+            'modalidad_presentacion' => 'copia_fedateada', 'pdf' => $this->pdf(paginas: max(1, ($cambios['folio_fin'] ?? $siguiente) - ($cambios['folio_inicio'] ?? $siguiente) + 1)),
         ];
         if (in_array($codigo, ['FORM_TITULO_GRADO_SUPERIOR', 'FORM_MAESTRIA_DOCTORADO'], true)) {
             $datos['nivel'] = $codigo === 'FORM_MAESTRIA_DOCTORADO' ? 'maestria' : 'titulo_profesional';
@@ -117,8 +118,8 @@ class Seccion03ApiTest extends TestCase
         $this->assertDatabaseHas('formacion_academica', ['documento_id' => $id, 'numero_registro_sunedu' => 'REG-001', 'registrado_por' => $this->autor->id]);
         $this->assertDatabaseHas('historial_estados_documento', ['documento_usuario_id' => $id, 'estado_nuevo' => 'pendiente', 'cambiado_por' => $this->autor->id]);
         $this->assertDatabaseHas('auditoria_eventos', ['entidad_id' => $id, 'accion' => 'formacion.documento.creado', 'actor_usuario_id' => $this->autor->id]);
-        $this->assertSame('pendiente', $doc->archivo->estado_antivirus);
-        $this->assertSame(hash('sha256', Storage::disk(config('legajo.disco_documentos'))->get($doc->archivo->storage_path)), $doc->archivo->hash_sha256);
+        $this->assertSame('limpio', $doc->archivo->estado_antivirus);
+        $this->assertSame(hash('sha256', AlmacenDocumento::leer($doc->archivo)), $doc->archivo->hash_sha256);
         $this->assertDatabaseHas('legajo_secciones', ['legajo_id' => $this->legajo->id, 'seccion_legajo_id' => 3, 'ultimo_folio' => 1]);
         $this->assertSame($this->persona->numero_doc_identidad, $doc->titular_documento);
     }
@@ -307,7 +308,7 @@ class Seccion03ApiTest extends TestCase
 
     public function test_state_priority_excludes_annulled_and_subsaned_documents(): void
     {
-        $documento = fn (string $estado, bool $subsanado = false): array => ['estado' => $estado, 'subsanado' => $subsanado];
+        $documento = fn (string $estado, bool $subsanado = false): array => ['estado' => $estado, 'subsanado' => $subsanado, 'fecha_recepcion' => '2026-10-01'];
         $this->assertSame('falta', ResumenSeccion03::estado(true, false, collect([$documento('anulado')])));
         $this->assertSame('aceptado', ResumenSeccion03::estado(true, false, collect([$documento('aceptado'), $documento('observado', true)])));
         $this->assertSame('observado', ResumenSeccion03::estado(true, false, collect([$documento('observado'), $documento('pendiente')])));

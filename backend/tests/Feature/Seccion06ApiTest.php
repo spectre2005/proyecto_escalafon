@@ -10,6 +10,7 @@ use App\Models\Rol;
 use App\Models\TiempoServicioReconocido;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
+use App\Support\Documentos\AlmacenDocumento;
 use Database\Seeders\Seccion06CatalogoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -53,7 +54,7 @@ class Seccion06ApiTest extends TestCase
         $tipo = TipoDocumento::query()->where('codigo', $codigo)->firstOrFail();
         $folio = (int) DocumentoUsuario::query()->where('legajo_id', $this->legajo->id)->where('seccion_legajo_id', 6)->max('folio_fin') + 1;
         $datos = ['tipo_documento_id' => $tipo->id, 'nombre' => 'Documento de compensaciones', 'emisor' => 'Oficina de Recursos Humanos', 'fecha_emision' => '2026-10-01',
-            'folio_inicio' => $folio, 'folio_fin' => $folio, 'modalidad_presentacion' => 'copia_simple', 'pdf' => $this->pdf()];
+            'folio_inicio' => $folio, 'folio_fin' => $folio, 'modalidad_presentacion' => 'copia_simple', 'pdf' => $this->pdf(paginas: max(1, ($cambios['folio_fin'] ?? $folio) - ($cambios['folio_inicio'] ?? $folio) + 1))];
         if ($codigo === 'COMP_RECONOCIMIENTO_TIEMPO') {
             $datos += ['num_resolucion' => 'RES-001', 'anios' => 12, 'meses' => 3, 'dias' => 15];
         }
@@ -91,8 +92,8 @@ class Seccion06ApiTest extends TestCase
         $this->assertSame($doc->fecha_emision->toDateString(), $tiempo->fecha_resolucion->toDateString());
         $this->assertDatabaseHas('historial_estados_documento', ['documento_usuario_id' => $id, 'estado_nuevo' => 'pendiente']);
         $this->assertDatabaseHas('auditoria_eventos', ['entidad_id' => $id, 'accion' => 'compensaciones.documento.creado']);
-        $this->assertSame('pendiente', $doc->archivo->estado_antivirus);
-        $this->assertSame(hash('sha256', Storage::disk(config('legajo.disco_documentos'))->get($doc->archivo->storage_path)), $doc->archivo->hash_sha256);
+        $this->assertSame('limpio', $doc->archivo->estado_antivirus);
+        $this->assertSame(hash('sha256', AlmacenDocumento::leer($doc->archivo)), $doc->archivo->hash_sha256);
         $this->assertSame($this->persona->numero_doc_identidad, $doc->titular_documento);
         $this->getJson($this->url())->assertOk()->assertJsonPath('data.items.0.documentos.0.tiempos_reconocidos.0.anios', 12)->assertJsonPath('data.resumen.pendientes', 1);
     }

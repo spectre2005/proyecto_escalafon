@@ -1,3 +1,5 @@
+import { usePuede } from '../auth/session'
+import { NewRequirement, RequirementManagement } from './RequirementManagement'
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from '../../shared/queries/useLiveQuery'
@@ -16,12 +18,12 @@ function personName(person) {
   return [person.nombres, person.apellido_paterno, person.apellido_materno].filter(Boolean).join(' ')
 }
 
-export default function RequirementsPage() {
+function Results() {
   const [searchParams, setSearchParams] = useSearchParams()
   const query = searchParams.get('q') || ''
   const [searchState, setSearchState] = useState({ query, value: query })
   const search = searchState.query === query ? searchState.value : query
-  const request = useLiveQuery(`/requerimientos-documentos?${searchParams.toString()}`)
+  const request = useLiveQuery(`/requerimientos?${searchParams.toString()}`)
   const result = request.data
 
   function updateFilter(key, value) {
@@ -44,6 +46,7 @@ export default function RequirementsPage() {
       <p className="mt-3 text-sm text-slate-500">Revisa las solicitudes de documentos, sus plazos y la ficha de Legajo vinculada.</p>
     </div>
 
+    <NewRequirement onCreated={request.retry} />
     <section className={`${panel} mb-6 p-5`} aria-label="Buscar y filtrar requerimientos">
       <form onSubmit={submitSearch} className="flex flex-wrap gap-3">
         <label className="flex min-w-60 flex-1 items-center gap-2 rounded-xl border border-slate-200 px-3">
@@ -76,11 +79,11 @@ export default function RequirementsPage() {
           <thead className="bg-slate-50 text-xs text-slate-500"><tr>{['Persona', 'Documento solicitado', 'Fecha de solicitud', 'Fecha límite', 'Estado', 'Legajo'].map(title => <th key={title} className="px-5 py-4 font-medium">{title}</th>)}</tr></thead>
           <tbody>{result.data.map(record => <tr key={record.id} className="border-t border-slate-100 align-top">
             <td className="px-5 py-4"><span className="font-medium text-slate-800">{personName(record.usuario)}</span></td>
-            <td className="max-w-sm px-5 py-4"><p className="font-medium text-slate-800">{record.tipo_documento?.nombre || 'Tipo documental no especificado'}</p><p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-slate-500">{record.descripcion}</p><details className="mt-2 text-xs"><summary className="cursor-pointer font-medium text-teal-700">Ver seguimiento</summary><dl className="mt-3 grid gap-2 text-slate-600 sm:grid-cols-2"><div><dt className="text-slate-400">Origen</dt><dd>{record.origen || 'No registrado'}</dd></div><div><dt className="text-slate-400">Plazo indicado</dt><dd>{record.plazo_dias_habiles} días hábiles</dd></div><div><dt className="text-slate-400">Prórroga hasta</dt><dd>{dateText(record.prorroga_hasta)}</dd></div><div><dt className="text-slate-400">Documento vinculado</dt><dd>{record.documento ? [record.documento.num_resolucion, record.documento.estado].filter(Boolean).join(' · ') || 'Asociado' : 'Aún no asociado'}</dd></div><div><dt className="text-slate-400">Cierre</dt><dd>{dateText(record.cerrado_en)}</dd></div></dl></details></td>
+            <td className="max-w-sm px-5 py-4"><p className="font-medium text-slate-800">{record.tipo_documento?.nombre || 'Tipo documental no especificado'}</p><p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-slate-500">{record.descripcion}</p><details className="mt-2 text-xs"><summary className="cursor-pointer font-medium text-teal-700">Ver seguimiento</summary><dl className="mt-3 grid gap-2 text-slate-600 sm:grid-cols-2"><div><dt className="text-slate-400">Origen</dt><dd>{record.origen || 'No registrado'}</dd></div><div><dt className="text-slate-400">Plazo indicado</dt><dd>{record.plazo_dias_habiles === null ? 'Fecha límite explícita' : `${record.plazo_dias_habiles} días hábiles (dato histórico)`}</dd></div><div><dt className="text-slate-400">Prórroga hasta</dt><dd>{dateText(record.prorroga_hasta)}</dd></div><div><dt className="text-slate-400">Documento vinculado</dt><dd>{record.documento ? [record.documento.num_resolucion, record.documento.estado].filter(Boolean).join(' · ') || 'Asociado' : 'Aún no asociado'}</dd></div><div><dt className="text-slate-400">Cierre</dt><dd>{dateText(record.cerrado_en)}</dd></div></dl></details></td>
             <td className="whitespace-nowrap px-5 py-4 text-slate-600">{dateText(record.fecha_requerimiento)}</td>
-            <td className="whitespace-nowrap px-5 py-4 text-slate-600">{dateText(record.fecha_limite)}</td>
-            <td className="px-5 py-4"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">{record.estado || 'No registrado'}</span></td>
-            <td className="px-5 py-4">{record.usuario_id ? <Link className="whitespace-nowrap text-xs font-semibold text-teal-700 hover:underline" to={`/legajos/${record.usuario_id}?categoria=requerimientos-documentos`}>Ver ficha →</Link> : '—'}</td>
+            <td className="whitespace-nowrap px-5 py-4 text-slate-600">{dateText(record.prorroga_hasta || record.fecha_limite)}{record.prorroga_hasta && <p className="mt-1 text-xs text-slate-500">Original: {dateText(record.fecha_limite)}</p>}</td>
+            <td className="px-5 py-4"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">{record.estado || 'No registrado'}</span><RequirementManagement record={record} onChanged={request.retry} /></td>
+            <td className="px-5 py-4">{record.usuario_id ? <Link className="whitespace-nowrap text-xs font-semibold text-teal-700 hover:underline" to={`/legajos/${record.usuario_id}`}>Ver ficha →</Link> : '—'}</td>
           </tr>)}</tbody>
         </table>
       </div>
@@ -88,4 +91,9 @@ export default function RequirementsPage() {
       {result.meta?.last_page > 1 && <nav aria-label="Paginación de requerimientos" className="flex items-center justify-between gap-3 border-t border-slate-100 px-6 py-4 text-xs text-slate-500"><span>Página {result.meta.current_page} de {result.meta.last_page}</span><div className="flex gap-2"><button className={control} disabled={!result.links?.prev} onClick={() => updateFilter('page', result.meta.current_page - 1)}>Anterior</button><button className={control} disabled={!result.links?.next} onClick={() => updateFilter('page', result.meta.current_page + 1)}>Siguiente</button></div></nav>}
     </section>}
   </>
+}
+
+export default function RequirementsPage() {
+  const authorized = usePuede('sistema.administrar')
+  return authorized ? <Results /> : <p role="alert">No tienes permiso para gestionar requerimientos.</p>
 }

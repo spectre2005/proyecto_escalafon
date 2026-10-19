@@ -8,7 +8,10 @@ use App\Support\Plataforma\AuditoriaOperaciones;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -46,6 +49,7 @@ class AuthController extends Controller
         $request->session()->regenerate();
         /** @var AdministradorPlataforma $administrador */
         $administrador = Auth::guard('plataforma')->user();
+        $request->session()->put('password_hash_plataforma', $administrador->getAuthPassword());
         $administrador->forceFill(['ultimo_acceso' => now()])->save();
         AuditoriaOperaciones::registrar('sesion.inicio', $request, $administrador->id);
 
@@ -70,6 +74,36 @@ class AuthController extends Controller
         $this->cerrar($request);
 
         return response()->json(['message' => 'Sesión cerrada.']);
+    }
+
+    public function cambiarPassword(Request $request): JsonResponse
+    {
+        $datos = $request->validate([
+            'password_actual' => 'required|string|max:255',
+            'password' => ['required', 'string', 'max:255', 'confirmed', Password::defaults()],
+        ], [
+            'password.confirmed' => 'Las contraseñas nuevas no coinciden.',
+            'password.min' => 'La nueva contraseña debe tener al menos :min caracteres.',
+            'password.password.letters' => 'La nueva contraseña debe tener letras.',
+            'password.password.mixed' => 'La nueva contraseña debe tener mayúsculas y minúsculas.',
+            'password.password.numbers' => 'La nueva contraseña debe tener números.',
+        ]);
+        /** @var AdministradorPlataforma $administrador */
+        $administrador = Auth::guard('plataforma')->user();
+        if (! Hash::check($datos['password_actual'], $administrador->password)) {
+            throw ValidationException::withMessages(['password_actual' => 'La contraseña actual no es correcta.']);
+        }
+        if (Hash::check($datos['password'], $administrador->password)) {
+            throw ValidationException::withMessages(['password' => 'La nueva contraseña debe ser distinta de la actual.']);
+        }
+        DB::connection('plataforma')->transaction(function () use ($administrador, $datos, $request): void {
+            $administrador->forceFill(['password' => $datos['password']])->save();
+            AuditoriaOperaciones::registrar('cuenta.password_cambiada', $request, $administrador->id);
+        });
+        $request->session()->put('password_hash_plataforma', $administrador->getAuthPassword());
+        $request->session()->regenerate();
+
+        return $this->sesion($administrador);
     }
 
     private function sesion(AdministradorPlataforma $administrador): JsonResponse

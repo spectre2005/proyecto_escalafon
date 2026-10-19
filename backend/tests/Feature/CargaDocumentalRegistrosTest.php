@@ -108,7 +108,7 @@ class CargaDocumentalRegistrosTest extends TestCase
         $subir = fn (array $cambios = []): TestResponse => $this->post('/api/v1/expedientes/'.$persona->id.'/seccion-03/documentos', [
             'tipo_documento_id' => $tipo->id, 'nombre' => 'Constancia de habilitación', 'emisor' => 'Colegio de Abogados', 'fecha_emision' => '2025-05-02',
             'folio_inicio' => $this->siguiente($persona, 3), 'folio_fin' => $this->siguiente($persona, 3), 'modalidad_presentacion' => 'copia_simple',
-            'numero_colegiatura' => 'CAL-123', 'vigente_hasta' => '2026-12-31', 'pdf' => $this->pdf(), ...$cambios,
+            'numero_colegiatura' => 'CAL-123', 'vigente_hasta' => '2026-12-31', 'pdf' => $this->pdf(paginas: 1), ...$cambios,
         ], ['Accept' => 'application/json']);
         $original = $subir()->assertCreated()->json('data.id');
 
@@ -133,7 +133,7 @@ class CargaDocumentalRegistrosTest extends TestCase
             'tipo_documento_id' => $tipo->id, 'nombre' => 'Certificado de trabajo', 'emisor' => 'Municipalidad Demo', 'fecha_emision' => '2024-01-15',
             'folio_inicio' => $this->siguiente($persona, 4), 'folio_fin' => $this->siguiente($persona, 4), 'modalidad_presentacion' => 'copia_simple',
             'sector' => 'publico', 'cargo' => 'Asistente', 'fecha_inicio' => '2022-01-01', 'fecha_fin' => '2023-12-31', 'tipo_vinculo' => 'planilla',
-            'es_ejercicio_profesional' => '1', 'es_docencia_universitaria' => '0', 'pdf' => $this->pdf(), ...$cambios,
+            'es_ejercicio_profesional' => '1', 'es_docencia_universitaria' => '0', 'pdf' => $this->pdf(paginas: 1), ...$cambios,
         ], ['Accept' => 'application/json']);
         $original = $subir()->assertCreated()->json('data.id');
         $correccion = $subir(['subsana_a_documento_id' => $original, 'cargo' => 'Asistente administrativo'])->assertCreated()->json('data.id');

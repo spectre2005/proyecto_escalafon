@@ -16,7 +16,7 @@ try {
         }
     }
 
-    Invoke-Docker @('compose', 'up', '-d', '--build', '--wait', 'db', 'app', 'nginx')
+    Invoke-Docker @('compose', 'up', '-d', '--build', '--wait', 'db', 'app', 'nginx', 'clamav')
     Invoke-Docker @('compose', 'exec', '-T', '-e', 'COMPOSER_HOME=/tmp/composer', 'app', 'composer', 'install', '--no-interaction', '--prefer-dist')
     Invoke-Docker @('compose', 'exec', '-T', 'app', 'php', 'artisan', 'config:clear', '--no-interaction')
 
@@ -26,13 +26,14 @@ try {
         Invoke-Docker @('compose', 'exec', '-T', 'app', 'php', 'artisan', 'key:generate', '--no-interaction')
     }
 
+    Invoke-Docker @('compose', 'exec', '-T', 'app', 'php', 'artisan', 'documentos:clave', '--no-interaction')
     Invoke-Docker @('compose', 'exec', '-T', 'app', 'php', 'artisan', 'migrate', '--no-interaction')
     # Base de la plataforma y bases de cada institución aprovisionada (con una sola institución no hace nada).
     Invoke-Docker @('compose', 'exec', '-T', 'app', 'php', 'artisan', 'plataforma:migrar-instituciones', '--crear-base', '--no-interaction')
     # Catálogos y cuentas de prueba (backend/.env); se puede repetir sin duplicar datos.
     Invoke-Docker @('compose', 'exec', '-T', 'app', 'php', 'artisan', 'db:seed', '--no-interaction')
     Invoke-Docker @('compose', 'exec', '-T', 'app', 'php', 'artisan', 'optimize:clear', '--no-interaction')
-    Invoke-Docker @('compose', 'up', '-d', '--build', '--force-recreate', 'frontend')
+    Invoke-Docker @('compose', 'up', '-d', '--build', '--force-recreate', 'frontend', 'scheduler', 'worker')
 
     Write-Host 'Sistema preparado. Cuentas de prueba en el README:'
     Write-Host '  Institucion: http://uniq.localhost:5173 (tambien uno. y dos.)'
