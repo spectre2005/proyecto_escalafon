@@ -381,13 +381,13 @@ function Formalizacion({ usuario, data, sinLegajo }) {
   const accionAdenda = vinculo => puedeAnular && (adenda => <button disabled={ocupado} onClick={() => empezar(() => setAnulando({ tipo: 'vinculo-adendas', record: adenda, vinculoId: vinculo.id, titulo: tituloAdenda }))} className="text-xs font-semibold text-rose-700 disabled:opacity-50">Anular</button>)
   const acciones = vinculo => <>
     {(puedeRegistrar || puedeAnular) && <div className="mt-5 flex flex-wrap items-center gap-4">
-      {puedeRegistrar && <>
+      {puedeRegistrar && !vinculo.cerrado && <>
         <button disabled={ocupado || !!sinLegajo || vinculo.cerrado} onClick={() => empezar(() => setForm({ tipo: 'adenda', vinculo }))} className={enlace}>Registrar adenda</button>
         <button disabled={ocupado || !!sinLegajo || vinculo.cerrado} onClick={() => empezar(() => setForm({ tipo: 'vinculo', record: vinculo }))} className={enlace}>Corregir</button>
         <button disabled={ocupado || !!sinLegajo || vinculo.cerrado} onClick={() => empezar(() => setForm({ tipo: 'puesto', vinculo }))} className={enlace}>Datos del puesto</button>
       </>}
       {puedeAnular && <button disabled={ocupado} onClick={() => empezar(() => setAnulando({ tipo: 'vinculos-laborales', record: vinculo, vinculoId: vinculo.id, titulo: v => v.values.nombre_puesto }))} className="text-sm font-semibold text-rose-700 disabled:opacity-50">Anular vínculo</button>}
-      {puedeRegistrar && (sinLegajo || vinculo.cerrado) && <Bloqueo>{sinLegajo || 'Vínculo cerrado (con fecha de cese): no se corrige ni recibe adendas.'}</Bloqueo>}
+      {puedeRegistrar && (sinLegajo || vinculo.cerrado) && <Bloqueo>{sinLegajo || `Vínculo cerrado por cese el ${fecha(vinculo.values.fecha_cese)}: no se corrige ni recibe adendas. Para una nueva incorporación, usa «Registrar vínculo».`}</Bloqueo>}
     </div>}
     {anulando?.vinculoId === vinculo.id && <AnularForm record={anulando.record} titulo={anulando.titulo} busy={busy} onCancel={() => setAnulando(null)} onConfirm={anular} />}
   </>
@@ -421,7 +421,11 @@ function Formalizacion({ usuario, data, sinLegajo }) {
     {formulario && <EnZona titulo={form.tipo === 'adenda' ? `Registrar adenda: ${form.vinculo.values.nombre_puesto}` : form.tipo === 'puesto' ? `Datos del puesto: ${form.vinculo.values.nombre_puesto}` : form.record ? `Corregir vínculo: ${form.record.values.nombre_puesto}` : 'Registrar vínculo'}>{formulario}</EnZona>}
     <p className="mb-4 text-xs text-slate-500">Vínculos y adendas no se eliminan: si hay un error, se anulan con motivo (administración) y se registran de nuevo. Las adendas no se corrigen.</p>
     {data.vinculos.length === 0 && <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">No hay vínculos laborales registrados. {sinLegajo ? 'Primero se debe abrir el legajo.' : 'Registra el vínculo (resolución o contrato) para habilitar adendas, inducciones y período de prueba.'}</p>}
-    {data.vinculos.length > 0 && vigentes.length === 0 && <Aviso>La persona no tiene un vínculo vigente: todos están cesados, vencidos o aún no inician. Revisa el historial.</Aviso>}
+    {data.vinculos.length > 0 && vigentes.length === 0 && <div role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+      <p className="font-semibold">La persona no tiene un vínculo vigente.</p>
+      <p className="mt-1">Los vínculos del historial están cesados, vencidos o aún no inician. Esto no impide registrar un vínculo nuevo; los anteriores se conservan.</p>
+      {sinLegajo ? <p className="mt-2">Primero se debe abrir el legajo.</p> : !puedeRegistrar && <p className="mt-2">Tu cuenta no tiene permiso para registrar vínculos.</p>}
+    </div>}
     <div className="space-y-4">{vigentes.map(v => tarjeta(v, true))}</div>
     {historial.length > 0 && <details className="mt-5" open={vigentes.length === 0}><summary className="cursor-pointer text-sm font-semibold text-slate-600">Historial de vínculos ({historial.length})</summary>
       <div className="mt-4 space-y-4">{historial.map(v => tarjeta(v, false))}</div>
@@ -541,15 +545,15 @@ export default function Seccion02Panel({ usuario, categoria, onNavigate }) {
     {noAplica ? <NoAplicaPrueba onNavigate={onNavigate} /> : <>
       {sinLegajo ? <Aviso accion={<AbrirLegajo usuario={usuario} />}>{sinLegajo} Los formularios y la carga de documentos de la sección 02 están deshabilitados hasta abrirlo.</Aviso>
         : sinVinculo && categoria !== 's02-vinculo' && <Aviso accion={irAVinculo}>La persona no tiene un vínculo laboral abierto. Los formularios de esta subsección dependen del vínculo.</Aviso>}
-      {/* Primero los documentos (qué falta, qué hay, qué es opcional); después los registros que acreditan. */}
+      {/* En formalización, el alta del vínculo debe estar visible antes del catálogo documental. */}
+      {codigo === '2.2' && <div id={idBloque.registros} className="mb-8 scroll-mt-4"><Formalizacion usuario={usuario} data={data} sinLegajo={sinLegajo} /></div>}
       <div ref={documentosRef} tabIndex={-1} className="scroll-mt-6 outline-none"><Documentos usuario={usuario} data={data} subseccion={subseccion} sinLegajo={sinLegajo} /></div>
-      <div id={idBloque.registros} className="mt-8 scroll-mt-4">
+      {codigo !== '2.2' && <div id={idBloque.registros} className="mt-8 scroll-mt-4">
       {codigo === '2.1' && <Seleccion usuario={usuario} data={data} sinLegajo={sinLegajo} />}
-      {codigo === '2.2' && <Formalizacion usuario={usuario} data={data} sinLegajo={sinLegajo} />}
       {codigo === '2.3' && <Induccion usuario={usuario} data={data} bloqueo={bloqueo} />}
       {enNoConDatos && <Aviso accion={categoria !== 's02-vinculo' && <button onClick={() => onNavigate('s02-vinculo')} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">Revisar la bandera en 2.2</button>}>«Tiene período de prueba» está en No, pero hay períodos o documentos de período de prueba registrados: se muestran y se conservan, pero no se exigen ni se cuentan. Para registrar uno nuevo, cambia la bandera a Sí en el vínculo laboral.</Aviso>}
       {codigo === '2.4' && <Prueba usuario={usuario} data={data} bloqueo={bloqueo} />}
-      </div>
+      </div>}
     </>}
   </EspacioSeccion>
 }

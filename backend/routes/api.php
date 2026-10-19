@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\V1\DeclaracionVerificacionController;
 use App\Http\Controllers\Api\V1\DesplazamientoController;
 use App\Http\Controllers\Api\V1\DesvinculacionController;
 use App\Http\Controllers\Api\V1\DocumentoUsuarioController;
+use App\Http\Controllers\Api\V1\EquipoAccesoController;
 use App\Http\Controllers\Api\V1\EvaluacionDesempenoController;
 use App\Http\Controllers\Api\V1\Evaluaciones\Seccion07Controller;
 use App\Http\Controllers\Api\V1\ExperienciaLaboralController;
@@ -102,6 +103,14 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
     Route::get('reportes/{tipo}', [ReporteController::class, 'show'])->whereIn('tipo', array_keys(ConsultaReportes::catalogo()));
     Route::get('vencimientos', VencimientosController::class)->middleware('can:legajo.ver');
     Route::get('institucion', [InstitutionSettingsController::class, 'show']);
+    Route::middleware('can:equipo.gestionar')->prefix('equipo-accesos')->group(function (): void {
+        Route::get('/', [EquipoAccesoController::class, 'index']);
+        Route::get('personas', [EquipoAccesoController::class, 'personas']);
+        Route::post('/', [EquipoAccesoController::class, 'store']);
+        Route::patch('{asignacion}', [EquipoAccesoController::class, 'update'])->whereUuid('asignacion');
+        Route::post('{asignacion}/revocar', [EquipoAccesoController::class, 'revocar'])->whereUuid('asignacion');
+        Route::post('{asignacion}/restablecer', [EquipoAccesoController::class, 'restablecer'])->whereUuid('asignacion');
+    });
     // Qué ocultar en la navegación (cualquier sesión). Cambiar la configuración exige configuracion.modulos.
     Route::get('funcionalidades', [ConfiguracionFuncionalidadController::class, 'publico']);
     Route::put('institucion', [InstitutionSettingsController::class, 'update'])->middleware('can:sistema.administrar');

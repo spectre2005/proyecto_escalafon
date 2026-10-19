@@ -97,8 +97,9 @@ class Usuario extends Authenticatable
         return $this->rolesVigentesCalculados = Rol::query()
             ->where('activo', true)
             ->whereIn('id', $this->usuarioRolesPorUsuario()
-                ->where('vigente_desde', '<=', $hoy)
-                ->where(fn (Builder $query): Builder => $query->whereNull('vigente_hasta')->orWhere('vigente_hasta', '>=', $hoy))
+                ->whereNull('revocado_en')
+                ->whereDate('vigente_desde', '<=', $hoy)
+                ->where(fn (Builder $query): Builder => $query->whereNull('vigente_hasta')->orWhereDate('vigente_hasta', '>=', $hoy))
                 ->select('rol_id'))
             ->get();
     }

@@ -12,6 +12,11 @@ export function vinculoInicial(v = {}) {
   }
 }
 
+// Un alta normal no lleva cese, incluso si quedó una fecha en un borrador histórico anterior.
+export function vinculoParaGuardar(draft, { historico = false, correccion = false } = {}) {
+  return { ...draft, fecha_cese: historico || correccion ? draft.fecha_cese || null : null }
+}
+
 // Borrador de los datos del puesto (perfil_docente o perfil_administrativo).
 export function datosPuestoInicial(docente, v = {}) {
   return docente

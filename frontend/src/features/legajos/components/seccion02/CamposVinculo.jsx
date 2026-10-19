@@ -56,7 +56,7 @@ export function CampoTipoVinculo({ draft, set, poner, errors, sugerencia = null,
 // A. Información del vínculo. children: campos tras el tipo de vínculo (en 2.2, la ley y la sugerencia). conCese: solo
 // en 2.2 (el primer vínculo del registro es el vigente). conTipo: el registro manual pide el tipo en el paso 3
 // (CampoTipoVinculo), después de los datos del puesto que permiten sugerirlo.
-export function CamposVinculoBasicos({ draft, set, poner, errors, opciones, tipoPersonal, conCese = false, conTipo = true, nombre = 'vinculo', children }) {
+export function CamposVinculoBasicos({ draft, set, poner, errors, opciones, tipoPersonal, conCese = false, ceseObligatorio = false, conTipo = true, nombre = 'vinculo', children }) {
   return <>
     {conTipo && <Campo label="Tipo de vínculo" required error={errors.regimen_laboral}><select name={`${nombre}-tipo`} required value={draft.regimen_laboral} onChange={set('regimen_laboral')}><Opciones lista={regimenesLaborales} actual={draft.regimen_laboral} vacio="Seleccionar tipo de vínculo" /></select></Campo>}
     {children}
@@ -64,7 +64,7 @@ export function CamposVinculoBasicos({ draft, set, poner, errors, opciones, tipo
     <Campo label="Unidad orgánica" error={errors.unidad_organica_id}><select name={`${nombre}-unidad`} value={draft.unidad_organica_id} onChange={set('unidad_organica_id')} disabled={!opciones}><OpcionesCatalogo lista={opciones?.unidades} actual={draft.unidad_organica_id} vacio={opciones ? 'Seleccionar unidad orgánica' : 'Cargando unidades…'} /></select></Campo>
     <Campo label="Fecha de inicio" required error={errors.fecha_inicio}><input name={`${nombre}-inicio`} type="date" required value={draft.fecha_inicio} onChange={set('fecha_inicio')} /></Campo>
     <Campo label="Fecha de fin prevista" error={errors.fecha_fin_prevista}><input name={`${nombre}-fin`} type="date" min={draft.fecha_inicio || undefined} value={draft.fecha_fin_prevista} onChange={set('fecha_fin_prevista')} /></Campo>
-    {conCese && <Campo label="Fecha de cese (solo si el vínculo ya terminó)" error={errors.fecha_cese}><input type="date" min={draft.fecha_inicio || undefined} max={hoy()} value={draft.fecha_cese} onChange={set('fecha_cese')} /></Campo>}
+    {conCese && <Campo label="Fecha de cese (solo si el vínculo ya terminó)" required={ceseObligatorio} error={errors.fecha_cese}><input type="date" required={ceseObligatorio} min={draft.fecha_inicio || undefined} max={hoy()} value={draft.fecha_cese} onChange={set('fecha_cese')} /></Campo>}
   </>
 }
 
@@ -85,9 +85,9 @@ export function CondicionesPuesto({ draft, poner, errors, nombre = 'vinculo' }) 
 }
 
 // Vínculo completo (sección 02): información, documento de ingreso y condiciones del puesto.
-export function CamposVinculo({ draft, set, poner, errors, opciones, tipoPersonal, conCese = false, nombre = 'vinculo', children }) {
+export function CamposVinculo({ draft, set, poner, errors, opciones, tipoPersonal, conCese = false, ceseObligatorio = false, nombre = 'vinculo', children }) {
   return <>
-    <CamposVinculoBasicos draft={draft} set={set} poner={poner} errors={errors} opciones={opciones} tipoPersonal={tipoPersonal} conCese={conCese} nombre={nombre}>{children}</CamposVinculoBasicos>
+    <CamposVinculoBasicos draft={draft} set={set} poner={poner} errors={errors} opciones={opciones} tipoPersonal={tipoPersonal} conCese={conCese} ceseObligatorio={ceseObligatorio} nombre={nombre}>{children}</CamposVinculoBasicos>
     <CamposDocumentoIngreso draft={draft} set={set} errors={errors} />
     <CondicionesPuesto draft={draft} poner={poner} errors={errors} nombre={nombre} />
   </>

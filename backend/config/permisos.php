@@ -34,6 +34,7 @@ return [
         'discapacidad.editar' => 'Registrar o cambiar si la persona tiene discapacidad (el servidor o alguno de sus hijos). Cada cambio queda en la auditoría.',
         'sistema.administrar' => 'Configuración, catálogos y herramientas internas de la ORH.',
         'configuracion.modulos' => 'Activar o desactivar funcionalidades configurables, con motivo y auditoría.',
+        'equipo.gestionar' => 'Asignar, renovar y revocar accesos de asistentes y suplentes de la institución.',
     ],
 
     // Permisos que no se asignan por rol, sino que salen de una columna de roles.
@@ -50,6 +51,7 @@ return [
     // (docs/decisiones-configuracion-secciones.md, sección 8).
     'explicitos' => [
         'configuracion.modulos',
+        'equipo.gestionar',
     ],
 
     // Código de rol (roles.codigo) => permisos. '*' = todo el catálogo menos
@@ -57,7 +59,7 @@ return [
     'roles' => [
         // El administrador de cada institución (jefe de la ORH) también configura sus funcionalidades
         // (decisión del 17/10/2026). Cada cambio exige motivo y queda auditado.
-        'ADMIN' => ['*', 'configuracion.modulos'],
+        'ADMIN' => ['*', 'configuracion.modulos', 'equipo.gestionar'],
 
         // Rol adicional para que otra persona, sin ser ADMIN, cambie la configuración de funcionalidades. No
         // existe en la base ni en los seeders: se asigna expresamente.
@@ -65,8 +67,7 @@ return [
             'configuracion.modulos',
         ],
 
-        // Pendiente de confirmar con el cliente: el rol no existe en la base
-        // ni en los seeders. Basado en la tabla "Límites del asistente".
+        // Perfiles fijos del equipo institucional; se crean al otorgar su primer acceso.
         'asistente_legajo' => [
             'personal.ver',
             'legajo.ver',
@@ -74,6 +75,11 @@ return [
             'documento.subir',
             'documento.recepcionar',
             'seccion07.ver',
+        ],
+        'suplente_legajo' => [
+            'personal.ver', 'legajo.ver', 'legajo.editar', 'legajo.abrir',
+            'documento.subir', 'documento.recepcionar', 'documento.revisar',
+            'seccion07.ver', 'seccion07.registrar',
         ],
     ],
 

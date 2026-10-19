@@ -86,6 +86,33 @@ class Seccion02ApiTest extends TestCase
         $this->patchJson($this->url(Usuario::factory()->create(), 'vinculos-laborales').'/'.$id, ['nombre_puesto' => 'Otro'])->assertConflict();
     }
 
+    public function test_a_person_with_three_ceased_links_can_register_a_new_link_without_changing_history(): void
+    {
+        $this->travelTo('2026-10-19 12:00:00');
+        $this->actuarComo();
+        $persona = Usuario::factory()->create();
+        Legajo::factory()->create(['usuario_id' => $persona->id, 'estado_legajo' => 'activo']);
+        $historicos = collect([
+            ['fecha_inicio' => '2026-10-18', 'fecha_fin_prevista' => '2026-10-20', 'fecha_cese' => '2026-10-19'],
+            ['fecha_inicio' => '2026-10-15', 'fecha_fin_prevista' => '2026-10-23', 'fecha_cese' => '2026-10-16'],
+            ['fecha_inicio' => '2026-10-10', 'fecha_fin_prevista' => '2026-10-21', 'fecha_cese' => '2026-10-19'],
+        ])->map(fn (array $fechas): VinculoLaboral => VinculoLaboral::factory()->create(['usuario_id' => $persona->id, ...$fechas]));
+        $antes = $this->getJson($this->url($persona, 'seccion-02'))->assertOk()->json('data.vinculos');
+        $this->assertCount(3, $antes);
+        $this->assertSame([false, false, false], array_column($antes, 'vigente'));
+        $nuevo = $this->postJson($this->url($persona, 'vinculos-laborales'), $this->vinculoValido([
+            'fecha_inicio' => '2026-10-19', 'fecha_fin_prevista' => '2026-11-19', 'numero_documento_vinculo' => 'NUEVA-INCORPORACION',
+        ]))->assertCreated()->json('data.id');
+        $despues = $this->getJson($this->url($persona, 'seccion-02'))->assertOk()->json('data.vinculos');
+        $this->assertCount(4, $despues);
+        $this->assertSame($nuevo, $despues[0]['id']);
+        $this->assertTrue($despues[0]['vigente']);
+        foreach ($historicos as $historico) {
+            $this->assertDatabaseHas('vinculos_laborales', ['id' => $historico->id, 'anulado' => false,
+                'fecha_cese' => $historico->fecha_cese->format('Y-m-d H:i:s')]);
+        }
+    }
+
     public function test_addenda_induction_and_trial_period_store_author_and_validate_owner(): void
     {
         $autor = $this->actuarComo();

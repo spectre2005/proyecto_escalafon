@@ -61,6 +61,24 @@ class Seccion02ResumenTest extends TestCase
         $this->assertSame('vigente', $this->seccion($persona)['vinculos'][0]['vencimiento']['estado']);
     }
 
+    public function test_a_ceased_link_ends_on_its_cese_date_even_when_the_contract_or_addendum_ends_later(): void
+    {
+        $this->actuarComo();
+        $persona = Usuario::factory()->create();
+        $vinculo = VinculoLaboral::factory()->create(['usuario_id' => $persona->id,
+            'fecha_inicio' => '2026-01-01', 'fecha_fin_prevista' => '2026-06-30', 'fecha_cese' => '2026-02-20']);
+        VinculoAdenda::factory()->create(['vinculo_laboral_id' => $vinculo->id, 'fecha_inicio' => '2026-02-01', 'fecha_fin' => '2026-08-31']);
+        $fila = $this->seccion($persona)['vinculos'][0];
+
+        $this->assertTrue($fila['cerrado']);
+        $this->assertFalse($fila['vigente']);
+        $this->assertSame('cesado', $fila['vencimiento']['estado']);
+        $this->assertSame('2026-02-20', $fila['vencimiento']['fin_efectivo']);
+        $this->assertFalse($fila['vencimiento']['por_adenda']);
+        $this->assertSame('2026-06-30', $fila['values']['fecha_fin_prevista']);
+        $this->assertCount(1, $fila['adendas']);
+    }
+
     public function test_summary_counts_pending_and_required_types_and_subsection_states(): void
     {
         $this->actuarComo();

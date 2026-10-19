@@ -36,6 +36,7 @@ class UsuarioRol extends Model
             'vigente_desde' => 'date',
             'vigente_hasta' => 'date',
             'created_at' => 'datetime',
+            'revocado_en' => 'datetime',
         ];
     }
 

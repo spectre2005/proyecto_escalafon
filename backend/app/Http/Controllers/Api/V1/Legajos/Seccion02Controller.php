@@ -331,7 +331,7 @@ class Seccion02Controller extends Controller
     {
         $hoy = today();
         $adendas = $vinculo->vinculoAdendas;
-        $fin = $adendas->last()?->fecha_fin ?? $vinculo->fecha_fin_prevista;
+        $fin = $vinculo->fecha_cese ?? $adendas->last()?->fecha_fin ?? $vinculo->fecha_fin_prevista;
         $dias = $fin ? (int) $hoy->diffInDays($fin, false) : null;
         $estado = match (true) {
             $vinculo->fecha_cese !== null => 'cesado',
@@ -352,7 +352,7 @@ class Seccion02Controller extends Controller
             'unidad_organica' => $vinculo->unidadOrganica?->nombre,
             'cerrado' => $vinculo->fecha_cese !== null,
             'vigente' => in_array($estado, ['sin_fin', 'vigente', 'por_vencer'], true),
-            'vencimiento' => ['estado' => $estado, 'fin_efectivo' => $fin?->format('Y-m-d'), 'por_adenda' => $adendas->isNotEmpty(), 'dias' => $dias],
+            'vencimiento' => ['estado' => $estado, 'fin_efectivo' => $fin?->format('Y-m-d'), 'por_adenda' => $vinculo->fecha_cese === null && $adendas->isNotEmpty(), 'dias' => $dias],
             'adendas' => $this->filas($adendas, ['numero', 'motivo', 'fecha_inicio', 'fecha_fin', 'documento_id', 'created_at']),
             'inducciones_faltantes' => array_values(array_diff(['general', 'especifica'], $tiposInduccion)),
             // Datos del puesto según el tipo de personal del vínculo.

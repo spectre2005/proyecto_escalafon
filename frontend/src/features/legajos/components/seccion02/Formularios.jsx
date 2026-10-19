@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { saveDatosPuesto, saveSeccion02 } from '../../api/seccion02Api'
 import { etiquetaVinculo, regimenesLaborales, resultadosPeriodo, tiposInduccion, tiposPersonal } from '../../config/seccion02'
 import { CamposDatosPuesto, CamposVinculo, OpcionesCatalogo } from './CamposVinculo'
-import { datosPuestoInicial, limpiarDatosPuesto, vinculoInicial } from './borradoresVinculo'
+import { datosPuestoInicial, limpiarDatosPuesto, vinculoInicial, vinculoParaGuardar } from './borradoresVinculo'
 import Campo, { Formulario, Opciones } from '../seccion01/Campo'
 import { hoy, useBorrador, useGuardar } from '../seccion01/useGuardar'
 
@@ -27,6 +28,7 @@ function CampoVinculo({ vinculos, draft, set, errors }) {
 // el botón y se guarda al guardar el vínculo. Uno nuevo precarga la ley y el tipo de personal de la persona.
 export function VinculoForm({ usuario, record, documentoId, onSaved, onCancel }) {
   const v = record?.values || {}
+  const [historico, setHistorico] = useState(false)
   const opciones = useLiveQuery('/expediente-opciones').data?.data
   const persona = useLiveQuery(`/expedientes/${usuario}`).data?.data
   const sugerencia = record?.tipo_sugerido
@@ -38,19 +40,24 @@ export function VinculoForm({ usuario, record, documentoId, onSaved, onCancel })
     regimen_normativo_id: v.regimen_normativo_id || (record ? '' : persona?.edit_values?.regimen_normativo_id) || '',
     fecha_cese: v.fecha_cese || '',
   })
-  const { busy, error, errors, guardar } = useGuardar(data => saveSeccion02(usuario, 'vinculos-laborales', record?.id, conDocumento(data, documentoId)), onSaved)
+  const { busy, error, errors, guardar } = useGuardar(data => saveSeccion02(usuario, 'vinculos-laborales', record?.id,
+    conDocumento(vinculoParaGuardar(data, { historico, correccion: !!record }), documentoId)), onSaved)
   // El tipo de personal precargado se puede cambiar; la ley se conserva solo si también corresponde al nuevo.
   const cambiarTipoPersonal = event => {
     const tipo = event.target.value
     poner('tipo_personal')(tipo)
     if (!(opciones?.regimenes || []).some(ley => ley.id === draft.regimen_normativo_id && ley.aplica_a === tipo)) poner('regimen_normativo_id')('')
   }
-  return <Formulario titulo={record ? 'Corregir vínculo laboral' : 'Registrar vínculo laboral'} guardar="Guardar vínculo" busy={busy} error={error} onSubmit={() => guardar(draft)} onCancel={onCancel}
-    nota="Datos de la resolución o contrato. Con fecha de cese el vínculo queda cerrado y ya no se corrige.">
+  return <Formulario titulo={record ? 'Corregir vínculo laboral' : 'Registrar vínculo laboral'} guardar={historico ? 'Guardar vínculo histórico' : 'Guardar vínculo'} busy={busy} error={error} onSubmit={() => guardar(draft)} onCancel={onCancel}
+    nota={record || historico ? 'Con fecha de cese el vínculo queda cerrado y ya no se corrige ni recibe adendas.' : 'Para un contrato con duración definida usa «Fecha de fin prevista». El cese se registra cuando la relación laboral ya terminó.'}>
     <NotaDocumento documentoId={documentoId} />
+    {!record && <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm sm:col-span-2">
+      <label className="flex items-start gap-3 font-medium text-slate-700"><input type="checkbox" checked={historico} onChange={event => setHistorico(event.target.checked)} className="mt-1" />Registrar un vínculo histórico que ya terminó</label>
+      <p className="text-xs leading-relaxed text-slate-600">{historico ? 'Se guardará como cesado. Indica la fecha real de cese; permanecerá en el historial.' : 'Alta normal: se guardará sin fecha de cese. Será vigente si ya inició y su fecha de fin prevista no venció.'}</p>
+    </div>}
     <Campo label="Tipo de personal" required error={errors.tipo_personal}><select required value={draft.tipo_personal} onChange={cambiarTipoPersonal} disabled={tipoFijo}><Opciones lista={tiposPersonal} actual={draft.tipo_personal} vacio="Selecciona" /></select></Campo>
     {tipoFijo && <p className="self-end text-[11px] text-slate-500">El tipo de personal no se cambia: el vínculo ya tiene datos del puesto. Si es otro, anula el vínculo y registra el correcto.</p>}
-    <CamposVinculo draft={draft} set={set} poner={poner} errors={errors} opciones={opciones} tipoPersonal={draft.tipo_personal} conCese>
+    <CamposVinculo draft={draft} set={set} poner={poner} errors={errors} opciones={opciones} tipoPersonal={draft.tipo_personal} conCese={!!record || historico} ceseObligatorio={!record && historico}>
       <Campo label="Ley / régimen normativo" required error={errors.regimen_normativo_id}><select required value={draft.regimen_normativo_id} onChange={set('regimen_normativo_id')} disabled={!opciones}><OpcionesCatalogo lista={(opciones?.regimenes || []).filter(ley => !draft.tipo_personal || ley.aplica_a === draft.tipo_personal || ley.id === draft.regimen_normativo_id)} actual={draft.regimen_normativo_id} /></select></Campo>
       {sugerencia && <div role="note" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 sm:col-span-2">
         <span>Tipo de vínculo sin definir. {sugerencia.valor ? <>Sugerencia: <strong>{regimenesLaborales[sugerencia.valor]}</strong> ({sugerencia.motivo}) Revísala antes de guardar.</> : sugerencia.motivo}</span>

@@ -106,6 +106,30 @@ class ResolverInstitucionTest extends TestCase
         $this->assertSame('sqlite', config('database.default'));
     }
 
+    public function test_team_accesses_and_person_search_are_isolated_by_institution(): void
+    {
+        config(['session.driver' => 'file']);
+        $this->activa('uno', conAdministrador: true);
+        $this->activa('dos', conAdministrador: true);
+        foreach (['uno', 'dos'] as $slug) {
+            $this->navegar($slug, 'POST', '/api/v1/auth/login', ['email' => self::EMAIL, 'password' => self::CLAVE])->assertOk();
+        }
+        $creado = $this->navegar('uno', 'POST', '/api/v1/equipo-accesos', [
+            'nombres' => 'Ana', 'apellido_paterno' => 'Quispe', 'numero_doc_identidad' => '99887766',
+            'email' => 'equipo@example.test', 'perfil' => 'asistente_legajo',
+            'vigente_desde' => today()->toDateString(), 'motivo' => 'Apoyo para la primera institución',
+        ])->assertCreated();
+        $this->navegar('uno', 'GET', '/api/v1/equipo-accesos')->assertOk()->assertJsonCount(1, 'data.asignaciones');
+        $this->navegar('dos', 'GET', '/api/v1/equipo-accesos')->assertOk()->assertJsonCount(0, 'data.asignaciones');
+        $this->navegar('dos', 'GET', '/api/v1/equipo-accesos/personas?q=99887766')->assertOk()->assertJsonCount(0, 'data');
+        $this->navegar('dos', 'POST', '/api/v1/equipo-accesos', [
+            'usuario_id' => $creado->json('data.persona.id'), 'perfil' => 'asistente_legajo',
+            'vigente_desde' => today()->toDateString(), 'motivo' => 'Intento de usar una persona de otra institución',
+        ])->assertUnprocessable()->assertJsonValidationErrors('usuario_id');
+        $this->navegar('dos', 'POST', '/api/v1/equipo-accesos/'.$creado->json('data.id').'/revocar', ['motivo' => 'Intento desde otra institución'])->assertNotFound();
+        $this->assertDatabaseCount('usuarios', 0);
+    }
+
     public function test_only_an_active_institution_operates(): void
     {
         $this->activa('suspendida', estado: Institucion::SUSPENDIDA);
