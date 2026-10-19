@@ -1,7 +1,8 @@
 #!/bin/sh
 # Respaldo por institución: para cada objetivo de «php artisan plataforma:respaldo-plan» (la plataforma, cada
-# institución aprovisionada y la base principal si no es de ninguna) guarda en respaldos/AAAAMMDD-HHMMSS/<objetivo>/
-# su base (pg_dump, formato custom), sus archivos privados (archivos.tar.gz) y SHA256SUMS. Las bases del servidor que no
+# institución aprovisionada y la base principal si no es de ninguna) guarda en RESPALDO_DIR/AAAAMMDD-HHMMSS/<objetivo>/
+# su base (pg_dump, formato custom), sus archivos privados (archivos.tar.gz) y SHA256SUMS. Todo con umask 077: carpetas
+# 0700 y archivos 0600. Las bases del servidor que no
 # figuran en el plan van a otras/, para no perder nada.
 #
 # Copia externa (opcional): si RESPALDO_REMOTO está definido, sube la carpeta con rclone (imagen Docker, sin
@@ -14,10 +15,16 @@
 # Variables (entorno o líneas RESPALDO_* de .env.produccion):
 #   RESPALDO_REMOTO        remoto:ruta de rclone, de tipo crypt (vacío: sin copia externa)
 #   RESPALDO_RCLONE_CONF   archivo de configuración de rclone (por defecto ~/.config/rclone/rclone.conf)
-#   RESPALDO_DIAS          días que se conservan en el servidor (14)
+#   RESPALDO_DIR           carpeta de los respaldos (por defecto «respaldos», en la raíz del repositorio)
+#   RESPALDO_DIAS          días que se conservan en el servidor (14); nunca se borra uno protegido
+#   RESPALDO_CONSERVAR     motivo para proteger ESTE respaldo (p. ej. antes de normalizar una institución): queda con
+#                          una marca .conservar, la limpieza automática no lo borra nunca (borrarlo es una decisión
+#                          expresa, a mano) y no se sube a ninguna copia externa. Exige RESPALDO_REMOTO vacío y un
+#                          RESPALDO_DIR fuera de todo repositorio git (.gitignore no basta: git add -f lo incluiría).
 #   RESPALDO_REMOTO_DIAS   días que se conservan en la copia externa (30)
 #   RESPALDO_DC            orden de docker compose (por defecto, la de producción; las pruebas usan otra)
 set -eu
+umask 077
 cd "$(dirname "$0")/../.."
 
 if [ -f .env.produccion ]; then
@@ -30,16 +37,38 @@ if [ -f .env.produccion ]; then
 fi
 RESPALDO_DC=${RESPALDO_DC:-docker compose --env-file .env.produccion -f docker-compose.produccion.yml}
 RESPALDO_REMOTO=${RESPALDO_REMOTO:-}
+RESPALDO_DIR=${RESPALDO_DIR:-respaldos}
+RESPALDO_CONSERVAR=${RESPALDO_CONSERVAR:-}
 RESPALDO_RCLONE_CONF=${RESPALDO_RCLONE_CONF:-$HOME/.config/rclone/rclone.conf}
 RCLONE_IMAGEN=rclone/rclone:1.68.2
 # Sin entrada estándar: docker compose exec la leería y, dentro de un «while read», se comería las líneas siguientes.
 dc() { $RESPALDO_DC "$@" < /dev/null; }
-rclone_docker() { docker run --rm -v "$RESPALDO_RCLONE_CONF:/config/rclone/rclone.conf" -v "$(pwd)/respaldos:/respaldos:ro" ${RESPALDO_RCLONE_DOCKER_ARGS:-} "$RCLONE_IMAGEN" "$@"; }
+rclone_docker() { docker run --rm -v "$RESPALDO_RCLONE_CONF:/config/rclone/rclone.conf" -v "$RESPALDO_DIR:/respaldos:ro" ${RESPALDO_RCLONE_DOCKER_ARGS:-} "$RCLONE_IMAGEN" "$@"; }
+
+# Un respaldo protegido se comprueba antes de crear nada.
+if [ -n "$RESPALDO_CONSERVAR" ]; then
+	printf '%s' "$RESPALDO_CONSERVAR" | grep -Eqx '[[:print:]]{3,200}' || { echo "RESPALDO_CONSERVAR debe ser un motivo de una línea (3 a 200 caracteres)." >&2; exit 2; }
+	[ -z "$RESPALDO_REMOTO" ] || { echo "Un respaldo protegido no se sube a ninguna copia externa: deja RESPALDO_REMOTO vacío." >&2; exit 2; }
+	existente=$RESPALDO_DIR
+	while [ ! -d "$existente" ]; do existente=$(dirname "$existente"); done
+	if command -v git > /dev/null 2>&1 && git -C "$existente" rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+		echo "Un respaldo protegido no se guarda dentro de un repositorio git: usa un RESPALDO_DIR fuera de él." >&2
+		exit 2
+	fi
+fi
 
 carpeta=$(date +%Y%m%d-%H%M%S)
-destino="respaldos/$carpeta"
-mkdir -p "$destino"
-chmod 700 respaldos "$destino"
+mkdir -p "$RESPALDO_DIR"
+chmod 700 "$RESPALDO_DIR"
+RESPALDO_DIR=$(cd "$RESPALDO_DIR" && pwd -P)
+destino="$RESPALDO_DIR/$carpeta"
+mkdir "$destino"
+chmod 700 "$destino"
+if [ -n "$RESPALDO_CONSERVAR" ]; then
+	printf 'motivo=%s\ncreado=%s\nNo se borra automáticamente. Eliminarlo requiere una autorización expresa.\n' \
+		"$RESPALDO_CONSERVAR" "$(date -Iseconds)" > "$destino/.conservar"
+	echo "Respaldo protegido: $destino/.conservar"
+fi
 resultados="$destino/.resultados"
 : > "$resultados"
 fallos=0
@@ -144,7 +173,14 @@ done < "$resultados"
 [ "$externa" != fallida ] || fallos=$((fallos + 1))
 rm -f "$resultados"
 
-# Solo carpetas de respaldo (AAAAMMDD-HHMMSS) más antiguas que RESPALDO_DIAS.
-find respaldos -mindepth 1 -maxdepth 1 -type d -name '20[0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]' -mtime +"${RESPALDO_DIAS:-14}" -exec rm -rf {} +
+# Solo carpetas de respaldo (AAAAMMDD-HHMMSS) más antiguas que RESPALDO_DIAS y sin la marca .conservar.
+find "$RESPALDO_DIR" -mindepth 1 -maxdepth 1 -type d -name '20[0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]' -mtime +"${RESPALDO_DIAS:-14}" \
+	| while IFS= read -r antiguo; do
+		if [ -e "$antiguo/.conservar" ]; then
+			echo "Se conserva $(basename "$antiguo") (protegido con .conservar)."
+		else
+			rm -rf "$antiguo"
+		fi
+	done
 echo "Respaldo en $destino"
 [ "$fallos" -eq 0 ] || { echo "$fallos problema(s) en el respaldo: revisa el panel de plataforma." >&2; exit 1; }

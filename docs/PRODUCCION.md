@@ -77,7 +77,8 @@ falla, la versión anterior sigue funcionando.
 
     sh docker/produccion/respaldar.sh
 
-Hace un respaldo **por institución** en `respaldos/AAAAMMDD-HHMMSS/<objetivo>/`:
+Hace un respaldo **por institución** en `RESPALDO_DIR/AAAAMMDD-HHMMSS/<objetivo>/` (`RESPALDO_DIR` es `respaldos`,
+en la raíz del proyecto, por defecto; carpetas 0700 y archivos 0600):
 
 - `plataforma/`: la base de la plataforma (instituciones, superadministradores, pagos y auditoría).
 - `<slug>/` de cada institución aprovisionada, también las suspendidas: `base.dump` (`pg_dump`), `archivos.tar.gz`
@@ -88,7 +89,19 @@ Hace un respaldo **por institución** en `respaldos/AAAAMMDD-HHMMSS/<objetivo>/`
 Qué respaldar lo decide `php artisan plataforma:respaldo-plan`. Cada resultado se registra en la base de la
 plataforma y el **panel** lo muestra: el estado en cada institución y, en el resumen, las instituciones sin un
 respaldo correcto en las últimas 26 horas. El script termina con error si algo falló. Se conservan
-`RESPALDO_DIAS` días en el servidor (14 por defecto).
+`RESPALDO_DIAS` días en el servidor (14 por defecto), salvo los protegidos.
+
+**Respaldo protegido** (p. ej. antes de normalizar el almacenamiento de una institución): con
+`RESPALDO_CONSERVAR="<motivo>"`, el respaldo lleva una marca `.conservar` y la limpieza automática no lo borra nunca,
+aunque después se ejecute con la retención predeterminada; borrarlo es una decisión expresa, a mano. Se niega a
+empezar si `RESPALDO_REMOTO` no está vacío (no sale a ninguna copia externa) o si `RESPALDO_DIR` está dentro de un
+repositorio git (`.gitignore` no basta: `git add -f` lo incluiría). Por ejemplo:
+
+    RESPALDO_DIR="$HOME/respaldos-escalafon" RESPALDO_REMOTO= RESPALDO_CONSERVAR="antes de normalizar uniq" \
+        sh docker/produccion/respaldar.sh
+    RESPALDO_DIR="$HOME/respaldos-escalafon" sh docker/produccion/restaurar.sh verificar AAAAMMDD-HHMMSS uniq
+
+Pruebas aisladas de los dos scripts (en el host, sin Docker ni bases reales): `sh docker/produccion/pruebas/respaldos.sh`.
 
 Programarlo cada noche con `crontab -e`:
 
@@ -131,14 +144,16 @@ Para recuperar un respaldo de la copia externa en otro servidor, con la misma co
 
 ### Verificar y restaurar
 
-Prueba de restauración, que no toca nada real. Comprueba las huellas, restaura cada base en una base temporal, que
-se borra siempre, y lee los paquetes de archivos. El resultado aparece en el panel. Conviene programarla cada semana:
+Prueba de restauración, que no toca nada real. Comprueba las huellas, restaura cada base en una base temporal que
+crea esa misma ejecución, y lee los paquetes de archivos. Solo borra la temporal que creó: si `createdb` falla (también
+porque ya existe una base con ese nombre), se detiene sin restaurar ni borrar nada. Con otro `RESPALDO_DIR`, se indica
+igual que al respaldar. El resultado aparece en el panel. Conviene programarla cada semana:
 
     sh docker/produccion/restaurar.sh verificar AAAAMMDD-HHMMSS          # todos los objetivos
     sh docker/produccion/restaurar.sh verificar AAAAMMDD-HHMMSS uniq     # solo uno
 
 Restaurar **una** institución, o `plataforma`, o `principal`. Conviene suspenderla antes desde el panel. Pide
-escribir su nombre para confirmar. Antes guarda su estado actual en `respaldos/antes-de-restaurar-…/` y aparta sus
+escribir su nombre para confirmar. Antes guarda su estado actual en `RESPALDO_DIR/antes-de-restaurar-…/` y aparta sus
 archivos actuales en `storage/app/private/instituciones/<slug>.antes-de-restaurar-…`, sin borrarlos. Después
 aplica las migraciones pendientes:
 
@@ -154,7 +169,8 @@ aplica las migraciones pendientes:
   `/expedientes`. `API_CRUD_GENERICO_ESCRITURA=true` lo abriría: no hacerlo sin auditar antes cada recurso.
 - Caddy agrega HSTS y cabeceras de seguridad, limita las peticiones a 4 MB y solo pasa a PHP `/api`, `/sanctum` y `/up`.
 - PostgreSQL no publica su puerto.
-- `.env.produccion` y `respaldos/` están en `.gitignore`: nunca se suben al repositorio.
+- `.env.produccion` y `respaldos/` están en `.gitignore`, pero eso no impide un `git add -f`: los respaldos con datos
+  reales conviene guardarlos fuera del repositorio (`RESPALDO_DIR`), y los protegidos lo exigen.
 
 **Pendiente antes de recibir datos reales:**
 - Cifrado en reposo de los PDF (pendiente 9 de `ESTADO_PROYECTO.md`) y antivirus de las cargas.

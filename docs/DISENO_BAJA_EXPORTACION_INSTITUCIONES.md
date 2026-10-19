@@ -354,7 +354,7 @@ opciones, no cambia nada) en su equipo.
 y después; lectura, descarga y carga probadas; un `respaldar.sh` y un `restaurar.sh verificar` correctos con la
 estructura nueva; el plazo de observación cumplido. Solo entonces se puede quitar `-h` de `respaldar.sh`.
 
-### 10.7 Modo unica: `PLATAFORMA_ALMACENAMIENTO_UNICA` (implementado el 18/10/2026, sin commit)
+### 10.7 Modo unica: `PLATAFORMA_ALMACENAMIENTO_UNICA` (implementado el 18/10/2026, b0e2814)
 
 Qué carpeta usa el modo `unica` se dice de forma explícita (`App\Support\Plataforma\AlmacenamientoUnica`, aplicado
 al arrancar en `AppServiceProvider`):
@@ -391,12 +391,81 @@ Rompería los equipos de los compañeros (carpeta propia vacía y archivos en la
 ### 10.8 Decisiones pendientes de la normalización (NO aprobadas)
 
 1. Si se normaliza el equipo de desarrollo de Willian (en producción el aprovisionamiento ya crea carpetas propias).
+   **PROPUESTA PENDIENTE DE APROBACIÓN (18/10/2026):** normalizar únicamente la instalación de desarrollo de Willian.
 2. Ventana de mantenimiento y suspensión de UNIQ durante la preparación y el cambio.
-3. ~~El modo `unica` después~~: resuelto con la variable de 10.7 (implementada, sin commit).
+   **PROPUESTA PENDIENTE DE APROBACIÓN:** una ventana de una hora; UNIQ se suspende antes de empezar y sigue suspendida
+   hasta verificar el resultado (procedimiento de 10.9).
+3. ~~El modo `unica` después~~: resuelto con la variable de 10.7 (b0e2814).
 4. Los originales de las carpetas comunes: cuánto se conservan y qué se hace después (archivo cifrado o borrado con
    aprobación expresa). Mientras tanto, ningún respaldo los cubre (el objetivo `principal` no figura en el plan).
+   **PROPUESTA PENDIENTE DE APROBACIÓN:** conservarlos 30 días sin borrado automático; después se decide expresamente si
+   se archivan cifrados o se eliminan. En esos 30 días, el respaldo previo (10.9, paso 1) es el único que los contiene.
 5. Si se ofrece la herramienta a los compañeros para su caso (carpeta vacía y archivos en las carpetas comunes).
 6. Cuánto se conservan las preparaciones y el manifiesto (contiene rutas con DNI).
+   **PROPUESTA PENDIENTE DE APROBACIÓN:** mantener el manifiesto privado 30 días para facilitar la recuperación; después,
+   revisar y autorizar expresamente su eliminación. No conservar copias temporales innecesarias tras verificar
+   correctamente la operación.
 7. Plazo de observación antes de quitar `-h` de `respaldar.sh`.
 8. El DNI en el nombre de las fotos y `foto_path` en la API: aparte, nunca en la misma operación (cambiar nombres
    obliga a tocar la base).
+
+### 10.9 Procedimiento para UNIQ en el entorno de desarrollo (PROPUESTO, PENDIENTE DE APROBACIÓN)
+
+Nada de esto se ha ejecutado. Requiere aprobar antes las propuestas 1, 2, 4 y 6 de 10.8. Estado comprobado en solo
+lectura el 18/10/2026: UNIQ `activa`, base `escalafon`, `instituciones/uniq` con 3 enlaces a carpetas comunes;
+inventario de 10 referencias (8 PDF y 2 fotos, 3.856.573 bytes), sin bloqueos, huella `a6345df6405f…`; las carpetas
+comunes solo tienen esos archivos (más el `.gitignore` de `fotos-personal`); no hay ningún respaldo previo en el equipo;
+no hay worker de colas ni tareas programadas; ~131 GB libres en el mismo sistema de archivos que `storage`.
+
+En desarrollo, los scripts se usan con el compose de desarrollo: `RESPALDO_DC="docker compose"`. El respaldo previo es
+**protegido** (`RESPALDO_CONSERVAR`, ver docs/PRODUCCION.md): marca `.conservar` que la limpieza respeta siempre, aunque
+después alguien ejecute el script con la retención predeterminada; carpetas 0700 y archivos 0600; sin copia externa; y
+en un `RESPALDO_DIR` fuera del repositorio (`$HOME/respaldos-escalafon`), no en `respaldos/`. `respaldar.sh` registra
+el resultado en la base de la plataforma; `restaurar.sh verificar` solo borra la base temporal que él mismo creó.
+
+0. **Antes de la ventana** (sin tocar nada): `git status` limpio; inventario sin opciones con la misma huella que el
+   informe; decidir aparte si se aplica la migración de plataforma pendiente (`modulos_sistema`), nunca dentro de la
+   ventana.
+1. **Respaldo previo** (UNIQ aún activa, para que el plan la incluya igual que suspendida):
+   `RESPALDO_DC="docker compose" RESPALDO_DIR="$HOME/respaldos-escalafon" RESPALDO_REMOTO= RESPALDO_CONSERVAR="antes de
+   normalizar uniq" sh docker/produccion/respaldar.sh`. Gracias a `tar -h`, el paquete
+   de `uniq` contiene los archivos reales de las carpetas enlazadas. Verificarlo con
+   `RESPALDO_DC="docker compose" RESPALDO_DIR="$HOME/respaldos-escalafon" sh docker/produccion/restaurar.sh verificar
+   <carpeta> uniq` (SHA256SUMS, restauración
+   de la base en una temporal, migraciones, lectura del paquete) y, además, comparar el SHA-256 de cada miembro del
+   paquete (leído con `tar -xzOf`, sin extraerlo a disco) con las huellas del inventario: deben estar los 10, más el
+   `.gitignore`. Solo se muestran cifras.
+2. **Suspender UNIQ** desde el panel, con motivo (queda auditado). Comprobar que una petición a `uniq.localhost`
+   responde 403 `institucion_suspendida`. Con subdominio, ninguna otra dirección escribe en la carpeta de UNIQ: el
+   dominio sin subdominio solo atiende el panel, y otra institución usa su propia carpeta. Durante la ventana no se
+   ejecuta ningún otro comando de artisan (con la configuración del `.env` usarían las carpetas comunes), ni un worker.
+3. **Espacio:** `--preparar` exige el doble de lo que copia (~7,7 MB) y que `storage/app/normalizacion` y
+   `instituciones/uniq` estén en el mismo sistema de archivos (rename atómico); si no, se detiene sin copiar. Se
+   comprueba también con `df` antes de empezar.
+4. **`--preparar`**: inventario sin bloqueos, manifiesto (0600, en una carpeta 0700 fuera de `private/` y de todo
+   respaldo) y copia de cada archivo, sin sobrescribir nunca y comprobando tamaño y SHA-256. Los originales no se tocan.
+5. **`--verificar`**: cada copia con su tamaño y SHA-256, nada de más, y el inventario igual al de la preparación.
+6. **`--cambiar`**: vuelve a verificar; por carpeta, aparta el enlace en `anteriores/` y pone la copia en su lugar
+   (rename). Luego la comprobación final: las 10 referencias en estado `propio`, sin enlaces comunes y con las mismas
+   huellas. Si algo falla, se revierte solo. La copia queda movida a su lugar: en `normalizacion/` solo quedan el
+   manifiesto, `estado.json` y los 3 enlaces apartados, sin copias de documentos.
+7. **Comprobaciones con UNIQ todavía suspendida:** inventario (10 `propio`, 0 enlaces, sin bloqueos);
+   `ls -l instituciones/uniq` sin enlaces; los originales comunes intactos (mismos archivos y huellas que en el paso
+   1); respaldo nuevo protegido en la misma `RESPALDO_DIR` y `restaurar.sh verificar`, y comparación miembro a miembro con el
+   respaldo previo: mismas rutas y huellas, salvo el `.gitignore` (marcador de git, no se copia).
+8. **Reactivar UNIQ** y probar en la interfaz, sin subir nada: abrir PDF de varias secciones y ver las fotos.
+9. **Después:** los originales comunes y el manifiesto se conservan 30 días (propuestas 4 y 6); cualquier borrado
+   necesita una aprobación expresa. `-h` sigue en `respaldar.sh` (punto 7 de 10.8). `PLATAFORMA_ALMACENAMIENTO_UNICA`
+   solo se añade si este equipo vuelve al modo `unica`.
+
+**Recuperación:**
+- Falla `--preparar` o `--verificar`: no se cambió nada. La preparación queda marcada como fallida y no se puede usar;
+  se prepara otra. Las copias parciales se borran solo con aprobación (son copias de documentos personales).
+- Falla `--cambiar`: se revierte solo y la institución queda como estaba. Si la reversión automática no puede
+  terminar, el mensaje lo dice: se ejecuta `--revertir`, que mira lo que hay en el disco (sirve tras una interrupción).
+- Problema detectado después (pasos 7-8): suspender de nuevo y `--revertir` (vuelven los enlaces; la carpeta
+  normalizada vuelve a `preparacion/`). Se niega si llegaron archivos nuevos después del cambio. Después de revertir,
+  esa copia sobra y se borra solo con aprobación.
+- Último recurso: `restaurar.sh restaurar <carpeta previa> uniq`. Guarda antes el estado actual y aparta la carpeta (no
+  borra), pero también **restaura la base** (`pg_restore --clean`), deja carpetas reales en lugar de enlaces y aplica
+  migraciones institucionales pendientes. Solo con aprobación expresa.
