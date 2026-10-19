@@ -388,34 +388,39 @@ al arrancar en `AppServiceProvider`):
 Alternativa descartada: activar la reubicación en `unica` siempre que la base esté vinculada a una institución.
 Rompería los equipos de los compañeros (carpeta propia vacía y archivos en las carpetas comunes).
 
-### 10.8 Decisiones pendientes de la normalización (NO aprobadas)
+### 10.8 Decisiones de la normalización (1, 2, 4 y 6 aprobadas el 18/10/2026; 5, 7 y 8 pendientes)
 
 1. Si se normaliza el equipo de desarrollo de Willian (en producción el aprovisionamiento ya crea carpetas propias).
-   **PROPUESTA PENDIENTE DE APROBACIÓN (18/10/2026):** normalizar únicamente la instalación de desarrollo de Willian.
+   **APROBADA (18/10/2026)** por Willian: «normalizar únicamente mi instalación local de desarrollo».
 2. Ventana de mantenimiento y suspensión de UNIQ durante la preparación y el cambio.
-   **PROPUESTA PENDIENTE DE APROBACIÓN:** una ventana de una hora; UNIQ se suspende antes de empezar y sigue suspendida
-   hasta verificar el resultado (procedimiento de 10.9).
+   **APROBADA (18/10/2026):** reservar una ventana de mantenimiento de una hora y mantener UNIQ suspendida hasta
+   completar las verificaciones (procedimiento de 10.9).
 3. ~~El modo `unica` después~~: resuelto con la variable de 10.7 (b0e2814).
 4. Los originales de las carpetas comunes: cuánto se conservan y qué se hace después (archivo cifrado o borrado con
    aprobación expresa). Mientras tanto, ningún respaldo los cubre (el objetivo `principal` no figura en el plan).
-   **PROPUESTA PENDIENTE DE APROBACIÓN:** conservarlos 30 días sin borrado automático; después se decide expresamente si
-   se archivan cifrados o se eliminan. En esos 30 días, el respaldo previo (10.9, paso 1) es el único que los contiene.
+   **APROBADA (18/10/2026):** conservar los originales de las carpetas comunes durante 30 días, sin eliminarlos
+   automáticamente. Después se decidirá expresamente si se archivan cifrados o se eliminan.
+   Nota: en esos 30 días, el respaldo previo protegido (10.9, paso 1) es el único respaldo que los contiene.
 5. Si se ofrece la herramienta a los compañeros para su caso (carpeta vacía y archivos en las carpetas comunes).
+   **PENDIENTE.**
 6. Cuánto se conservan las preparaciones y el manifiesto (contiene rutas con DNI).
-   **PROPUESTA PENDIENTE DE APROBACIÓN:** mantener el manifiesto privado 30 días para facilitar la recuperación; después,
-   revisar y autorizar expresamente su eliminación. No conservar copias temporales innecesarias tras verificar
-   correctamente la operación.
-7. Plazo de observación antes de quitar `-h` de `respaldar.sh`.
+   **APROBADA (18/10/2026):** conservar el manifiesto durante 30 días en almacenamiento privado y eliminarlo después
+   solo con revisión y autorización expresa.
+7. Plazo de observación antes de quitar `-h` de `respaldar.sh`. **PENDIENTE.**
 8. El DNI en el nombre de las fotos y `foto_path` en la API: aparte, nunca en la misma operación (cambiar nombres
-   obliga a tocar la base).
+   obliga a tocar la base). **PENDIENTE.**
 
-### 10.9 Procedimiento para UNIQ en el entorno de desarrollo (PROPUESTO, PENDIENTE DE APROBACIÓN)
+Aprobar estas decisiones no ejecuta nada: **UNIQ sigue sin normalizar** y cada operación sobre los datos reales de
+10.9 (respaldo, suspensión, etapas) necesita su propia autorización.
 
-Nada de esto se ha ejecutado. Requiere aprobar antes las propuestas 1, 2, 4 y 6 de 10.8. Estado comprobado en solo
-lectura el 18/10/2026: UNIQ `activa`, base `escalafon`, `instituciones/uniq` con 3 enlaces a carpetas comunes;
-inventario de 10 referencias (8 PDF y 2 fotos, 3.856.573 bytes), sin bloqueos, huella `a6345df6405f…`; las carpetas
-comunes solo tienen esos archivos (más el `.gitignore` de `fotos-personal`); no hay ningún respaldo previo en el equipo;
-no hay worker de colas ni tareas programadas; ~131 GB libres en el mismo sistema de archivos que `storage`.
+### 10.9 Procedimiento para UNIQ en el entorno de desarrollo (NO EJECUTADO)
+
+Nada de esto se ha ejecutado: UNIQ **no está normalizada**. Las decisiones 1, 2, 4 y 6 de 10.8 están aprobadas; cada
+paso sobre los datos reales (respaldo, suspensión, cada etapa) se ejecuta solo con una autorización expresa. Estado
+comprobado en solo lectura el 18/10/2026: UNIQ `activa`, base `escalafon`, `instituciones/uniq` con 3 enlaces a carpetas
+comunes; inventario de 10 referencias (8 PDF y 2 fotos, 3.856.573 bytes), sin bloqueos, huella `a6345df6405f…`; las
+carpetas comunes solo tienen esos archivos (más el `.gitignore` de `fotos-personal`); no hay ningún respaldo previo en
+el equipo; no hay worker de colas ni tareas programadas; ~131 GB libres en el mismo sistema de archivos que `storage`.
 
 En desarrollo, los scripts se usan con el compose de desarrollo: `RESPALDO_DC="docker compose"`. El respaldo previo es
 **protegido** (`RESPALDO_CONSERVAR`, ver docs/PRODUCCION.md): marca `.conservar` que la limpieza respeta siempre, aunque
@@ -454,7 +459,7 @@ el resultado en la base de la plataforma; `restaurar.sh verificar` solo borra la
    1); respaldo nuevo protegido en la misma `RESPALDO_DIR` y `restaurar.sh verificar`, y comparación miembro a miembro con el
    respaldo previo: mismas rutas y huellas, salvo el `.gitignore` (marcador de git, no se copia).
 8. **Reactivar UNIQ** y probar en la interfaz, sin subir nada: abrir PDF de varias secciones y ver las fotos.
-9. **Después:** los originales comunes y el manifiesto se conservan 30 días (propuestas 4 y 6); cualquier borrado
+9. **Después:** los originales comunes y el manifiesto se conservan 30 días (decisiones 4 y 6); cualquier borrado
    necesita una aprobación expresa. `-h` sigue en `respaldar.sh` (punto 7 de 10.8). `PLATAFORMA_ALMACENAMIENTO_UNICA`
    solo se añade si este equipo vuelve al modo `unica`.
 

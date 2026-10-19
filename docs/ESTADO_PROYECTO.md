@@ -174,7 +174,10 @@ migraciones y verificación. Respaldos (17/10/2026): uno por institución, copia
    Herramienta de inventario y normalización del almacenamiento (`plataforma:normalizar-almacenamiento`; sin opciones
    solo inventaría): probada en entornos aislados, **no ejecutada** sobre UNIQ. Modo `unica` resuelto con
    `PLATAFORMA_ALMACENAMIENTO_UNICA` (vacía = carpetas comunes; se pone solo después de normalizar; `--cambiar` indica
-   la línea y `produccion:verificar` la revisa; diseño 10.7). Normalizar espera las demás decisiones de la sección 10.8.
+   la línea y `produccion:verificar` la revisa; diseño 10.7). Decisiones 1, 2, 4 y 6 de la sección 10.8 aprobadas el
+   18/10/2026 (solo el equipo de desarrollo, ventana de una hora con UNIQ suspendida, originales y manifiesto 30 días);
+   5, 7 y 8 pendientes. **UNIQ sigue sin normalizar**: falta el respaldo previo protegido y ejecutar el procedimiento
+   de 10.9, cada paso con autorización.
 5. ~~Uso por institución (personas, legajos, espacio, último ingreso) y estado técnico~~ hecho el 18/10/2026
    (UsoInstitucion, página «Estado técnico» y sección en el detalle): base de datos, migraciones, carpeta, respaldo y
    copia externa. Último ingreso = último inicio de sesión (usuarios.ultimo_acceso). El espacio no sigue enlaces
