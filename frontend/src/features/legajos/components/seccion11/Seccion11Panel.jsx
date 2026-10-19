@@ -134,11 +134,11 @@ function Desvinculaciones({ usuario, data, sinLegajo, onNavigate }) {
 }
 
 // Un tipo de documento: estado, lista (recepción y visor comunes) y carga con enlace a la desvinculación o al vínculo.
-function TipoDocumento({ usuario, data, tipo, sinLegajo, ofrecer }) {
+function TipoDocumento({ usuario, data, tipo, sinLegajo, ofrecer, modo }) {
   // Cargar uno nuevo solo si el tipo se ofrece; subsanar uno existente también si ya no se ofrece (lo admite el backend).
   const puedeCargar = usePuede('documento.subir')
   const puedeSubir = puedeCargar && ofrecer
-  const [subiendo, setSubiendo] = useState(false)
+  const [subiendo, setSubiendo] = useState(modo === 'subir')
   const [subsanando, setSubsanando] = useState(null)
   // Documento ya cargado que quedó sin desvinculación: se enlaza a una existente o (los del término) se registra.
   const [recuperando, setRecuperando] = useState(null)
@@ -185,12 +185,15 @@ function TipoDocumento({ usuario, data, tipo, sinLegajo, ofrecer }) {
 }
 
 function Documentos({ usuario, data, sinLegajo }) {
+  const puedeSubir = usePuede('documento.subir')
   const noAplica = useNoAplicables(usuario)
   if (!data.tipos.length) return <Aviso>El catálogo de documentos de la sección 11 no está cargado en la base de datos (Seccion11CatalogoSeeder).</Aviso>
   // Los que quedaron sin desvinculación: arriba, con acceso a su tipo (cada tipo ofrece «Enlazar ahora»).
   return <div id={idBloque.documentos} className="scroll-mt-4"><SinAsociar tipos={data.tipos} />{Object.entries(bloquesDocumentos11).map(([bloque, titulo]) => <section key={bloque} aria-label={titulo} className="mb-8">
     <h3 className="mb-3 text-base font-semibold text-slate-800">{titulo}</h3>
-    <GruposTipos tipos={data.tipos.filter(t => t.bloque === bloque)} noAplica={noAplica} render={tipo => <TipoDocumento key={tipo.id} usuario={usuario} data={data} tipo={tipo} sinLegajo={sinLegajo} ofrecer={ofrecerTipo(noAplica, tipo)} />} />
+    <GruposTipos tipos={data.tipos.filter(t => t.bloque === bloque)} noAplica={noAplica}
+      puedeSubir={tipo => puedeSubir && ofrecerTipo(noAplica, tipo)} deshabilitado={tipo => !!sinLegajo || tipo.restringido}
+      render={(tipo, modo) => <TipoDocumento modo={modo} key={tipo.id} usuario={usuario} data={data} tipo={tipo} sinLegajo={sinLegajo} ofrecer={ofrecerTipo(noAplica, tipo)} />} />
   </section>)}</div>
 }
 

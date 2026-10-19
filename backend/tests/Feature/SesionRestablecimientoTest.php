@@ -53,7 +53,7 @@ class SesionRestablecimientoTest extends TestCase
         $this->app->useStoragePath($this->storage);
         $this->base = tempnam(sys_get_temp_dir(), 'inst_');
         config([
-            'session.driver' => 'file', 'session.files' => $this->storage.'/framework/sessions',
+            'session.driver' => 'file', 'session.files' => $this->storage.'/framework/sessions', 'session.encrypt' => true,
             'plataforma.modo' => 'subdominio', 'plataforma.dominio' => 'localhost', 'sanctum.stateful' => ['uno.localhost:5173', 'localhost:5173'],
             'auth.administrador_inicial' => ['email' => self::ADMIN, 'password' => self::CLAVE],
             'database.connections.institucion_prueba' => ['driver' => 'sqlite', 'database' => $this->base, 'prefix' => '', 'foreign_key_constraints' => true],
@@ -113,10 +113,10 @@ class SesionRestablecimientoTest extends TestCase
     private function quitarHuella(string $quien): void
     {
         $archivo = $this->storage.'/framework/sessions/instituciones/uno/'.$this->navegadores[$quien][config('session.cookie')];
-        $sesion = json_decode(File::get($archivo), true, flags: JSON_THROW_ON_ERROR);
+        $sesion = json_decode($this->app['encrypter']->decrypt(File::get($archivo)), true, flags: JSON_THROW_ON_ERROR);
         $this->assertArrayHasKey('password_hash_web', $sesion);
         unset($sesion['password_hash_web']);
-        File::put($archivo, json_encode($sesion, JSON_THROW_ON_ERROR));
+        File::put($archivo, $this->app['encrypter']->encrypt(json_encode($sesion, JSON_THROW_ON_ERROR)));
     }
 
     private function entrar(string $quien, string $email, string $clave): TestResponse

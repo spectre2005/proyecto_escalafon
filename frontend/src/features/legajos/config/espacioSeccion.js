@@ -14,6 +14,9 @@ export function tituloSeccion(numero) {
 
 // Lleva la vista a un bloque o a un tipo documental (y abre el <details> que lo contenga, si estaba plegado).
 export function irA(id) {
+  if (id.startsWith('tipo-')) {
+    window.dispatchEvent(new CustomEvent('consultar-tipo-documental', { detail: id }))
+  }
   const destino = document.getElementById(id)
   destino?.closest('details')?.setAttribute('open', '')
   destino?.scrollIntoView({ behavior: 'smooth', block: 'start' })

@@ -1,11 +1,10 @@
-import ResumenTipo from '../documentos/ResumenTipo'
 import { useState } from 'react'
 import { apiErrorMessage } from '../../../../axios'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../../auth/session'
 import AbrirLegajo from '../AbrirLegajo'
 import EspacioSeccion from '../documentos/EspacioSeccion'
-import VistasDocumentales from '../documentos/VistasDocumentales'
+import TablaTiposDocumentales from '../documentos/TablaTiposDocumentales'
 import { tituloSeccion } from '../../config/espacioSeccion'
 import { vistaDeItem } from '../../config/vistasDocumentales'
 import VisorPdf from '../documentos/VisorPdf'
@@ -82,11 +81,12 @@ export default function Seccion08Panel({ usuario, categoria }) {
     {items === null ? <div role="alert" className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">No tienes permiso para ver la documentación de sanciones disciplinarias.</div> : <>
       <section className="space-y-3" aria-label={titulo}>
         {/* Documentos por vista: Pendientes · Con documentos · Opcionales · No corresponde (cada ítem conserva su formulario). */}
-        <VistasDocumentales elementos={items} idDe={item => item.codigo} clasificar={item => vistaDeItem(item, ofrecerTipo(noAplica, item))}>{lista => <div className="space-y-3">{lista.map(item => <details key={item.codigo} className="group overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        <summary id={`item-${item.codigo}`} className="cursor-pointer list-none p-4 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-teal-700 [&::-webkit-details-marker]:hidden">
-          <ResumenTipo nombre={item.nombre} literal={item.letra} cantidad={item.cantidad} estado={<Estado estado={item.estado} />} />
-        </summary>
-          <div className="space-y-4 border-t border-slate-100 p-4 sm:p-5">
+        <TablaTiposDocumentales elementos={items} idDe={item => item.codigo}
+          clasificar={item => vistaDeItem(item, ofrecerTipo(noAplica, item))} estado={item => <Estado estado={item.estado} />}
+          puedeSubir={item => !!data.legajo && (grupoActual === 'sanciones' ? puedeRegistrarSanciones : puedeSubir) && ofrecerTipo(noAplica, item)}
+          onSubir={item => { setAviso(''); setFormulario({ item: item.codigo, origen: `item-${item.codigo}` }) }}>
+          {item => (
+          <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
           {item.motivo && <p className="text-xs leading-relaxed text-slate-500">{item.motivo}{item.requiere_fedateo && ' Requiere fedateo.'}</p>}
             {item.documentos.length === 0 && <p className="text-sm text-slate-500">{item.estado === 'no_aplica' ? 'No aplica al tipo de personal registrado.' : 'No hay documentos registrados. Este ítem es opcional; agrega un documento si corresponde.'}</p>}
             {item.documentos.map(doc => <article key={doc.id} className="min-w-0 rounded-xl border border-slate-200 p-4">
@@ -116,7 +116,8 @@ export default function Seccion08Panel({ usuario, categoria }) {
               {formulario?.item === item.codigo && !formulario.documento ? <Documento08Form usuario={usuario} item={item} datos={data} subsana={formulario.subsana || ''} soloSubsanar={!ofrecerTipo(noAplica, item)} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado. Queda en revisión de RR. HH.')} /> : ofrecerTipo(noAplica, item) && <button id={`agregar-${item.codigo}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.codigo, origen: `agregar-${item.codigo}` }) }}>{item.cantidad ? 'Agregar otro documento' : 'Agregar documento'}</button>}
             </>}
           </div>
-        </details>)}</div>}</VistasDocumentales>
+          )}
+        </TablaTiposDocumentales>
       </section>
       <section className="rounded-2xl border border-slate-200 bg-white p-5" aria-label={`Línea de tiempo de ${titulo.toLowerCase()}`}>
         <h3 className="font-semibold text-slate-800">Línea de tiempo</h3>

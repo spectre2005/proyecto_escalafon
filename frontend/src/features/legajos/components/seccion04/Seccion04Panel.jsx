@@ -1,4 +1,3 @@
-import ResumenTipo from '../documentos/ResumenTipo'
 import { useState } from 'react'
 import { apiErrorMessage } from '../../../../axios'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
@@ -9,7 +8,7 @@ import { estados03, antivirus03 } from '../../config/seccion03'
 import { folios } from '../../config/documentos'
 import AbrirLegajo from '../AbrirLegajo'
 import EspacioSeccion from '../documentos/EspacioSeccion'
-import VistasDocumentales from '../documentos/VistasDocumentales'
+import TablaTiposDocumentales from '../documentos/TablaTiposDocumentales'
 import { tituloSeccion } from '../../config/espacioSeccion'
 import { vistaDeItem } from '../../config/vistasDocumentales'
 import VisorPdf from '../documentos/VisorPdf'
@@ -62,13 +61,12 @@ export default function Seccion04Panel({ usuario }) {
     {aviso && <p role="status" className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">{aviso}</p>}
     {data.items.length === 0 && <p className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600">No hay tipos documentales disponibles para tu perfil. Solicita a administración revisar el catálogo de la Sección 04.</p>}
     {/* Documentos por vista: Pendientes · Con documentos · Opcionales · No corresponde (cada ítem conserva su formulario). */}
-    <VistasDocumentales elementos={data.items} clasificar={item => vistaDeItem(item, ofrecerTipo(noAplica, item))} nombreDe={item => `${item.letra}) ${item.nombre}`}>{lista => <div className="space-y-4">{[['Documentos de experiencia laboral', 'Certificados, asignación de funciones y documentos que requiera la entidad.']].map(([titulo, descripcion], grupo) => lista.some(item => item.grupo === grupo) && <section key={titulo} aria-label={titulo} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-      <header className="border-b border-slate-100 p-5"><h3 className="font-semibold text-slate-800">{titulo}</h3><p className="mt-1 text-xs text-slate-500">{descripcion}</p></header>
-      {lista.filter(item => item.grupo === grupo).map(item => <details key={item.id} className="border-b border-slate-100 last:border-b-0">
-        <summary id={`item-${item.id}`} className="cursor-pointer list-none p-4 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-teal-700 [&::-webkit-details-marker]:hidden">
-          <ResumenTipo nombre={item.nombre} literal={item.letra} cantidad={item.cantidad} estado={<Estado estado={item.estado} />} />
-        </summary>
-        <div className="space-y-4 px-4 pb-5 sm:pl-14">
+    <TablaTiposDocumentales elementos={data.items} clasificar={item => vistaDeItem(item, ofrecerTipo(noAplica, item))}
+      nombreDe={item => `${item.letra}) ${item.nombre}`} estado={item => <Estado estado={item.estado} />}
+      puedeSubir={item => puedeAgregar && !!data.legajo && item.aplica && ofrecerTipo(noAplica, item)}
+      onSubir={item => { setAviso(''); setFormulario({ item: item.id, origen: `item-${item.id}` }) }}>
+      {item => (
+        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
           {item.motivo && <p className="text-xs leading-relaxed text-slate-500">{item.motivo}{item.requiere_fedateo && ' Requiere fedateo.'}</p>}
           {item.documentos.length === 0 && <p className="text-sm text-slate-500">{item.estado === 'falta' ? 'Todavía no se registró este documento. Agrégalo para que RR. HH. lo revise.' : item.estado === 'no_aplica' ? 'Este documento no se exige para el puesto registrado.' : 'No hay documentos registrados. Puedes agregar uno si corresponde.'}</p>}
           <ul className="space-y-3">{item.documentos.map(doc => <li key={doc.id} className={`min-w-0 rounded-xl border border-slate-200 p-4 ${doc.subsanado ? 'bg-slate-50' : ''}`}>
@@ -95,8 +93,8 @@ export default function Seccion04Panel({ usuario }) {
             {formulario?.item === item.id && !formulario.documento ? <Documento04Form usuario={usuario} item={item} datos={data} subsana={formulario.subsana || ''} soloSubsanar={!ofrecerTipo(noAplica, item)} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado. Queda en revisión de RR. HH.')} /> : ofrecerTipo(noAplica, item) && <button id={`agregar-${item.id}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.id, origen: `agregar-${item.id}` }) }}>{item.cantidad ? (item.permite_multiples ? 'Agregar otro documento' : 'Agregar documento que subsane al anterior') : 'Agregar documento'}</button>}
           </>}
         </div>
-      </details>)}
-    </section>)}</div>}</VistasDocumentales>
+      )}
+    </TablaTiposDocumentales>
     <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-3">
       {[['Experiencia total', data.tiempo.total], ['Sector público', data.tiempo.publico], ['Sector privado', data.tiempo.privado]].map(([label, t]) => <div key={label}><p className="text-xs text-slate-500">{label}</p><p className="mt-2 text-lg font-semibold text-slate-800">{t.anios} años, {t.meses} meses y {t.dias} días</p><p className="mt-1 text-xs text-slate-500">{t.dias_totales} días calendario · {t.anios_decimal.toFixed(2)} años</p></div>)}
       <p className="col-span-full text-xs text-slate-500">Corte: {fecha(data.tiempo.fecha_corte)}. Mes de {data.tiempo.configuracion.dias_por_mes} días y año de {data.tiempo.configuracion.dias_por_anio} días. {data.tiempo.configuracion.incluir_pendientes ? 'Incluye documentos aceptados y en revisión.' : 'Solo cuenta documentos aceptados.'} Los subtotales por sector pueden sumar más que el total si hay periodos simultáneos.</p>

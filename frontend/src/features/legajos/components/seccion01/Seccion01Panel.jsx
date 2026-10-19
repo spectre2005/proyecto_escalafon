@@ -143,7 +143,10 @@ function Documentos({ usuario, data, codigos }) {
     {aviso && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
     <SinAsociar tipos={catalogo} onEnlazar={enlazar} />
     {/* Solo los tipos que corresponden a la persona (o que ya tienen documentos), agrupados. */}
-    <GruposTipos tipos={catalogo} noAplica={noAplica} render={tipo => {
+    <GruposTipos tipos={catalogo} noAplica={noAplica} puedeSubir={tipo => puedeSubir && ofrecerTipo(noAplica, tipo) && !!textoSubirTipo(tipo)}
+      deshabilitado={() => ocupado || !!sinLegajo}
+      seleccionado={subiendo || subsanando?.tipoId || enlazando?.tipoId || recuperando?.tipoId}
+      onSubir={tipo => { setAviso(''); setSubiendo(tipo.id) }} render={tipo => {
       const [exigeTexto, exigeClase] = tipo.aplica ? exigencia[String(tipo.exigido)] : ['No aplica', 'bg-slate-100 text-slate-500']
       return <li key={tipo.id} id={idTipo(tipo.id)} className={`scroll-mt-4 p-4 ${tipo.aplica ? '' : 'opacity-60'}`}>
         <div className="flex flex-wrap items-start justify-between gap-3">
