@@ -171,15 +171,16 @@ class Seccion06ApiTest extends TestCase
         $this->cargar()->assertConflict();
     }
 
-    public function test_author_cannot_review_and_other_reviewer_must_confirm_receipt_and_fedateo(): void
+    public function test_acceptance_requires_receipt_and_registered_fedateo_with_evidence(): void
     {
         TipoDocumento::query()->where('codigo', 'COMP_RECONOCIMIENTO_TIEMPO')->update(['requiere_fedateo' => true]);
         $id = $this->cargar()->assertCreated()->json('data.id');
-        $this->aceptar($id)->assertForbidden();
-        $this->actuarComo();
+        $this->aceptar($id)->assertUnprocessable()->assertJsonValidationErrors('fedateado');
         $this->aceptar($id, ['recepcion_confirmada' => false])->assertUnprocessable()->assertJsonValidationErrors('recepcion_confirmada');
         $this->aceptar($id)->assertUnprocessable()->assertJsonValidationErrors('fedateado');
-        $this->aceptar($id, ['fedateado' => true])->assertOk();
+        $this->aceptar($id, ['fedateado' => true])->assertUnprocessable()->assertJsonValidationErrors('fedateado');
+        $this->registrarFedateoConSustento($id);
+        $this->aceptar($id)->assertOk();
         $this->assertDatabaseHas('documentos_usuario', ['id' => $id, 'estado' => 'aceptado', 'fiscalizado' => false, 'fedateado' => true]);
         $this->getJson($this->url())->assertOk()->assertJsonPath('data.resumen.porcentaje', 100);
         $this->aceptar($id)->assertConflict();

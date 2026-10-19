@@ -126,15 +126,12 @@ class Seccion08ApiTest extends TestCase
             ->assertJsonPath('data.resumen.dejadas_sin_efecto', 0)->assertJsonPath('data.resumen.vigentes', 0);
     }
 
-    public function test_days_are_required_only_for_suspension_and_another_person_must_review(): void
+    public function test_days_are_required_only_for_suspension_and_admin_can_review_own_upload(): void
     {
         config(['permisos.pendientes' => ['seccion07.ver_calificacion']]);
         $this->cargar('SAN_RESOLUCION_SANCION', ['tipo' => 'SUSPENSION', 'dias_suspension' => null])->assertUnprocessable()->assertJsonValidationErrors('dias_suspension');
         $this->cargar('SAN_RESOLUCION_SANCION', ['tipo' => 'DESTITUCION', 'dias_suspension' => 3])->assertUnprocessable()->assertJsonValidationErrors('dias_suspension');
         $id = $this->cargar('SAN_RESOLUCION_SANCION')->assertCreated()->json('data.id');
-        $this->postJson($this->url('/documentos/'.$id.'/estado'), ['estado' => 'aceptado', 'estado_anterior' => 'pendiente', 'recepcion_confirmada' => true])->assertForbidden();
-        $revisor = $this->actuarComo();
-        $this->assertNotSame($this->autor->id, $revisor->id);
         $this->postJson($this->url('/documentos/'.$id.'/estado'), ['estado' => 'aceptado', 'estado_anterior' => 'pendiente', 'recepcion_confirmada' => true])->assertOk();
         $this->assertDatabaseHas('historial_estados_documento', ['documento_usuario_id' => $id, 'estado_nuevo' => 'aceptado']);
     }

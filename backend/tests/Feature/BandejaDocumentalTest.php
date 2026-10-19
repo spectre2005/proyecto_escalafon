@@ -27,7 +27,7 @@ class BandejaDocumentalTest extends TestCase
         $this->assertDatabaseCount('observaciones_documento', 1);
         $propio = $this->documentoOperativo($legajo);
         $propio->update(['created_by' => $admin->id]);
-        $this->postJson('/api/v1/revision-documental/'.$propio->id, ['estado' => 'aceptado', 'estado_anterior' => 'cargado', 'recepcion_confirmada' => true])->assertForbidden();
+        $this->postJson('/api/v1/revision-documental/'.$propio->id, ['estado' => 'aceptado', 'estado_anterior' => 'cargado', 'recepcion_confirmada' => true])->assertOk();
         $this->actuarComo(codigo: 'asistente_legajo');
         $this->getJson('/api/v1/revision-documental')->assertForbidden();
     }
@@ -73,10 +73,10 @@ class BandejaDocumentalTest extends TestCase
 
         $propio = $this->documentoOperativo($legajo);
         $propio->update(['created_by' => $admin->id]);
-        $this->getJson('/api/v1/revision-documental?vista=por_revisar')->assertOk()->assertJsonPath('data.0.carga_propia', true);
-        $this->postJson('/api/v1/revision-documental/'.$propio->id, $aceptacion)->assertForbidden();
-        $this->postJson('/api/v1/revision-documental/'.$propio->id, ['estado' => 'observado', 'estado_anterior' => 'cargado', 'descripcion' => 'Tampoco se permite observar la carga propia', 'plazo_subsanacion' => $this->fechaOperacion(5)])->assertForbidden();
-        $this->assertDatabaseHas('documentos_usuario', ['id' => $propio->id, 'estado' => 'cargado']);
+        $this->getJson('/api/v1/revision-documental?vista=por_revisar')->assertOk()->assertJsonPath('data.0.carga_propia', true)->assertJsonPath('data.0.revision_propia_bloqueada', false);
+        $this->postJson('/api/v1/revision-documental/'.$propio->id, $aceptacion)->assertOk();
+        $this->postJson('/api/v1/revision-documental/'.$propio->id, ['estado' => 'observado', 'estado_anterior' => 'aceptado', 'descripcion' => 'Administrador observa su propia carga', 'plazo_subsanacion' => $this->fechaOperacion(5)])->assertOk();
+        $this->assertDatabaseHas('documentos_usuario', ['id' => $propio->id, 'estado' => 'observado']);
     }
 
     public function test_review_views_distinguish_registered_receipted_complete_and_observed_documents(): void
@@ -96,5 +96,23 @@ class BandejaDocumentalTest extends TestCase
         $this->getJson('/api/v1/revision-documental?vista=completos')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $completo->id)->assertJsonPath('data.0.completo', true);
         $this->getJson('/api/v1/revision-documental?vista=observados')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $observado->id)->assertJsonPath('data.0.completo', false);
         $this->getJson('/api/v1/revision-documental?vista=invalida')->assertUnprocessable();
+    }
+
+    public function test_non_admin_reviewer_cannot_review_own_upload_and_unprivileged_accounts_cannot_review_any_upload(): void
+    {
+        $this->prepararOperaciones();
+        $legajo = $this->legajoOperativo();
+        config(['permisos.roles.REVISOR' => ['legajo.ver', 'documento.revisar']]);
+        $revisor = $this->actuarComo(codigo: 'REVISOR');
+        $propio = $this->documentoOperativo($legajo);
+        $propio->update(['created_by' => $revisor->id]);
+        $aceptacion = ['estado' => 'aceptado', 'estado_anterior' => 'cargado', 'recepcion_confirmada' => true];
+        $this->getJson('/api/v1/revision-documental')->assertOk()->assertJsonPath('data.0.revision_propia_bloqueada', true);
+        $this->postJson('/api/v1/revision-documental/'.$propio->id, $aceptacion)->assertForbidden();
+        $ajeno = $this->documentoOperativo($legajo);
+        $this->postJson('/api/v1/revision-documental/'.$ajeno->id, $aceptacion)->assertOk();
+        $this->actuarComo(codigo: 'sin_permisos');
+        $this->getJson('/api/v1/revision-documental')->assertForbidden();
+        $this->postJson('/api/v1/revision-documental/'.$propio->id, $aceptacion)->assertForbidden();
     }
 }

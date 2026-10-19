@@ -133,13 +133,13 @@ class Seccion06Controller extends Controller
 
     private function documento(DocumentoUsuario $doc, Request $request): array
     {
-        return [...$doc->only(['id', 'nombre', 'emisor', 'num_resolucion', 'folio_inicio', 'folio_fin', 'fedateado', 'fiscalizado', 'modalidad_presentacion', 'subsana_a_documento_id']),
+        return [...$doc->only(['id', 'nombre', 'emisor', 'num_resolucion', 'folio_inicio', 'folio_fin', 'fedateado', 'fecha_fedateo', 'fedatario_id', 'fedateo_sustento_documento_id', 'fiscalizado', 'modalidad_presentacion', 'subsana_a_documento_id']),
             'nombre' => $doc->nombre ?: ($doc->archivo?->nombre_original ?? 'Documento sin archivo'),
             'fecha_emision' => $doc->fecha_emision?->format('Y-m-d'), 'fecha_incorporacion' => $doc->fecha_incorporacion?->format('Y-m-d'),
             'titular_nombre' => $doc->titular_nombre, 'titular_documento' => $doc->titular_documento, 'fecha_recepcion' => $doc->fecha_recepcion?->format('Y-m-d'),
             'estado' => ResumenSeccion03::estadoDocumento($doc->estado), 'estado_original' => $doc->estado,
             'subsanado' => $doc->documentosUsuarioPorSubsanaADocumento->isNotEmpty(),
-            'puede_revisar' => $doc->created_by !== $request->user()->getAuthIdentifier() && $doc->estado !== 'anulado' && $doc->documentosUsuarioPorSubsanaADocumento->isEmpty(),
+            'puede_revisar' => RevisionDocumento::permiteRevisarCarga($request, $doc) && $doc->estado !== 'anulado' && $doc->documentosUsuarioPorSubsanaADocumento->isEmpty(),
             'archivo' => $doc->archivo?->only(['id', 'nombre_original', 'mime_type', 'estado_antivirus', 'tamano_bytes']),
             'tiempos_reconocidos' => $doc->tiempoServiciosReconocidos->where('usuario_id', $doc->usuario_id)->map(fn (TiempoServicioReconocido $p): array => [...$p->only(['id', 'numero_resolucion', 'anios', 'meses', 'dias', 'anulado']), 'fecha_resolucion' => $p->fecha_resolucion->format('Y-m-d')])->all(),
             'compensaciones' => $doc->compensacionesBeneficios->where('usuario_id', $doc->usuario_id)->map(fn (CompensacionBeneficio $p): array => [...$p->only(['id', 'tipo', 'concepto', 'numero_documento', 'anulado']), 'fecha' => $p->fecha->format('Y-m-d')])->all(),

@@ -192,4 +192,27 @@ class GestionRequerimientosTest extends TestCase
         $this->accion($registro, 'responder', ['documento_id' => $doc->id])->assertOk();
         $this->getJson('/api/v1/requerimientos/'.$registro['id'])->assertOk()->assertJsonPath('data.usuario.id', $registro['usuario_id'])->assertJsonPath('data.documento.nombre', 'Certificado de prueba')->assertJsonPath('data.documento.id', $doc->id);
     }
+
+    public function test_type_counts_only_include_selected_person_current_available_documents(): void
+    {
+        $registro = $this->crear();
+        $doc = $this->documento($registro);
+        $doc->tipoDocumento->update(['activo' => true, 'es_dato_sensible' => false, 'es_dato_salud' => false]);
+        $datos = ['usuario_id' => $doc->usuario_id, 'legajo_id' => $doc->legajo_id, 'seccion_legajo_id' => 3,
+            'tipo_documento_id' => $doc->tipo_documento_id, 'archivo_id' => $doc->archivo_id, 'estado' => 'cargado'];
+        DocumentoUsuario::factory()->create([...$datos, 'estado' => 'anulado']);
+        $anterior = DocumentoUsuario::factory()->create($datos);
+        DocumentoUsuario::factory()->create([...$datos, 'subsana_a_documento_id' => $anterior->id]);
+        DocumentoUsuario::factory()->create([...$datos, 'archivo_id' => ArchivoDocumento::factory()->create(['estado_antivirus' => 'infectado'])->id]);
+        $otra = Usuario::factory()->create();
+        DocumentoUsuario::factory()->create([...$datos, 'usuario_id' => $otra->id, 'legajo_id' => Legajo::factory()->create(['usuario_id' => $otra->id, 'estado_legajo' => 'activo'])->id]);
+        DocumentoUsuario::factory()->create([...$datos, 'legajo_id' => Legajo::factory()->create(['usuario_id' => $doc->usuario_id, 'estado_legajo' => 'pasivo'])->id]);
+        $sinDocumentos = TipoDocumento::factory()->create(['seccion_legajo_id' => 3, 'activo' => true]);
+        $tipos = $this->getJson('/api/v1/requerimientos/tipos?usuario_id='.$doc->usuario_id)->assertOk()->json('data');
+        $this->assertSame(2, collect($tipos)->firstWhere('id', $doc->tipo_documento_id)['documentos_registrados']);
+        $this->assertSame(0, collect($tipos)->firstWhere('id', $sinDocumentos->id)['documentos_registrados']);
+        $tiposOtra = $this->getJson('/api/v1/requerimientos/tipos?usuario_id='.$otra->id)->assertOk()->json('data');
+        $this->assertSame(1, collect($tiposOtra)->firstWhere('id', $doc->tipo_documento_id)['documentos_registrados']);
+        $this->getJson('/api/v1/requerimientos/tipos?usuario_id=invalido')->assertUnprocessable();
+    }
 }

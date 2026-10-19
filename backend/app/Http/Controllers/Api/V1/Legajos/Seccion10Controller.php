@@ -199,7 +199,7 @@ class Seccion10Controller extends Controller
         $estadoEps = $anulado || $subsanado ? 'inactivo' : ($vence && $vence < $hoy ? 'vencido'
             : ($registro?->fecha_inicio?->format('Y-m-d') > $hoy || ! $disponible ? 'pendiente' : 'activo'));
 
-        return [...$doc->only(['id', 'nombre', 'emisor', 'tipo_documento_id', 'folio_inicio', 'folio_fin', 'modalidad_presentacion', 'subsana_a_documento_id', 'fedateado', 'fiscalizado', 'created_by']),
+        return [...$doc->only(['id', 'nombre', 'emisor', 'tipo_documento_id', 'folio_inicio', 'folio_fin', 'modalidad_presentacion', 'subsana_a_documento_id', 'fedateado', 'fecha_fedateo', 'fedatario_id', 'fedateo_sustento_documento_id', 'fiscalizado', 'created_by']),
             'codigo_tipo' => $doc->tipoDocumento->codigo, 'subseccion' => $doc->tipoDocumento->subseccionLegajo?->codigo,
             ...($registro?->only(['descripcion', 'numero_documento', 'entidad', 'estado_tramite', 'motivo_anulacion']) ?? []),
             'estado_original' => $doc->estado, 'anulado' => $anulado, 'subsanado' => $subsanado, 'archivo_disponible' => (bool) $disponible,
@@ -212,7 +212,7 @@ class Seccion10Controller extends Controller
             'numero_folios' => $doc->folio_inicio && $doc->folio_fin ? $doc->folio_fin - $doc->folio_inicio + 1 : 0,
             'creado_por' => $this->nombre($doc->createdBy), 'creado_en' => $doc->created_at?->toISOString(), 'modificado_en' => $doc->updated_at?->toISOString(),
             'puede_editar' => $activo && $registro && RegistroSeccion10::editable($doc),
-            'puede_revisar' => $activo && $disponible && $doc->created_by !== $request->user()->getAuthIdentifier(),
+            'puede_revisar' => $activo && $disponible && RevisionDocumento::permiteRevisarCarga($request, $doc),
             'puede_anular' => $activo && $registro !== null, 'puede_subsanar' => $activo && $registro !== null,
         ];
     }

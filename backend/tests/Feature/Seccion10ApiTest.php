@@ -311,8 +311,6 @@ class Seccion10ApiTest extends TestCase
         $evento = AuditoriaEvento::query()->where('entidad_id', $id)->where('accion', 'ACTUALIZAR_DOCUMENTO')->firstOrFail();
         $this->assertSame('2026-10-03', Carbon::parse(json_decode($evento->datos_antes, true)['registro']['fecha_fin'])->toDateString());
         $this->assertSame('2026-10-04', Carbon::parse(json_decode($evento->datos_despues, true)['registro']['fecha_fin'])->toDateString());
-        $this->postJson($this->url('/documentos/'.$id.'/estado'), ['estado' => 'aceptado', 'estado_anterior' => 'cargado', 'recepcion_confirmada' => true])->assertForbidden();
-        $this->actuarComo();
         $this->postJson($this->url('/documentos/'.$id.'/estado'), ['estado' => 'aceptado', 'estado_anterior' => 'cargado', 'recepcion_confirmada' => true])->assertOk();
         $this->patchJson($this->url('/documentos/'.$id), $this->datos('S10_DESCANSO_MEDICO', ['estado_anterior' => 'aceptado', 'nombre' => 'Alterado']))->assertConflict();
         $nuevo = $this->cargar('S10_DESCANSO_MEDICO', ['subsana_a_documento_id' => $id])->assertCreated()->json('data.id');

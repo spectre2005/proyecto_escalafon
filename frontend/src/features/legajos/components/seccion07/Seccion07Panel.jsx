@@ -169,7 +169,7 @@ function Documentos({ usuario, data, subseccion, sinLegajo, aplica }) {
     <p className="mb-4 text-xs text-slate-500">Sube cada documento desde su tipo. Si acredita un registro, también puedes adjuntarlo desde la tarjeta del registro.{sinLegajo && puedeSubir ? ` ${sinLegajo}` : ''}</p>
     {aviso && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
     <SinAsociar tipos={subseccion.tipos} onEnlazar={ocupado ? null : enlazar} />
-    <GruposTipos tipos={subseccion.tipos} noAplica={noAplica} aplica={aplica} render={tipo => {
+    <GruposTipos onSubir={tipo => { setAviso(''); setSubiendo(tipo.id) }} puedeSubir={tipo => puedeSubir && !sinLegajo && !ocupado && ofrecerTipo(noAplica, tipo) && aplica} tipos={subseccion.tipos} noAplica={noAplica} aplica={aplica} render={tipo => {
       const [exigeTexto, exigeClase] = exigencia[String(aplica ? tipo.exigido : false)]
       const datos = tipo.formulario_datos === 'progresiones_carrera' ? 'progresión (administrativos) o ratificación (docentes)' : formulariosDatos07[tipo.formulario_datos]?.toLowerCase()
       return <li key={tipo.id} id={idTipo(tipo.id)} className="scroll-mt-4 p-4">

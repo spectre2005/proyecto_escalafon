@@ -16,6 +16,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Sanctum\Sanctum;
 use Tests\Concerns\SubeDocumentos;
 use Tests\TestCase;
 
@@ -39,6 +40,7 @@ class Seccion03ApiTest extends TestCase
         $this->persona = Usuario::factory()->create(['tipo_personal' => 'docente', 'exige_estudios_basicos' => false, 'exige_colegiatura' => false]);
         $this->legajo = Legajo::factory()->create(['usuario_id' => $this->persona->id]);
         $this->autor = $this->actuarComo();
+        TipoDocumento::query()->where('seccion_legajo_id', 3)->update(['requiere_fedateo' => false]);
     }
 
     private function url(string $sufijo = ''): string
@@ -71,7 +73,7 @@ class Seccion03ApiTest extends TestCase
     private function revisar(string $documento, array $datos = [])
     {
         return $this->postJson($this->url('/documentos/'.$documento.'/estado'), $datos + [
-            'estado' => 'aceptado', 'estado_anterior' => 'pendiente', 'recepcion_confirmada' => true, 'fedateado' => true,
+            'estado' => 'aceptado', 'estado_anterior' => 'pendiente', 'recepcion_confirmada' => true, 'fedateado' => false,
         ]);
     }
 
@@ -167,15 +169,18 @@ class Seccion03ApiTest extends TestCase
         $this->assertDatabaseMissing('capacitaciones', ['documento_id' => null]);
     }
 
-    public function test_author_and_assistant_cannot_review_but_another_admin_can(): void
+    public function test_admin_author_can_review_but_assistant_cannot(): void
     {
         $id = $this->cargar()->assertCreated()->json('data.id');
-        $this->revisar($id)->assertForbidden();
+        $items = $this->getJson($this->url())->assertOk()->json('data.items');
+        $documento = collect($items)->flatMap(fn ($item) => $item['documentos'])->firstWhere('id', $id);
+        $this->assertTrue($documento['puede_revisar']);
         $this->actuarComo(codigo: 'asistente_legajo');
         $this->revisar($id)->assertForbidden();
-        $revisor = $this->actuarComo();
+        $revisor = $this->autor;
+        Sanctum::actingAs($revisor);
         $this->revisar($id)->assertOk()->assertJsonPath('data.estado', 'aceptado')->assertJsonPath('data.fiscalizado', false);
-        $this->assertDatabaseHas('documentos_usuario', ['id' => $id, 'recepcionado_por' => $revisor->id, 'fedateado' => true]);
+        $this->assertDatabaseHas('documentos_usuario', ['id' => $id, 'recepcionado_por' => $revisor->id, 'fedateado' => false]);
         $this->assertDatabaseHas('historial_estados_documento', ['documento_usuario_id' => $id, 'estado_anterior' => 'pendiente', 'estado_nuevo' => 'aceptado']);
         $eventos = AuditoriaEvento::query()->where('entidad_id', $id)->orderBy('id')->get();
         $this->assertCount(2, $eventos);
@@ -185,6 +190,7 @@ class Seccion03ApiTest extends TestCase
 
     public function test_acceptance_requires_receipt_fedateo_and_rejects_infected_file(): void
     {
+        TipoDocumento::query()->where('codigo', 'FORM_TITULO_GRADO_SUPERIOR')->update(['requiere_fedateo' => true]);
         $id = $this->cargar()->assertCreated()->json('data.id');
         $this->actuarComo();
         $this->revisar($id, ['recepcion_confirmada' => false])->assertUnprocessable();

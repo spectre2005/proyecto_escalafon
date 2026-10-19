@@ -97,4 +97,40 @@ class FiscalizacionPanelTest extends TestCase
         $this->accion($caso, 'cerrar', ['informe_documento_id' => $doc->id, 'fecha_fin' => $this->fechaOperacion(), 'conclusiones' => 'No debe admitirse'])->assertForbidden();
         $this->assertSame('cargado', $doc->fresh()->estado);
     }
+
+    public function test_uploaded_types_are_scoped_to_legajo_and_saved_as_the_case_document_type(): void
+    {
+        $legajo = $this->legajoOperativo();
+        $doc = $this->documentoOperativo($legajo);
+        $doc->tipoDocumento->update(['nombre' => 'Certificado de experiencia profesional y funciones acreditadas', 'activo' => true]);
+        $ajeno = $this->documentoOperativo($this->legajoOperativo());
+        $anulado = $this->documentoOperativo($legajo);
+        $anulado->update(['estado' => 'anulado']);
+        $r = $this->getJson('/api/v1/fiscalizacion/tipos?legajo_id='.$legajo->id)->assertOk()->assertJsonCount(1, 'data');
+        $r->assertJsonPath('data.0.id', $doc->tipo_documento_id)->assertJsonPath('data.0.cantidad', 1);
+        $datos = ['legajo_id' => $legajo->id, 'tipo_documento_id' => $doc->tipo_documento_id,
+            'fecha_vinculacion' => $this->fechaOperacion(-5), 'fecha_inicio' => $this->fechaOperacion(), 'fecha_limite' => $this->fechaOperacion(15)];
+        $this->postJson('/api/v1/fiscalizacion/casos', [...$datos, 'tipo_documento_id' => $ajeno->tipo_documento_id])->assertUnprocessable()->assertJsonValidationErrors('tipo_documento_id');
+        $caso = $this->postJson('/api/v1/fiscalizacion/casos', $datos)->assertCreated()->assertJsonPath('data.tipo_documento_id', $doc->tipo_documento_id)->json('data');
+        $this->getJson('/api/v1/fiscalizacion/casos/'.$caso['id'])->assertOk()->assertJsonPath('data.tipo_documento.nombre', $doc->tipoDocumento->nombre);
+        $this->getJson('/api/v1/operaciones/legajos/'.$legajo->id.'/documentos?tipo_documento_id='.$doc->tipo_documento_id)->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $doc->id);
+        $oficio = $this->documentoOperativo($legajo);
+        $comunicacion = ['documento_id' => $oficio->id, 'oficio_documento_id' => $oficio->id, 'entidad_consultada' => 'Entidad de prueba',
+            'medio' => 'mesa_partes', 'numero_oficio' => 'OF-002', 'fecha_envio' => $this->fechaOperacion()];
+        $this->accion($caso, 'comunicar', $comunicacion)->assertUnprocessable()->assertJsonValidationErrors('documento_id');
+        $this->accion($caso, 'comunicar', [...$comunicacion, 'documento_id' => $doc->id])->assertOk();
+        $this->assertDatabaseHas('solicitudes_fiscalizacion', ['proceso_fiscalizacion_id' => $caso['id'], 'documento_id' => $doc->id]);
+    }
+
+    public function test_unavailable_uploaded_type_cannot_open_a_case_and_assistant_cannot_access_type_selector(): void
+    {
+        $legajo = $this->legajoOperativo();
+        $doc = $this->documentoOperativo($legajo);
+        $doc->update(['estado' => 'anulado']);
+        $this->getJson('/api/v1/fiscalizacion/tipos?legajo_id='.$legajo->id)->assertOk()->assertJsonCount(0, 'data');
+        $this->postJson('/api/v1/fiscalizacion/casos', ['legajo_id' => $legajo->id, 'tipo_documento_id' => $doc->tipo_documento_id,
+            'fecha_vinculacion' => $this->fechaOperacion(-5), 'fecha_inicio' => $this->fechaOperacion(), 'fecha_limite' => $this->fechaOperacion(15)])->assertUnprocessable();
+        $this->actuarComo(codigo: 'asistente_legajo');
+        $this->getJson('/api/v1/fiscalizacion/tipos?legajo_id='.$legajo->id)->assertForbidden();
+    }
 }

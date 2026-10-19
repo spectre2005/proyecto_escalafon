@@ -6,9 +6,23 @@ use App\Models\DocumentoUsuario;
 use App\Models\Legajo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 final class GestionFedateo
 {
+    public static function validarRegistro(Request $request, DocumentoUsuario $documento): void
+    {
+        if (! $documento->fedateado || ! $documento->fecha_fedateo || ! $documento->fedatario_id || ! $documento->fedateo_sustento_documento_id
+            || $documento->fedateo_sustento_documento_id === $documento->id) {
+            throw ValidationException::withMessages(['fedateado' => 'Registra primero el fedateo con fecha, responsable y PDF de sustento desde Revisión documental. La aceptación no registra el fedateo.']);
+        }
+        $sustento = DocumentosOperativos::consulta($request, $documento->legajo_id)->with('archivo')->find($documento->fedateo_sustento_documento_id);
+        if (! $sustento) {
+            throw ValidationException::withMessages(['fedateado' => 'El PDF de sustento del fedateo no está disponible en este legajo. Registra un sustento válido antes de aceptar.']);
+        }
+        AlmacenDocumento::leer($sustento->archivo);
+    }
+
     public static function registrar(Request $request, string $id): DocumentoUsuario
     {
         $campos = ['sustento_documento_id', 'sustento_anterior_id', 'fecha_fedateo', 'estado_anterior', 'motivo'];
@@ -21,7 +35,7 @@ final class GestionFedateo
             $doc = DocumentosOperativos::consulta($request, null, todas: true)->findOrFail($id);
             Legajo::query()->whereKey($doc->legajo_id)->lockForUpdate()->firstOrFail();
             $doc = DocumentosOperativos::consulta($request, $doc->legajo_id)->lockForUpdate()->findOrFail($id);
-            abort_if($doc->created_by === $request->user()->id, 403, 'El fedateo debe registrarlo otra persona de RR. HH.');
+            abort_unless(RevisionDocumento::permiteRevisarCarga($request, $doc), 403, 'El fedateo debe registrarlo otra persona de RR. HH.');
             abort_if($doc->documentosUsuarioPorSubsanaADocumento()->exists(), 409, 'Registra el fedateo del documento vigente.');
             abort_unless($doc->estado === $datos['estado_anterior'] && $doc->fedateo_sustento_documento_id === ($datos['sustento_anterior_id'] ?? null), 409, 'El documento cambió. Actualiza la bandeja.');
             abort_if($datos['sustento_documento_id'] === $doc->id, 422, 'El sustento debe ser otro PDF del mismo legajo.');

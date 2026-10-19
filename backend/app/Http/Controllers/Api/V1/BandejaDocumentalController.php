@@ -37,8 +37,9 @@ class BandejaDocumentalController extends Controller
         $consulta->when($datos['estado'] ?? null, fn ($q, $estado) => $q->where('estado', $estado));
         $pagina = $consulta->with(['usuario:id,nombres,apellido_paterno,apellido_materno,numero_doc_identidad', 'tipoDocumento:id,nombre,requiere_fedateo', 'archivo:id,num_paginas'])
             ->orderBy('fecha_incorporacion')->orderBy('id')->paginate(20);
-        $pagina->through(fn (DocumentoUsuario $doc): array => [...$doc->only(['id', 'usuario_id', 'legajo_id', 'seccion_legajo_id', 'estado', 'fedateado', 'folio_inicio', 'folio_fin', 'fecha_recepcion', 'created_by', 'fecha_fedateo', 'fedateo_sustento_documento_id']),
+        $pagina->through(fn (DocumentoUsuario $doc): array => [...$doc->only(['id', 'usuario_id', 'legajo_id', 'seccion_legajo_id', 'estado', 'fedateado', 'folio_inicio', 'folio_fin', 'fecha_recepcion', 'fedatario_id', 'created_by', 'fecha_fedateo', 'fedateo_sustento_documento_id']),
             'carga_propia' => (string) $doc->created_by === (string) $request->user()->id,
+            'revision_propia_bloqueada' => ! RevisionDocumento::permiteRevisarCarga($request, $doc),
             'completo' => in_array($doc->estado, ['aceptado', 'verificado'], true) && $doc->fecha_recepcion !== null && $doc->recepcionado_por !== null,
             'usuario' => $doc->usuario, 'tipo' => $doc->tipoDocumento, 'paginas' => $doc->archivo->num_paginas]);
 

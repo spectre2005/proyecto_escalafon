@@ -124,6 +124,7 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
         Route::get('operaciones/legajos', [OperacionesLegajoController::class, 'legajos']);
         Route::get('operaciones/legajos/{legajo}/documentos', [OperacionesLegajoController::class, 'documentos'])->whereUuid('legajo');
         Route::get('operaciones/historial/{entidad}/{registro}', [OperacionesLegajoController::class, 'historial'])->whereUuid('registro');
+        Route::get('fiscalizacion/tipos', [FiscalizacionPanelController::class, 'tipos']);
         Route::get('fiscalizacion/casos', [FiscalizacionPanelController::class, 'index']);
         Route::post('fiscalizacion/casos', [FiscalizacionPanelController::class, 'store']);
         Route::get('fiscalizacion/casos/{caso}', [FiscalizacionPanelController::class, 'show'])->whereUuid('caso');

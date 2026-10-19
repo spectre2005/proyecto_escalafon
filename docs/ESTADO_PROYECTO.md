@@ -20,7 +20,7 @@ Base: `main`, `95e3a75`. Cambios actuales sin commit ni publicación. Este apart
 
 - Requerimientos incorpora el flujo confirmado: abierto → en revisión → cumplido; observado permite subsanar; cancelación y prórroga con motivo. Fechas explícitas, evidencias del mismo legajo, historial y control de concurrencia.
 - Fiscalización y custodia tienen rutas y pantallas operativas: casos/comunicaciones/evidencias/resultados, solicitud/autorización, alcance, préstamo y devolución. La aprobación no crea una cuenta externa ni envía correos.
-- Accesos de apoyo desde Configuración con rol fijo de asistente; perfil y cambio de contraseña propios institucionales y de plataforma. La recepción de la propia carga se mantiene; la revisión requiere otra persona.
+- Accesos de apoyo desde Configuración con rol fijo de asistente; perfil y cambio de contraseña propios institucionales y de plataforma. La recepción de la propia carga se mantiene; ADMIN puede revisar su propia carga; el asistente no puede aceptar ni observar documentos.
 - ClamAV y cifrado para nuevos PDF; clave independiente fuera del repositorio y conversión histórica verificada con retirada recuperable. Poppler valida el conteo y exige un folio por página. El barrido de archivos históricos no se da por ejecutado.
 - Bandeja de Revisión documental con estados separados: completos solo recepcionados y aceptados/verificados, observados y cargas pendientes. Conserva validaciones específicas y permisos sensibles.
 - Vigencia laboral compartida por fechas efectivas incluidas; pase automático a pasivo tras el último vínculo y reapertura conservando datos. Falta la vista de referencias a legajos pasivos.

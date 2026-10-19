@@ -5,8 +5,8 @@ Implementada en `feature/seccion_04_experiencia_laboral`, sin commit ni push. Si
 ## Comportamiento
 
 - Cada carga crea documento, archivo privado, hash SHA-256, historial, auditoría y, para certificados, un periodo de experiencia en la misma transacción. Un fallo revierte los datos, los folios y el PDF recién almacenado.
-- Estado inicial: `pendiente`. ADMIN acepta/observa y puede anular con motivo; no revisa su propia carga. El asistente configurado puede consultar y cargar, pero no revisar. La autorización siempre se valida en servidor.
-- Aceptar exige revisión de recepción/sello/folios, fedateo cuando corresponde y datos de experiencia completos. La fiscalización con la entidad emisora y el análisis antivirus son independientes. El antivirus permanece pendiente hasta integrar un analizador real; los infectados se bloquean.
+- Estado inicial: `pendiente`. ADMIN acepta/observa y puede anular con motivo; puede revisar también su propia carga (criterio actualizado el 19/10/2026). El asistente configurado puede consultar y cargar, pero no revisar. La autorización siempre se valida en servidor.
+- Aceptar exige revisión de recepción/sello/folios, fedateo registrado con PDF de sustento cuando corresponde y datos de experiencia completos. La aceptación no genera el fedateo. La fiscalización con la entidad emisora y el análisis antivirus son independientes. El antivirus permanece pendiente hasta integrar un analizador real; los infectados se bloquean.
 - Los periodos sustentados no se editan ni eliminan mediante el CRUD genérico. Las correcciones crean una evidencia nueva que subsana a la anterior. Los documentos anulados/subsanados y sus archivos se conservan.
 - Resoluciones guardan `funcion_asignada` en el documento; no crean periodos artificiales. El formulario de certificados incluye fecha de emisión para completar el metadato obligatorio aprobado.
 - El resumen cuenta cada documento exigido vigente: si todavía no existe ninguno, espera al menos uno. El estado del ítem observa la prioridad observado → pendiente → aceptado, excluyendo anulados y subsanados. No puede detectar experiencias declaradas fuera del sistema que aún no se hayan registrado.
@@ -71,7 +71,7 @@ docker compose exec frontend pnpm build
 
 Las dos migraciones nuevas ya se aplicaron al entorno local. Permanecen las migraciones antiguas pendientes de fotografía y adjuntos de Sección 01. En este entorno `foto_path` ya existe aunque su migración figura pendiente; no se corrigió esa discrepancia y por eso se aplicaron rutas específicas en vez de ejecutar una migración general.
 
-Abre `http://localhost:5173`, ingresa, abre un legajo y selecciona **Experiencia laboral → Documentos y tiempo de experiencia**. Registra certificados con periodos consecutivos, superpuestos, separados y abiertos; comprueba PDF antes de guardar. Usa otra cuenta ADMIN para aceptar, observar o anular. Comprueba el fedateo, los folios y que aceptar cambie el total mientras observar/anular lo excluye. Prueba resolución y otros documentos, que no añaden tiempo por sí mismos. Revisa a 400 px y con teclado.
+Abre `http://localhost:5173`, ingresa, abre un legajo y selecciona **Experiencia laboral → Documentos y tiempo de experiencia**. Registra certificados con periodos consecutivos, superpuestos, separados y abiertos; comprueba PDF antes de guardar. Usa una cuenta ADMIN para aceptar, observar o anular, incluida la que cargó el documento. Comprueba el fedateo, los folios y que aceptar cambie el total mientras observar/anular lo excluye. Prueba resolución y otros documentos, que no añaden tiempo por sí mismos. Revisa a 400 px y con teclado.
 
 Las migraciones son reversibles; la del catálogo impide retirar tipos que ya tengan documentos. No ejecutes rollback en una base con evidencias para intentar eliminar registros históricos.
 

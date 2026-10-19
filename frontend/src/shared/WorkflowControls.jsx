@@ -31,10 +31,10 @@ function LegajoOptions({ term, onChange }) {
   return <div><QueryStatus request={request} />{request.data && <><ul className="max-h-48 space-y-2 overflow-auto">{request.data.data.map(legajo => <li key={legajo.id}><button type="button" className={button} onClick={() => onChange(legajo)}>{legajo.numero_legajo} · {[legajo.usuario?.nombres, legajo.usuario?.apellido_paterno].filter(Boolean).join(' ')} · {legajo.estado_legajo}</button></li>)}</ul>{!request.data.data.length && <p className="text-sm">No se encontraron legajos.</p>}<WorkflowPagination data={request.data} setPage={setPage} loading={request.loading} /></>}</div>
 }
 
-export function DocumentPicker({ legajo, value, onChange, label, multiple = false }) {
+export function DocumentPicker({ legajo, value, onChange, label, multiple = false, tipoDocumento }) {
   const [page, setPage] = useState(1)
   const [names, setNames] = useState({})
-  const request = useLiveQuery(`/operaciones/legajos/${legajo}/documentos?page=${page}`)
+  const request = useLiveQuery(`/operaciones/legajos/${legajo}/documentos?${new URLSearchParams({ page, ...(tipoDocumento ? { tipo_documento_id: tipoDocumento } : {}) })}`)
   function select(event) {
     const id = event.target.value
     const item = request.data?.data.find(doc => doc.id === id)

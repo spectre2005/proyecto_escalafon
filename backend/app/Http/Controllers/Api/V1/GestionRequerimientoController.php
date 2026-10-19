@@ -7,6 +7,7 @@ use App\Models\AuditoriaEvento;
 use App\Models\RequerimientoDocumento;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
+use App\Support\Documentos\DocumentosOperativos;
 use App\Support\GestionRequerimientos;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -62,12 +63,18 @@ class GestionRequerimientoController extends Controller
 
     public function tipos(Request $request): JsonResponse
     {
+        $datos = $request->validate(['usuario_id' => 'nullable|uuid|exists:usuarios,id']);
+        $usuario = $datos['usuario_id'] ?? null;
+        $conteos = $usuario ? DocumentosOperativos::consulta($request, null, $usuario)
+            ->whereDoesntHave('documentosUsuarioPorSubsanaADocumento')
+            ->selectRaw('tipo_documento_id, COUNT(*) as cantidad')->groupBy('tipo_documento_id')->pluck('cantidad', 'tipo_documento_id') : collect();
         $consulta = TipoDocumento::query()->where('activo', true);
         if (! $request->user()->veDatosSensibles()) {
             $consulta->whereNotIn('seccion_legajo_id', [1, 9, 10])->where('es_dato_sensible', false)->where('es_dato_salud', false);
         }
 
-        return response()->json(['data' => $consulta->with('seccionLegajo:id,nombre')->orderBy('seccion_legajo_id')->orderBy('nombre')->get(['id', 'codigo', 'nombre', 'seccion_legajo_id'])]);
+        return response()->json(['data' => $consulta->with('seccionLegajo:id,nombre')->orderBy('seccion_legajo_id')->orderBy('nombre')->get(['id', 'codigo', 'nombre', 'seccion_legajo_id'])->map(fn (TipoDocumento $tipo): array => [...$tipo->toArray(),
+            'documentos_registrados' => $usuario ? (int) ($conteos[$tipo->id] ?? 0) : null])]);
     }
 
     public function documentos(Request $request, string $requerimiento): JsonResponse

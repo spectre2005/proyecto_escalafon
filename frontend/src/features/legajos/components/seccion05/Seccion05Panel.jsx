@@ -109,7 +109,7 @@ function Documentos({ usuario, data, tipos, sinLegajo, subiendo, setSubiendo }) 
     <p className="mb-4 text-xs text-slate-500">Sube cada documento desde su tipo. Si acredita un registro, también puedes adjuntarlo desde la tarjeta del registro.{sinLegajo && puedeSubir ? ` ${sinLegajo}` : ''}</p>
     {aviso && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
     <SinAsociar tipos={tipos} onEnlazar={enlazar} />
-    <GruposTipos tipos={tipos} noAplica={noAplica} render={tipo => <li key={tipo.id} id={idTipo(tipo.id)} className="scroll-mt-4 p-4">
+    <GruposTipos onSubir={tipo => { setAviso(''); setSubiendo(tipo.id) }} puedeSubir={tipo => puedeSubir && !sinLegajo && !ocupado && ofrecerTipo(noAplica, tipo)} tipos={tipos} noAplica={noAplica} render={tipo => <li key={tipo.id} id={idTipo(tipo.id)} className="scroll-mt-4 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-slate-800">{tipo.literal && <span className="mr-1 text-slate-500">{tipo.literal})</span>}{tipo.nombre}</p>

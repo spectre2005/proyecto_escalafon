@@ -1,3 +1,4 @@
+import TablaTiposDocumentales from './documentos/TablaTiposDocumentales'
 import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from '../../../shared/queries/useLiveQuery'
 import ListaDocumentos from './documentos/ListaDocumentos'
@@ -8,7 +9,7 @@ const documents = [
   ['S01_B_DOCUMENTO_IDENTIDAD', 'Copia de DNI / identidad'],
 ]
 
-export default function PersonalDocuments({ usuario, uploadCode, onClose }) {
+export default function PersonalDocuments({ usuario, uploadCode, onClose, onUpload }) {
   const request = useLiveQuery(`/expedientes/${usuario}/seccion-01`)
   const data = request.data?.data
   const dialog = useRef(null)
@@ -31,15 +32,7 @@ export default function PersonalDocuments({ usuario, uploadCode, onClose }) {
   return <>
     {message && <p role="status" className="mt-5 rounded-xl bg-teal-50 p-3 text-sm text-teal-800">{message}</p>}
     {request.error && <p role="alert" className="mt-5 text-xs text-rose-700">No se pudieron actualizar los documentos. <button type="button" onClick={request.retry} className="font-semibold underline">Reintentar</button></p>}
-    <div className="mt-6 grid gap-3 border-t border-slate-100 pt-5 sm:grid-cols-2">
-      {documents.map(([code, label]) => {
-        const item = data?.tipos.find(document => document.codigo === code)
-        return <details key={code} className="min-w-0 rounded-xl border border-slate-200 p-3 sm:open:col-span-2">
-          <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 text-xs"><span className="font-semibold text-slate-700">{label}</span><span className="text-teal-700">{item?.lista?.length ? `Ver archivos (${item.lista.length})` : request.loading ? 'Consultando…' : 'Sin archivo'}</span></summary>
-          {item && <ListaDocumentos usuario={usuario} tipo={item} />}
-        </details>
-      })}
-    </div>
+    <div className="mt-6 border-t border-slate-100 pt-5">{data ? <TablaTiposDocumentales elementos={data.tipos.filter(tipo => documents.some(([code]) => code === tipo.codigo))} nombreDe={tipo => documents.find(([code]) => code === tipo.codigo)?.[1] || tipo.nombre} onSubir={onUpload ? tipo => onUpload(tipo.codigo) : undefined} puedeSubir={() => Boolean(data.legajo)} mostrarDetalleAlSubir={false} renderDetalle={tipo => <ListaDocumentos usuario={usuario} tipo={tipo} />} /> : request.loading && <p role="status" className="text-xs text-slate-500">Consultando documentos…</p>}</div>
     <dialog ref={dialog} aria-labelledby="personal-document-title" onClose={onClose}
       onCancel={event => { if (dialog.current.querySelector('form[aria-busy="true"]')) event.preventDefault() }}
       className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-6xl overflow-y-auto rounded-2xl border-0 bg-slate-50 p-5 text-slate-800 shadow-2xl backdrop:bg-slate-900/50">

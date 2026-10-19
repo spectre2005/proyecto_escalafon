@@ -224,13 +224,13 @@ class Seccion08Controller extends Controller
         $recursos = $sancion?->recursosImpugnatorios ?? collect();
         $hasSancion = $sancion !== null;
 
-        return [...$doc->only(['id', 'nombre', 'emisor', 'num_resolucion', 'folio_inicio', 'folio_fin', 'fedateado', 'fiscalizado', 'modalidad_presentacion']),
+        return [...$doc->only(['id', 'nombre', 'emisor', 'num_resolucion', 'folio_inicio', 'folio_fin', 'fedateado', 'fecha_fedateo', 'fedatario_id', 'fedateo_sustento_documento_id', 'fiscalizado', 'modalidad_presentacion']),
             'nombre' => $doc->nombre ?: ($doc->archivo?->nombre_original ?? 'Documento sin archivo'),
             'fecha_emision' => $doc->fecha_emision?->format('Y-m-d'), 'estado' => ResumenSeccion03::estadoDocumento($doc->estado),
             'estado_original' => $doc->estado, 'fecha_recepcion' => $doc->fecha_recepcion?->format('Y-m-d'), 'tipo_documento_codigo' => $doc->tipoDocumento->codigo,
             'grupo' => ResumenSeccion08::ITEMS[$doc->tipoDocumento->codigo][1],
             'subsanado' => $doc->documentosUsuarioPorSubsanaADocumento->isNotEmpty(),
-            'puede_revisar' => $doc->created_by !== $request->user()->getAuthIdentifier() && $doc->estado !== 'anulado' && $doc->documentosUsuarioPorSubsanaADocumento->isEmpty(),
+            'puede_revisar' => RevisionDocumento::permiteRevisarCarga($request, $doc) && $doc->estado !== 'anulado' && $doc->documentosUsuarioPorSubsanaADocumento->isEmpty(),
             'archivo' => $doc->archivo?->only(['id', 'nombre_original', 'mime_type', 'estado_antivirus', 'tamano_bytes']),
             'observaciones' => $doc->observacionesDocumentoPorDocumento->where('estado', 'abierta')->map(fn ($obs): array => ['descripcion' => $obs->descripcion, 'plazo_subsanacion' => $obs->plazo_subsanacion?->format('Y-m-d')])->values()->all(),
             'motivo' => $reconocimiento?->motivo, 'tipo_reconocimiento' => $reconocimiento?->tipo,

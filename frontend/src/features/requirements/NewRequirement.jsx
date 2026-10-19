@@ -5,30 +5,32 @@ import LegajoSearch from '../../shared/LegajoSearch'
 import { useManualQuery } from '../../shared/queries/useManualQuery'
 import { QueryStatus, WorkflowField } from '../../shared/WorkflowControls'
 import { todayLima, formatDate } from '../../shared/dates'
-import { personName, filterTypes } from './requirementUtils'
+import { personName } from './requirementUtils'
 import { requirementError } from './requirementApi'
 import { panel, primary, button, input, RequirementSection } from './RequirementUI'
 import DocumentoModal from '../legajos/components/documentos/DocumentoModal'
 
 function DocumentType({ request, value, onChange }) {
-  const [search, setSearch] = useState('')
-  const [seccion, setSeccion] = useState('')
+  const [mostrarTodos, setMostrarTodos] = useState(false)
   const types = request.data?.data || []
-  const visible = filterTypes(types, search, seccion)
+  const registrados = types.filter(type => type.documentos_registrados > 0)
+  const visible = mostrarTodos ? types : registrados
   const selected = types.find(type => type.id === value)
-  const sections = [...new Map(types.map(type => [type.seccion_legajo_id, type.seccion_legajo?.nombre || `Sección ${type.seccion_legajo_id}`])).entries()].sort(([a], [b]) => a - b)
-  return <div className="space-y-3"><QueryStatus request={request} />{request.data && <>
-    <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(140px,1fr)]"><label className="grid gap-2 text-sm text-slate-700">Buscar tipo documental<input className={input} value={search} onChange={event => setSearch(event.target.value)} placeholder="Ej.: certificado, título, capacitación" maxLength={120} /></label><WorkflowField label="Sección" required={false} value={seccion} onChange={event => setSeccion(event.target.value)}><option value="">Todas las secciones</option>{sections.map(([id, name]) => <option key={id} value={id}>{String(id).padStart(2, '0')} · {name}</option>)}</WorkflowField></div>
-    <label className="grid gap-2 text-sm text-slate-700">Documento que se solicitará<select name="tipo_documento_id" className={input} value={value} onChange={event => onChange(event.target.value)}><option value="">Solicitud general · sin tipo documental específico</option>{selected && !visible.some(type => type.id === selected.id) && <option value={selected.id}>{selected.nombre} · seleccionado</option>}{sections.map(([id, name]) => { const group = visible.filter(type => type.seccion_legajo_id === id); return group.length ? <optgroup key={id} label={`${String(id).padStart(2, '0')} · ${name}`}>{group.map(type => <option key={type.id} value={type.id}>{type.nombre}</option>)}</optgroup> : null })}</select></label>
-    {selected ? <div className="flex gap-3 rounded-xl border border-teal-100 bg-teal-50/50 p-3"><span className="mt-0.5 text-teal-700"><Icon name="file" size={18} /></span><div><p className="text-sm font-semibold text-teal-900">{selected.nombre}</p><p className="mt-1 text-xs text-teal-800">Sección {String(selected.seccion_legajo_id).padStart(2, '0')}. La respuesta deberá pertenecer a este mismo tipo y a la persona seleccionada.</p></div></div> : <p className="rounded-xl bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">Si necesitas un certificado o título concreto, selecciónalo arriba. Una solicitud general permitirá vincular cualquier documento admisible de la persona.</p>}
-    {!visible.length && <p role="status" className="text-xs text-slate-500">No hay tipos que coincidan con esta búsqueda. Amplía el texto o cambia la sección; tu selección anterior se conserva.</p>}
+  const groups = [
+    ['Ya registrados', visible.filter(type => type.documentos_registrados > 0)],
+    ['Sin documentos registrados', visible.filter(type => !type.documentos_registrados)],
+  ]
+  const nombre = type => `${type.nombre}${type.documentos_registrados > 0 ? ` · ${type.documentos_registrados} registrado(s)` : ''}`
+  return <div className="space-y-2"><QueryStatus request={request} />{request.data && <>
+    <label className="grid gap-2 text-sm text-slate-700">Tipo documental<select name="tipo_documento_id" className={input} value={value} onChange={event => onChange(event.target.value)}><option value="">Solicitud general · sin tipo específico</option>{selected && !visible.some(type => type.id === selected.id) && <option value={selected.id}>{nombre(selected)}</option>}{groups.filter(([, items]) => items.length).map(([label, items]) => <optgroup key={label} label={label}>{items.map(type => <option key={type.id} value={type.id}>{nombre(type)}</option>)}</optgroup>)}</select></label>
+    <div className="flex flex-wrap items-center justify-between gap-2 text-xs"><span className="text-slate-500">{registrados.length ? 'Tipos registrados en el legajo de la persona.' : 'Esta persona aún no tiene documentos disponibles.'}</span><button type="button" aria-expanded={mostrarTodos} className="font-semibold text-teal-800 underline" onClick={() => setMostrarTodos(current => !current)}>{mostrarTodos ? 'Ver solo registrados' : 'Solicitar otro tipo'}</button></div>
   </>}</div>
 }
 
 function CreateForm({ onCreated, onCancel, onBusy }) {
-  const types = useManualQuery('/requerimientos/tipos')
   const [search, setSearch] = useState('')
   const [person, setPerson] = useState(null)
+  const types = useManualQuery(person ? `/requerimientos/tipos?usuario_id=${encodeURIComponent(person.id)}` : null)
   const [tipo, setTipo] = useState('')
   const [origen, setOrigen] = useState('legajo')
   const [descripcion, setDescripcion] = useState('')
@@ -47,9 +49,9 @@ function CreateForm({ onCreated, onCancel, onBusy }) {
     catch (failure) { setError(requirementError(failure)) } finally { setBusy(false); onBusy(false) }
   }
   return <form onSubmit={submit} aria-busy={busy} className="border-t border-slate-100"><fieldset disabled={busy} className="space-y-7 p-5 sm:p-6">
-    <RequirementSection number="1" title="Selecciona al destinatario"><LegajoSearch search={search} legajo={person} mode="persona" endpoint="/requerimientos/personas" onSearch={setSearch} onSelect={value => { setPerson(value); setSearch('') }} onClear={() => { setPerson(null); setSearch('') }} /></RequirementSection>
+    <RequirementSection number="1" title="Selecciona al destinatario"><LegajoSearch search={search} legajo={person} mode="persona" endpoint="/requerimientos/personas" onSearch={setSearch} onSelect={value => { setPerson(value); setSearch(''); setTipo('') }} onClear={() => { setPerson(null); setSearch(''); setTipo('') }} /></RequirementSection>
     {person ? <>
-      <RequirementSection number="2" title="Define el documento y la solicitud"><DocumentType request={types} value={tipo} onChange={setTipo} /><div className="grid gap-3 sm:grid-cols-2"><WorkflowField name={origen === 'otro' ? undefined : 'origen'} label="Origen de la solicitud" value={origen} onChange={event => setOrigen(event.target.value)}><option value="legajo">Legajo</option><option value="fiscalizacion">Fiscalización</option><option value="otro">Otro origen…</option></WorkflowField>{origen === 'otro' && <WorkflowField name="origen" label="Indica el origen" maxLength={15} placeholder="Máximo 15 caracteres" />}</div><label className="grid gap-2 text-sm text-slate-700">¿Qué debe presentar la persona?<textarea name="descripcion" required maxLength={300} rows={3} value={descripcion} onChange={event => setDescripcion(event.target.value)} className={input} placeholder="Describe el documento solicitado y el motivo de la solicitud." /></label><div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500"><span>{descripcion.length}/300 caracteres</span>{selectedType && <button type="button" className="font-semibold text-teal-800 underline" onClick={() => setDescripcion(`Presentar ${selectedType.nombre.toLowerCase()} para completar la documentación del legajo.`.slice(0, 300))}>Usar descripción sugerida</button>}</div></RequirementSection>
+      <RequirementSection number="2" title="Define el documento y la solicitud"><DocumentType key={person.id} request={types} value={tipo} onChange={setTipo} /><div className="grid gap-3 sm:grid-cols-2"><WorkflowField name={origen === 'otro' ? undefined : 'origen'} label="Origen de la solicitud" value={origen} onChange={event => setOrigen(event.target.value)}><option value="legajo">Legajo</option><option value="fiscalizacion">Fiscalización</option><option value="otro">Otro origen…</option></WorkflowField>{origen === 'otro' && <WorkflowField name="origen" label="Indica el origen" maxLength={15} placeholder="Máximo 15 caracteres" />}</div><label className="grid gap-2 text-sm text-slate-700">¿Qué debe presentar la persona?<textarea name="descripcion" required maxLength={300} rows={3} value={descripcion} onChange={event => setDescripcion(event.target.value)} className={input} placeholder="Describe el documento solicitado y el motivo de la solicitud." /></label><div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500"><span>{descripcion.length}/300 caracteres</span>{selectedType && <button type="button" className="font-semibold text-teal-800 underline" onClick={() => setDescripcion(`Presentar ${selectedType.nombre.toLowerCase()} para completar la documentación del legajo.`.slice(0, 300))}>Usar descripción sugerida</button>}</div></RequirementSection>
       <RequirementSection number="3" title="Establece las fechas"><div className="grid gap-4 sm:grid-cols-2"><WorkflowField name="fecha_requerimiento" label="Fecha de solicitud" type="date" value={solicitud} max={todayLima()} onChange={event => setSolicitud(event.target.value)} /><WorkflowField name="fecha_limite" label="Fecha límite de entrega" type="date" min={solicitud || undefined} value={limite} onChange={event => setLimite(event.target.value)} /></div><p className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">Selecciona una fecha límite explícita. El sistema no calcula feriados ni días hábiles automáticamente.</p></RequirementSection>
     </> : <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">Selecciona a la persona para continuar con el documento y las fechas de entrega.</p>}
     {error && <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-800">{error}</p>}

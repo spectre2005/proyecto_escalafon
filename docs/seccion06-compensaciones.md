@@ -50,8 +50,8 @@ La consulta especializada muestra evidencias del legajo activo, como 03/04. La c
 - `CargaDocumento` y su callback crean PDF, documento, datos, historial y auditoría en el mismo flujo transaccional; un fallo retira el archivo huérfano.
 - `Folios` conserva su bloqueo del legajo/sección: inicio = último + 1, sin huecos ni solapamientos. Folios históricos, anulados o subsanados siguen ocupados.
 - Estado inicial `pendiente`; aceptar, observar o anular reutiliza `RevisionDocumento`.
-- El autor no revisa su propia carga. Se rechazan cambios de estado obsoletos, documentos anulados/subsanados, legajo cerrado, datos estructurados inconsistentes y archivos ausentes/infectados al aceptar.
-- Aceptar requiere recepción confirmada y fedateo si el tipo lo exige. La fiscalización posterior no se marca automáticamente.
+- ADMIN puede revisar también su propia carga (criterio actualizado el 19/10/2026). Se rechazan cambios de estado obsoletos, documentos anulados/subsanados, legajo cerrado, datos estructurados inconsistentes y archivos ausentes/infectados al aceptar.
+- Aceptar requiere recepción confirmada y fedateo registrado con PDF de sustento si el tipo lo exige; la aceptación no lo registra. La fiscalización posterior no se marca automáticamente.
 - Una corrección crea evidencia nueva con `subsana_a_documento_id`. La aceptación de la subsanación cierra las observaciones abiertas anteriores.
 - Registros estructurados vinculados a documentos de sección 6 no se editan, borran ni reasignan por CRUD genérico. Las cargas genéricas no pueden crear los tipos especializados omitiendo el flujo aprobado.
 - Las consultas de expediente y los listados/detalles administrativos de documentos, archivos y datos estructurados filtran información sensible. La protección se aplica también antes de editar/eliminar por rutas administrativas.

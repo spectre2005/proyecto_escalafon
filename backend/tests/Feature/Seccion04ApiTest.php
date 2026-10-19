@@ -40,6 +40,7 @@ class Seccion04ApiTest extends TestCase
         $this->persona = Usuario::factory()->create(['tipo_personal' => 'docente', 'regimen_laboral' => 'carrera']);
         $this->legajo = Legajo::factory()->create(['usuario_id' => $this->persona->id]);
         $this->autor = $this->actuarComo();
+        TipoDocumento::query()->where('seccion_legajo_id', 4)->update(['requiere_fedateo' => false]);
     }
 
     private function url(string $sufijo = ''): string
@@ -66,7 +67,7 @@ class Seccion04ApiTest extends TestCase
 
     private function aceptar(string $id): TestResponse
     {
-        return $this->postJson($this->url('/documentos/'.$id.'/estado'), ['estado' => 'aceptado', 'estado_anterior' => 'pendiente', 'recepcion_confirmada' => true, 'fedateado' => true]);
+        return $this->postJson($this->url('/documentos/'.$id.'/estado'), ['estado' => 'aceptado', 'estado_anterior' => 'pendiente', 'recepcion_confirmada' => true, 'fedateado' => false]);
     }
 
     public function test_catalog_is_idempotent_and_requirement_flags_are_respected(): void
@@ -138,14 +139,14 @@ class Seccion04ApiTest extends TestCase
         $this->assertDatabaseCount('archivos_documento', 2);
     }
 
-    public function test_review_cannot_be_own_and_requires_reception_fedateo_and_correct_owner(): void
+    public function test_admin_can_review_own_upload_with_reception_fedateo_and_correct_owner(): void
     {
+        TipoDocumento::query()->where('codigo', 'EXP_CERTIFICADO_TRABAJO')->update(['requiere_fedateo' => true]);
         $id = $this->cargar()->assertCreated()->json('data.id');
-        $this->aceptar($id)->assertForbidden();
-        $this->actuarComo();
         $this->postJson($this->url('/documentos/'.$id.'/estado'), ['estado' => 'aceptado', 'estado_anterior' => 'pendiente', 'recepcion_confirmada' => true, 'fedateado' => false])->assertUnprocessable()->assertJsonValidationErrors('fedateado');
         $otra = Usuario::factory()->create();
         $this->postJson('/api/v1/expedientes/'.$otra->id.'/seccion-04/documentos/'.$id.'/estado', ['estado' => 'aceptado', 'estado_anterior' => 'pendiente', 'recepcion_confirmada' => true])->assertConflict();
+        $this->registrarFedateoConSustento($id);
         $this->aceptar($id)->assertOk();
         $this->assertDatabaseHas('documentos_usuario', ['id' => $id, 'estado' => 'aceptado', 'fedateado' => true, 'fiscalizado' => false]);
         $this->getJson($this->url())->assertOk()->assertJsonPath('data.resumen.aceptados', 1)->assertJsonPath('data.tiempo.total.dias_totales', 10);

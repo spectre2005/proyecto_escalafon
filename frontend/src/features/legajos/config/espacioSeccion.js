@@ -14,7 +14,10 @@ export function tituloSeccion(numero) {
 
 // Lleva la vista a un bloque o a un tipo documental (y abre el <details> que lo contenga, si estaba plegado).
 export function irA(id) {
-  const destino = document.getElementById(id)
+  const fila = document.getElementById(`tabla-${id}`)
+  const abrir = fila?.querySelector('[data-abrir-detalle]')
+  if (abrir?.getAttribute('aria-expanded') === 'false') abrir.click()
+  const destino = fila || document.getElementById(id)
   destino?.closest('details')?.setAttribute('open', '')
   destino?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }

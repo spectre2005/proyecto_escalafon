@@ -2,6 +2,7 @@
 
 namespace Tests\Concerns;
 
+use App\Models\DocumentoUsuario;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use Database\Seeders\Seccion02CatalogoSeeder;
@@ -13,6 +14,18 @@ use Illuminate\Testing\TestResponse;
 /** Ayudas para subir documentos de la sección 02 con las personas de Seccion02DemoSeeder y un disco falso. */
 trait SubeDocumentos
 {
+    /** Sustento aislado para las pruebas que necesitan un fedateo completo antes de aceptar. */
+    protected function registrarFedateoConSustento(string $id): void
+    {
+        $documento = DocumentoUsuario::query()->findOrFail($id);
+        $tipo = TipoDocumento::factory()->create(['seccion_legajo_id' => 1, 'requiere_fedateo' => false, 'es_dato_sensible' => false, 'es_dato_salud' => false]);
+        $sustento = DocumentoUsuario::factory()->create(['usuario_id' => $documento->usuario_id, 'legajo_id' => $documento->legajo_id,
+            'seccion_legajo_id' => 1, 'tipo_documento_id' => $tipo->id, 'archivo_id' => $documento->archivo_id, 'estado' => 'cargado']);
+        $this->postJson('/api/v1/revision-documental/'.$id.'/fedatear', ['sustento_documento_id' => $sustento->id,
+            'sustento_anterior_id' => $documento->fedateo_sustento_documento_id, 'estado_anterior' => $documento->estado,
+            'fecha_fedateo' => now('America/Lima')->toDateString(), 'motivo' => 'Fedateo con evidencia documental de prueba'])->assertOk();
+    }
+
     protected function prepararDemo(): void
     {
         Storage::fake((string) config('legajo.disco_documentos'));

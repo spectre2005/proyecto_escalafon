@@ -1,3 +1,4 @@
+import TablaTiposDocumentales from './TablaTiposDocumentales'
 import { useState } from 'react'
 import { cambiosDeVista, repartir, VISTAS, vistaInicial, visiblesEnVista } from '../../config/vistasDocumentales'
 
@@ -11,7 +12,7 @@ import { cambiosDeVista, repartir, VISTAS, vistaInicial, visiblesEnVista } from 
  * forma. Un tipo que sale de la vista mientras se mira (p. ej. al cargar su documento) se queda visible hasta cambiar de
  * vista: su paso en curso (completar datos, enlazar) sigue abierto; retenido(elemento) lo indica.
  */
-export default function VistasDocumentales({ elementos, clasificar, idDe = elemento => elemento.id, nombreDe = elemento => elemento.nombre, titulo = null, children }) {
+export default function VistasDocumentales({ elementos, clasificar, idDe = elemento => elemento.id, nombreDe = elemento => elemento.nombre, titulo = null, children, tabla = true, onSubir, puedeSubir }) {
   const grupos = repartir(elementos, clasificar)
   const [vista, setVista] = useState(() => vistaInicial(grupos))
   // Vista de cada tipo en el render anterior, para avisar lo que cambió tras una carga (ajuste de estado en el render).
@@ -52,7 +53,7 @@ export default function VistasDocumentales({ elementos, clasificar, idDe = eleme
       <button type="button" onClick={() => elegir(movido.vista)} className="font-semibold underline">Ver</button>
     </p>}
     <div role="region" aria-label={datos.titulo} className="mt-3">
-      {lista.length ? children(lista, vista, retenido) : <p className="rounded-xl border border-dashed border-slate-200 bg-white p-5 text-sm text-slate-500">{datos.vacio}</p>}
+      {lista.length ? tabla ? <TablaTiposDocumentales key={vista} elementos={lista} idDe={idDe} nombreDe={nombreDe} onSubir={onSubir} puedeSubir={puedeSubir} renderDetalle={tipo => children([tipo], vista, retenido)} /> : children(lista, vista, retenido) : <p className="rounded-xl border border-dashed border-slate-200 bg-white p-5 text-sm text-slate-500">{datos.vacio}</p>}
     </div>
   </div>
 }

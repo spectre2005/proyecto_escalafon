@@ -13,6 +13,7 @@ use App\Support\Documentos\EstadoDocumento;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 final class GestionFiscalizacion
 {
@@ -21,6 +22,15 @@ final class GestionFiscalizacion
         return DB::transaction(function () use ($request, $datos): ProcesoFiscalizacion {
             $legajo = Legajo::query()->lockForUpdate()->findOrFail($datos['legajo_id']);
             abort_unless($legajo->estado_legajo === 'activo', 409, 'La fiscalización se inicia en un legajo activo.');
+            if (! empty($datos['tipo_documento_id'])) {
+                $disponible = DocumentosOperativos::consulta($request, $legajo->id, $legajo->usuario_id)
+                    ->where('tipo_documento_id', $datos['tipo_documento_id'])->whereDoesntHave('documentosUsuarioPorSubsanaADocumento')
+                    ->whereHas('tipoDocumento', fn ($q) => $q->where('activo', true))->exists();
+                if (! $disponible) {
+                    throw ValidationException::withMessages(['tipo_documento_id' => 'El legajo no tiene documentos disponibles de este tipo. Actualiza la selección.']);
+                }
+                $datos['tipo_muestra'] = 'Verificación documental';
+            }
             $proceso = new ProcesoFiscalizacion;
             $proceso->forceFill([...$datos, 'usuario_id' => $legajo->usuario_id, 'responsable_id' => $request->user()->id, 'estado' => 'abierto'])->save();
             AuditoriaInstitucional::registrar('procesos_fiscalizacion', $proceso->id, 'fiscalizacion.abrir', $request, $legajo->usuario_id, null, $proceso->getAttributes());
@@ -43,6 +53,9 @@ final class GestionFiscalizacion
                 abort_unless($proceso->estado === 'abierto', 409, 'La fiscalización no está abierta.');
                 if ($accion === 'comunicar') {
                     $documento = self::documento($request, $proceso, $datos['documento_id']);
+                    if ($proceso->tipo_documento_id && ($documento->tipo_documento_id !== $proceso->tipo_documento_id || $documento->documentosUsuarioPorSubsanaADocumento()->exists())) {
+                        throw ValidationException::withMessages(['documento_id' => 'Selecciona un documento vigente del tipo elegido al abrir este caso.']);
+                    }
                     $oficio = self::documento($request, $proceso, $datos['oficio_documento_id']);
                     AlmacenDocumento::leer($oficio->archivo);
                     abort_unless($datos['fecha_envio'] >= $proceso->fecha_inicio->toDateString(), 422, 'La comunicación no puede preceder a la apertura.');

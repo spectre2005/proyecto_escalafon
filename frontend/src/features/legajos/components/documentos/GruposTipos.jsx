@@ -13,7 +13,7 @@ const observado = tipo => (tipo.lista || []).some(documento => !documento.subsan
  * «No corresponde». Los que no corresponden se siguen viendo allí, con sus documentos y su subsanación.
  * render(tipo) devuelve el <li> del tipo (cada panel conserva sus filas y acciones).
  */
-export default function GruposTipos({ tipos, noAplica, render, aplica = true }) {
+export default function GruposTipos({ tipos, noAplica, render, aplica = true, onSubir, puedeSubir }) {
   const clasificar = tipo => vistaDe({
     aplica: aplica && tipo.aplica !== false && ofrecerTipo(noAplica, tipo),
     exigido: tipo.exigido === undefined ? false : tipo.exigido,
@@ -21,7 +21,7 @@ export default function GruposTipos({ tipos, noAplica, render, aplica = true }) 
     observado: observado(tipo),
   })
   const nombre = tipo => `${tipo.literal ? `${tipo.literal}) ` : ''}${tipo.nombre}`
-  return <VistasDocumentales elementos={tipos} clasificar={clasificar} nombreDe={nombre}>
+  return <VistasDocumentales elementos={tipos} clasificar={clasificar} nombreDe={nombre} onSubir={onSubir} puedeSubir={puedeSubir}>
     {visibles => <ul className={lista}>{visibles.map(render)}</ul>}
   </VistasDocumentales>
 }

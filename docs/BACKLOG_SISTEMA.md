@@ -5,9 +5,9 @@
 ## Prueba integral pendiente (19/10/2026)
 
 - **Pendiente de ejecución y aceptación:** recorrer en navegador personal → vínculo → legajo → carga PDF → revisión → reportes; requerimientos completos (incluidas observación, subsanación, prórroga y cancelación); custodia hasta devolución; vencimientos y avisos con fechas controladas; exportaciones y restauración de respaldos. Registrar resultado, evidencia e incidencias. Las pruebas automáticas no sustituyen esta aceptación.
-- **Roles:** verificar cuentas distintas de administrador y asistente, recepción permitida de la propia carga y revisión propia prohibida. La comprobación automatizada se mantiene separada de la demostración manual con cuentas reales.
+- **Roles:** verificar cuentas distintas de administrador y asistente, recepción propia permitida y aceptación/observación propia permitida para ADMIN; asistente sin permiso de revisión. La comprobación automatizada se mantiene separada de la demostración manual con cuentas reales.
 
-**Comprobación automatizada de roles (19/10/2026):** cuentas ficticias distintas de administrador y asistente en pruebas aisladas; asistente sin acceso a la bandeja ni aceptación/observación, recepción propia permitida, administrador acepta carga ajena y no puede aceptar ni observar la propia. Bandeja y formación: 23 pruebas, 188 aserciones correctas. No se han cambiado cuentas reales; el recorrido manual de inicio de sesión sigue pendiente.
+**Criterio de roles actualizado (19/10/2026):** ADMIN puede cargar, aceptar y observar sus propios documentos. Asistentes y cuentas sin permiso de revisión siguen bloqueados. Los revisores sin rol ADMIN mantienen la restricción de carga propia. La aceptación documental no registra fedateo: cuando corresponde, exige fecha, responsable y PDF de sustento disponible. ADMIN puede registrar el fedateo de su propia carga. La fiscalización mantiene su flujo independiente. La demostración manual con inicio de sesión real continúa pendiente.
 
 ## Avance de implementación (18/10/2026)
 

@@ -1,3 +1,4 @@
+import TablaTiposDocumentales from '../documentos/TablaTiposDocumentales'
 import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { apiErrorMessage } from '../../../../axios'
@@ -16,13 +17,8 @@ import { useNoAplicables } from '../../api/useNoAplicables'
 import { ofrecerTipo } from '../../config/aplicacion'
 
 const boton = 'rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-800 hover:bg-teal-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 disabled:opacity-50'
-const botonIcono = 'inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-teal-200 bg-teal-50 text-teal-800 hover:bg-teal-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700'
 const fecha = valor => valor ? valor.split('-').reverse().join('/') : '—'
 const momento = valor => valor ? new Date(valor).toLocaleString('es-PE', { timeZone: 'America/Lima' }) : '—'
-const estados = {
-  si: ['Sí', 'bg-teal-50 text-teal-800'], no: ['No', 'bg-slate-100 text-slate-600'],
-  pendiente: ['Pendiente', 'bg-amber-50 text-amber-900'], vencido: ['Vencido', 'bg-rose-50 text-rose-800'],
-}
 const acciones = {
   CREAR_DOCUMENTO: 'Registro creado', ADJUNTAR_ARCHIVO: 'Archivo adjuntado', ACTUALIZAR_DOCUMENTO: 'Metadatos actualizados',
   REEMPLAZAR_ARCHIVO: 'Nueva versión del archivo', COMPLETAR_TRAMITE: 'Trámite completado', DOCUMENTO_SUBSANADO: 'Sustituido por una nueva evidencia',
@@ -129,10 +125,7 @@ export default function Seccion10Panel({ usuario, subseccion = '10.1' }) {
     {/* Documentos por vista: Pendientes · Con documentos · Opcionales · No corresponde; cada tipo se sube desde su fila. */}
     {!itemsSeccion.length ? <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">El catálogo de esta sección está incompleto. Solicita a administración actualizar los tipos documentales para poder registrar y consultar documentos.</p>
       : <section aria-label={`Documentos de ${titulo}`} className="rounded-2xl border border-slate-200 bg-white p-5">
-      <VistasDocumentales elementos={itemsSeccion} clasificar={item => vistaDeItem(item, ofrecerTipo(noAplica, item))}>{lista => <div className="overflow-x-auto rounded-xl border border-slate-100">
-<table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr>{['Tipo de documento', 'Estado', 'Cantidad', 'Última fecha', 'Número de folios', 'Acciones'].map(tituloColumna => <th key={tituloColumna} scope="col" className="px-4 py-3 font-medium">{tituloColumna}</th>)}</tr></thead><tbody>
-        {lista.map(item => <tr key={item.id} className="border-t border-slate-100"><th scope="row" className="min-w-64 px-4 py-4 font-medium text-slate-800">{item.nombre}{!item.activo && <span className="ml-2 text-xs text-slate-400">Inactivo</span>}</th><td className="px-4 py-4"><span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs ${estados[item.estado][1]}`}>{estados[item.estado][0]}</span></td><td className="px-4 py-4">{item.cantidad}</td><td className="whitespace-nowrap px-4 py-4 text-slate-600">{fecha(item.ultima_fecha)}</td><td className="px-4 py-4">{item.numero_folios}</td><td className="px-4 py-4"><div className="flex items-center gap-2">{subir && data.legajo && item.activo && ofrecerTipo(noAplica, item) && <button type="button" className={`${boton} inline-flex items-center gap-1.5 whitespace-nowrap`} aria-label={`Subir documento: ${item.nombre}`} onClick={() => abrir('nuevo', item)}><Icon name="paperclip" size={16} />Subir</button>}<button type="button" className={botonIcono} title="Ver documentos" aria-label={`Ver documentos: ${item.nombre}`} onClick={() => setSeleccion(item.id)}><Icon name="eye" size={18} /></button></div></td></tr>)}
-      </tbody></table></div>}</VistasDocumentales>
+      <VistasDocumentales tabla={false} elementos={itemsSeccion} clasificar={item => vistaDeItem(item, ofrecerTipo(noAplica, item))}>{lista => <TablaTiposDocumentales elementos={lista} mostrarDetalleAlSubir={false} onSubir={item => abrir('nuevo', item)} puedeSubir={item => subir && Boolean(data.legajo) && item.activo && ofrecerTipo(noAplica, item)} onVer={item => setSeleccion(item.id)} />}</VistasDocumentales>
     </section>}
     {data.folios.sin_clasificar > 0 && <p className="rounded-xl bg-amber-50 p-4 text-xs text-amber-900">El total incluye {data.folios.sin_clasificar} folio(s) de documentos anteriores sin clasificación. Se conservan en el historial.</p>}
     {data.documentos_anteriores?.length > 0 && <details className="rounded-2xl border border-slate-200 bg-white p-4"><summary className="cursor-pointer text-sm font-medium text-slate-700">Documentos archivados de tipos anteriores</summary><div className="mt-4"><Documentos item={{ nombre: 'Documentos archivados', activo: false, documentos: data.documentos_anteriores }} permisos={{ anular }} abrir={abrir} ver={setVisor} /></div></details>}

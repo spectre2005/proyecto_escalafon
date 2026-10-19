@@ -22,6 +22,7 @@ class ProcesoFiscalizacion extends Model
         'usuario_id',
         'legajo_id',
         'tipo_muestra',
+        'tipo_documento_id',
         'fecha_vinculacion',
         'fecha_inicio',
         'fecha_limite',
@@ -63,6 +64,11 @@ class ProcesoFiscalizacion extends Model
     public function responsable(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'responsable_id', 'id');
+    }
+
+    public function tipoDocumento(): BelongsTo
+    {
+        return $this->belongsTo(TipoDocumento::class, 'tipo_documento_id', 'id');
     }
 
     public function informeDocumento(): BelongsTo

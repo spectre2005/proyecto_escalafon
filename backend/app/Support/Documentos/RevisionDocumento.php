@@ -14,6 +14,13 @@ use Illuminate\Validation\ValidationException;
 
 final class RevisionDocumento
 {
+    /** Administración institucional puede revisar su carga; las rutas siguen exigiendo permiso de revisión. */
+    public static function permiteRevisarCarga(Request $request, DocumentoUsuario $documento): bool
+    {
+        return $documento->created_by !== $request->user()->getAuthIdentifier()
+            || $request->user()->rolesVigentes()->contains('codigo', 'ADMIN');
+    }
+
     public static function cambiarEstado(Request $request, string $usuario, string $documento, int $seccion, string $accion): JsonResponse
     {
         $hoy = in_array($seccion, [4, 6, 8, 10], true) ? now('America/Lima')->startOfDay() : today();
@@ -42,7 +49,7 @@ final class RevisionDocumento
                 ->lockForUpdate()->findOrFail($documento);
             abort_if(($doc->tipoDocumento->es_dato_sensible || $doc->tipoDocumento->es_dato_salud) && ! $request->user()->veDatosSensibles(), 403, 'Tu perfil no tiene acceso a este documento sensible.');
             abort_unless($doc->legajo->estado_legajo === 'activo', 409, 'El legajo está cerrado y no admite revisiones.');
-            abort_if($doc->created_by === $request->user()->getAuthIdentifier(), 403, 'La revisión debe hacerla otra persona de RR. HH. No puedes revisar tu propia carga.');
+            abort_unless(self::permiteRevisarCarga($request, $doc), 403, 'La revisión debe hacerla otra persona de RR. HH. No puedes revisar tu propia carga.');
             abort_if($doc->documentosUsuarioPorSubsanaADocumento()->exists() || $doc->estado === 'anulado', 409, 'El documento fue subsanado o anulado. Revisa el documento vigente.');
             abort_if($doc->estado !== $datos['estado_anterior'] || $doc->estado === $datos['estado'], 409, 'El documento cambió desde que lo abriste. Actualiza la lista antes de revisarlo.');
             $antes = $doc->getAttributes();
@@ -73,14 +80,11 @@ final class RevisionDocumento
                     throw ValidationException::withMessages(['estado' => 'El archivo PDF no está disponible. Registra una subsanación.']);
                 }
                 AlmacenDocumento::leer($doc->archivo);
-                if ($doc->tipoDocumento->requiere_fedateo && ! $doc->fedateado && ! ($datos['fedateado'] ?? false)) {
-                    throw ValidationException::withMessages(['fedateado' => 'Este documento requiere fedateo. Confirma el fedateo antes de aceptarlo.']);
+                if ($doc->tipoDocumento->requiere_fedateo || $doc->fedateado || ($datos['fedateado'] ?? false)) {
+                    GestionFedateo::validarRegistro($request, $doc);
                 }
                 if (! $doc->fecha_recepcion) {
                     $cambios += ['fecha_recepcion' => $hoy, 'recepcionado_por' => $request->user()->getAuthIdentifier()];
-                }
-                if (($datos['fedateado'] ?? false) && ! $doc->fedateado) {
-                    $cambios += ['fedateado' => true, 'fecha_fedateo' => $hoy, 'fedatario_id' => $request->user()->getAuthIdentifier()];
                 }
                 abort_if($doc->observacionesDocumentoPorDocumento()->where('estado', 'abierta')->exists(), 409, 'Tiene una observación abierta. Registra un documento nuevo que la subsane antes de aceptarlo.');
             } elseif ($datos['estado'] === 'observado') {
