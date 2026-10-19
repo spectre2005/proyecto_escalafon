@@ -2,85 +2,266 @@
 
 Aplicación para gestionar expedientes del personal docente y administrativo: datos personales, trayectoria laboral, documentos organizados por las secciones del legajo y evaluaciones. Incluye acceso por roles, configuración institucional, registros de auditoría y un panel de plataforma para atender varias instituciones, cada una con su propia base de datos.
 
-Esta guía es el punto de entrada para instalar el proyecto y continuar su desarrollo. Todos los comandos se ejecutan **desde la raíz del repositorio**, donde están `docker-compose.yml` e `iniciar.ps1`, salvo que se indique otra ubicación.
+Esta guía explica la **instalación local para desarrollo**, primero en Windows y después en Linux. Sigue únicamente la sección de tu sistema operativo, en el orden indicado. Al terminar, consulta las cuentas de acceso de la sección 4.
 
-## Elegir cómo instalar
+Los comandos se ejecutan desde la raíz del repositorio, donde están `docker-compose.yml` e `iniciar.ps1`, salvo que se indique otra ubicación. PHP, Composer, Node, pnpm y PostgreSQL se ejecutan en contenedores; no necesitas instalarlos por separado.
 
-| Tu equipo | Ruta de instalación |
+## 1. Instalación en Windows
+
+Usa **PowerShell** para todos los pasos de esta sección. Si trabajas desde una terminal de Ubuntu en WSL, sigue los comandos de Linux de la sección 2.
+
+### Paso 1. Instalar las herramientas
+
+1. Instala Git para Windows.
+2. Instala Docker Desktop, habilita WSL2 y selecciona contenedores Linux. Completa los reinicios que solicite el instalador.
+3. Abre Docker Desktop y espera a que el motor esté listo.
+4. Abre una nueva ventana de PowerShell y comprueba:
+
+   ```powershell
+   git --version
+   docker --version
+   docker compose version
+   docker info
+   ```
+
+Continúa cuando los cuatro comandos funcionen. Necesitas conexión a Internet durante la primera instalación y los puertos **5173**, **8000** y **5433** disponibles.
+
+### Paso 2. Descargar el proyecto
+
+En PowerShell, entra en la carpeta donde guardarás el proyecto y ejecuta:
+
+```powershell
+git clone https://github.com/spectre2005/proyecto_escalafon.git
+cd proyecto_escalafon
+```
+
+Si ya tienes el repositorio, entra en su carpeta; no vuelvas a clonarlo encima.
+
+### Paso 3. Preparar la configuración
+
+Crea los archivos que falten:
+
+```powershell
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
+if (!(Test-Path backend/.env)) { Copy-Item backend/.env.example backend/.env }
+```
+
+Para una instalación nueva, conserva los valores de las plantillas. En el `.env` de la raíz deben aparecer:
+
+```dotenv
+DOCKER_UID=1000
+DOCKER_GID=1000
+DB_DATABASE=escalafon
+DB_USERNAME=app
+DB_PASSWORD=secret
+```
+
+En `backend/.env`, comprueba la conexión:
+
+```dotenv
+DB_CONNECTION=pgsql
+DB_HOST=db
+DB_PORT=5432
+DB_DATABASE=escalafon
+DB_USERNAME=app
+DB_PASSWORD=secret
+```
+
+Conserva también las variables de cuentas demo, sesiones y plataforma de la plantilla. **No sobrescribas los `.env` ni cambies `APP_KEY` de una instalación existente.** La sección 3 explica cada archivo.
+
+### Paso 4. Instalar e iniciar el sistema
+
+Desde la raíz del proyecto:
+
+```powershell
+.\iniciar.ps1
+```
+
+El script construye e inicia los servicios, instala las dependencias del backend, genera la clave si falta, aplica las migraciones, crea la base de plataforma y carga los catálogos, instituciones y cuentas de demostración. Finalmente inicia el frontend. La primera ejecución puede tardar varios minutos.
+
+Si el script termina con un error, resuélvelo antes de continuar; consulta las soluciones de esta sección. No borres la base de datos para reintentarlo.
+
+### Paso 5. Comprobar el arranque y entrar
+
+```powershell
+docker compose ps
+docker compose logs --tail=50 frontend
+docker compose exec app php artisan migrate:status --no-interaction
+```
+
+Comprueba que `db` y `app` estén saludables, que `nginx` y `frontend` estén en ejecución y que no queden migraciones pendientes. `frontend_dependencies` puede aparecer detenido con código 0: es una tarea de preparación que ya terminó.
+
+Espera el mensaje `VITE ... ready` en los logs. Abre **http://uniq.localhost:5173** para la institución o **http://localhost:5173/plataforma/login** para el panel. Las cuentas están en la sección 4. Puedes cerrar PowerShell: los servicios siguen en segundo plano.
+
+### Problemas durante la instalación en Windows
+
+| Problema | Solución |
 | --- | --- |
-| Windows/macOS con Docker Desktop | Requisitos y primera instalación de las secciones 1 a 3. |
-| Linux sin Docker Desktop | Docker Engine y el plugin Compose; se usan los mismos comandos de las secciones 2 y 3. |
-| Equipo sin ningún Docker | Instalación nativa de la sección «Sin Docker»; necesitas instalar PHP, Composer, Node y PostgreSQL. |
+| `git` o `docker` «no se reconoce» | Comprueba que instalaste la herramienta y abre una nueva ventana de PowerShell. |
+| Docker informa que falta WSL2 o virtualización | Completa los requisitos que indica Docker Desktop, habilita la virtualización y reinicia cuando corresponda. Usa contenedores Linux. |
+| `Cannot connect to the Docker daemon` | Abre Docker Desktop, espera a que esté listo y repite `docker info`. |
+| PowerShell bloquea `iniciar.ps1` | Desde la raíz del proyecto, ejecuta `powershell -ExecutionPolicy Bypass -File .\iniciar.ps1`; el permiso se aplica solo a ese proceso. |
+| `iniciar.ps1` no se encuentra | Comprueba que estás en la carpeta del repositorio y usa `.\iniciar.ps1`, incluido el prefijo `.\`. |
+| Error de descarga de imágenes o paquetes | Revisa conexión, DNS o proxy. Corrige el problema y vuelve a ejecutar el script. |
+| Puerto ocupado, página vacía, error 419 o conexión a la base | Consulta la sección 9 para los comandos de diagnóstico y la solución correspondiente. |
 
-## 1. Requisitos
+Para revisar un fallo del script:
 
-- Git.
-- Docker Engine con Docker Compose v2 en Linux, o Docker Desktop en Windows/macOS. En Windows, habilitar el motor WSL2 y los contenedores Linux.
-- Conexión a Internet para descargar imágenes y dependencias durante la primera instalación.
-- Puertos locales disponibles: **5173**, **8000** y **5433**.
-- En Windows, PowerShell para utilizar `iniciar.ps1`.
-- Un navegador que abra subdominios de `localhost` sin configuración (Chrome, Edge o Firefox): cada institución se abre en `{nombre}.localhost:5173`.
+```powershell
+docker compose ps -a
+docker compose logs --tail=100 app db nginx frontend
+```
 
-En la instalación con Docker, PHP, Composer, Node y pnpm se ejecutan dentro de los contenedores; no hace falta instalarlos en tu computadora.
+## 2. Instalación en Linux
 
-| Componente | Versión del proyecto | Ubicación |
-| --- | --- | --- |
-| Backend | Laravel 12; `composer.lock` registra 12.69.2 | `backend/` |
-| PHP | 8.4 en la imagen Docker | `docker/php/Dockerfile` |
-| Composer | 2 | Imagen del backend |
-| Frontend | React 19, Vite 8, Tailwind CSS 4 | `frontend/package.json` |
-| Node | 22 | `docker/node/Dockerfile` |
-| Base de datos | PostgreSQL 16 | `docker-compose.yml` |
-| Dependencias frontend | pnpm | `frontend/pnpm-lock.yaml` |
+Usa una terminal Bash. En WSL, ejecuta estos pasos dentro de tu distribución Linux y guarda el proyecto en tu carpeta personal, por ejemplo `~/proyecto/`.
 
-La imagen instala pnpm globalmente sin fijar su versión. Los archivos de bloqueo de Composer y pnpm forman parte del repositorio y deben conservarse.
+### Paso 1. Instalar y comprobar las herramientas
 
-Comprueba Docker antes de comenzar:
+Instala Git con el gestor de paquetes de tu distribución. Instala [Docker Engine](https://docs.docker.com/engine/install/) y el [plugin Docker Compose](https://docs.docker.com/compose/install/linux/) siguiendo las instrucciones oficiales para tu distribución.
+
+En una distribución con systemd, comprueba e inicia el servicio:
 
 ```sh
+sudo systemctl status docker
+# Ejecuta lo siguiente si el servicio está detenido:
+sudo systemctl start docker
+```
+
+Si trabajas en WSL con el motor de Windows, activa la integración de tu distribución en Docker Desktop y comprueba la conexión desde esa terminal.
+
+```sh
+git --version
 docker --version
 docker compose version
 docker info
 ```
 
-### Si no tienes Docker Desktop
+Continúa cuando funcionen los cuatro comandos. Necesitas conexión a Internet durante la primera instalación y los puertos **5173**, **8000** y **5433** disponibles.
 
-**Linux no necesita Docker Desktop.** Instala [Docker Engine para tu distribución](https://docs.docker.com/engine/install/) y el [plugin Docker Compose](https://docs.docker.com/compose/install/linux/). Usa `docker compose` (con espacio), como en esta guía. En Windows/macOS, Docker Desktop proporciona el motor y Compose; tener solo el comando `docker` no significa que el motor esté funcionando.
-
-En Linux con systemd, comprueba el servicio:
-
-```sh
-sudo systemctl status docker
-# Si está detenido:
-sudo systemctl start docker
-```
-
-Si `docker info` indica `permission denied` sobre `docker.sock`, revisa la [configuración oficial de permisos](https://docs.docker.com/engine/install/linux-postinstall/). El grupo `docker` concede privilegios equivalentes a root; usa esa opción solo en equipos donde corresponda. Tras cambiar grupos, cierra y vuelve a abrir la sesión. No cambies los permisos del socket a `777`.
-
-Si aparece `Cannot connect to the Docker daemon`, abre Docker Desktop y espera a que termine de iniciar, o inicia el servicio Docker Engine. Revisa `docker context ls` si tienes varios motores configurados. Continúa solo cuando `docker info` y `docker compose version` funcionen.
-
-## 2. Descargar y configurar
+### Paso 2. Descargar el proyecto
 
 ```sh
 git clone https://github.com/spectre2005/proyecto_escalafon.git
 cd proyecto_escalafon
 ```
 
-Crea los archivos de configuración solo si todavía no existen. **No sobrescribas los `.env` de una instalación que ya funciona.**
+Si ya tienes el repositorio, entra en su carpeta. Mantén esa ubicación durante los siguientes pasos.
 
-Linux/macOS:
+### Paso 3. Preparar los archivos y permisos
 
 ```sh
 test -f .env || cp .env.example .env
 test -f backend/.env || cp backend/.env.example backend/.env
+id -u
+id -g
 ```
 
-PowerShell:
+Edita el `.env` de la raíz y coloca el resultado de `id -u` en `DOCKER_UID` y el de `id -g` en `DOCKER_GID`. Por ejemplo, **solo si ambos resultados son 1000**:
 
-```powershell
-if (!(Test-Path .env)) { Copy-Item .env.example .env }
-if (!(Test-Path backend/.env)) { Copy-Item backend/.env.example backend/.env }
+```dotenv
+DOCKER_UID=1000
+DOCKER_GID=1000
+DB_DATABASE=escalafon
+DB_USERNAME=app
+DB_PASSWORD=secret
 ```
+
+En `backend/.env`, comprueba:
+
+```dotenv
+DB_CONNECTION=pgsql
+DB_HOST=db
+DB_PORT=5432
+DB_DATABASE=escalafon
+DB_USERNAME=app
+DB_PASSWORD=secret
+```
+
+Conserva las variables de cuentas demo, sesiones y plataforma de la plantilla. Las credenciales de base de datos deben coincidir en ambos archivos. **No sobrescribas los `.env` ni cambies `APP_KEY` de una instalación existente.**
+
+### Paso 4. Iniciar la base de datos y el backend
+
+```sh
+docker compose up -d --build --wait db app nginx
+```
+
+Este comando espera a que PostgreSQL y PHP estén preparados. La primera ejecución descarga imágenes e instala dependencias y puede tardar varios minutos.
+
+Después, confirma las dependencias y limpia la configuración:
+
+```sh
+docker compose exec -e COMPOSER_HOME=/tmp/composer app composer install --no-interaction --prefer-dist
+docker compose exec app php artisan config:clear --no-interaction
+```
+
+Si aparece un error de permisos en `vendor`, aplica la solución de permisos indicada al final de esta sección y repite el paso.
+
+### Paso 5. Preparar la clave y las bases de datos
+
+**Solo en una instalación nueva con `APP_KEY` vacía** en `backend/.env`, ejecuta:
+
+```sh
+docker compose exec app php artisan key:generate --no-interaction
+```
+
+No regeneres la clave de una instalación existente: afecta las sesiones y los datos cifrados.
+
+Ejecuta los siguientes comandos **en este orden**, deteniéndote si alguno falla:
+
+```sh
+docker compose exec app php artisan migrate --no-interaction
+docker compose exec app php artisan plataforma:migrar-instituciones --crear-base --no-interaction
+docker compose exec app php artisan db:seed --no-interaction
+```
+
+Primero se prepara la base institucional, después la de plataforma y finalmente los catálogos y cuentas demo. El seeder crea también las instituciones `uno` y `dos` con sus propias bases.
+
+### Paso 6. Iniciar el frontend y entrar
+
+```sh
+docker compose up -d --build frontend
+docker compose ps
+docker compose logs --tail=50 frontend
+docker compose exec app php artisan migrate:status --no-interaction
+```
+
+Comprueba que `db` y `app` estén saludables, `nginx` y `frontend` estén en ejecución y no queden migraciones pendientes. `frontend_dependencies` termina con código 0 después de preparar los permisos: es lo esperado.
+
+Espera el mensaje `VITE ... ready` y abre **http://uniq.localhost:5173** o **http://localhost:5173/plataforma/login**. Las cuentas están en la sección 4. Los servicios siguen en segundo plano al cerrar la terminal.
+
+### Problemas durante la instalación en Linux
+
+| Problema | Solución |
+| --- | --- |
+| `docker: command not found` | Revisa la instalación de Docker Engine y abre una nueva terminal. |
+| `docker: 'compose' is not a docker command` | Instala el plugin Compose del paso 1. Los comandos usan `docker compose`, con espacio. |
+| `Cannot connect to the Docker daemon` | Comprueba el servicio con `systemctl`; en WSL revisa la integración con el motor de Windows. Usa `docker context ls` si configuraste varios motores. |
+| `permission denied` sobre `docker.sock` | Sigue la [configuración oficial de permisos](https://docs.docker.com/engine/install/linux-postinstall/). Tras cambiar los grupos, cierra y vuelve a abrir sesión. El grupo `docker` concede privilegios equivalentes a root; no cambies el socket a `777`. |
+| Error al descargar imágenes o paquetes | Comprueba conexión, DNS o proxy y repite el paso que falló. |
+| Puerto ocupado, página vacía, error 419 o conexión a la base | Consulta las soluciones de la sección 9. |
+
+#### Permisos en `storage`, `bootstrap/cache` o `vendor`
+
+Usa los UID/GID de tu `.env` de la raíz; el siguiente ejemplo supone 1000:1000:
+
+```sh
+docker compose run --rm --no-deps --user 0:0 --entrypoint sh app -c 'chown -R 1000:1000 storage bootstrap/cache vendor'
+docker compose up -d app nginx
+```
+
+#### La terminal está dentro de Flatpak
+
+Abre una terminal del sistema o antepone `flatpak-spawn --host` a los comandos de Docker. Especifica la ruta real del proyecto para que Compose encuentre la instalación correcta:
+
+```sh
+flatpak-spawn --host docker compose --project-directory /ruta/real/proyecto_escalafon ps
+flatpak-spawn --host docker compose --project-directory /ruta/real/proyecto_escalafon logs --tail=100 frontend
+```
+
+Sustituye `/ruta/real/proyecto_escalafon` por tu carpeta. Una terminal normal no necesita ese prefijo.
+
+## 3. Referencia de configuración
 
 ### Los dos archivos `.env`
 
@@ -122,158 +303,13 @@ Configura también:
 | `SESSION_DRIVER=file`, `CACHE_STORE=file` | Sesiones y caché en archivos; Compose también impone estos valores al servicio `app` |
 | `MAIL_MAILER=log` | Escribe correos en el log; no envía correo real |
 
-`backend/.env.example` trae **cuentas de demostración con una contraseña compartida y pública** (ver [Cuentas e instituciones de demostración](#cuentas-e-instituciones-de-demostración)), para que todos los equipos que clonan el proyecto entren igual. Los seeders solo las crean con `APP_ENV=local` o `testing`. Si dejas esas variables vacías, el seeder muestra una advertencia y no crea la cuenta.
+`backend/.env.example` trae **cuentas de demostración con una contraseña compartida y pública** (ver [Cuentas e instituciones de demostración](#4-direcciones-y-cuentas-de-acceso)), para que todos los equipos que clonan el proyecto entren igual. Los seeders solo las crean con `APP_ENV=local` o `testing`. Si dejas esas variables vacías, el seeder muestra una advertencia y no crea la cuenta.
 
 > **Producción:** nunca copies `backend/.env.example` a producción. Allí no hay cuentas ni contraseñas predeterminadas: se parte de `.env.produccion.example`, el primer superadministrador se crea con `php artisan plataforma:crear-administrador` y cada institución se aprovisiona desde el panel con una contraseña temporal. `php artisan produccion:verificar` (lo ejecuta el contenedor de producción antes de arrancar) rechaza la configuración si `ADMIN_*`, `PLATAFORMA_ADMIN_*` o `PLATAFORMA_PRUEBA_*` tienen valor. Ver [docs/PRODUCCION.md](docs/PRODUCCION.md).
 
 El frontend utiliza `/api/v1` y el proxy de Vite de forma predeterminada. No necesita un `.env` propio para esta instalación. `VITE_API_URL` permite cambiar la URL, pero una configuración externa requiere revisar cookies, dominios y acceso al backend.
 
-### Usuario de Docker en Linux
-
-Ejecuta `id -u` e `id -g` y coloca sus resultados en el `.env` de la raíz:
-
-```dotenv
-DOCKER_UID=1000
-DOCKER_GID=1000
-```
-
-Los números anteriores son ejemplos: usa los de tu usuario. Esto permite que los contenedores escriban en las carpetas montadas. La imagen PHP prepara `vendor` para el usuario 1000; si usas otro UID, consulta la solución de permisos más abajo.
-
-## 3. Primera instalación
-
-### Opción A: Windows con el script
-
-Con Docker Desktop encendido y las variables ya revisadas:
-
-```powershell
-.\iniciar.ps1
-```
-
-Si PowerShell bloquea el script, puedes permitirlo solo para esa ejecución:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\iniciar.ps1
-```
-
-El script crea los `.env` faltantes, construye e inicia `db`, `app` y `nginx`, instala Composer, limpia la configuración, genera `APP_KEY` si falta, aplica migraciones, crea y migra la base de la plataforma si falta, ejecuta `DatabaseSeeder` (catálogos, cuentas e instituciones de demostración) y recrea el frontend. Se puede volver a ejecutar: no duplica datos ni toca las instituciones que ya existen.
-
-### Opción B: instalación manual en Linux/macOS o Windows
-
-1. Construye e inicia primero la base de datos y el backend:
-
-   ```sh
-   docker compose up -d --build --wait db app nginx
-   ```
-
-2. Confirma las dependencias del backend y limpia la configuración:
-
-   ```sh
-   docker compose exec -e COMPOSER_HOME=/tmp/composer app composer install --no-interaction --prefer-dist
-   docker compose exec app php artisan config:clear --no-interaction
-   ```
-
-3. **Solo si `APP_KEY` está vacía**, genera la clave:
-
-   ```sh
-   docker compose exec app php artisan key:generate --no-interaction
-   ```
-
-   No vuelvas a generar la clave al actualizar una instalación: afecta sesiones y datos cifrados.
-
-4. Aplica las migraciones, crea y migra la base de la plataforma, y carga los datos iniciales. **En este orden**: los seeders necesitan la base de la plataforma.
-
-   ```sh
-   docker compose exec app php artisan migrate --no-interaction
-   docker compose exec app php artisan plataforma:migrar-instituciones --crear-base --no-interaction
-   docker compose exec app php artisan db:seed --no-interaction
-   ```
-
-   `--crear-base` solo crea la base de la plataforma si no existe; nunca borra ni reinicia bases. `db:seed` aprovisiona además las bases `escalafon_uno` y `escalafon_dos`; si ya existen sin estar registradas, no las toca y muestra un aviso.
-
-5. Inicia el frontend:
-
-   ```sh
-   docker compose up -d --build frontend
-   ```
-
-6. Revisa el arranque:
-
-   ```sh
-   docker compose ps
-   docker compose logs --tail=50 frontend
-   docker compose exec app php artisan migrate:status --no-interaction
-   ```
-
-El frontend instala sus dependencias antes de iniciar Vite. Espera el mensaje `VITE ... ready` y entra con las cuentas de la sección siguiente.
-
-| Servicio | Dirección o función |
-| --- | --- |
-| Instituciones | http://uniq.localhost:5173, http://uno.localhost:5173, http://dos.localhost:5173 |
-| Panel de plataforma | http://localhost:5173/plataforma/login |
-| Backend por Nginx | http://localhost:8000 |
-| API | `/api/v1` en el subdominio de cada institución; requiere sesión y permisos según la ruta |
-| PostgreSQL desde tu computadora | `localhost:5433` |
-
-`http://localhost:5173` sin subdominio responde "No existe una institución activa en esta dirección": es lo esperado, porque cada institución tiene su propia dirección.
-
-### Sin Docker: instalación nativa
-
-Esta alternativa requiere administrar los servicios en tu equipo. El procedimiento está basado en la configuración del repositorio; consulta el alcance de las pruebas al final de la sección 7. No ejecutes `iniciar.ps1` en esta modalidad.
-
-1. Instala Git, **PHP 8.4**, Composer 2, **Node 22.13 o posterior dentro de la rama 22**, pnpm y **PostgreSQL 16**. Habilita en PHP las extensiones de Laravel y PHPUnit (`ctype`, `dom`, `fileinfo`, `filter`, `iconv`, `mbstring`, `openssl`, `pdo`, `session`, `tokenizer`, `xml`, `xmlwriter`), además de `pdo_pgsql`, `pgsql`, `zip`, `gd` y `bcmath`; para las pruebas también `pdo_sqlite`. Comprueba qué PHP usa la terminal con `php --ini` y `php -m`. Instala pnpm con `npm install -g pnpm`.
-2. Descarga el repositorio y copia **solo los archivos que falten**, como en la sección 2. El `.env` de la raíz solo lo utiliza Compose; la instalación nativa usa `backend/.env`.
-3. Inicia PostgreSQL. En una base local nueva, conéctate como administrador mediante `psql -U postgres -d postgres` (en Linux puede ser `sudo -u postgres psql`) y ejecuta:
-
-   ```sql
-   CREATE ROLE app WITH LOGIN PASSWORD 'secret' CREATEDB;
-   CREATE DATABASE escalafon OWNER app;
-   ```
-
-   Son credenciales locales de ejemplo. Si el usuario o la base ya existen, revisa su configuración en lugar de repetir estas sentencias. `CREATEDB` permite crear la base de plataforma y las instituciones demo; no se necesita `SUPERUSER`.
-
-4. En `backend/.env`, cambia la conexión a tu PostgreSQL local:
-
-   ```dotenv
-   DB_CONNECTION=pgsql
-   DB_HOST=127.0.0.1
-   DB_PORT=5432
-   DB_DATABASE=escalafon
-   DB_USERNAME=app
-   DB_PASSWORD=secret
-   PLATAFORMA_DB_DATABASE=escalafon_plataforma
-   ```
-
-   Si definiste `PLATAFORMA_DB_HOST`, `PLATAFORMA_DB_PORT`, `PLATAFORMA_DB_USERNAME` o `PLATAFORMA_DB_PASSWORD`, ajústalos también; si quedan comentados heredan `DB_*`. Conserva las variables de sesión, subdominios y cuentas demo de la plantilla. El puerto nativo suele ser **5432**, mientras que **5433** corresponde al puerto publicado por Compose.
-
-5. Desde `backend/`, instala y prepara Laravel en este orden:
-
-   ```sh
-   composer install --no-interaction --prefer-dist
-   composer check-platform-reqs
-   php artisan config:clear --no-interaction
-   # Solo en una instalación nueva con APP_KEY vacía:
-   php artisan key:generate --no-interaction
-   php artisan migrate --no-interaction
-   php artisan plataforma:migrar-instituciones --crear-base --no-interaction
-   php artisan db:seed --no-interaction
-   php artisan serve --host=127.0.0.1 --port=8000
-   ```
-
-   Mantén esa terminal abierta. No uses `composer run setup`: el frontend de este proyecto está en `frontend/`, separado de los assets del esqueleto Laravel.
-
-6. Para que Vite encuentre el backend nativo, en `frontend/vite.config.js` cambia **ambos** `target: 'http://nginx'` por `target: 'http://127.0.0.1:8000'`, en `/api` y `/sanctum`. Conserva `changeOrigin: false`: el subdominio identifica a la institución. Es un ajuste local; restáuralo a `http://nginx` antes de volver a ejecutar el frontend dentro de Docker.
-7. En otra terminal, desde `frontend/`:
-
-   ```sh
-   pnpm install --frozen-lockfile
-   pnpm dev --host 127.0.0.1 --port 5173 --strictPort
-   ```
-
-   Abre las mismas direcciones y cuentas de la tabla siguiente. No hace falta definir `VITE_API_URL`: el proxy mantiene la API en el mismo origen y permite las cookies de sesión.
-
-Para detener esta instalación, usa `Ctrl+C` en cada terminal. Para iniciarla otra vez basta con PostgreSQL activo, `php artisan serve` en `backend/` y `pnpm dev` en `frontend/`. Las pruebas nativas se ejecutan con `php artisan test --compact` en `backend/` y `pnpm test`, `pnpm lint`, `pnpm build` en `frontend/`.
-
-### Cuentas e instituciones de demostración
+## 4. Direcciones y cuentas de acceso
 
 `db:seed` crea las mismas cuentas en todos los equipos, con los valores de `backend/.env.example`. **Son ficticias y su contraseña es pública: solo sirven en local.**
 
@@ -290,10 +326,40 @@ Cada institución usa su propia base: la cuenta de una no existe en las otras. D
 
 Los datos de demostración no incluyen documentos ni fotos: los legajos, PDF y fotos que cargue cada persona quedan solo en su computadora.
 
-**Si ya tenías el proyecto instalado**, copia de `backend/.env.example` a tu `backend/.env` las líneas `ADMIN_*`, `PLATAFORMA_ADMIN_*`, `PLATAFORMA_PRUEBA_*`, `PLATAFORMA_MODO`, `PLATAFORMA_DOMINIO` y `SANCTUM_STATEFUL_DOMAINS`, y vuelve a ejecutar los pasos 4 y 5 (o `iniciar.ps1`). Ten en cuenta:
+**Si ya tenías el proyecto instalado**, copia de `backend/.env.example` a tu `backend/.env` las líneas `ADMIN_*`, `PLATAFORMA_ADMIN_*`, `PLATAFORMA_PRUEBA_*`, `PLATAFORMA_MODO`, `PLATAFORMA_DOMINIO` y `SANCTUM_STATEFUL_DOMAINS`, y vuelve a ejecutar `iniciar.ps1` en Windows o los pasos 5 y 6 de la instalación en Linux. Ten en cuenta:
 
 - Las instituciones que ya tengas registradas en tu panel no se tocan, aunque usen el mismo subdominio.
 - `AdministradorSeeder` usa el correo de `ADMIN_EMAIL`: si tu base ya tenía el administrador del sistema con otro correo, lo cambia a `admin.uniq@demo.test` con la contraseña de demostración. Tus legajos no cambian.
+
+## 5. Trabajo diario y actualizaciones
+
+```sh
+# Iniciar los servicios
+docker compose up -d
+
+# Ver su estado y los últimos mensajes
+docker compose ps
+docker compose logs --tail=100 frontend app nginx
+
+# Detenerlos conservando los volúmenes
+docker compose down
+```
+
+Después de incorporar cambios del equipo, revisa las modificaciones de los `.env.example` y agrega las variables nuevas a tus archivos locales. Luego:
+
+```sh
+docker compose up -d --build --wait db app nginx
+docker compose exec -e COMPOSER_HOME=/tmp/composer app composer install --no-interaction --prefer-dist
+docker compose exec app php artisan config:clear --no-interaction
+docker compose exec app php artisan migrate --no-interaction
+docker compose exec app php artisan plataforma:migrar-instituciones --no-interaction
+docker compose exec app php artisan optimize:clear --no-interaction
+docker compose up -d --build --force-recreate frontend
+```
+
+El arranque del frontend ejecuta `pnpm install`. Usa `composer install` para respetar el archivo de bloqueo; `composer update` y `pnpm update` son cambios de dependencias que deben revisarse con el equipo.
+
+**Cada computadora tiene su propia base de datos y sus propios archivos.** Hacer `git pull` no descarga los registros, documentos ni fotos de otra instalación.
 
 ### Migraciones y seeders
 
@@ -320,84 +386,11 @@ Para ejecutar una clase específica:
 docker compose exec app php artisan db:seed --class=AdministradorSeeder --no-interaction
 ```
 
-Cambiar `ADMIN_PASSWORD` y repetir el seeder **no restablece automáticamente la contraseña de un administrador existente con el mismo correo**. El seeder está pensado para crear el administrador inicial.
+Cambiar `ADMIN_PASSWORD` o `PLATAFORMA_ADMIN_PASSWORD` y repetir el seeder **no restablece automáticamente la contraseña de una cuenta existente con el mismo correo**. Las plantillas `.env.example` tampoco modifican por sí solas los archivos `.env` locales.
 
 No todos los archivos de `database/seeders/` se ejecutan con `db:seed`: la lista está en `DatabaseSeeder.php`. Algunos son ejemplos o crean datos con factories; revisa su contenido antes de ejecutarlos individualmente. Las personas demo no reemplazan a la cuenta administradora.
 
-### Si no puedes entrar como administrador o superadministrador (local)
-
-El archivo `backend/.env.example` es una plantilla: sus valores no se aplican automáticamente a una instalación existente. Agrega o actualiza las siguientes variables en **`backend/.env`**, conservando el resto de tu configuración y sin duplicar claves:
-
-```dotenv
-APP_ENV=local
-ADMIN_EMAIL=admin.uniq@demo.test
-ADMIN_PASSWORD=Demo-Escalafon-2026
-PLATAFORMA_ADMIN_EMAIL=superadmin@demo.test
-PLATAFORMA_ADMIN_PASSWORD=Demo-Escalafon-2026
-PLATAFORMA_PRUEBA_SLUG=uniq
-PLATAFORMA_PRUEBA_NOMBRE="Universidad Nacional Intercultural de Quillabamba"
-PLATAFORMA_DB_DATABASE=escalafon_plataforma
-PLATAFORMA_MODO=subdominio
-PLATAFORMA_DOMINIO=localhost
-SANCTUM_STATEFUL_DOMAINS=localhost:5173,127.0.0.1:5173,localhost:8000,*.localhost:5173
-SESSION_SECURE_COOKIE=false
-```
-
-Estas cuentas y contraseñas son públicas y sirven únicamente para desarrollo local. Los seeders de cuentas de prueba solo se ejecutan en `local` o `testing`.
-
-Si aparece `database "escalafon_plataforma" does not exist`, falta crear la base de plataforma. Desde la **raíz del proyecto**, ejecuta los siguientes comandos en orden para preparar las bases y cargar las cuentas de prueba; detente si alguno falla:
-
-```sh
-docker compose up -d db app nginx frontend
-docker compose exec app php artisan config:clear --no-interaction
-docker compose exec app php artisan migrate --no-interaction
-docker compose exec app php artisan plataforma:migrar-instituciones --crear-base --no-interaction
-docker compose exec app php artisan db:seed --no-interaction
-```
-
-`--crear-base` crea la base de plataforma si falta, sin borrar bases existentes. `db:seed` carga también catálogos, personas e instituciones de demostración; si encuentra al administrador inicial con otro correo, puede actualizar su correo y contraseña a los configurados arriba.
-
-Después, entra por la dirección correspondiente:
-
-| Acceso | Dirección | Correo | Contraseña local |
-| --- | --- | --- | --- |
-| Administrador UNIQ | http://uniq.localhost:5173 | `admin.uniq@demo.test` | `Demo-Escalafon-2026` |
-| Superadministrador | http://localhost:5173/plataforma/login | `superadmin@demo.test` | `Demo-Escalafon-2026` |
-
-El acceso institucional necesita el subdominio `uniq`; el panel de plataforma se abre en `localhost`, sin subdominio. Si sigue apareciendo «credenciales incorrectas», ten en cuenta que **ninguno de los dos seeders restablece la contraseña de una cuenta existente con el mismo correo**. Cambiar las variables de contraseña del `.env` no cambia por sí solo la contraseña guardada en la base.
-
-No subas `.env` ni sus copias de respaldo al repositorio. Comparte la configuración mediante `.env.example`; cada integrante debe actualizar su `.env` local y ejecutar los comandos en su propia instalación.
-
-## 4. Trabajo diario y actualizaciones
-
-```sh
-# Iniciar los servicios
-docker compose up -d
-
-# Ver su estado y los últimos mensajes
-docker compose ps
-docker compose logs --tail=100 frontend app nginx
-
-# Detenerlos conservando los volúmenes
-docker compose down
-```
-
-Después de incorporar cambios del equipo, revisa las modificaciones de los `.env.example` y agrega las variables nuevas a tus archivos locales. Luego:
-
-```sh
-docker compose up -d --build db app nginx
-docker compose exec -e COMPOSER_HOME=/tmp/composer app composer install --no-interaction --prefer-dist
-docker compose exec app php artisan migrate --no-interaction
-docker compose exec app php artisan plataforma:migrar-instituciones --no-interaction
-docker compose exec app php artisan optimize:clear --no-interaction
-docker compose up -d --build --force-recreate frontend
-```
-
-El arranque del frontend ejecuta `pnpm install`. Usa `composer install` para respetar el archivo de bloqueo; `composer update` y `pnpm update` son cambios de dependencias que deben revisarse con el equipo.
-
-**Cada computadora tiene su propia base de datos y sus propios archivos.** Hacer `git pull` no descarga los registros, documentos ni fotos de otra instalación.
-
-## 5. Estructura del proyecto
+## 6. Estructura del proyecto
 
 ```text
 proyecto_escalafon/
@@ -433,7 +426,7 @@ proyecto_escalafon/
     └── pnpm-lock.yaml        Versiones resueltas de las dependencias.
 ```
 
-## 6. Arquitectura general
+## 7. Arquitectura general
 
 ```mermaid
 flowchart LR
@@ -447,7 +440,7 @@ flowchart LR
 
 React consume la API mediante Axios; Vite reenvía `/api` y `/sanctum` al servicio `nginx` conservando el subdominio. En cada petición, `ResolverInstitucion` busca la institución del subdominio en la base de la plataforma y atiende la petición con su base, su almacenamiento y sus sesiones; si está suspendida o vencida responde 403, y si no existe o no está activa, 404. El panel (`/api/plataforma`) solo responde en el dominio sin subdominio y tiene su propia sesión. Laravel autentica mediante cookies de sesión con Sanctum y valida roles, permisos y acceso a secciones. Documentos y fotos se guardan en almacenamiento privado y se entregan mediante endpoints que comprueban acceso.
 
-## 7. Cómo continuar el desarrollo
+## 8. Cómo continuar el desarrollo
 
 - Backend: empieza por `backend/routes/api.php`, sigue el controlador en `app/Http/Controllers/Api/V1` y revisa modelos, validaciones, permisos y pruebas relacionadas.
 - Frontend: busca el módulo en `frontend/src/features`; reutiliza componentes y utilidades existentes.
@@ -500,29 +493,11 @@ Verificación realizada el **19 de octubre de 2026**, en Linux con Docker Engine
 | Frontend (`pnpm lint` y `pnpm build`) | Correctos; Vite advierte de chunks mayores de 500 kB, sin impedir la compilación. |
 | HTTP de la instalación activa | Página HTML: 200; API institucional y de plataforma sin sesión: 401; CSRF de plataforma: 200; CSRF de Sanctum: 204, ambos con cookies. |
 
-La prueba sobre PostgreSQL vacío reutilizó el contenedor PHP y las dependencias instaladas, con conexión y almacenamiento temporal separados de la instalación de trabajo; no fue una instalación completa desde un clon limpio. El PostgreSQL temporal se retiró al terminar. Las comprobaciones HTTP enviaron el subdominio y el origen correspondientes; no sustituyen una prueba de inicio de sesión y carga de documentos desde el navegador. No se ejecutó Docker Desktop, el script PowerShell en Windows, una instalación nativa completa ni una reconstrucción de todas las imágenes desde cero. La alternativa nativa se documenta a partir de los manifiestos y la configuración revisados, sin presentarla como probada en esos sistemas.
+La prueba sobre PostgreSQL vacío reutilizó el contenedor PHP y las dependencias instaladas, con conexión y almacenamiento temporal separados de la instalación de trabajo; no fue una instalación completa desde un clon limpio. El PostgreSQL temporal se retiró al terminar. Las comprobaciones HTTP enviaron el subdominio y el origen correspondientes; no sustituyen una prueba de inicio de sesión y carga de documentos desde el navegador. No se ejecutó el script PowerShell en Windows ni una reconstrucción de todas las imágenes desde cero. Los resultados anteriores corresponden a la verificación técnica realizada en Linux.
 
-En la instalación existente se detectó pendiente `2026_10_19_164657_aceptar_documentos_anteriores_por_registro_directo`. Se conservó su estado para no modificar datos de trabajo: antes de actualizar, respalda los datos y aplica las migraciones institucionales y de plataforma de la sección 3. Esta migración regulariza documentos anteriores y registra su historial; conviene revisar ese cambio antes de aplicarlo a una base con datos.
+En la instalación existente se detectó pendiente `2026_10_19_164657_aceptar_documentos_anteriores_por_registro_directo`. Se conservó su estado para no modificar datos de trabajo: antes de actualizar, respalda los datos y aplica las migraciones institucionales y de plataforma de la sección 5. Esta migración regulariza documentos anteriores y registra su historial; conviene revisar ese cambio antes de aplicarlo a una base con datos.
 
-## 8. Problemas frecuentes
-
-### Docker o Compose no están instalados
-
-- `docker: command not found` / «docker no se reconoce»: instala el motor y la CLI, o usa la instalación nativa. Reinicia la terminal después de instalar.
-- `docker: 'compose' is not a docker command`: falta el plugin Compose; revisa los enlaces de la sección 1.
-- Windows: si Docker Desktop informa que falta WSL2 o virtualización, completa sus requisitos y selecciona contenedores Linux antes de iniciar el proyecto.
-- Un error al descargar imágenes o paquetes puede ser de conexión, DNS o proxy. Revisa los logs y vuelve a ejecutar el paso fallido; no borres los volúmenes de PostgreSQL para resolver una descarga.
-
-### Fallos de la instalación nativa
-
-| Síntoma | Qué comprobar |
-| --- | --- |
-| `getaddrinfo for db failed` | Laravel sigue usando `DB_HOST=db`; usa `127.0.0.1` y limpia la configuración. |
-| `ENOTFOUND nginx` o error de proxy de Vite | Cambia los dos targets del proxy a `http://127.0.0.1:8000` y reinicia Vite. |
-| `could not find driver` | Habilita `pdo_pgsql` para la aplicación y `pdo_sqlite` para PHPUnit en el PHP de la terminal. |
-| `permission denied to create database` | El usuario local de PostgreSQL necesita `CREATEDB` para plataforma y aprovisionamiento. |
-| Composer rechaza una extensión o versión | Ejecuta `php -v`, `php --ini`, `php -m` y `composer check-platform-reqs`; no uses `--ignore-platform-reqs`. |
-| Vite rechaza la versión de Node | Usa Node 22.13+ de la rama 22; verifica `node -v` y reinstala con `pnpm install --frozen-lockfile`. |
+## 9. Problemas frecuentes
 
 ### El puerto 5173 devuelve una página vacía o `NS_ERROR_NET_EMPTY_RESPONSE`
 
@@ -541,26 +516,6 @@ docker compose logs -f frontend
 ```
 
 Espera `VITE ... ready`, sal de los logs con `Ctrl+C` y recarga el navegador. No uses permisos `777` para todo el proyecto.
-
-### La terminal está dentro de Flatpak y no encuentra Docker
-
-Abre una terminal del sistema o antepone `flatpak-spawn --host` a los comandos de Docker. Especifica la ruta real del proyecto para que Compose encuentre la instalación correcta:
-
-```sh
-flatpak-spawn --host docker compose --project-directory /ruta/real/proyecto_escalafon ps
-flatpak-spawn --host docker compose --project-directory /ruta/real/proyecto_escalafon logs --tail=100 frontend
-```
-
-Sustituye `/ruta/real/proyecto_escalafon` por tu carpeta. Una terminal normal no necesita ese prefijo.
-
-### Laravel no puede escribir en `storage`, `bootstrap/cache` o `vendor`
-
-Usa los UID/GID de tu `.env` de la raíz; el siguiente ejemplo supone 1000:1000:
-
-```sh
-docker compose run --rm --no-deps --user 0:0 --entrypoint sh app -c 'chown -R 1000:1000 storage bootstrap/cache vendor'
-docker compose up -d app nginx
-```
 
 ### Error de conexión a PostgreSQL
 
@@ -607,7 +562,7 @@ Un puerto ocupado impide arrancar el servicio: revisa `docker compose ps -a` y l
 
 Para un 502, revisa `docker compose logs --tail=100 app nginx`: Nginx depende de que PHP-FPM arranque y Composer haya completado la instalación. Los errores de Laravel están en `backend/storage/logs/laravel.log`.
 
-## 9. Datos, respaldos y límites de esta instalación
+## 10. Datos, respaldos y límites de esta instalación
 
 - `dbdata` conserva PostgreSQL; `vendor` conserva dependencias PHP. `docker compose down` mantiene esos volúmenes.
 - Los documentos y fotos están en `backend/storage/app/private/`. Un respaldo completo necesita **base de datos y archivos privados**, además de conservar de forma segura la configuración y `APP_KEY`.
@@ -616,7 +571,7 @@ Para un 502, revisa `docker compose logs --tail=100 app nginx`: Nginx depende de
 - Esta configuración es de **desarrollo local**. `ApiHabilitada` bloquea la API fuera de `local` y `testing` salvo que se habilite expresamente; cambiar `APP_ENV` a `production` no constituye un despliegue. La instalación de producción (con Caddy y HTTPS) está en `docker-compose.produccion.yml` y [docs/PRODUCCION.md](docs/PRODUCCION.md); publicar el sistema requiere además revisar autenticación, secretos, correo y respaldos.
 - Las cuentas de demostración de `backend/.env.example` tienen una contraseña pública: no deben existir en una instalación real.
 
-## 10. Mantenimiento e incremento actual
+## 11. Mantenimiento e incremento actual
 
 Repositorio del equipo: [spectre2005/proyecto_escalafon](https://github.com/spectre2005/proyecto_escalafon). La autoría de los cambios puede consultarse en el historial de Git; no hay una lista formal de responsables en la configuración revisada.
 
