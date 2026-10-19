@@ -187,6 +187,15 @@ class Seccion03ApiTest extends TestCase
         $this->assertDatabaseCount('colegiaturas', 1);
         $this->assertDatabaseCount('capacitaciones', 3);
         $this->assertDatabaseMissing('capacitaciones', ['documento_id' => null]);
+        // El panel muestra lo que acredita cada documento (antes solo en los listados genéricos).
+        $documentos = collect($this->getJson($this->url())->assertOk()->json('data.items'))->flatMap(fn (array $item): array => $item['documentos']);
+        $registros = fn (string $clave): array => $documentos->flatMap(fn (array $doc): array => $doc['registros'][$clave])->all();
+        $this->assertCount(3, $registros('formacion'));
+        $this->assertCount(1, $registros('colegiaturas'));
+        $this->assertCount(3, $registros('capacitaciones'));
+        $this->assertArrayHasKey('numero_registro_sunedu', $registros('formacion')[0]);
+        $this->assertArrayHasKey('vigente_hasta', $registros('colegiaturas')[0]);
+        $this->assertArrayHasKey('horas', $registros('capacitaciones')[0]);
     }
 
     public function test_author_and_assistant_cannot_review_but_another_admin_can(): void

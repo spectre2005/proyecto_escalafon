@@ -27,3 +27,34 @@ export const capacitaciones03 = {
   f: { curso: 'Curso', programa_especializacion: 'Programa de especialización' },
   g: { congreso: 'Congreso', seminario: 'Seminario', taller: 'Taller' },
 }
+
+// Etiquetas de formacion_academica.nivel y capacitaciones.tipo (enums del esquema) para el resumen de formación.
+export const nivelesFormacion = {
+  educacion_basica: 'Educación básica', tecnico: 'Técnico', bachiller: 'Bachiller', titulo_profesional: 'Título profesional',
+  diplomado_especializacion: 'Diplomado o especialización', maestria: 'Maestría', doctorado: 'Doctorado',
+}
+export const tiposCapacitacion = { ...capacitaciones03.f, ...capacitaciones03.g, otro: 'Otro' }
+
+const recientes = campo => (a, b) => String(b[campo] || '').localeCompare(String(a[campo] || ''))
+
+/**
+ * Resumen de formación del panel 03: lo que acreditan los documentos vigentes (sin subsanados ni anulados, ni registros
+ * anulados). Cada fila lleva el tipo y el documento de origen para abrir su detalle.
+ */
+export function resumenFormacion(items) {
+  const filas = { formacion: [], colegiaturas: [], capacitaciones: [] }
+  for (const item of items || []) {
+    for (const documento of item.documentos || []) {
+      if (documento.subsanado || documento.estado === 'anulado') continue
+      for (const clave of Object.keys(filas)) {
+        for (const registro of documento.registros?.[clave] || []) {
+          if (!registro.anulado) filas[clave].push({ ...registro, item: item.id, documento: documento.id, estado: documento.estado })
+        }
+      }
+    }
+  }
+  filas.formacion.sort(recientes('fecha_obtencion'))
+  filas.colegiaturas.sort(recientes('fecha_colegiatura'))
+  filas.capacitaciones.sort(recientes('fecha_fin'))
+  return { ...filas, horas: filas.capacitaciones.reduce((total, fila) => total + (Number(fila.horas) || 0), 0) }
+}

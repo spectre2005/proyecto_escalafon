@@ -24,10 +24,6 @@ function Estado({ estado }) {
   return <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-medium ${clase}`}>{texto}</span>
 }
 
-function fechaEvento(documento) {
-  return documento.fecha_emision ? fecha(documento.fecha_emision) : 'Fecha no registrada'
-}
-
 export default function Seccion08Panel({ usuario, categoria }) {
   const request = useLiveQuery(`/expedientes/${usuario}/seccion-08`)
   const data = request.data?.data
@@ -55,7 +51,6 @@ export default function Seccion08Panel({ usuario, categoria }) {
   const items = data.grupos[grupoActual]
   const documentos = items?.flatMap(item => item.documentos) || []
   const documentosVigentes = documentos.filter(doc => !doc.subsanado && doc.estado !== 'anulado')
-  const listaTiempo = (data.linea_tiempo || []).filter(doc => doc.grupo === grupoActual)
   const resumen = {
     registrados: grupoActual === 'sanciones' ? data.resumen.sanciones || 0 : items?.reduce((total, item) => total + item.cantidad, 0) || 0,
     vigentes: data.resumen.vigentes || 0,
@@ -80,6 +75,7 @@ export default function Seccion08Panel({ usuario, categoria }) {
     {aviso && <p role="status" className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">{aviso}</p>}
     {items === null ? <div role="alert" className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">No tienes permiso para ver la documentación de sanciones disciplinarias.</div> : <>
       <section className="space-y-3" aria-label={titulo}>
+        {grupoActual === 'sanciones' && data.puede_ver_sanciones && resumen.registrados > 0 && <p className="text-sm text-slate-600"><span className="font-semibold text-slate-800">{resumen.vigentes} vigente(s)</span> · {resumen.dejadasSinEfecto} dejada(s) sin efecto</p>}
         {/* Documentos por vista: Pendientes · Con documentos · Opcionales · No corresponde (cada ítem conserva su formulario). */}
         <TablaTiposDocumentales elementos={items} idDe={item => item.codigo}
           clasificar={item => vistaDeItem(item, ofrecerTipo(noAplica, item))} estado={item => <Estado estado={item.estado} />}
@@ -121,12 +117,6 @@ export default function Seccion08Panel({ usuario, categoria }) {
       {formulario.documento ? item.documentos.filter(doc => formulario.documento.id === doc.id).map(doc => <div key={doc.id}><div className="mt-4"><Revision03Form key={`${doc.id}:${formulario.estado}`} usuario={usuario} documento={doc} item={item} estado={formulario.estado} revisar={revisarDocumento08} fechaActual={data.fecha_actual} onCancel={() => cerrar()} onSaved={() => cerrar(formulario.estado === 'aceptado' ? 'Documento aceptado.' : formulario.estado === 'anulado' ? 'Documento anulado; se conserva en el historial.' : 'Observación registrada. La corrección se presenta con un documento nuevo.')} nota="La revisión queda en el historial. Los documentos originales se conservan sin editar ni eliminar." /></div></div>) : <Documento08Form usuario={usuario} item={item} datos={data} subsana={formulario.subsana || ''} soloSubsanar={!ofrecerTipo(noAplica, item)} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado correctamente.')} />}
     </div>)}
       </section>
-      <section className="rounded-2xl border border-slate-200 bg-white p-5" aria-label={`Línea de tiempo de ${titulo.toLowerCase()}`}>
-        <h3 className="font-semibold text-slate-800">Línea de tiempo</h3>
-        {listaTiempo.length === 0 ? <p className="mt-2 text-sm text-slate-500">Todavía no hay documentos registrados.</p> : <ol className="mt-4 space-y-3">{[...listaTiempo].reverse().map(doc => <li key={doc.id} className="flex min-w-0 gap-3 border-l-2 border-teal-200 pl-4"><span aria-hidden="true" className={`mt-1 size-2.5 shrink-0 rounded-full ${doc.grupo === 'sanciones' ? 'bg-rose-600' : 'bg-teal-700'}`} /><div className="min-w-0"><p className="break-words text-sm font-medium text-slate-800">{doc.nombre}</p><p className="mt-1 text-xs text-slate-500">{fechaEvento(doc)} · {doc.grupo === 'sanciones' ? 'Sanción disciplinaria' : 'Reconocimiento'} · Folios {folios(doc.folio_inicio, doc.folio_fin)}</p></div></li>)}</ol>}
-      </section>
-      <p className="text-sm font-semibold text-slate-800">Número de folios: {data.numero_folios}</p>
-      <details className="rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-500"><summary className="cursor-pointer font-semibold text-slate-600">Cómo se conservan los documentos</summary><p className="mt-2 leading-relaxed">Los folios se asignan correlativamente. Los documentos registrados se conservan sin editar ni eliminar.</p></details>
     </>}
     </div>
   </EspacioSeccion>

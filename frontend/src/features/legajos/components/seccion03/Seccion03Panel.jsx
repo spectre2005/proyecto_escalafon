@@ -8,6 +8,7 @@ import { folios } from '../../config/documentos'
 import AbrirLegajo from '../AbrirLegajo'
 import EspacioSeccion from '../documentos/EspacioSeccion'
 import TablaTiposDocumentales from '../documentos/TablaTiposDocumentales'
+import ResumenFormacion from './ResumenFormacion'
 import { tituloSeccion } from '../../config/espacioSeccion'
 import { vistaDeItem } from '../../config/vistasDocumentales'
 import VisorPdf from '../documentos/VisorPdf'
@@ -56,6 +57,7 @@ export default function Seccion03Panel({ usuario }) {
     {!data.legajo && <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700"><p className="mb-3">Primero abre el legajo para agregar documentos.</p><AbrirLegajo usuario={usuario} /></div>}
     {aviso && <p role="status" className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">{aviso}</p>}
     {data.items.length === 0 && <p className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600">No hay tipos documentales disponibles para tu perfil. Solicita a administración revisar el catálogo de la Sección 03.</p>}
+    <ResumenFormacion items={data.items} />
     {/* Documentos por vista: Pendientes · Con documentos · Opcionales · No corresponde (cada ítem conserva su formulario). */}
     <TablaTiposDocumentales elementos={data.items} clasificar={item => vistaDeItem(item, ofrecerTipo(noAplica, item))}
       nombreDe={item => `${item.letra}) ${item.nombre}`} estado={item => <Estado estado={item.estado} />}

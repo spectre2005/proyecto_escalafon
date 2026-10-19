@@ -13,12 +13,14 @@ import { tituloSeccion } from '../../config/espacioSeccion'
 import { vistaDeItem } from '../../config/vistasDocumentales'
 import VisorPdf from '../documentos/VisorPdf'
 import Documento04Form from './Documento04Form'
-import LineaTiempoExperiencia from './LineaTiempoExperiencia'
+import ResumenExperiencia from './ResumenExperiencia'
 import { revisarDocumento04 } from '../../api/seccion04Api'
 import Revision03Form from '../seccion03/Revision03Form'
 
 const boton = 'rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-800 hover:bg-teal-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 disabled:opacity-50'
 const fecha = value => value ? value.split('-').reverse().join('/') : 'No registrada'
+// experiencia_laboral.tipo_vinculo (antes solo visible en el listado genérico).
+const vinculos04 = { planilla: 'Planilla', contrato_civil: 'Contrato civil', otro: 'Otro vínculo' }
 
 function Estado({ estado }) {
   const [texto, clase] = estados03[estado] || estados03.por_determinar
@@ -73,7 +75,7 @@ export default function Seccion04Panel({ usuario }) {
           <ul className="space-y-3">{item.documentos.map(doc => <li key={doc.id} className={`min-w-0 rounded-xl border border-slate-200 p-4 ${doc.subsanado ? 'bg-slate-50' : ''}`}>
             <div className="flex flex-wrap items-start justify-between gap-2"><h4 className="min-w-0 break-words text-sm font-semibold text-slate-800">{doc.nombre}</h4><Estado estado={doc.estado} /></div>
             <p className="mt-2 break-words text-xs text-slate-600">{doc.emisor} · Emitido el {fecha(doc.fecha_emision)}{doc.num_resolucion && ` · Registro ${doc.num_resolucion}`}</p>
-            {doc.experiencias.map(p => <p key={p.id} className="mt-2 break-words text-xs text-slate-600">{p.cargo} · {p.sector === 'publico' ? 'Público' : 'Privado'} · {fecha(p.fecha_inicio)} – {p.fecha_fin ? fecha(p.fecha_fin) : 'Hasta la fecha'}{p.es_ejercicio_profesional && ' · Ejercicio profesional'}{p.es_docencia_universitaria && ' · Docencia universitaria'}</p>)}
+            {doc.experiencias.map(p => <p key={p.id} className="mt-2 break-words text-xs text-slate-600">{p.cargo} · {p.sector === 'publico' ? 'Público' : 'Privado'}{vinculos04[p.tipo_vinculo] && ` · ${vinculos04[p.tipo_vinculo]}`} · {fecha(p.fecha_inicio)} – {p.fecha_fin ? fecha(p.fecha_fin) : 'Hasta la fecha'}{p.es_ejercicio_profesional && ' · Ejercicio profesional'}{p.es_docencia_universitaria && ' · Docencia universitaria'}</p>)}
             {doc.funcion_asignada && <p className="mt-2 break-words text-xs text-slate-600">Función asignada: {doc.funcion_asignada}</p>}
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500"><span>Folios {folios(doc.folio_inicio, doc.folio_fin)}</span><span>{doc.fedateado ? 'Fedateado' : 'Sin fedatear'}</span><span>{doc.fiscalizado ? 'Verificado con la entidad emisora' : 'Sin fiscalización registrada'}</span><span>{doc.archivo ? `PDF · ${antivirus03[doc.archivo.estado_antivirus] || 'Estado antivirus no confirmado'}` : 'Sin archivo'}</span><span>Recepción: {fecha(doc.fecha_recepcion)}</span></div>
             {doc.subsanado && <p className="mt-3 text-xs text-slate-500">Subsanado por otro documento. Se conserva en el historial y no cuenta en el avance.</p>}
@@ -96,13 +98,7 @@ export default function Seccion04Panel({ usuario }) {
     {data.items.filter(item => item.id === formulario?.item).map(item => <div key={item.id}>
       {formulario.documento ? item.documentos.filter(doc => formulario.documento === doc.id).map(doc => <div key={doc.id}><div className="mt-4"><Revision03Form revisar={revisarDocumento04} nota="La revisión queda en el historial. Verifica también el periodo y su clasificación. La aceptación no acredita una fiscalización posterior con la entidad emisora." key={`${doc.id}:${formulario.estado}`} usuario={usuario} documento={doc} item={item} estado={formulario.estado} onCancel={() => cerrar()} onSaved={() => cerrar(formulario.estado === 'aceptado' ? 'Documento aceptado. La fiscalización posterior sigue siendo independiente.' : formulario.estado === 'anulado' ? 'Documento anulado. Se conserva su archivo e historial.' : 'Observación registrada. La corrección se presenta con un documento nuevo.')} /></div></div>) : <Documento04Form usuario={usuario} item={item} datos={data} subsana={formulario.subsana || ''} soloSubsanar={!ofrecerTipo(noAplica, item)} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado correctamente.')} />}
     </div>)}
-    <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-3">
-      {[['Experiencia total', data.tiempo.total], ['Sector público', data.tiempo.publico], ['Sector privado', data.tiempo.privado]].map(([label, t]) => <div key={label}><p className="text-xs text-slate-500">{label}</p><p className="mt-2 text-lg font-semibold text-slate-800">{t.anios} años, {t.meses} meses y {t.dias} días</p><p className="mt-1 text-xs text-slate-500">{t.dias_totales} días calendario · {t.anios_decimal.toFixed(2)} años</p></div>)}
-      <p className="col-span-full text-xs text-slate-500">Corte: {fecha(data.tiempo.fecha_corte)}. Mes de {data.tiempo.configuracion.dias_por_mes} días y año de {data.tiempo.configuracion.dias_por_anio} días. {data.tiempo.configuracion.incluir_pendientes ? 'Incluye documentos aceptados y en revisión.' : 'Solo cuenta documentos aceptados.'} Los subtotales por sector pueden sumar más que el total si hay periodos simultáneos.</p>
-    </div>
-    <LineaTiempoExperiencia tiempo={data.tiempo} />
-    <p className="text-sm font-semibold text-slate-800">Número de folios: {data.numero_folios}</p>
-    <details className="rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-500"><summary className="cursor-pointer font-semibold text-slate-600">Cómo se conservan los documentos</summary><p className="mt-2 leading-relaxed">Los documentos se conservan sin editar ni eliminar. Los folios son correlativos por sección. La aceptación de RR. HH., el fedateo, la fiscalización posterior y el análisis antivirus se muestran por separado.</p></details>
+    <ResumenExperiencia tiempo={data.tiempo} resumen={resumen} folios={data.numero_folios} />
     </div>
   </EspacioSeccion>
 }

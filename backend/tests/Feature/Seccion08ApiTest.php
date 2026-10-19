@@ -83,7 +83,7 @@ class Seccion08ApiTest extends TestCase
         $this->assertDatabaseHas('historial_estados_documento', ['documento_usuario_id' => $id, 'estado_nuevo' => 'aceptado']);
         $this->assertDatabaseHas('auditoria_eventos', ['entidad_id' => $id, 'accion' => 'seccion08.documento.creado']);
         $this->getJson($this->url())->assertOk()->assertJsonPath('data.grupos.reconocimientos.0.documentos.0.id', $id)
-            ->assertJsonPath('data.numero_folios', 1)->assertJsonPath('data.resumen.reconocimientos', 1);
+            ->assertJsonMissingPath('data.numero_folios')->assertJsonMissingPath('data.linea_tiempo')->assertJsonPath('data.folio_sugerido', 2)->assertJsonPath('data.resumen.reconocimientos', 1);
     }
 
     public function test_time_service_recognition_reuses_existing_table_and_requires_a_complete_period(): void

@@ -67,9 +67,6 @@ class Seccion08Controller extends Controller
         });
         $todosLosItems = $items;
         $items = $items->groupBy('grupo');
-        $lineaTiempo = $todosLosItems->flatMap(fn (array $item): array => $item['documentos'])
-            ->reject(fn (array $doc): bool => $doc['subsanado'] || $doc['estado'] === 'anulado')
-            ->sortBy([['fecha_emision', 'asc'], ['id', 'asc']])->values();
 
         return response()->json(['data' => [
             'persona' => $persona->only(['id', 'tipo_personal', 'nombre_puesto']),
@@ -78,8 +75,6 @@ class Seccion08Controller extends Controller
             'grupos' => ['reconocimientos' => $items->get('reconocimientos', collect())->values(), 'sanciones' => $puedeVerSanciones ? $items->get('sanciones', collect())->values() : null],
             'puede_ver_sanciones' => $puedeVerSanciones,
             'resumen' => ResumenSeccion08::resumen($todosLosItems, $puedeVerSanciones),
-            'linea_tiempo' => $puedeVerSanciones ? $lineaTiempo : $lineaTiempo->where('grupo', 'reconocimientos')->values(),
-            'numero_folios' => $legajo ? Folios::ultimo($legajo, 8) : 0,
             'folio_sugerido' => $legajo ? Folios::ultimo($legajo, 8) + 1 : null,
             'tiempo_experiencia_calculada' => collect($tiempoExperiencia['total'])->only(['anios', 'meses', 'dias'])->all(),
             'fecha_actual' => now('America/Lima')->toDateString(),

@@ -19,6 +19,7 @@ use App\Support\Documentos\RevisionDocumento;
 use App\Support\Parametros;
 use App\Support\PerfilDocumental;
 use App\Support\ResumenSeccion03;
+use Carbon\CarbonInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -147,6 +148,27 @@ class Seccion03Controller extends Controller
         ], fn (mixed $valor): bool => $valor !== null);
     }
 
+    /** @return array{formacion: list<array<string, mixed>>, colegiaturas: list<array<string, mixed>>, capacitaciones: list<array<string, mixed>>} */
+    private function registros(DocumentoUsuario $doc): array
+    {
+        $fecha = fn (?CarbonInterface $valor): ?string => $valor?->format('Y-m-d');
+
+        return [
+            'formacion' => $doc->formacionAcademica->map(fn (FormacionAcademica $f): array => [
+                ...$f->only(['id', 'nivel', 'denominacion', 'institucion', 'pais', 'es_revalidado', 'numero_registro_sunedu', 'numero_diploma', 'anulado']),
+                'fecha_inicio' => $fecha($f->fecha_inicio), 'fecha_obtencion' => $fecha($f->fecha_obtencion),
+            ])->values()->all(),
+            'colegiaturas' => $doc->colegiaturas->map(fn (Colegiatura $c): array => [
+                ...$c->only(['id', 'colegio_profesional', 'numero_colegiatura', 'habilitado', 'anulado']),
+                'fecha_colegiatura' => $fecha($c->fecha_colegiatura), 'fecha_verificacion' => $fecha($c->fecha_verificacion), 'vigente_hasta' => $fecha($c->vigente_hasta),
+            ])->values()->all(),
+            'capacitaciones' => $doc->capacitaciones->map(fn (Capacitacion $c): array => [
+                ...$c->only(['id', 'tipo', 'nombre', 'entidad', 'horas', 'anulado']),
+                'fecha_inicio' => $fecha($c->fecha_inicio), 'fecha_fin' => $fecha($c->fecha_fin),
+            ])->values()->all(),
+        ];
+    }
+
     private function registrarDatos(DocumentoUsuario $doc, array $datos, string $letra): void
     {
         $base = ['usuario_id' => $doc->usuario_id, 'documento_id' => $doc->id, 'registrado_por' => $doc->created_by];
@@ -179,6 +201,8 @@ class Seccion03Controller extends Controller
             'archivo' => $doc->archivo?->only(['id', 'nombre_original', 'mime_type', 'estado_antivirus', 'tamano_bytes']),
             // Datos del registro que creó el documento, con los nombres del formulario: la subsanación los propone.
             'datos' => $this->datosRegistro($doc),
+            // Lo que el documento acredita, para el resumen de formación del panel (antes solo en los listados genéricos).
+            'registros' => $this->registros($doc),
             'observaciones' => $doc->observacionesDocumentoPorDocumento->where('estado', 'abierta')->map(fn (ObservacionDocumento $obs): array => [
                 'descripcion' => $obs->descripcion, 'plazo_subsanacion' => $obs->plazo_subsanacion?->format('Y-m-d'),
             ])->values()->all(),

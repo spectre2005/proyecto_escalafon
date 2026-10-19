@@ -7,18 +7,13 @@ export function activa(estado, codigo) {
   return estado?.activas?.[codigo] !== false
 }
 
-// Secciones del menú del legajo sin las ocultas y sin sus entradas inactivas. «Documentos de la sección» se oculta
-// con su sección; «Otros documentos» no es de ninguna funcionalidad y se ve mientras su sección esté visible.
+// Secciones del menú del legajo sin las ocultas y sin sus entradas inactivas.
 export function seccionesVisibles(secciones, estado) {
   const menuOculto = new Set(estado?.menu_oculto || [])
   const seccionesOcultas = new Set((estado?.secciones_ocultas || []).map(Number))
   return secciones
     .filter(seccion => !seccionesOcultas.has(Number(seccion.number)))
-    .map(seccion => ({
-      ...seccion,
-      categories: seccion.categories.filter(categoria => !menuOculto.has(categoria)),
-      sinDocumentos: seccion.sinDocumentos || menuOculto.has(`documentos-${seccion.number}`),
-    }))
+    .map(seccion => ({ ...seccion, categories: seccion.categories.filter(categoria => !menuOculto.has(categoria)) }))
 }
 
 // Junta lo que ocultan las banderas de la persona (condiciones.modulos_ocultos de la ficha) con lo que oculta la
