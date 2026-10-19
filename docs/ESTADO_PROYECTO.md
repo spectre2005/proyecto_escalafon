@@ -133,6 +133,65 @@ Accesos delegados (sugerencia del docente, 13/10/2026; pendiente de confirmar co
     puede recepcionar? (pend. 8); (d) ¿el jefe puede crear otros administradores o solo ayudantes?; (e) ¿alcance por
     tipo de personal o unidad orgánica?
 
+Revisión con una sola persona y validación con SUNEDU (analizado el 19/10/2026; pendiente del cliente y del equipo):
+30. ~~Revisión por segunda persona.~~ Decidido por el equipo el 19/10/2026 (`d319a89`): aceptación directa. Toda
+    carga queda «aceptado» y aprobada sin recepción ni fiscalización (`CargaDocumento::ESTADO_INICIAL`,
+    `EstadoDocumento::aprobado`); una subsanación cierra las observaciones del original. La migración
+    `2026_10_19_164657_aceptar_documentos_anteriores_por_registro_directo` pasa a «aceptado» los documentos pendientes
+    o cargados y no se revierte. Queda por hacer: (a) actualizar el CLAUDE.md, que aún define «aprobado» con recepción
+    y fiscalización y dice que quien sube no verifica; (b) decidir si más adelante se vuelve una opción por
+    institución, con la autorrevisión marcada en auditoría y reportes; (c) confirmar con el cliente que solo una
+    persona usa el sistema.
+31. Validación de grados y títulos con SUNEDU como evidencia de la fiscalización posterior (art. 7.1, 7.4 y 7.5), no
+    como reemplazo de la revisión: solo cubre títulos universitarios (no técnicos de MINEDU, extranjeros, colegiatura
+    ni las secciones 04, 06, 08 y 10) y una persona de la ORH sigue dando la conformidad. Hoy
+    `numero_registro_sunedu` es un dato declarado sin verificar; `solicitudes_fiscalizacion` ya tiene medio y
+    resultado, pero no hay pantalla de fiscalización. Propuesta (PROPUESTO): fase 1 manual (enlace a la consulta
+    oficial, resultado registrado como solicitud de fiscalización y constancia adjunta como documento nuevo, con
+    permiso propio y auditoría); fase 2 automática por PIDE solo donde la institución tenga acceso, con credenciales
+    en su configuración y confirmación humana. No usar APIs de terceros (Ley 29733). Antes de comprometerlo, verificar
+    cómo funcionan hoy la consulta pública y el acceso por PIDE. Preguntas: (a) ¿la universidad es pública y tiene o
+    puede pedir acceso a PIDE?; (b) ¿se validan solo los títulos que acreditan el perfil del puesto o todos?;
+    (c) ¿qué se hace con títulos técnicos y extranjeros?
+32. Fiscalización posterior (art. 7, Anexos 03 y 04; analizado el 19/10/2026). El ítem del menú no tiene pantalla.
+    El art. 7 obliga a la ORH a fiscalizar, pero no a hacerlo dentro del sistema; el 7.6 sí pide conservar las
+    respuestas y el informe. Con la aceptación directa (pend. 30) el documento ya sale aprobado, pero no se distingue
+    uno validado de uno solo registrado: `documentos_usuario.fiscalizado`, `fecha_fiscalizacion` y `fiscalizado_por`
+    existen sin pantalla que los llene. Propuesta (PROPUESTO): (1) en los documentos que acreditan el perfil del
+    puesto, registrar una fiscalización ya hecha (fecha, entidad consultada, resultado, informe o respuesta escaneada
+    o motivo si no la hay) y pasar el documento a «Verificado»; los reportes distinguen validado de registrado;
+    (2) ocultar el ítem o volverlo un módulo configurable como Evaluaciones; (3) el módulo completo, solo para quien
+    lo necesite: bandeja de plazos (7.2: confianza 100 %, inicio en 2 días hábiles; 7.3: resto, mínimo 10 % de las
+    incorporaciones del mes y máximo 150 por semestre, inicio en 30 días hábiles; ambos terminan en 15),
+    `procesos_fiscalizacion` y `solicitudes_fiscalizacion` (ya existen), oficio del Anexo 03, resultado (falso:
+    comunicar a Procuraduría y STPAD, art. 7.7) e informe del Anexo 04. Antes del módulo completo: respuestas en la
+    sección 12 (art. 7.6, pend. 1), calendario de feriados para los días hábiles y cómo se elige la muestra del 10 %.
+    Preguntas al cliente: (a) ¿los documentos que se digitalizan ya pasaron por fiscalización posterior? ¿todos o
+    solo algunos?; (b) ¿conservan los informes u oficios de respuesta?; (c) para el personal que ingrese en adelante,
+    ¿fiscalizan fuera del sistema y solo registran el resultado, o quieren que el sistema arme los oficios y avise
+    de los plazos?
+
+Evaluación del alta de personal con pruebas reales (19/10/2026, en una copia de la base ya borrada):
+33. Corregido el 19/10/2026: auditoría del alta e importación, ficha, borrado de persona, apertura del legajo, vínculo y
+    sus registros de la 02, carga genérica, recepción, familiares y toda anulación con motivo (`App\Support\Auditoria`);
+    escritura del CRUD genérico cerrada también en local; el titular de un documento del servidor debe ser la persona;
+    el vínculo de la 2.2 toma la ley y el tipo de personal de la persona si no se envían; datos del puesto
+    administrativo vacíos en el alta; listados sensibles fuera de la ficha sin datos sensibles; «por definir» de los
+    tipos que dependen del tipo de vínculo sin vínculo conocido. Una persona con historia en la auditoría ya no se
+    borra (sus eventos la referencian). Quedan:
+    (a) Decidido dejarlo así por ahora: la aceptación directa también da por cumplido el fedateo de los tipos que lo
+        exigen (título, certificado de trabajo) y no exige fiscalización (pend. 30 y 32).
+    (b) Decidido dejarlo así por ahora: el legajo pasa a pasivo a mano aunque el vínculo siga vigente, y se puede abrir
+        un legajo sin vínculo (art. 4.1: la apertura va concluido el proceso de vinculación).
+    (c) Pendiente del cliente: las cuentas creadas desde Equipo cuentan como personal en el Dashboard y en Personal.
+    (d) Requerimientos y compromisos de entrega (art. 4.3: 5 días hábiles + 5; art. 5.1: 30) solo existen en el CRUD
+        genérico: en producción no se pueden crear.
+    (e) Sin auditoría todavía: registros y correcciones de las secciones 01 (declaraciones, certificados), 05, 07, 09 y
+        11, y la foto. Su anulación sí queda auditada. Falta además el panel para consultar la auditoría (hoja de ruta 8).
+    (f) Menores: `usuarios.regimen_laboral` guarda el código de la ley con valores mezclados ('CAS' y '1057'); las
+        banderas del puesto en `usuarios` no se pueden editar y quedan siempre vacías; la ficha y el vínculo pueden
+        tener leyes distintas (falta decidir cuál manda).
+
 ## Hoja de ruta del sistema institucional (por definir, analizado el 13/10/2026)
 
 Funcionalidades que faltan, con su base en la directiva. Orden propuesto, sin decidir:
