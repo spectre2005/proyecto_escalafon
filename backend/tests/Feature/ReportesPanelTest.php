@@ -40,4 +40,22 @@ class ReportesPanelTest extends TestCase
         $this->getJson('/api/v1/reportes/incorporaciones?desde=2026-11-01')->assertOk()->assertJsonPath('total', 0);
         $this->getJson('/api/v1/reportes/referencias')->assertOk()->assertJsonPath('total', 0);
     }
+
+    public function test_search_finds_separate_names_identity_numbers_and_active_or_passive_legajos(): void
+    {
+        $this->prepararOperaciones();
+        $persona = Usuario::factory()->create(['nombres' => 'Ana Lucía', 'apellido_paterno' => 'Torres', 'apellido_materno' => 'Quispe', 'numero_doc_identidad' => '99000841']);
+        $activo = Legajo::factory()->create(['usuario_id' => $persona->id, 'numero_legajo' => 'DEMO-ACTIVO-001', 'estado_legajo' => 'activo']);
+        $pasivo = Legajo::factory()->create(['usuario_id' => $persona->id, 'numero_legajo' => 'DEMO-PASIVO-002', 'estado_legajo' => 'pasivo']);
+        Legajo::factory()->create(['usuario_id' => Usuario::factory()->create(['nombres' => 'Ana', 'apellido_paterno' => 'Rojas'])->id]);
+        foreach (['/api/v1/operaciones/legajos', '/api/v1/reportes/matriz'] as $ruta) {
+            foreach (['Ana Torres', 'Torres Ana', '  ANA   TORRES ', '99000841'] as $texto) {
+                $this->getJson($ruta.'?'.http_build_query(['q' => $texto]))->assertOk()->assertJsonPath('total', 2);
+            }
+            $this->getJson($ruta.'?q=DEMO-PASIVO')->assertOk()->assertJsonPath('total', 1)->assertJsonPath('data.0.'.(str_contains($ruta, '/operaciones/') ? 'id' : 'numero_legajo'), str_contains($ruta, '/operaciones/') ? $pasivo->id : $pasivo->numero_legajo);
+            $this->getJson($ruta.'?q=SinCoincidencias')->assertOk()->assertJsonPath('total', 0);
+        }
+        $this->getJson('/api/v1/reportes/matriz?q=Ana%20Torres&estado=activo&exportar=1')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.numero_legajo', $activo->numero_legajo);
+        $this->getJson('/api/v1/reportes/caratula?legajo_id='.$pasivo->id)->assertOk()->assertJsonPath('data.0.numero_legajo', $pasivo->numero_legajo);
+    }
 }

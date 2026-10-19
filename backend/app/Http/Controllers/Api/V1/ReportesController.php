@@ -57,7 +57,7 @@ class ReportesController extends Controller
     private function legajos(array $filtros): Builder
     {
         return Legajo::query()->when($filtros['legajo_id'] ?? null, fn ($q, $id) => $q->whereKey($id))->when($filtros['estado'] ?? null, fn ($q, $v) => $q->where('estado_legajo', $v))
-            ->when(trim($filtros['q'] ?? '') !== '', fn ($q) => $q->where(fn ($f) => $f->whereRaw('LOWER(numero_legajo) LIKE ?', ['%'.mb_strtolower(trim($filtros['q'])).'%'])->orWhereHas('usuario', fn ($u) => $u->whereRaw("LOWER(nombres || ' ' || apellido_paterno || ' ' || COALESCE(apellido_materno, '')) LIKE ?", ['%'.mb_strtolower(trim($filtros['q'])).'%'])->orWhere('numero_doc_identidad', 'like', '%'.trim($filtros['q']).'%'))))
+            ->buscar($filtros['q'] ?? null)
             ->when(($filtros['unidad'] ?? null) || ($filtros['regimen'] ?? null), fn ($q) => $q->whereHas('usuario.vinculosLaborales', fn ($v) => $v->vigente()->when($filtros['unidad'] ?? null, fn ($v, $id) => $v->where('unidad_organica_id', $id))->when($filtros['regimen'] ?? null, fn ($v, $r) => $v->where('regimen_laboral', $r))));
     }
 

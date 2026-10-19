@@ -86,6 +86,18 @@ class Usuario extends Authenticatable
     /** @var Collection<int, Rol>|null */
     private ?Collection $rolesVigentesCalculados = null;
 
+    /** Busca identidad por palabras, sin exigir escribir todos los nombres. */
+    public function scopeBuscarIdentidad(Builder $query, ?string $texto): Builder
+    {
+        foreach (preg_split('/\s+/u', mb_strtolower(trim($texto ?? '')), -1, PREG_SPLIT_NO_EMPTY) ?: [] as $palabra) {
+            $patron = '%'.$palabra.'%';
+            $query->where(fn (Builder $q) => $q->whereRaw("LOWER(nombres || ' ' || apellido_paterno || ' ' || COALESCE(apellido_materno, '')) LIKE ?", [$patron])
+                ->orWhere('numero_doc_identidad', 'like', $patron));
+        }
+
+        return $query;
+    }
+
     /** @return Collection<int, Rol> Roles activos con asignación vigente hoy. */
     public function rolesVigentes(): Collection
     {

@@ -1,134 +1,81 @@
-import { useState } from 'react'
-import api, { apiErrorMessage } from '../../axios'
-import { useLiveQuery } from '../../shared/queries/useLiveQuery'
+import { useEffect, useId, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+import api from '../../axios'
+import Icon from '../../components/ui/Icon'
+import { useManualQuery } from '../../shared/queries/useManualQuery'
+import { QueryStatus, WorkflowField, WorkflowPagination } from '../../shared/WorkflowControls'
+import { formatDate } from '../../shared/dates'
+import VisorPdf from '../legajos/components/documentos/VisorPdf'
+import { personName, stateLabels, availableActions, isClosed, isOverdue, effectiveDeadline, extensionMin } from './requirementUtils'
+import { requirementError } from './requirementApi'
+import { primary, button, RequirementState, EmptyRequirements } from './RequirementUI'
+export { default as NewRequirement } from './NewRequirement'
 
-const control = 'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800'
-const button = 'rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50 disabled:opacity-50'
-const nombre = person => [person.nombres, person.apellido_paterno, person.apellido_materno].filter(Boolean).join(' ')
-const hoy = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Lima' }).format(new Date())
-const fecha = value => value ? value.slice(0, 10).split('-').reverse().join('/') : 'Sin fecha'
+const actionNames = { responder: 'Presentar respuesta / subsanar', cumplir: 'Aceptar respuesta y cumplir', observar: 'Observar respuesta', editar: 'Corregir descripción', prorrogar: 'Conceder prórroga', cancelar: 'Cancelar requerimiento' }
+const actionHelp = { responder: 'Selecciona un PDF ya incorporado al legajo activo de esta persona. Debe corresponder al tipo documental solicitado.', cumplir: 'Confirma que revisaste la respuesta. El requerimiento quedará cumplido y cerrado.', observar: 'Explica qué debe corregirse. Después podrá presentarse una nueva respuesta.', editar: 'Puedes corregir la descripción mientras no exista una respuesta asociada.', prorrogar: 'La nueva fecha debe ser posterior al plazo efectivo actual. El estado del trámite se conserva.', cancelar: 'El requerimiento quedará cerrado como cancelado. Su información e historial se conservan.' }
 
-function EstadoConsulta({ request }) {
-  return <>{request.error && <p role="alert">{apiErrorMessage(request.error)} <button type="button" className={button} onClick={request.retry}>Reintentar</button></p>}{request.loading && !request.data && <p role="status">Cargando…</p>}</>
-}
-
-function Paginas({ data, setPage, loading }) {
-  if (!data || data.last_page <= 1) return null
-  return <nav aria-label="Paginación del seguimiento" className="my-3 flex flex-wrap items-center gap-2"><button type="button" className={button} disabled={loading || data.current_page <= 1} onClick={() => setPage(data.current_page - 1)}>Anterior</button><span>{data.current_page} / {data.last_page}</span><button type="button" className={button} disabled={loading || data.current_page >= data.last_page} onClick={() => setPage(data.current_page + 1)}>Siguiente</button></nav>
-}
-
-function Personas({ term, onSelect }) {
+function DocumentOptions({ record, selected, onSelect }) {
   const [page, setPage] = useState(1)
-  const request = useLiveQuery(`/requerimientos/personas?q=${encodeURIComponent(term)}&page=${page}`)
-  return <div className="my-3"><EstadoConsulta request={request} />{request.data && <><ul className="max-h-64 space-y-2 overflow-auto">{request.data.data.map(person => <li key={person.id}><button type="button" className={button} onClick={() => onSelect(person)}>{nombre(person)} · {person.numero_doc_identidad}</button></li>)}</ul>{!request.data.data.length && <p>No se encontraron personas.</p>}<Paginas data={request.data} setPage={setPage} loading={request.loading} /></>}</div>
-}
-
-export function NewRequirement({ onCreated }) {
-  const [open, setOpen] = useState(false)
-  const [success, setSuccess] = useState(false)
-  return <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5">
-    <button type="button" className={button} aria-expanded={open} onClick={() => { setOpen(!open); setSuccess(false) }}>{open ? 'Cerrar formulario' : 'Nuevo requerimiento'}</button>
-    {success && <p role="status" className="mt-3 text-teal-800">Requerimiento registrado.</p>}
-    {open && <CreateForm onCreated={() => { setOpen(false); setSuccess(true); onCreated() }} />}
+  const [visor, setVisor] = useState(null)
+  const request = useManualQuery(`/requerimientos/${record.id}/documentos?page=${page}`)
+  return <section className="space-y-3 rounded-xl border border-slate-200 p-4"><div className="flex flex-wrap items-center justify-between gap-3"><h4 className="text-sm font-semibold text-slate-800">Documento de respuesta</h4><button type="button" className={button} onClick={request.retry}>Actualizar documentos</button></div><p className="text-xs text-slate-500">Destinatario: {personName(record.usuario)} · {record.tipo_documento?.nombre || 'Solicitud general sin tipo específico'}</p><Link className="inline-block text-sm font-semibold text-teal-800 underline" to={`/legajos/${record.usuario_id}`} target="_blank" rel="noopener noreferrer">Abrir ficha para cargar o subsanar un PDF ↗</Link>
+    <QueryStatus request={request} />
+    {selected && <p role="status" className="rounded-lg bg-teal-50 p-3 text-sm text-teal-800">Seleccionado: {selected.nombre || selected.tipo_documento?.nombre} · {selected.num_resolucion || 'Sin número'} · {formatDate(selected.fecha_emision)}</p>}
+    {request.data && <>{!request.data.data.length ? <EmptyRequirements title="No hay documentos admisibles">Carga el PDF desde la ficha del destinatario, en el mismo tipo solicitado y su legajo activo. Después vuelve aquí y pulsa Actualizar documentos. Un PDF de otra persona no aparecerá.</EmptyRequirements> : <fieldset className="max-h-72 space-y-2 overflow-auto"><legend className="sr-only">Selecciona un documento existente como respuesta</legend>{request.data.data.map(doc => <div key={doc.id} className={`flex items-start gap-3 rounded-xl border p-3 ${selected?.id === doc.id ? 'border-teal-300 bg-teal-50/50' : 'border-slate-200'}`}><label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3"><input type="radio" name="documento_seleccionado" value={doc.id} checked={selected?.id === doc.id} onChange={() => onSelect(doc)} className="mt-1 size-4 accent-teal-700" /><span className="min-w-0"><span className="block text-sm font-semibold text-slate-800">{doc.nombre || doc.tipo_documento?.nombre}</span><span className="mt-1 block text-xs text-slate-500">{doc.num_resolucion || 'Sin número'} · {formatDate(doc.fecha_emision)} · {doc.estado}</span>{doc.folio_inicio && <span className="mt-1 block text-xs text-slate-500">Sección {doc.seccion_legajo_id} · Folios {doc.folio_inicio}–{doc.folio_fin}</span>}</span></label><button type="button" aria-label={`Ver PDF ${doc.nombre || doc.tipo_documento?.nombre}`} className="rounded-lg p-2 text-teal-700 hover:bg-teal-50" onClick={() => setVisor(doc)}><Icon name="eye" size={18} /></button></div>)}</fieldset>}<WorkflowPagination data={request.data} setPage={setPage} loading={request.loading} /></>}
+    {visor && <VisorPdf usuario={record.usuario_id} documento={visor} titulo={visor.nombre || visor.tipo_documento?.nombre} onClose={() => setVisor(null)} />}
   </section>
-}
-
-function CreateForm({ onCreated }) {
-  const types = useLiveQuery('/requerimientos/tipos')
-  const [search, setSearch] = useState('')
-  const [person, setPerson] = useState(null)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  async function submit(event) {
-    event.preventDefault()
-    if (busy || !person) return
-    const datos = Object.fromEntries(new FormData(event.currentTarget))
-    datos.usuario_id = person.id
-    datos.tipo_documento_id ||= null
-    setBusy(true)
-    setError('')
-    try { await api.post('/requerimientos', datos); onCreated() } catch (failure) { setError(apiErrorMessage(failure)) } finally { setBusy(false) }
-  }
-  return <form onSubmit={submit} aria-busy={busy} className="mt-5 space-y-4">
-    <h2 className="font-semibold text-slate-900">Registrar solicitud documental</h2>
-    <p className="text-sm text-slate-600">Selecciona a la persona y una fecha límite explícita. No se calculan feriados ni días hábiles.</p>
-    {error && <p role="alert" className="text-rose-800">{error}</p>}
-    <fieldset disabled={busy} className="space-y-4">
-      <label className="grid gap-2 text-sm">Buscar persona por nombre o documento<input className={control} value={search} maxLength={120} onChange={event => { setSearch(event.target.value); setPerson(null) }} /></label>
-      {person ? <p className="text-sm font-medium text-teal-800">Destinatario: {nombre(person)}</p> : search.trim().length >= 2 ? <Personas key={search.trim()} term={search.trim()} onSelect={setPerson} /> : <p className="text-sm text-slate-500">Escribe al menos dos caracteres para buscar.</p>}
-      <EstadoConsulta request={types} />
-      <label className="grid gap-2 text-sm">Tipo documental<select name="tipo_documento_id" className={control}><option value="">No especificado</option>{types.data?.data.map(type => <option key={type.id} value={type.id}>{type.nombre}</option>)}</select></label>
-      <label className="grid gap-2 text-sm">Origen<input name="origen" required maxLength={15} defaultValue="legajo" className={control} /></label>
-      <label className="grid gap-2 text-sm">Descripción<textarea name="descripcion" required maxLength={300} rows={3} className={control} /></label>
-      <div className="grid gap-4 sm:grid-cols-2"><label className="grid gap-2 text-sm">Fecha de solicitud<input name="fecha_requerimiento" required type="date" defaultValue={hoy()} max={hoy()} className={control} /></label><label className="grid gap-2 text-sm">Fecha límite<input name="fecha_limite" required type="date" className={control} /></label></div>
-      <button className={button} disabled={!person || busy || !types.data}>{busy ? 'Guardando…' : 'Registrar requerimiento'}</button>
-    </fieldset>
-  </form>
-}
-
-export function RequirementManagement({ record, onChanged }) {
-  const [open, setOpen] = useState(false)
-  return <details className="mt-3 min-w-64" onToggle={event => setOpen(event.currentTarget.open)}><summary className="cursor-pointer text-xs font-semibold text-teal-800">Gestionar e historial</summary>{open && <ManagementForm initial={record} onChanged={onChanged} />}</details>
-}
-
-function DocumentOptions({ id, selected, onSelect }) {
-  const [page, setPage] = useState(1)
-  const request = useLiveQuery(`/requerimientos/${id}/documentos?page=${page}`)
-  return <div><EstadoConsulta request={request} />{request.data && <>
-    <label className="grid gap-2">Documento de respuesta<select className={control} required value={selected} onChange={event => onSelect(event.target.value)}><option value="">Seleccionar documento</option>{request.data.data.map(doc => <option key={doc.id} value={doc.id}>{doc.tipo_documento?.nombre} · {doc.num_resolucion || 'Sin número'} · {fecha(doc.fecha_emision)} · {doc.estado}</option>)}</select></label>
-    {!request.data.data.length && <p className="mt-2">No hay documentos admisibles. Carga el documento desde la ficha del legajo y reintenta.</p>}
-    <Paginas data={request.data} setPage={value => { setPage(value); onSelect('') }} loading={request.loading} />
-  </>}</div>
-}
-
-function ManagementForm({ initial, onChanged }) {
-  const [record, setRecord] = useState(initial)
-  const [action, setAction] = useState('')
-  const [document, setDocument] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const closed = !!record.cerrado_en || ['cumplido', 'cancelado'].includes(record.estado)
-  async function submit(event) {
-    event.preventDefault()
-    if (busy) return
-    const datos = { ...Object.fromEntries(new FormData(event.currentTarget)), accion: action, version: record.version }
-    if (action === 'responder') datos.documento_id = document
-    setBusy(true); setError(''); setSuccess('')
-    try {
-      const response = await api.post(`/requerimientos/${record.id}/acciones`, datos)
-      setRecord(response.data.data); setAction(''); setDocument(''); setSuccess('Operación registrada.'); onChanged()
-    } catch (failure) { setError(apiErrorMessage(failure)) } finally { setBusy(false) }
-  }
-  async function refresh() {
-    try {
-      const response = await api.get(`/requerimientos/${record.id}`)
-      setRecord(response.data.data); setAction(''); setDocument(''); setError(''); onChanged()
-    } catch (failure) { setError(apiErrorMessage(failure)) }
-  }
-  return <div className="mt-3 space-y-4 text-xs">
-    <p>Estado: <strong>{record.estado}</strong> · Plazo efectivo: {fecha(record.prorroga_hasta || record.fecha_limite)}</p>
-    {error && <p role="alert" className="text-rose-800">{error} <button type="button" className={button} onClick={refresh}>Actualizar requerimiento</button></p>}
-    {success && <p role="status" className="text-teal-800">{success}</p>}
-    {!closed && <form key={record.version} onSubmit={submit} aria-busy={busy}><fieldset disabled={busy} className="space-y-3">
-      <label className="grid gap-2">Acción<select className={control} required value={action} onChange={event => { setAction(event.target.value); setError('') }}><option value="">Seleccionar acción</option>
-        {record.estado !== 'en_revision' && <option value="responder">Presentar respuesta / subsanar</option>}
-        {record.estado === 'en_revision' && <><option value="cumplir">Aceptar respuesta y cumplir</option><option value="observar">Observar respuesta</option></>}
-        {!record.documento_id && ['abierto', 'pendiente', 'vencido', 'prorrogado'].includes(record.estado) && <option value="editar">Corregir descripción</option>}
-        <option value="prorrogar">Conceder prórroga</option><option value="cancelar">Cancelar requerimiento</option>
-      </select></label>
-      {action === 'editar' && <label className="grid gap-2">Descripción<textarea required name="descripcion" defaultValue={record.descripcion} maxLength={300} className={control} /></label>}
-      {action === 'responder' && <DocumentOptions id={record.id} selected={document} onSelect={setDocument} />}
-      {action === 'prorrogar' && <label className="grid gap-2">Nueva fecha límite<input required type="date" name="prorroga_hasta" min={hoy()} className={control} /></label>}
-      {['editar', 'observar', 'prorrogar', 'cancelar'].includes(action) && <label className="grid gap-2">Motivo<textarea required name="motivo" maxLength={1000} className={control} /></label>}
-      {action && <button className={button} disabled={busy || (action === 'responder' && !document)}>{busy ? 'Guardando…' : 'Registrar acción'}</button>}
-    </fieldset></form>}
-    <History id={record.id} />
-  </div>
 }
 
 function History({ id }) {
   const [page, setPage] = useState(1)
-  const request = useLiveQuery(`/requerimientos/${id}/historial?page=${page}`)
-  return <section aria-label="Historial del requerimiento"><h3 className="font-semibold">Historial</h3><EstadoConsulta request={request} />{request.data && <><ul className="mt-2 space-y-3">{request.data.data.map(event => <li key={event.id} className="border-l-2 border-teal-200 pl-3"><p className="font-medium">{event.accion.replace('requerimiento.', '')} · {fecha(event.fecha)}</p><p>{event.actor ? nombre(event.actor) : 'Actor no disponible'}</p>{event.despues?.motivo && <p className="whitespace-pre-wrap">{event.despues.motivo}</p>}<p>{event.antes?.estado || 'Nuevo'} → {event.despues?.estado} · Límite: {fecha(event.despues?.prorroga_hasta || event.despues?.fecha_limite)}</p></li>)}</ul>{!request.data.data.length && <p>Registro anterior a este historial; no se reconstruyen operaciones históricas.</p>}<Paginas data={request.data} setPage={setPage} loading={request.loading} /></>}</section>
+  const request = useManualQuery(`/requerimientos/${id}/historial?page=${page}`)
+  return <section className="space-y-3 rounded-xl border border-slate-200 p-4"><h3 className="text-sm font-semibold text-slate-900">Historial del requerimiento</h3><QueryStatus request={request} />{request.data && <><ol className="space-y-4">{request.data.data.map(event => <li key={event.id} className="border-l-2 border-teal-200 pl-4 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold text-slate-800">{{ crear: 'Solicitud registrada', responder: 'Respuesta presentada', observar: 'Respuesta observada', cumplir: 'Requerimiento cumplido', prorrogar: 'Prórroga concedida', cancelar: 'Requerimiento cancelado', editar: 'Descripción corregida' }[event.accion.replace('requerimiento.', '')] || event.accion}</p><time className="text-xs text-slate-500" dateTime={event.fecha}>{new Date(event.fecha).toLocaleString('es-PE', { timeZone: 'America/Lima' })}</time></div><p className="mt-1 text-xs text-slate-500">{personName(event.actor)}</p>{event.despues?.motivo && <p className="mt-2 whitespace-pre-wrap break-words text-slate-700">{event.despues.motivo}</p>}<p className="mt-2 text-xs text-slate-500">{stateLabels[event.antes?.estado] || 'Nuevo'} → {stateLabels[event.despues?.estado] || event.despues?.estado} · Límite: {formatDate(event.despues?.prorroga_hasta || event.despues?.fecha_limite)}</p></li>)}</ol>{!request.data.data.length && <p className="text-sm text-slate-500">No hay operaciones registradas en este historial. Las operaciones antiguas no se reconstruyen.</p>}<WorkflowPagination data={request.data} setPage={setPage} loading={request.loading} /></>}</section>
+}
+
+function ManagementForm({ initial, onChanged, onBusy }) {
+  const [record, setRecord] = useState(initial)
+  const [action, setAction] = useState('')
+  const [documento, setDocumento] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [visor, setVisor] = useState(null)
+  async function refresh() {
+    try { const response = await api.get(`/requerimientos/${record.id}`); setRecord(response.data.data); setAction(''); setDocumento(null); setError(''); onChanged() }
+    catch (failure) { setError(requirementError(failure)) }
+  }
+  async function submit(event) {
+    event.preventDefault()
+    if (busy) return
+    const datos = { ...Object.fromEntries(new FormData(event.currentTarget)), accion: action, version: record.version }
+    delete datos.documento_seleccionado
+    if (action === 'responder') datos.documento_id = documento?.id
+    setBusy(true); onBusy(true); setError(''); setSuccess('')
+    try { await api.post(`/requerimientos/${record.id}/acciones`, datos); setSuccess('Operación registrada. El estado y el historial se actualizaron.'); await refresh() }
+    catch (failure) { setError(requirementError(failure)) } finally { setBusy(false); onBusy(false) }
+  }
+  return <div className="space-y-5">
+    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs text-slate-500">Destinatario</p><h3 className="mt-1 font-semibold text-slate-900">{personName(record.usuario)}</h3><p className="mt-1 text-xs text-slate-500">Documento: {record.usuario?.numero_doc_identidad || 'Sin dato'}</p></div><RequirementState state={record.estado} /></div><p className="mt-4 text-sm font-semibold text-slate-800">{record.tipo_documento?.nombre || 'Solicitud general sin tipo documental específico'}</p><p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-600">{record.descripcion}</p><Link to={`/legajos/${record.usuario_id}`} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-xs font-semibold text-teal-800 underline">Abrir ficha del destinatario ↗</Link></div>
+    <dl className="grid gap-4 text-sm sm:grid-cols-3">{[['Fecha de solicitud', formatDate(record.fecha_requerimiento)], ['Plazo efectivo', formatDate(effectiveDeadline(record))], ['Origen', record.origen || 'Sin registrar']].map(([title, text]) => <div key={title}><dt className="text-xs text-slate-500">{title}</dt><dd className="mt-1 font-medium text-slate-800">{text}</dd></div>)}</dl>{record.prorroga_hasta && <p className="text-xs text-slate-500">Fecha límite original: {formatDate(record.fecha_limite)} · Prórroga hasta {formatDate(record.prorroga_hasta)}.</p>}{isOverdue(record) && <p className="rounded-xl bg-rose-50 p-3 text-sm text-rose-800">El plazo efectivo ya pasó y el requerimiento sigue sin cerrar.</p>}
+    {record.documento_id && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-100 bg-teal-50/40 p-4"><div><h3 className="text-sm font-semibold text-teal-900">Respuesta vinculada</h3><p className="mt-1 text-xs text-teal-800">{record.documento?.nombre || record.documento?.num_resolucion || 'Documento del legajo'} · {record.documento?.estado || 'Estado no disponible'}</p></div><button type="button" className={button} onClick={() => setVisor({ id: record.documento_id })}>Ver PDF<Icon name="eye" size={16} /></button></div>}
+    {success && <p role="status" className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">{success}</p>}{error && <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-800">{error} <button type="button" className="font-semibold underline" disabled={busy} onClick={refresh}>Actualizar requerimiento</button></p>}
+    {isClosed(record) ? <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">Este requerimiento está cerrado. Puedes consultar la respuesta y el historial; no admite nuevas acciones.</p> : <section className="space-y-4 rounded-xl border border-slate-200 p-4"><h3 className="text-sm font-semibold text-slate-900">¿Qué necesitas hacer?</h3><div className="flex flex-wrap gap-2">{availableActions(record).map(key => <button key={key} type="button" className={action === key ? primary : button} aria-pressed={action === key} disabled={busy} onClick={() => { setAction(key); setDocumento(null); setError(''); setSuccess('') }}>{actionNames[key]}</button>)}</div>{action && <form key={`${record.version}:${action}`} onSubmit={submit} aria-busy={busy}><fieldset disabled={busy} className="space-y-4 border-t border-slate-100 pt-4"><p className="text-sm text-slate-600">{actionHelp[action]}</p>
+      {action === 'editar' && <WorkflowField name="descripcion" label="Descripción corregida" type="textarea" defaultValue={record.descripcion} maxLength={300} />}
+      {action === 'responder' && <DocumentOptions record={record} selected={documento} onSelect={setDocumento} />}
+      {action === 'prorrogar' && <WorkflowField name="prorroga_hasta" label="Nueva fecha límite" type="date" min={extensionMin(record)} />}
+      {['editar', 'observar', 'prorrogar', 'cancelar'].includes(action) && <WorkflowField name="motivo" label={action === 'observar' ? '¿Qué debe corregirse en la respuesta?' : 'Motivo de la operación'} type="textarea" maxLength={1000} />}
+      <div className="flex flex-wrap gap-3"><button className={primary} disabled={busy || (action === 'responder' && !documento)}>{busy ? 'Guardando…' : { responder: 'Presentar documento como respuesta', cumplir: 'Confirmar cumplimiento', observar: 'Guardar observación', editar: 'Guardar corrección', prorrogar: 'Confirmar prórroga', cancelar: 'Confirmar cancelación' }[action]}</button><button type="button" className={button} disabled={busy} onClick={() => setAction('')}>Cancelar operación</button></div>
+    </fieldset></form>}</section>}
+    <History key={record.version} id={record.id} />
+    {visor && <VisorPdf usuario={record.usuario_id} documento={visor} titulo="Documento de respuesta" onClose={() => setVisor(null)} />}
+  </div>
+}
+
+export function RequirementManagement({ id, onClose, onChanged }) {
+  const dialog = useRef(null)
+  const titulo = useId()
+  const [locked, setLocked] = useState(false)
+  const request = useManualQuery(`/requerimientos/${id}`)
+  useEffect(() => { if (!dialog.current.open) dialog.current.showModal() }, [])
+  return <dialog ref={dialog} onClose={onClose} onCancel={event => { if (locked) event.preventDefault() }} aria-labelledby={titulo} className="m-auto max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-4xl overflow-y-auto rounded-2xl border-0 bg-white p-0 shadow-xl backdrop:bg-slate-900/45"><header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4 sm:px-6"><div><p className="text-[10px] font-semibold uppercase tracking-wider text-teal-700">Seguimiento documental</p><h2 id={titulo} className="mt-1 text-lg font-semibold text-slate-900">Gestionar requerimiento e historial</h2></div><button type="button" aria-label="Cerrar detalle del requerimiento" disabled={locked} onClick={() => dialog.current.close()} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-40"><Icon name="close" /></button></header><div className="p-5 sm:p-6"><QueryStatus request={request} />{request.data && <ManagementForm initial={request.data.data} onBusy={setLocked} onChanged={onChanged} />}</div></dialog>
 }

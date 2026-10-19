@@ -17,10 +17,7 @@ class OperacionesLegajoController extends Controller
     {
         $filtros = $request->validate(['q' => 'nullable|string|max:120', 'page' => 'sometimes|integer|min:1']);
         $consulta = Legajo::query()->with('usuario:id,nombres,apellido_paterno,apellido_materno,numero_doc_identidad');
-        if (! empty($filtros['q'])) {
-            $q = '%'.mb_strtolower(trim($filtros['q'])).'%';
-            $consulta->where(fn ($c) => $c->whereRaw('LOWER(numero_legajo) LIKE ?', [$q])->orWhereHas('usuario', fn ($u) => $u->whereRaw("LOWER(nombres || ' ' || apellido_paterno || ' ' || COALESCE(apellido_materno, '')) LIKE ?", [$q])->orWhere('numero_doc_identidad', 'like', $q)));
-        }
+        $consulta->buscar($filtros['q'] ?? null);
 
         return response()->json($consulta->orderBy('numero_legajo')->orderBy('id')->paginate(20, ['id', 'usuario_id', 'numero_legajo', 'estado_legajo']));
     }
@@ -45,9 +42,17 @@ class OperacionesLegajoController extends Controller
 
     public function documentos(Request $request, string $legajo): JsonResponse
     {
-        $request->validate(['page' => 'sometimes|integer|min:1']);
+        $filtros = $request->validate(['page' => 'sometimes|integer|min:1', 'q' => 'nullable|string|max:120']);
         Legajo::query()->findOrFail($legajo);
 
-        return response()->json(DocumentosOperativos::consulta($request, $legajo, soloActivos: false)->with('tipoDocumento:id,nombre')->orderByDesc('fecha_emision')->orderBy('id')->paginate(20, ['id', 'tipo_documento_id', 'num_resolucion', 'estado', 'fecha_emision']));
+        $consulta = DocumentosOperativos::consulta($request, $legajo, soloActivos: false);
+        foreach (preg_split('/\s+/u', mb_strtolower(trim($filtros['q'] ?? '')), -1, PREG_SPLIT_NO_EMPTY) ?: [] as $palabra) {
+            $patron = '%'.$palabra.'%';
+            $consulta->where(fn ($q) => $q->whereRaw('LOWER(nombre) LIKE ?', [$patron])->orWhereRaw('LOWER(num_resolucion) LIKE ?', [$patron])
+                ->orWhereHas('tipoDocumento', fn ($t) => $t->whereRaw('LOWER(nombre) LIKE ?', [$patron])));
+        }
+
+        return response()->json($consulta->with('tipoDocumento:id,nombre,es_dato_sensible,es_dato_salud')->orderByDesc('fecha_emision')->orderBy('id')
+            ->paginate(20, ['id', 'tipo_documento_id', 'num_resolucion', 'nombre', 'estado', 'fecha_emision', 'seccion_legajo_id', 'folio_inicio', 'folio_fin']));
     }
 }

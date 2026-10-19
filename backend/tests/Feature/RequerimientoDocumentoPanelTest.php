@@ -7,6 +7,7 @@ use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use Database\Seeders\RequerimientoDocumentoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class RequerimientoDocumentoPanelTest extends TestCase
@@ -149,5 +150,18 @@ class RequerimientoDocumentoPanelTest extends TestCase
             ->assertJsonCount(10, 'data')
             ->assertJsonFragment(['descripcion' => 'Ejemplo ficticio de requerimiento 01'])
             ->assertJsonFragment(['nombres' => 'Persona Demo 01']);
+    }
+
+    public function test_search_and_overdue_filter_use_identity_and_effective_deadline_without_changing_state(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-19 12:00:00', 'America/Lima'));
+        $persona = Usuario::factory()->create(['nombres' => 'Ana Lucía', 'apellido_paterno' => 'Torres', 'apellido_materno' => 'Quispe', 'numero_doc_identidad' => '99000841']);
+        $atrasado = RequerimientoDocumento::factory()->create(['usuario_id' => $persona->id, 'estado' => 'abierto', 'fecha_limite' => '2026-10-18', 'prorroga_hasta' => null, 'cerrado_en' => null]);
+        $prorrogado = RequerimientoDocumento::factory()->create(['usuario_id' => $persona->id, 'estado' => 'abierto', 'fecha_limite' => '2026-10-17', 'prorroga_hasta' => '2026-10-21', 'cerrado_en' => null]);
+        RequerimientoDocumento::factory()->create(['usuario_id' => $persona->id, 'estado' => 'cumplido', 'fecha_limite' => '2026-10-17', 'cerrado_en' => now()]);
+        $this->getJson('/api/v1/requerimientos?q=Torres%20Ana')->assertOk()->assertJsonPath('meta.total', 3);
+        $this->getJson('/api/v1/requerimientos?q=99000841&atrasados=1')->assertOk()->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.id', $atrasado->id);
+        $this->assertSame('abierto', $atrasado->refresh()->estado);
+        $this->assertSame('abierto', $prorrogado->refresh()->estado);
     }
 }

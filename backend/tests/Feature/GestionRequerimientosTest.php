@@ -168,4 +168,28 @@ class GestionRequerimientosTest extends TestCase
         $this->postJson('/api/v1/requerimientos', [])->assertForbidden();
         $this->accion($registro, 'cancelar', ['motivo' => 'Sin permisos'])->assertForbidden();
     }
+
+    public function test_person_search_accepts_separate_names_and_dni_and_types_include_section_context(): void
+    {
+        $persona = Usuario::factory()->create(['nombres' => 'Ana Lucía', 'apellido_paterno' => 'Torres', 'apellido_materno' => 'Quispe', 'numero_doc_identidad' => '99000841']);
+        foreach (['Ana Torres', 'Torres Ana', '99000841'] as $texto) {
+            $this->getJson('/api/v1/requerimientos/personas?'.http_build_query(['q' => $texto]))->assertOk()->assertJsonPath('total', 1)->assertJsonPath('data.0.id', $persona->id);
+        }
+        $tipo = TipoDocumento::factory()->create(['seccion_legajo_id' => 3, 'nombre' => 'Certificado específico Demo', 'activo' => true]);
+        $r = $this->getJson('/api/v1/requerimientos/tipos')->assertOk();
+        $encontrado = collect($r->json('data'))->firstWhere('id', $tipo->id);
+        $this->assertSame(3, $encontrado['seccion_legajo_id']);
+        $this->assertSame(3, $encontrado['seccion_legajo']['id']);
+        $this->assertNotEmpty($encontrado['seccion_legajo']['nombre']);
+    }
+
+    public function test_detail_and_document_picker_return_the_context_needed_to_identify_the_response(): void
+    {
+        $registro = $this->crear();
+        $doc = $this->documento($registro);
+        $doc->update(['nombre' => 'Certificado de prueba', 'num_resolucion' => 'CERT-001', 'folio_inicio' => 4, 'folio_fin' => 6]);
+        $this->getJson('/api/v1/requerimientos/'.$registro['id'].'/documentos')->assertOk()->assertJsonPath('data.0.nombre', 'Certificado de prueba')->assertJsonPath('data.0.folio_inicio', 4);
+        $this->accion($registro, 'responder', ['documento_id' => $doc->id])->assertOk();
+        $this->getJson('/api/v1/requerimientos/'.$registro['id'])->assertOk()->assertJsonPath('data.usuario.id', $registro['usuario_id'])->assertJsonPath('data.documento.nombre', 'Certificado de prueba')->assertJsonPath('data.documento.id', $doc->id);
+    }
 }

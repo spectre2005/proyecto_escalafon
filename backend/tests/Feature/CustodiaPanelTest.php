@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\AuditoriaEvento;
 use App\Models\DocumentoUsuario;
+use App\Models\MovimientoCustodiaLegajo;
+use App\Models\SolicitudAccesoLegajo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
 use Tests\Concerns\OperacionesAdministrativas;
@@ -107,5 +109,48 @@ class CustodiaPanelTest extends TestCase
         $doc->tipoDocumento->update(['es_dato_salud' => true]);
         $this->getJson('/api/v1/custodia/solicitudes/'.$solicitud['id'].'/documentos/'.$doc->id.'/archivo')->assertForbidden();
         $this->assertDatabaseCount('bitacora_accesos_legajo', 0);
+    }
+
+    public function test_request_search_includes_the_legajo_owner_and_filters_expired_authorizations(): void
+    {
+        $doc = $this->documentoOperativo($this->legajoOperativo());
+        $doc->legajo->usuario->update(['nombres' => 'Ana Lucía', 'apellido_paterno' => 'Torres', 'apellido_materno' => 'Quispe']);
+        $solicitud = $this->solicitud($doc);
+        $otra = $this->solicitud($this->documentoOperativo($this->legajoOperativo()));
+        $this->getJson('/api/v1/custodia/solicitudes?q=Torres%20Ana')->assertOk()->assertJsonPath('total', 1)->assertJsonPath('data.0.id', $solicitud['id'])->assertJsonPath('data.0.legajo.usuario.nombres', 'Ana Lucía');
+        $this->getJson('/api/v1/custodia/solicitudes?forma_entrega=copia')->assertOk()->assertJsonPath('total', 0);
+        $this->accion($solicitud, 'aprobar', ['vigente_hasta' => $this->fechaOperacion(7)])->assertOk();
+        SolicitudAccesoLegajo::query()->whereKey($solicitud['id'])->update(['vigente_hasta' => $this->fechaOperacion(-1)]);
+        $this->getJson('/api/v1/custodia/solicitudes?vencidas=1&forma_entrega=prestamo')->assertOk()->assertJsonPath('total', 1)->assertJsonPath('data.0.id', $solicitud['id']);
+        $this->getJson('/api/v1/custodia/solicitudes?estado=pendiente')->assertOk()->assertJsonPath('total', 1)->assertJsonPath('data.0.id', $otra['id']);
+    }
+
+    public function test_loan_search_and_returned_filter_keep_pending_and_overdue_movements_separate(): void
+    {
+        $doc = $this->documentoOperativo($this->legajoOperativo());
+        $doc->legajo->usuario->update(['nombres' => 'Ana Lucía', 'apellido_paterno' => 'Torres', 'apellido_materno' => 'Quispe']);
+        $solicitud = $this->solicitud($doc);
+        $this->accion($solicitud, 'aprobar', ['vigente_hasta' => $this->fechaOperacion(7)])->assertOk();
+        $prestamo = $this->prestar($solicitud)->assertCreated()->json('data');
+        MovimientoCustodiaLegajo::query()->whereKey($prestamo['id'])->update(['fecha_movimiento' => $this->fechaOperacion(-3), 'fecha_devolucion_prevista' => $this->fechaOperacion(-1)]);
+        $this->getJson('/api/v1/custodia/movimientos?q=Ana%20Torres&atrasados=1')->assertOk()->assertJsonPath('total', 1)->assertJsonPath('data.0.id', $prestamo['id'])->assertJsonPath('data.0.legajo.usuario.nombres', 'Ana Lucía');
+        $this->getJson('/api/v1/custodia/movimientos?devueltos=1')->assertOk()->assertJsonPath('total', 0);
+        $this->postJson('/api/v1/custodia/movimientos/'.$prestamo['id'].'/devolver', ['version' => $prestamo['version'], 'fecha_retorno' => $this->fechaOperacion(), 'motivo' => 'Recepción completa del ejemplar'])->assertOk();
+        $this->getJson('/api/v1/custodia/movimientos?q=INV-001&devueltos=1')->assertOk()->assertJsonPath('total', 1);
+        $this->getJson('/api/v1/custodia/movimientos?pendientes=1')->assertOk()->assertJsonPath('total', 0);
+        $this->getJson('/api/v1/custodia/movimientos?atrasados=1')->assertOk()->assertJsonPath('total', 0);
+    }
+
+    public function test_document_search_is_limited_to_the_selected_legajo_and_returns_scope_metadata(): void
+    {
+        $doc = $this->documentoOperativo($this->legajoOperativo());
+        $doc->update(['nombre' => 'Certificado de estudios Demo', 'num_resolucion' => 'CERT-001', 'folio_inicio' => 3, 'folio_fin' => 5]);
+        $this->documentoOperativo($this->legajoOperativo())->update(['nombre' => 'Certificado de estudios Demo']);
+        $url = '/api/v1/operaciones/legajos/'.$doc->legajo_id.'/documentos';
+        $this->getJson($url.'?q=estudios%20certificado')->assertOk()->assertJsonPath('total', 1)->assertJsonPath('data.0.id', $doc->id)->assertJsonPath('data.0.folio_inicio', 3)->assertJsonPath('data.0.tipo_documento.es_dato_sensible', false);
+        $this->getJson($url.'?q=CERT-001')->assertOk()->assertJsonPath('total', 1);
+        $this->getJson($url.'?q=OtroDocumento')->assertOk()->assertJsonPath('total', 0);
+        $this->actuarComo(null, 'asistente_legajo');
+        $this->getJson($url)->assertForbidden();
     }
 }

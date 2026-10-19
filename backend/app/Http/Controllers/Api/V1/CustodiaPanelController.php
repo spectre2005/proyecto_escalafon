@@ -19,11 +19,17 @@ class CustodiaPanelController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $filtros = $request->validate(['q' => 'nullable|string|max:120', 'estado' => 'nullable|in:pendiente,aprobada,rechazada,revocada', 'page' => 'sometimes|integer|min:1']);
-        $consulta = SolicitudAccesoLegajo::query()->with('legajo:id,numero_legajo,usuario_id');
-        if (! empty($filtros['q'])) {
-            $q = '%'.mb_strtolower(trim($filtros['q'])).'%';
-            $consulta->where(fn ($c) => $c->whereRaw('LOWER(solicitante_nombre) LIKE ?', [$q])->orWhere('solicitante_documento', 'like', $q)->orWhereHas('legajo', fn ($l) => $l->whereRaw('LOWER(numero_legajo) LIKE ?', [$q])));
+        $filtros = $request->validate(['q' => 'nullable|string|max:120', 'estado' => 'nullable|in:pendiente,aprobada,rechazada,revocada', 'vencidas' => 'nullable|boolean', 'forma_entrega' => 'nullable|in:consulta,copia,prestamo', 'page' => 'sometimes|integer|min:1']);
+        $consulta = SolicitudAccesoLegajo::query()->with(['legajo:id,numero_legajo,usuario_id', 'legajo.usuario:id,nombres,apellido_paterno,apellido_materno,numero_doc_identidad']);
+        foreach (preg_split('/\s+/u', mb_strtolower(trim($filtros['q'] ?? '')), -1, PREG_SPLIT_NO_EMPTY) ?: [] as $palabra) {
+            $q = '%'.$palabra.'%';
+            $consulta->where(fn ($c) => $c->whereRaw('LOWER(solicitante_nombre) LIKE ?', [$q])->orWhere('solicitante_documento', 'like', $q)->orWhereHas('legajo', fn ($l) => $l->buscar($palabra)));
+        }
+        if ($filtros['vencidas'] ?? false) {
+            $consulta->where('estado', 'aprobada')->whereDate('vigente_hasta', '<', now('America/Lima')->toDateString());
+        }
+        if (! empty($filtros['forma_entrega'])) {
+            $consulta->where('forma_entrega', $filtros['forma_entrega']);
         }
         if (! empty($filtros['estado'])) {
             $consulta->where('estado', $filtros['estado']);
@@ -34,13 +40,21 @@ class CustodiaPanelController extends Controller
 
     public function show(string $solicitud): JsonResponse
     {
-        return response()->json(['data' => SolicitudAccesoLegajo::query()->with('legajo:id,numero_legajo,usuario_id')->findOrFail($solicitud)]);
+        return response()->json(['data' => SolicitudAccesoLegajo::query()->with(['legajo:id,numero_legajo,usuario_id', 'legajo.usuario:id,nombres,apellido_paterno,apellido_materno,numero_doc_identidad'])->findOrFail($solicitud)]);
     }
 
     public function movimientos(Request $request): JsonResponse
     {
-        $filtros = $request->validate(['pendientes' => 'nullable|boolean', 'atrasados' => 'nullable|boolean', 'page' => 'sometimes|integer|min:1']);
-        $consulta = MovimientoCustodiaLegajo::query()->where('tipo_movimiento', 'prestamo')->with('legajo:id,numero_legajo');
+        $filtros = $request->validate(['q' => 'nullable|string|max:120', 'devueltos' => 'nullable|boolean', 'pendientes' => 'nullable|boolean', 'atrasados' => 'nullable|boolean', 'page' => 'sometimes|integer|min:1']);
+        $consulta = MovimientoCustodiaLegajo::query()->where('tipo_movimiento', 'prestamo')->with(['legajo:id,numero_legajo,usuario_id', 'legajo.usuario:id,nombres,apellido_paterno,apellido_materno,numero_doc_identidad']);
+        foreach (preg_split('/\s+/u', mb_strtolower(trim($filtros['q'] ?? '')), -1, PREG_SPLIT_NO_EMPTY) ?: [] as $palabra) {
+            $patron = '%'.$palabra.'%';
+            $consulta->where(fn ($q) => $q->whereRaw('LOWER(numero_inventario) LIKE ?', [$patron])->orWhereRaw('LOWER(entidad_destino) LIKE ?', [$patron])
+                ->orWhereRaw('LOWER(numero_documento_sustento) LIKE ?', [$patron])->orWhereHas('legajo', fn ($l) => $l->buscar($palabra)));
+        }
+        if ($filtros['devueltos'] ?? false) {
+            $consulta->where(fn ($q) => $q->whereNotNull('fecha_retorno')->orWhereNotNull('devuelto_en'));
+        }
         if (($filtros['pendientes'] ?? false) || ($filtros['atrasados'] ?? false)) {
             $consulta->whereNull('fecha_retorno')->whereNull('devuelto_en');
         }
@@ -58,7 +72,7 @@ class CustodiaPanelController extends Controller
 
         return response()->json(DocumentosOperativos::consulta($request, $registro->legajo_id, soloActivos: false)
             ->whereIn('id', $registro->documentos_autorizados ?? [])->with('tipoDocumento:id,nombre')
-            ->orderBy('id')->paginate(20, ['id', 'tipo_documento_id', 'num_resolucion', 'estado']));
+            ->orderBy('id')->paginate(20, ['id', 'tipo_documento_id', 'num_resolucion', 'nombre', 'estado', 'folio_inicio', 'folio_fin', 'seccion_legajo_id']));
     }
 
     public function store(Request $request): JsonResponse

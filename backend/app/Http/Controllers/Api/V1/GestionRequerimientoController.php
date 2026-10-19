@@ -55,9 +55,8 @@ class GestionRequerimientoController extends Controller
     public function personas(Request $request): JsonResponse
     {
         $datos = $request->validate(['q' => 'required|string|min:2|max:120', 'page' => 'sometimes|integer|min:1']);
-        $termino = '%'.mb_strtolower(trim($datos['q'])).'%';
 
-        return response()->json(Usuario::query()->where(fn ($q) => $q->whereRaw("LOWER(nombres || ' ' || apellido_paterno || ' ' || COALESCE(apellido_materno, '')) LIKE ?", [$termino])->orWhere('numero_doc_identidad', 'like', $termino))
+        return response()->json(Usuario::query()->buscarIdentidad($datos['q'])
             ->orderBy('apellido_paterno')->orderBy('id')->paginate(20, ['id', 'nombres', 'apellido_paterno', 'apellido_materno', 'numero_doc_identidad']));
     }
 
@@ -68,7 +67,7 @@ class GestionRequerimientoController extends Controller
             $consulta->whereNotIn('seccion_legajo_id', [1, 9, 10])->where('es_dato_sensible', false)->where('es_dato_salud', false);
         }
 
-        return response()->json(['data' => $consulta->orderBy('nombre')->get(['id', 'nombre'])]);
+        return response()->json(['data' => $consulta->with('seccionLegajo:id,nombre')->orderBy('seccion_legajo_id')->orderBy('nombre')->get(['id', 'codigo', 'nombre', 'seccion_legajo_id'])]);
     }
 
     public function documentos(Request $request, string $requerimiento): JsonResponse
@@ -76,7 +75,7 @@ class GestionRequerimientoController extends Controller
         $request->validate(['page' => 'sometimes|integer|min:1']);
         $registro = RequerimientoDocumento::query()->findOrFail($requerimiento);
 
-        return response()->json(GestionRequerimientos::documentos($request, $registro)->with('tipoDocumento:id,nombre')->orderByDesc('fecha_emision')->orderBy('id')->paginate(20, ['id', 'tipo_documento_id', 'num_resolucion', 'fecha_emision', 'estado']));
+        return response()->json(GestionRequerimientos::documentos($request, $registro)->with('tipoDocumento:id,nombre')->orderByDesc('fecha_emision')->orderBy('id')->paginate(20, ['id', 'tipo_documento_id', 'num_resolucion', 'nombre', 'fecha_emision', 'estado', 'folio_inicio', 'folio_fin', 'seccion_legajo_id', 'fecha_recepcion']));
     }
 
     public function historial(Request $request, string $requerimiento): JsonResponse

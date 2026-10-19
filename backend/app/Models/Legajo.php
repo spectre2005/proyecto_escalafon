@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\LegajoFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -44,6 +45,19 @@ class Legajo extends Model
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'usuario_id', 'id');
+    }
+
+    /** Cada palabra puede pertenecer al nombre, documento o número de expediente. */
+    public function scopeBuscar(Builder $query, ?string $texto): Builder
+    {
+        foreach (preg_split('/\s+/u', mb_strtolower(trim($texto ?? '')), -1, PREG_SPLIT_NO_EMPTY) ?: [] as $palabra) {
+            $patron = '%'.$palabra.'%';
+            $query->where(fn (Builder $coincidencia) => $coincidencia->whereRaw('LOWER(numero_legajo) LIKE ?', [$patron])
+                ->orWhereHas('usuario', fn (Builder $persona) => $persona->whereRaw("LOWER(nombres || ' ' || apellido_paterno || ' ' || COALESCE(apellido_materno, '')) LIKE ?", [$patron])
+                    ->orWhere('numero_doc_identidad', 'like', $patron)));
+        }
+
+        return $query;
     }
 
     public static function paraConsulta(string $usuario): ?self
