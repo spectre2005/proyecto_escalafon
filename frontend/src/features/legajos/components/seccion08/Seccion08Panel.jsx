@@ -84,7 +84,8 @@ export default function Seccion08Panel({ usuario, categoria }) {
         <TablaTiposDocumentales elementos={items} idDe={item => item.codigo}
           clasificar={item => vistaDeItem(item, ofrecerTipo(noAplica, item))} estado={item => <Estado estado={item.estado} />}
           puedeSubir={item => !!data.legajo && (grupoActual === 'sanciones' ? puedeRegistrarSanciones : puedeSubir) && ofrecerTipo(noAplica, item)}
-          onSubir={item => { setAviso(''); setFormulario({ item: item.codigo, origen: `item-${item.codigo}` }) }}>
+          seleccionado={formulario?.item}
+      onSubir={item => { setAviso(''); setFormulario({ item: item.codigo, origen: `item-${item.codigo}` }) }}>
           {item => (
           <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
           {item.motivo && <p className="text-xs leading-relaxed text-slate-500">{item.motivo}{item.requiere_fedateo && ' Requiere fedateo.'}</p>}
@@ -108,16 +109,17 @@ export default function Seccion08Panel({ usuario, categoria }) {
                 {(doc.grupo === 'sanciones' ? puedeRevisarSanciones : puedeRevisarDocumentos) && doc.puede_revisar && doc.estado !== 'observado' && <button className={boton} onClick={() => setFormulario({ item: item.codigo, documento: doc, estado: 'observado', origen: `item-${item.codigo}` })}>Observar</button>}
                 {puedeAnular && doc.estado !== 'anulado' && <button className={`${boton} border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100`} onClick={() => setFormulario({ item: item.codigo, documento: doc, estado: 'anulado', origen: `item-${item.codigo}` })}>Anular</button>}
               </div>
-              {formulario?.documento?.id === doc.id && <div className="mt-4"><Revision03Form key={`${doc.id}:${formulario.estado}`} usuario={usuario} documento={doc} item={item} estado={formulario.estado} revisar={revisarDocumento08} fechaActual={data.fecha_actual} onCancel={() => cerrar()} onSaved={() => cerrar(formulario.estado === 'aceptado' ? 'Documento aceptado.' : formulario.estado === 'anulado' ? 'Documento anulado; se conserva en el historial.' : 'Observación registrada. La corrección se presenta con un documento nuevo.')} nota="La revisión queda en el historial. Los documentos originales se conservan sin editar ni eliminar." /></div>}
               {visor?.id === doc.id && <VisorPdf usuario={usuario} documento={doc} titulo={doc.nombre} onClose={() => setVisor(null)} />}
             </article>)}
             {/* Subsanar no depende de que el tipo aplique (lo admite el backend); la carga nueva sí (ofrecerTipo). */}
-            {data.legajo && (grupoActual === 'sanciones' ? puedeRegistrarSanciones : puedeSubir) && <>
-              {formulario?.item === item.codigo && !formulario.documento ? <Documento08Form usuario={usuario} item={item} datos={data} subsana={formulario.subsana || ''} soloSubsanar={!ofrecerTipo(noAplica, item)} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado. Queda en revisión de RR. HH.')} /> : ofrecerTipo(noAplica, item) && <button id={`agregar-${item.codigo}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.codigo, origen: `agregar-${item.codigo}` }) }}>{item.cantidad ? 'Agregar otro documento' : 'Agregar documento'}</button>}
-            </>}
+
+          {data.legajo && (grupoActual === 'sanciones' ? puedeRegistrarSanciones : puedeSubir) && ofrecerTipo(noAplica, item) && <button id={`agregar-${item.codigo}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.codigo, origen: `agregar-${item.codigo}` }) }}>Subir documento</button>}
           </div>
           )}
         </TablaTiposDocumentales>
+    {(items || []).filter(item => item.codigo === formulario?.item).map(item => <div key={item.codigo}>
+      {formulario.documento ? item.documentos.filter(doc => formulario.documento.id === doc.id).map(doc => <div key={doc.id}><div className="mt-4"><Revision03Form key={`${doc.id}:${formulario.estado}`} usuario={usuario} documento={doc} item={item} estado={formulario.estado} revisar={revisarDocumento08} fechaActual={data.fecha_actual} onCancel={() => cerrar()} onSaved={() => cerrar(formulario.estado === 'aceptado' ? 'Documento aceptado.' : formulario.estado === 'anulado' ? 'Documento anulado; se conserva en el historial.' : 'Observación registrada. La corrección se presenta con un documento nuevo.')} nota="La revisión queda en el historial. Los documentos originales se conservan sin editar ni eliminar." /></div></div>) : <Documento08Form usuario={usuario} item={item} datos={data} subsana={formulario.subsana || ''} soloSubsanar={!ofrecerTipo(noAplica, item)} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado correctamente.')} />}
+    </div>)}
       </section>
       <section className="rounded-2xl border border-slate-200 bg-white p-5" aria-label={`Línea de tiempo de ${titulo.toLowerCase()}`}>
         <h3 className="font-semibold text-slate-800">Línea de tiempo</h3>

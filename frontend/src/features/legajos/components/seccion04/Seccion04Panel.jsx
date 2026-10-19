@@ -64,11 +64,12 @@ export default function Seccion04Panel({ usuario }) {
     <TablaTiposDocumentales elementos={data.items} clasificar={item => vistaDeItem(item, ofrecerTipo(noAplica, item))}
       nombreDe={item => `${item.letra}) ${item.nombre}`} estado={item => <Estado estado={item.estado} />}
       puedeSubir={item => puedeAgregar && !!data.legajo && item.aplica && ofrecerTipo(noAplica, item)}
+      seleccionado={formulario?.item}
       onSubir={item => { setAviso(''); setFormulario({ item: item.id, origen: `item-${item.id}` }) }}>
       {item => (
         <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
           {item.motivo && <p className="text-xs leading-relaxed text-slate-500">{item.motivo}{item.requiere_fedateo && ' Requiere fedateo.'}</p>}
-          {item.documentos.length === 0 && <p className="text-sm text-slate-500">{item.estado === 'falta' ? 'Todavía no se registró este documento. Agrégalo para que RR. HH. lo revise.' : item.estado === 'no_aplica' ? 'Este documento no se exige para el puesto registrado.' : 'No hay documentos registrados. Puedes agregar uno si corresponde.'}</p>}
+          {item.documentos.length === 0 && <p className="text-sm text-slate-500">{item.estado === 'falta' ? 'Todavía no se registró este documento. Puedes subirlo ahora.' : item.estado === 'no_aplica' ? 'Este documento no se exige para el puesto registrado.' : 'No hay documentos registrados. Puedes agregar uno si corresponde.'}</p>}
           <ul className="space-y-3">{item.documentos.map(doc => <li key={doc.id} className={`min-w-0 rounded-xl border border-slate-200 p-4 ${doc.subsanado ? 'bg-slate-50' : ''}`}>
             <div className="flex flex-wrap items-start justify-between gap-2"><h4 className="min-w-0 break-words text-sm font-semibold text-slate-800">{doc.nombre}</h4><Estado estado={doc.estado} /></div>
             <p className="mt-2 break-words text-xs text-slate-600">{doc.emisor} · Emitido el {fecha(doc.fecha_emision)}{doc.num_resolucion && ` · Registro ${doc.num_resolucion}`}</p>
@@ -86,15 +87,16 @@ export default function Seccion04Panel({ usuario }) {
               {puedeRevisar && doc.puede_revisar && doc.estado !== 'observado' && <button id={`observar-${doc.id}`} className={boton} onClick={() => setFormulario({ item: item.id, documento: doc.id, estado: 'observado', origen: `observar-${doc.id}` })}>Observar</button>}
             </div>
             {puedeRevisar && !doc.puede_revisar && !doc.subsanado && doc.estado !== 'anulado' && <p className="mt-3 text-xs text-slate-500">Otra persona de RR. HH. debe revisar esta carga.</p>}
-            {formulario?.documento === doc.id && <div className="mt-4"><Revision03Form revisar={revisarDocumento04} nota="La revisión queda en el historial. Verifica también el periodo y su clasificación. La aceptación no acredita una fiscalización posterior con la entidad emisora." key={`${doc.id}:${formulario.estado}`} usuario={usuario} documento={doc} item={item} estado={formulario.estado} onCancel={() => cerrar()} onSaved={() => cerrar(formulario.estado === 'aceptado' ? 'Documento aceptado. La fiscalización posterior sigue siendo independiente.' : formulario.estado === 'anulado' ? 'Documento anulado. Se conserva su archivo e historial.' : 'Observación registrada. La corrección se presenta con un documento nuevo.')} /></div>}
             {visor?.id === doc.id && <VisorPdf usuario={usuario} documento={doc} titulo={doc.nombre} onClose={() => setVisor(null)} />}
           </li>)}</ul>
-          {puedeAgregar && data.legajo && item.aplica && <>
-            {formulario?.item === item.id && !formulario.documento ? <Documento04Form usuario={usuario} item={item} datos={data} subsana={formulario.subsana || ''} soloSubsanar={!ofrecerTipo(noAplica, item)} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado. Queda en revisión de RR. HH.')} /> : ofrecerTipo(noAplica, item) && <button id={`agregar-${item.id}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.id, origen: `agregar-${item.id}` }) }}>{item.cantidad ? (item.permite_multiples ? 'Agregar otro documento' : 'Agregar documento que subsane al anterior') : 'Agregar documento'}</button>}
-          </>}
+
+          {puedeAgregar && data.legajo && item.aplica && ofrecerTipo(noAplica, item) && <button id={`agregar-${item.id}`} className={boton} onClick={() => { setAviso(''); setFormulario({ item: item.id, origen: `agregar-${item.id}` }) }}>Subir documento</button>}
         </div>
       )}
     </TablaTiposDocumentales>
+    {data.items.filter(item => item.id === formulario?.item).map(item => <div key={item.id}>
+      {formulario.documento ? item.documentos.filter(doc => formulario.documento === doc.id).map(doc => <div key={doc.id}><div className="mt-4"><Revision03Form revisar={revisarDocumento04} nota="La revisión queda en el historial. Verifica también el periodo y su clasificación. La aceptación no acredita una fiscalización posterior con la entidad emisora." key={`${doc.id}:${formulario.estado}`} usuario={usuario} documento={doc} item={item} estado={formulario.estado} onCancel={() => cerrar()} onSaved={() => cerrar(formulario.estado === 'aceptado' ? 'Documento aceptado. La fiscalización posterior sigue siendo independiente.' : formulario.estado === 'anulado' ? 'Documento anulado. Se conserva su archivo e historial.' : 'Observación registrada. La corrección se presenta con un documento nuevo.')} /></div></div>) : <Documento04Form usuario={usuario} item={item} datos={data} subsana={formulario.subsana || ''} soloSubsanar={!ofrecerTipo(noAplica, item)} onCancel={() => cerrar()} onSaved={() => cerrar('Documento guardado correctamente.')} />}
+    </div>)}
     <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-3">
       {[['Experiencia total', data.tiempo.total], ['Sector público', data.tiempo.publico], ['Sector privado', data.tiempo.privado]].map(([label, t]) => <div key={label}><p className="text-xs text-slate-500">{label}</p><p className="mt-2 text-lg font-semibold text-slate-800">{t.anios} años, {t.meses} meses y {t.dias} días</p><p className="mt-1 text-xs text-slate-500">{t.dias_totales} días calendario · {t.anios_decimal.toFixed(2)} años</p></div>)}
       <p className="col-span-full text-xs text-slate-500">Corte: {fecha(data.tiempo.fecha_corte)}. Mes de {data.tiempo.configuracion.dias_por_mes} días y año de {data.tiempo.configuracion.dias_por_anio} días. {data.tiempo.configuracion.incluir_pendientes ? 'Incluye documentos aceptados y en revisión.' : 'Solo cuenta documentos aceptados.'} Los subtotales por sector pueden sumar más que el total si hay periodos simultáneos.</p>

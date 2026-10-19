@@ -134,7 +134,7 @@ function Desvinculaciones({ usuario, data, sinLegajo, onNavigate }) {
 }
 
 // Un tipo de documento: estado, lista (recepción y visor comunes) y carga con enlace a la desvinculación o al vínculo.
-function TipoDocumento({ usuario, data, tipo, sinLegajo, ofrecer, modo }) {
+function TipoDocumento({ usuario, data, tipo, sinLegajo, ofrecer, modo, onTerminar }) {
   // Cargar uno nuevo solo si el tipo se ofrece; subsanar uno existente también si ya no se ofrece (lo admite el backend).
   const puedeCargar = usePuede('documento.subir')
   const puedeSubir = puedeCargar && ofrecer
@@ -154,8 +154,10 @@ function TipoDocumento({ usuario, data, tipo, sinLegajo, ofrecer, modo }) {
     const abre = tipo.principal && !documento.enlazado && !documento.subsana_a_documento_id
     setAviso(`Documento cargado (folios ${folios(documento.folio_inicio, documento.folio_fin)}).${documento.enlazado ? ' Quedó enlazado.' : abre ? ' Registra la desvinculación que acredita o cancela si es un documento adicional.' : tipo.formulario_datos ? ' Quedó sin vínculo: para agruparlo, súbelo eligiendo la desvinculación.' : ''}`)
     if (abre) setRegistrando(documento.id)
+    else onTerminar?.('Documento guardado correctamente.')
   }
   return <li id={idTipo(tipo.id)} className="scroll-mt-4 p-4">
+    {modo !== 'subir' && (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-slate-800">{tipo.literal ? <span className="mr-1 text-slate-500">{tipo.literal})</span> : tipo.codigo === 'S11_X_ACEPTACION_RENUNCIA' && <span className="mr-1 text-slate-500">Anexo 05 ·</span>}{tipo.nombre}</p>
@@ -172,29 +174,36 @@ function TipoDocumento({ usuario, data, tipo, sinLegajo, ofrecer, modo }) {
         {puedeSubir && <button disabled={subiendo || !!registrando || !!sinLegajo || tipo.restringido} title={tipo.restringido ? 'Requiere acceso a datos sensibles.' : sinLegajo || undefined} onClick={() => { setAviso(''); setSubiendo(true) }} className={`${enlace} inline-flex items-center gap-2`}><Icon name="paperclip" size={18} />Subir documento</button>}
       </div>
     </div>
+    )}
     {aviso && <p role="status" className="mt-3 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
-    {subiendo && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={11} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo, data)} precarga={id => precargaDe(tipo, data, id)} onSaved={subido} onCancel={() => setSubiendo(false)} /></div>}
+    {subiendo && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={11} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo, data)} precarga={id => precargaDe(tipo, data, id)} onSaved={subido} onCancel={() => { setSubiendo(false); onTerminar?.() }} /></div>}
     {recuperando && <EnZona titulo={tituloPaso('Enlazar', tipo, recuperando)}><EnlazarDocumento usuario={usuario} documento={recuperando} opciones={enlacesDe(tipo, data)}
       onRegistrarNuevo={tipo.principal ? () => { setRegistrando(recuperando.id); setRecuperando(null) } : null}
       onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} /></EnZona>}
     {subsanando && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={11} tipo={tipo} titular={data.titular} subsanar={subsanando} onSaved={subido} onCancel={() => setSubsanando(null)} /></div>}
     {registrando && <EnZona titulo={tituloPaso('Registrar la desvinculación que acredita', tipo)}>{libres.length
-      ? <div className="mt-4"><DesvinculacionForm usuario={usuario} vinculos={libres} motivos={tipo.motivos} documentoId={registrando} onSaved={() => { setRegistrando(null); setAviso('Desvinculación registrada y acreditada por el documento.') }} onCancel={() => { setRegistrando(null); setAviso('El documento quedó cargado sin desvinculación enlazada.') }} /></div>
-      : <div className="mt-4"><Aviso accion={<button onClick={() => setRegistrando(null)} className={enlace}>Entendido</button>}>El documento quedó cargado, pero no hay vínculos con cese registrado pendientes de desvinculación{tipo.solo_plazo_determinado ? ' de plazo determinado' : ''}. Registra el cese en la sección 02.</Aviso></div>}</EnZona>}
+      ? <div className="mt-4"><DesvinculacionForm usuario={usuario} vinculos={libres} motivos={tipo.motivos} documentoId={registrando} onSaved={() => { setRegistrando(null); setAviso('Desvinculación registrada y acreditada por el documento.'); onTerminar?.('Documento y desvinculación guardados correctamente.') }} onCancel={() => { setRegistrando(null); setAviso('El documento quedó cargado sin desvinculación enlazada.'); onTerminar?.('Documento guardado correctamente.') }} /></div>
+      : <div className="mt-4"><Aviso accion={<button onClick={() => { setRegistrando(null); onTerminar?.('Documento guardado correctamente.') }} className={enlace}>Entendido</button>}>El documento quedó cargado, pero no hay vínculos con cese registrado pendientes de desvinculación{tipo.solo_plazo_determinado ? ' de plazo determinado' : ''}. Registra el cese en la sección 02.</Aviso></div>}</EnZona>}
   </li>
 }
 
 function Documentos({ usuario, data, sinLegajo }) {
   const puedeSubir = usePuede('documento.subir')
   const noAplica = useNoAplicables(usuario)
+  const [carga, setCarga] = useState(null)
+  const [aviso, setAviso] = useState('')
+  const tipoCarga = data.tipos.find(tipo => tipo.id === carga)
+  const terminar = mensaje => { setCarga(null); if (mensaje) setAviso(mensaje) }
   if (!data.tipos.length) return <Aviso>El catálogo de documentos de la sección 11 no está cargado en la base de datos (Seccion11CatalogoSeeder).</Aviso>
   // Los que quedaron sin desvinculación: arriba, con acceso a su tipo (cada tipo ofrece «Enlazar ahora»).
-  return <div id={idBloque.documentos} className="scroll-mt-4"><SinAsociar tipos={data.tipos} />{Object.entries(bloquesDocumentos11).map(([bloque, titulo]) => <section key={bloque} aria-label={titulo} className="mb-8">
+  return <div id={idBloque.documentos} className="scroll-mt-4">{aviso && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}<SinAsociar tipos={data.tipos} />{Object.entries(bloquesDocumentos11).map(([bloque, titulo]) => <section key={bloque} aria-label={titulo} className="mb-8">
     <h3 className="mb-3 text-base font-semibold text-slate-800">{titulo}</h3>
     <GruposTipos tipos={data.tipos.filter(t => t.bloque === bloque)} noAplica={noAplica}
-      puedeSubir={tipo => puedeSubir && ofrecerTipo(noAplica, tipo)} deshabilitado={tipo => !!sinLegajo || tipo.restringido}
+      puedeSubir={tipo => puedeSubir && ofrecerTipo(noAplica, tipo)} deshabilitado={tipo => !!carga || !!sinLegajo || tipo.restringido} onSubir={tipo => { setAviso(''); setCarga(tipo.id) }}
       render={(tipo, modo) => <TipoDocumento modo={modo} key={tipo.id} usuario={usuario} data={data} tipo={tipo} sinLegajo={sinLegajo} ofrecer={ofrecerTipo(noAplica, tipo)} />} />
-  </section>)}</div>
+  </section>)}
+    {tipoCarga && <ul className="list-none"><TipoDocumento key={tipoCarga.id} modo="subir" usuario={usuario} data={data} tipo={tipoCarga} sinLegajo={sinLegajo} ofrecer={ofrecerTipo(noAplica, tipoCarga)} onTerminar={terminar} /></ul>}
+  </div>
 }
 
 export default function Seccion11Panel({ usuario, categoria, onNavigate }) {

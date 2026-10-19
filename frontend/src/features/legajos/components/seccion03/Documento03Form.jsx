@@ -126,7 +126,7 @@ export default function Documento03Form({
       onSubmit={() => {
         if (pdf && !errorPdf) guardar(draft)
       }}
-      nota="Quedará en revisión. Lo registrado no se edita ni se elimina: para corregirlo, agrega un documento nuevo que subsane al anterior."
+      nota="Lo registrado no se edita ni se elimina: para corregirlo, agrega un documento nuevo que subsane al anterior."
     >
       <FormSplit
         pdf={

@@ -48,7 +48,7 @@ export default function Documento06Form({ usuario, item, datos, onSaved, onCance
   }, () => { recordarModalidad(draft.modalidad_presentacion); onSaved() })
   const vigentes = item.documentos.filter(doc => !doc.subsanado && doc.estado !== 'anulado')
   return <Formulario modal titulo={draft.subsana_a_documento_id ? 'Subsanar documento de compensaciones' : 'Agregar documento de compensaciones'} guardar="Guardar registro" busy={busy} error={error} onCancel={onCancel}
-    onSubmit={() => { if (pdf && !errorPdf) guardar(draft) }} nota="Lo registrado no se edita ni se borra. Si hay un error, agrega un documento nuevo que subsane al anterior. Quedará en revisión de RR. HH.">
+    onSubmit={() => { if (pdf && !errorPdf) guardar(draft) }} nota="Lo registrado no se edita ni se borra. Si hay un error, agrega un documento nuevo que subsane al anterior.">
     <FormSplit pdf={<PdfPreviewField onPages={setPaginas} label={`Adjuntar PDF (máximo ${datos.tamano_maximo_kb} KB)`} required maxMB={datos.tamano_maximo_kb / 1024} help="La vista previa se genera en tu navegador. El PDF se envía al guardar el registro." error={errorPdf || errors.pdf} onChange={(file, message) => { setPdf(file); setErrorPdf(message) }} />}>
       <Campo label="Nombre del documento" required error={errors.nombre} className="sm:col-span-2"><input ref={primero} required maxLength={200} value={draft.nombre} onChange={set('nombre')} /></Campo>
       <Campo label="Entidad emisora" required error={errors.emisor}><input required maxLength={200} value={draft.emisor} onChange={set('emisor')} /></Campo>

@@ -146,7 +146,14 @@ function Documentos({ usuario, data, codigos }) {
     <GruposTipos tipos={catalogo} noAplica={noAplica} puedeSubir={tipo => puedeSubir && ofrecerTipo(noAplica, tipo) && !!textoSubirTipo(tipo)}
       deshabilitado={() => ocupado || !!sinLegajo}
       seleccionado={subiendo || subsanando?.tipoId || enlazando?.tipoId || recuperando?.tipoId}
-      onSubir={tipo => { setAviso(''); setSubiendo(tipo.id) }} render={tipo => {
+      onSubir={tipo => { setAviso(''); setSubiendo(tipo.id) }} flujos={tipo => <>
+        {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={1} tipo={tipo} titular={data.titular} relacion={relacionPorTipo[tipo.codigo]} enlaces={enlacesDe(tipo, data)} precarga={id => precargaDe(tipo, data, id)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}
+        {recuperando?.tipoId === tipo.id && <EnZona titulo={tituloPaso('Enlazar', tipo, recuperando.documento)}><EnlazarDocumento usuario={usuario} documento={recuperando.documento} opciones={enlacesDe(tipo, data)}
+          onRegistrarNuevo={() => { setEnlazando({ tipoId: tipo.id, documentoId: recuperando.documento.id }); setRecuperando(null) }}
+          onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} /></EnZona>}
+        {subsanando?.tipoId === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={1} tipo={tipo} titular={data.titular} relacion={relacionPorTipo[tipo.codigo]} subsanar={subsanando.documento} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubsanando(null)} /></div>}
+        {enlazando?.tipoId === tipo.id && <EnZona titulo={tituloPaso('Completar los datos que acredita', tipo)}><div className="mt-4"><FormularioEnlazado usuario={usuario} data={data} tipo={tipo} documentoId={enlazando.documentoId} onDone={enlazado} /></div></EnZona>}
+      </>} render={tipo => {
       const [exigeTexto, exigeClase] = tipo.aplica ? exigencia[String(tipo.exigido)] : ['No aplica', 'bg-slate-100 text-slate-500']
       return <li key={tipo.id} id={idTipo(tipo.id)} className={`scroll-mt-4 p-4 ${tipo.aplica ? '' : 'opacity-60'}`}>
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -164,12 +171,6 @@ function Documentos({ usuario, data, codigos }) {
             {puedeSubir && ofrecerTipo(noAplica, tipo) && textoSubirTipo(tipo) && <button disabled={ocupado || sinLegajo} onClick={() => { setAviso(''); setSubiendo(tipo.id) }} className={`${enlace} inline-flex items-center gap-2`}><Icon name="paperclip" size={18} />{textoSubirTipo(tipo)}</button>}
           </div>
         </div>
-        {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={1} tipo={tipo} titular={data.titular} relacion={relacionPorTipo[tipo.codigo]} enlaces={enlacesDe(tipo, data)} precarga={id => precargaDe(tipo, data, id)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}
-        {recuperando?.tipoId === tipo.id && <EnZona titulo={tituloPaso('Enlazar', tipo, recuperando.documento)}><EnlazarDocumento usuario={usuario} documento={recuperando.documento} opciones={enlacesDe(tipo, data)}
-          onRegistrarNuevo={() => { setEnlazando({ tipoId: tipo.id, documentoId: recuperando.documento.id }); setRecuperando(null) }}
-          onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} /></EnZona>}
-        {subsanando?.tipoId === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={1} tipo={tipo} titular={data.titular} relacion={relacionPorTipo[tipo.codigo]} subsanar={subsanando.documento} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubsanando(null)} /></div>}
-        {enlazando?.tipoId === tipo.id && <EnZona titulo={tituloPaso('Completar los datos que acredita', tipo)}><div className="mt-4"><FormularioEnlazado usuario={usuario} data={data} tipo={tipo} documentoId={enlazando.documentoId} onDone={enlazado} /></div></EnZona>}
       </li>
     }} />
   </section>

@@ -57,7 +57,7 @@ export default function Documento04Form({ usuario, item, datos, onSaved, onCance
     return (Date.parse(`${draft.fecha_inicio}T00:00:00Z`) - Date.parse(`${fin}T00:00:00Z`)) / 86400000 - 1 > datos.tiempo.configuracion.hueco_largo_dias
   })()
   return <Formulario modal titulo={draft.subsana_a_documento_id ? 'Subsanar documento de experiencia laboral' : 'Agregar documento de experiencia laboral'} guardar="Guardar registro" busy={busy} error={error} onCancel={onCancel}
-    onSubmit={() => { if (pdf && !errorPdf) guardar(draft) }} nota="Lo registrado no se edita ni se borra. Si hay un error, agrega un documento nuevo que subsane al anterior. Quedará en revisión de RR. HH.">
+    onSubmit={() => { if (pdf && !errorPdf) guardar(draft) }} nota="Lo registrado no se edita ni se borra. Si hay un error, agrega un documento nuevo que subsane al anterior.">
     <FormSplit pdf={<PdfPreviewField onPages={setPaginas} label={`Adjuntar PDF (máximo ${datos.tamano_maximo_kb} KB)`} required maxMB={datos.tamano_maximo_kb / 1024} help="La vista previa se genera en tu navegador. El PDF se envía al guardar el registro." error={errorPdf || errors.pdf} onChange={(file, message) => { setPdf(file); setErrorPdf(message) }} />}>
       <Campo label="Nombre del documento" required error={errors.nombre} className="sm:col-span-2"><input ref={primero} required maxLength={200} value={draft.nombre} onChange={set('nombre')} /></Campo>
       <Campo label={item.letra === 'a' ? 'Entidad o empresa' : 'Entidad emisora'} required error={errors.emisor}><input required maxLength={200} value={draft.emisor} onChange={set('emisor')} /></Campo>

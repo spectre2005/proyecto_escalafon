@@ -15,7 +15,7 @@ export default function TablaTiposDocumentales({ elementos, clasificar, estado, 
   const [previoSeleccionado, setPrevioSeleccionado] = useState(seleccionado)
   if (seleccionado !== previoSeleccionado) {
     setPrevioSeleccionado(seleccionado)
-    if (seleccionado) setSeleccion({ id: seleccionado, modo: 'ver' })
+    if (seleccionado) setSeleccion(null)
   }
   const item = elementos.find(elemento => String(idDe(elemento)) === String(seleccion?.id))
 
@@ -29,8 +29,12 @@ export default function TablaTiposDocumentales({ elementos, clasificar, estado, 
   }, [elementos, idDe])
 
   function abrir(elemento, modo) {
-    setSeleccion({ id: idDe(elemento), modo })
-    if (modo === 'subir') onSubir?.(elemento)
+    if (modo === 'subir') {
+      setSeleccion(null)
+      onSubir(elemento)
+    } else {
+      setSeleccion({ id: idDe(elemento), modo })
+    }
   }
   function cerrar() {
     if (contenido.current?.querySelector('form[aria-busy="true"]')) return

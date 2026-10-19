@@ -1,10 +1,11 @@
+import { Fragment } from 'react'
 import { cantidadDocumentos, ofrecerTipo } from '../../config/aplicacion'
 import { vistaDe } from '../../config/vistasDocumentales'
 import TablaTiposDocumentales from './TablaTiposDocumentales'
 
 const observado = tipo => (tipo.lista || []).some(documento => !documento.subsanado && (documento.estado_visible || documento.values?.estado) === 'observado')
 
-export default function GruposTipos({ tipos, noAplica, render, aplica = true, puedeSubir, onSubir, deshabilitado, seleccionado }) {
+export default function GruposTipos({ tipos, noAplica, render, flujos, aplica = true, puedeSubir, onSubir, deshabilitado, seleccionado }) {
   const clasificar = tipo => vistaDe({
     aplica: aplica && tipo.aplica !== false && ofrecerTipo(noAplica, tipo),
     exigido: tipo.exigido === undefined ? false : tipo.exigido,
@@ -21,9 +22,12 @@ export default function GruposTipos({ tipos, noAplica, render, aplica = true, pu
     const [texto, color] = estados[clasificar(tipo)]
     return <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs ${color}`}>{texto}</span>
   }
-  return <TablaTiposDocumentales elementos={tipos} clasificar={clasificar} estado={estado}
+  return <>
+  <TablaTiposDocumentales elementos={tipos} clasificar={clasificar} estado={estado}
     nombreDe={tipo => `${tipo.literal ? `${tipo.literal}) ` : ''}${tipo.nombre}`}
     puedeSubir={puedeSubir} onSubir={onSubir} deshabilitado={deshabilitado} seleccionado={seleccionado}>
     {(tipo, modo) => <ul className="list-none">{render(tipo, modo)}</ul>}
   </TablaTiposDocumentales>
+  {flujos && tipos.map(tipo => <Fragment key={tipo.id}>{flujos(tipo)}</Fragment>)}
+  </>
 }

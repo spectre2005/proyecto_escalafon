@@ -187,7 +187,20 @@ function Documentos({ usuario, data, subseccion, sinLegajo, aplica = true }) {
     <GruposTipos tipos={subseccion.tipos} noAplica={noAplica} aplica={aplica} puedeSubir={tipo => puedeSubir && ofrecerTipo(noAplica, tipo) && !!textoSubirTipo(tipo) && aplica}
       deshabilitado={() => ocupado || !!sinLegajo}
       seleccionado={subiendo || subsanando?.tipoId || enlazando?.tipoId || recuperando?.tipoId}
-      onSubir={tipo => { setAviso(''); setSubiendo(tipo.id) }} render={tipo => {
+      onSubir={tipo => { setAviso(''); setSubiendo(tipo.id) }} flujos={tipo => <>
+        {recuperando?.tipoId === tipo.id && <EnZona titulo={`Enlazar: ${tipo.literal ? `${tipo.literal}) ` : ''}${tipo.nombre} (folios ${folios(recuperando.documento.values.folio_inicio, recuperando.documento.values.folio_fin)})`}><EnlazarDocumento usuario={usuario} documento={recuperando.documento} opciones={enlacesDe(tipo.formulario_datos, data)}
+          onRegistrarNuevo={() => { setEnlazando({ tipoId: tipo.id, formulario: tipo.formulario_datos, documentoId: recuperando.documento.id, confirmar: tipo.formulario_datos === 'vinculos_laborales' && vigentes.length > 0 }); setRecuperando(null) }}
+          onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} /></EnZona>}
+        {subsanando?.tipoId === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={2} tipo={tipo} titular={data.titular} subsanar={subsanando.documento}
+          enlaces={tipo.formulario_datos === 'vinculos_laborales' ? enlacesDe(tipo.formulario_datos, data) : null} enlaceInicial={tipo.formulario_datos === 'vinculos_laborales' ? subsanando.documento.values.vinculo_laboral_id || '' : ''}
+          precarga={id => precargaDe(tipo, data, id)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubsanando(null)} /></div>}
+        {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={2} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo.formulario_datos, data)}
+          enlaceInicial={vinculoPropuesto(tipo, data)} precarga={id => precargaDe(tipo, data, id)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}
+        {enlazando?.tipoId === tipo.id && <EnZona titulo={`Datos que acredita: ${tipo.literal ? `${tipo.literal}) ` : ''}${tipo.nombre}`}>{enlazando.confirmar
+          ? <div className="mt-4"><Aviso accion={<div className="flex flex-wrap gap-3"><button onClick={() => setEnlazando({ ...enlazando, confirmar: false })} className={enlace}>Sí, registrar otro vínculo</button><button onClick={() => enlazado(false)} className="text-sm text-slate-600">No, dejarlo sin vínculo</button></div>}>
+            El documento quedó cargado sin vínculo elegido y la persona ya tiene un vínculo vigente ({vigentes.map(v => v.values.nombre_puesto).join(', ')}). ¿El documento corresponde a otro vínculo nuevo?</Aviso></div>
+          : <div className="mt-4"><FormularioEnlazado usuario={usuario} data={data} formulario={enlazando.formulario} documentoId={enlazando.documentoId} onDone={enlazado} /></div>}</EnZona>}
+      </>} render={tipo => {
       const [exigeTexto, exigeClase] = exigencia[String(aplica ? tipo.exigido : false)]
       return <li key={tipo.id} id={idTipo(tipo.id)} className="scroll-mt-4 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -205,18 +218,6 @@ function Documentos({ usuario, data, subseccion, sinLegajo, aplica = true }) {
           </div>
         </div>
         {/* Los documentos del vínculo admiten varios: la subsanación se agrupa con el mismo vínculo (editable). */}
-        {recuperando?.tipoId === tipo.id && <EnZona titulo={`Enlazar: ${tipo.literal ? `${tipo.literal}) ` : ''}${tipo.nombre} (folios ${folios(recuperando.documento.values.folio_inicio, recuperando.documento.values.folio_fin)})`}><EnlazarDocumento usuario={usuario} documento={recuperando.documento} opciones={enlacesDe(tipo.formulario_datos, data)}
-          onRegistrarNuevo={() => { setEnlazando({ tipoId: tipo.id, formulario: tipo.formulario_datos, documentoId: recuperando.documento.id, confirmar: tipo.formulario_datos === 'vinculos_laborales' && vigentes.length > 0 }); setRecuperando(null) }}
-          onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} /></EnZona>}
-        {subsanando?.tipoId === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={2} tipo={tipo} titular={data.titular} subsanar={subsanando.documento}
-          enlaces={tipo.formulario_datos === 'vinculos_laborales' ? enlacesDe(tipo.formulario_datos, data) : null} enlaceInicial={tipo.formulario_datos === 'vinculos_laborales' ? subsanando.documento.values.vinculo_laboral_id || '' : ''}
-          precarga={id => precargaDe(tipo, data, id)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubsanando(null)} /></div>}
-        {subiendo === tipo.id && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={2} tipo={tipo} titular={data.titular} enlaces={enlacesDe(tipo.formulario_datos, data)}
-          enlaceInicial={vinculoPropuesto(tipo, data)} precarga={id => precargaDe(tipo, data, id)} onSaved={documento => subido(tipo, documento)} onCancel={() => setSubiendo(null)} /></div>}
-        {enlazando?.tipoId === tipo.id && <EnZona titulo={`Datos que acredita: ${tipo.literal ? `${tipo.literal}) ` : ''}${tipo.nombre}`}>{enlazando.confirmar
-          ? <div className="mt-4"><Aviso accion={<div className="flex flex-wrap gap-3"><button onClick={() => setEnlazando({ ...enlazando, confirmar: false })} className={enlace}>Sí, registrar otro vínculo</button><button onClick={() => enlazado(false)} className="text-sm text-slate-600">No, dejarlo sin vínculo</button></div>}>
-            El documento quedó cargado sin vínculo elegido y la persona ya tiene un vínculo vigente ({vigentes.map(v => v.values.nombre_puesto).join(', ')}). ¿El documento corresponde a otro vínculo nuevo?</Aviso></div>
-          : <div className="mt-4"><FormularioEnlazado usuario={usuario} data={data} formulario={enlazando.formulario} documentoId={enlazando.documentoId} onDone={enlazado} /></div>}</EnZona>}
       </li>
     }} />
   </section>
