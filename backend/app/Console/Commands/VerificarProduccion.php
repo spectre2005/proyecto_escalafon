@@ -57,6 +57,8 @@ class VerificarProduccion extends Command
         } else {
             $this->avisar('PLATAFORMA_MODO=unica: una sola institución, sin panel de plataforma operativo.');
         }
+        $this->exigir(trim((string) config('identidad.proveedor')) !== 'simulado',
+            'IDENTIDAD_PROVEEDOR no puede ser simulado: sus datos son ficticios (en producción se bloquea igual). Usa ninguno hasta tener un proveedor oficial.');
         $this->almacenamientoUnica();
         if (config('app.crud_generico_escritura')) {
             $this->avisar('API_CRUD_GENERICO_ESCRITURA=true: el CRUD genérico permite borrar y editar sin las reglas de cada sección (auditoría, historial, folios).');

@@ -192,6 +192,15 @@ Evaluación del alta de personal con pruebas reales (19/10/2026, en una copia de
         banderas del puesto en `usuarios` no se pueden editar y quedan siempre vacías; la ficha y el vínculo pueden
         tener leyes distintas (falta decidir cuál manda).
 
+Consulta de identidad por DNI en el registro manual (20/10/2026, rama `feature/consulta-dni-reniec`):
+34. Hecho con un proveedor SIMULADO (datos ficticios, solo en local y pruebas). El detalle está en
+    `docs/CONSULTA_IDENTIDAD.md`. Completa nombres y apellidos; es opcional, con el módulo `consulta_dni` por
+    institución, auditoría sin el DNI completo y límite de consultas. **No hay conexión con RENIEC ni PIDE.** Pendiente
+    del cliente: (a) ¿la universidad tiene o puede pedir acceso oficial (PIDE o el servicio que corresponda)?; (b) ¿quién
+    aporta las credenciales, la plataforma o cada universidad?; (c) documentación técnica oficial antes de programar el
+    proveedor real. Igual que en el pend. 31, no usar APIs de terceros (Ley 29733). Fuera de alcance por ahora: fecha de
+    nacimiento, estado civil, domicilio, ubigeo, sexo, foto y familiares.
+
 ## Hoja de ruta del sistema institucional (por definir, analizado el 13/10/2026)
 
 Funcionalidades que faltan, con su base en la directiva. Orden propuesto, sin decidir:

@@ -43,6 +43,7 @@ class ProduccionTest extends TestCase
             'auth.administrador_inicial' => ['email' => null, 'password' => null],
             'plataforma.administrador_prueba' => ['email' => null, 'password' => null],
             'plataforma.institucion_prueba' => ['slug' => null, 'nombre' => null],
+            'identidad.proveedor' => 'ninguno',
             ...$cambios,
         ]);
     }
@@ -78,6 +79,12 @@ class ProduccionTest extends TestCase
             $this->segura([$clave => 'valor-de-env-example']);
             $this->artisan('produccion:verificar')->expectsOutputToContain("{$variable} debe quedar vacía")->assertFailed();
         }
+    }
+
+    public function test_the_simulated_identity_provider_does_not_start(): void
+    {
+        $this->segura(['identidad.proveedor' => 'simulado']);
+        $this->artisan('produccion:verificar')->expectsOutputToContain('IDENTIDAD_PROVEEDOR no puede ser simulado')->assertFailed();
     }
 
     public function test_the_demo_seeders_create_nothing_in_production(): void

@@ -13,8 +13,9 @@ function notifyUpdate() {
   window.dispatchEvent(new Event('records-updated'))
 }
 if (updates) updates.onmessage = notifyUpdate
+// Una escritura avisa a las listas para recargarse; una consulta que va por POST (sinAvisoCambios) no cambia nada.
 api.interceptors.response.use(response => {
-  if (['post', 'put', 'patch', 'delete'].includes(response.config.method)) {
+  if (['post', 'put', 'patch', 'delete'].includes(response.config.method) && !response.config.sinAvisoCambios) {
     notifyUpdate()
     updates?.postMessage('updated')
   }
