@@ -31,19 +31,21 @@ function LegajoOptions({ term, onChange }) {
   return <div><QueryStatus request={request} />{request.data && <><ul className="max-h-48 space-y-2 overflow-auto">{request.data.data.map(legajo => <li key={legajo.id}><button type="button" className={button} onClick={() => onChange(legajo)}>{legajo.numero_legajo} · {[legajo.usuario?.nombres, legajo.usuario?.apellido_paterno].filter(Boolean).join(' ')} · {legajo.estado_legajo}</button></li>)}</ul>{!request.data.data.length && <p className="text-sm">No se encontraron legajos.</p>}<WorkflowPagination data={request.data} setPage={setPage} loading={request.loading} /></>}</div>
 }
 
-export function DocumentPicker({ legajo, value, onChange, label, multiple = false, tipoDocumento }) {
+export function DocumentPicker({ legajo, value, onChange, label, multiple = false, tipoDocumento, excluirDocumento, disabled = false }) {
   const [page, setPage] = useState(1)
   const [names, setNames] = useState({})
-  const request = useLiveQuery(`/operaciones/legajos/${legajo}/documentos?${new URLSearchParams({ page, ...(tipoDocumento ? { tipo_documento_id: tipoDocumento } : {}) })}`)
+  const request = useLiveQuery(`/operaciones/legajos/${legajo}/documentos?${new URLSearchParams({ page, ...(tipoDocumento ? { tipo_documento_id: tipoDocumento } : {}), ...(excluirDocumento ? { excluir_documento_id: excluirDocumento } : {}) })}`)
+  const titulo = doc => [doc.nombre || doc.tipo_documento?.nombre || 'Documento', doc.num_resolucion || 'Sin número', doc.estado].filter(Boolean).join(' · ')
   function select(event) {
     const id = event.target.value
+    if (!id) { if (!multiple) onChange(''); return }
     const item = request.data?.data.find(doc => doc.id === id)
     if (!item) return
-    setNames(current => ({ ...current, [id]: `${item.tipo_documento?.nombre || 'Documento'} · ${item.num_resolucion || 'Sin número'}` }))
+    setNames(current => ({ ...current, [id]: titulo(item) }))
     onChange(multiple ? [...new Set([...value, id])] : id)
   }
   return <fieldset className="space-y-2 rounded-xl border border-slate-200 p-3"><legend className="px-2 text-sm">{label}</legend><QueryStatus request={request} />{request.data && <>
-    <select aria-label={label} className={control} value={multiple ? '' : value || ''} onChange={select}><option value="">Seleccionar documento</option>{!multiple && value && !request.data.data.some(doc => doc.id === value) && <option value={value}>{names[value] || 'Documento seleccionado'}</option>}{request.data.data.map(doc => <option key={doc.id} value={doc.id}>{doc.tipo_documento?.nombre} · {doc.num_resolucion || 'Sin número'} · {doc.estado}</option>)}</select>
+    <select aria-label={label} disabled={disabled} className={control} value={multiple ? '' : value || ''} onChange={select}><option value="">Seleccionar documento</option>{!multiple && value && !request.data.data.some(doc => doc.id === value) && <option value={value}>{names[value] || 'Documento seleccionado'}</option>}{request.data.data.map(doc => <option key={doc.id} value={doc.id}>{titulo(doc)}</option>)}</select>
     {multiple && value.length > 0 && <ul className="space-y-2 text-sm">{value.map(id => <li key={id}>{names[id] || 'Documento seleccionado'} <button type="button" className="font-semibold text-teal-800 underline" onClick={() => onChange(value.filter(item => item !== id))}>Quitar</button></li>)}</ul>}
     {!request.data.data.length && <p className="text-sm">No hay documentos disponibles. Puedes cargarlos desde la ficha del legajo.</p>}
     <WorkflowPagination data={request.data} setPage={setPage} loading={request.loading} />

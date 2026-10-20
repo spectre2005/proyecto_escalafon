@@ -56,6 +56,9 @@ final class GestionFiscalizacion
                     if ($proceso->tipo_documento_id && ($documento->tipo_documento_id !== $proceso->tipo_documento_id || $documento->documentosUsuarioPorSubsanaADocumento()->exists())) {
                         throw ValidationException::withMessages(['documento_id' => 'Selecciona un documento vigente del tipo elegido al abrir este caso.']);
                     }
+                    if ($datos['oficio_documento_id'] === $documento->id) {
+                        throw ValidationException::withMessages(['oficio_documento_id' => 'Selecciona el PDF del oficio de consulta, distinto del documento que se fiscaliza.']);
+                    }
                     $oficio = self::documento($request, $proceso, $datos['oficio_documento_id']);
                     AlmacenDocumento::leer($oficio->archivo);
                     abort_unless($datos['fecha_envio'] >= $proceso->fecha_inicio->toDateString(), 422, 'La comunicación no puede preceder a la apertura.');

@@ -15,11 +15,16 @@ class FiscalizacionPanelController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $filtros = $request->validate(['q' => 'nullable|string|max:120', 'estado' => 'nullable|in:abierto,cerrado,cancelado', 'atrasado' => 'nullable|boolean', 'page' => 'sometimes|integer|min:1']);
+        $filtros = $request->validate(['q' => 'nullable|string|max:120', 'estado' => 'nullable|in:abierto,cerrado,cancelado', 'atrasado' => 'nullable|boolean', 'legajo_id' => 'nullable|uuid', 'tipo_documento_id' => 'nullable|uuid', 'page' => 'sometimes|integer|min:1']);
         $consulta = ProcesoFiscalizacion::query()->with(['usuario:id,nombres,apellido_paterno,apellido_materno', 'legajo:id,numero_legajo', 'responsable:id,nombres,apellido_paterno', 'tipoDocumento:id,nombre,seccion_legajo_id']);
         if (! empty($filtros['q'])) {
             $q = '%'.mb_strtolower(trim($filtros['q'])).'%';
             $consulta->whereHas('usuario', fn ($u) => $u->whereRaw("LOWER(nombres || ' ' || apellido_paterno || ' ' || COALESCE(apellido_materno, '')) LIKE ?", [$q]));
+        }
+        foreach (['legajo_id', 'tipo_documento_id'] as $campo) {
+            if (! empty($filtros[$campo])) {
+                $consulta->where($campo, $filtros[$campo]);
+            }
         }
         if (! empty($filtros['estado'])) {
             $consulta->where('estado', $filtros['estado']);

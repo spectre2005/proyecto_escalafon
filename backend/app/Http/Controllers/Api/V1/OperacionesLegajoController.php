@@ -42,12 +42,15 @@ class OperacionesLegajoController extends Controller
 
     public function documentos(Request $request, string $legajo): JsonResponse
     {
-        $filtros = $request->validate(['page' => 'sometimes|integer|min:1', 'q' => 'nullable|string|max:120', 'tipo_documento_id' => 'nullable|uuid']);
+        $filtros = $request->validate(['page' => 'sometimes|integer|min:1', 'q' => 'nullable|string|max:120', 'tipo_documento_id' => 'nullable|uuid', 'excluir_documento_id' => 'nullable|uuid']);
         Legajo::query()->findOrFail($legajo);
 
         $consulta = DocumentosOperativos::consulta($request, $legajo, soloActivos: false);
         if (! empty($filtros['tipo_documento_id'])) {
             $consulta->where('tipo_documento_id', $filtros['tipo_documento_id'])->whereDoesntHave('documentosUsuarioPorSubsanaADocumento');
+        }
+        if (! empty($filtros['excluir_documento_id'])) {
+            $consulta->where('id', '!=', $filtros['excluir_documento_id']);
         }
         foreach (preg_split('/\s+/u', mb_strtolower(trim($filtros['q'] ?? '')), -1, PREG_SPLIT_NO_EMPTY) ?: [] as $palabra) {
             $patron = '%'.$palabra.'%';
