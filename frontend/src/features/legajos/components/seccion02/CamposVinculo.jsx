@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { categoriasDocente, condicionesDocente, dedicacionesDocente, funcionesPrevias, gruposOcupacionales, regimenesLaborales, subtiposExtraordinario } from '../../config/seccion02'
+import { categoriasDocente, condicionesDocente, dedicacionesDocente, funcionesPrevias, gruposOcupacionales, regimenesLaborales, subtiposExtraordinario, tiposVinculoPara } from '../../config/seccion02'
 import { etiquetaOtro, OTRO, puestoElegido, seleccionPuesto, sugerenciasPuesto } from '../../config/puestosSugeridos'
 import Campo, { Opciones } from '../seccion01/Campo'
 import { hoy } from '../seccion01/useGuardar'
@@ -43,9 +43,10 @@ const condicionesPuesto = [['obligado_djbr', 'Obligado a la declaración jurada 
 
 // Tipo de vínculo con la sugerencia que se deduce de los datos ({ valor, motivo }, opcional). La sugerencia solo se aplica
 // con su botón y el usuario puede elegir otro tipo: no es una validación.
-export function CampoTipoVinculo({ draft, set, poner, errors, sugerencia = null, nombre = 'vinculo' }) {
+export function CampoTipoVinculo({ draft, set, poner, errors, sugerencia = null, nombre = 'vinculo', tipoPersonal }) {
   return <>
-    <Campo label="Tipo de vínculo" required error={errors.regimen_laboral}><select name={`${nombre}-tipo`} required value={draft.regimen_laboral} onChange={set('regimen_laboral')}><Opciones lista={regimenesLaborales} actual={draft.regimen_laboral} vacio="Seleccionar tipo de vínculo" /></select></Campo>
+    <Campo label="Tipo de vínculo" required error={errors.regimen_laboral}><select name={`${nombre}-tipo`} required value={draft.regimen_laboral} onChange={set('regimen_laboral')}><Opciones lista={tiposVinculoPara(tipoPersonal)} actual={draft.regimen_laboral} vacio="Seleccionar tipo de vínculo" /></select></Campo>
+    {tipoPersonal === 'docente' && <p className="self-end rounded-lg bg-teal-50 p-3 text-xs text-teal-900">La condición docente se registra como ordinario, extraordinario o contratado. La designación por confianza corresponde a un vínculo administrativo.</p>}
     {sugerencia && <div role="note" className="flex flex-wrap items-center justify-between gap-2 self-end rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900 sm:col-span-1 lg:col-span-2">
       <span>{sugerencia.valor ? <>Sugerencia: <strong>{regimenesLaborales[sugerencia.valor]}</strong> ({sugerencia.motivo}) Revísala: puedes elegir otro tipo.</> : sugerencia.motivo}</span>
       {sugerencia.valor && draft.regimen_laboral !== sugerencia.valor && <button type="button" onClick={() => poner('regimen_laboral')(sugerencia.valor)} className="font-semibold underline">Usar sugerencia</button>}
@@ -58,7 +59,7 @@ export function CampoTipoVinculo({ draft, set, poner, errors, sugerencia = null,
 // (CampoTipoVinculo), después de los datos del puesto que permiten sugerirlo.
 export function CamposVinculoBasicos({ draft, set, poner, errors, opciones, tipoPersonal, conCese = false, ceseObligatorio = false, conTipo = true, nombre = 'vinculo', children }) {
   return <>
-    {conTipo && <Campo label="Tipo de vínculo" required error={errors.regimen_laboral}><select name={`${nombre}-tipo`} required value={draft.regimen_laboral} onChange={set('regimen_laboral')}><Opciones lista={regimenesLaborales} actual={draft.regimen_laboral} vacio="Seleccionar tipo de vínculo" /></select></Campo>}
+    {conTipo && <Campo label="Tipo de vínculo" required error={errors.regimen_laboral}><select name={`${nombre}-tipo`} required value={draft.regimen_laboral} onChange={set('regimen_laboral')}><Opciones lista={tiposVinculoPara(tipoPersonal)} actual={draft.regimen_laboral} vacio="Seleccionar tipo de vínculo" /></select></Campo>}
     {children}
     <CampoPuesto valor={draft.nombre_puesto} tipoPersonal={tipoPersonal} onChange={poner('nombre_puesto')} error={errors.nombre_puesto} nombre={nombre} />
     <Campo label="Unidad orgánica" error={errors.unidad_organica_id}><select name={`${nombre}-unidad`} value={draft.unidad_organica_id} onChange={set('unidad_organica_id')} disabled={!opciones}><OpcionesCatalogo lista={opciones?.unidades} actual={draft.unidad_organica_id} vacio={opciones ? 'Seleccionar unidad orgánica' : 'Cargando unidades…'} /></select></Campo>
@@ -68,12 +69,33 @@ export function CamposVinculoBasicos({ draft, set, poner, errors, opciones, tipo
   </>
 }
 
-// B. Documento de ingreso: resolución o contrato y datos de la selección.
-export function CamposDocumentoIngreso({ draft, set, errors }) {
+export function CamposProcesoSeleccion({ draft, set, errors }) {
   return <>
-    <Campo label="N.º de resolución o contrato" error={errors.numero_documento_vinculo}><input maxLength={60} value={draft.numero_documento_vinculo} onChange={set('numero_documento_vinculo')} /></Campo>
-    <Campo label="Proceso de selección" error={errors.proceso_seleccion}><input maxLength={100} placeholder="Ej.: concurso o proceso CAS" value={draft.proceso_seleccion} onChange={set('proceso_seleccion')} /></Campo>
+    <Campo label="Código oficial del proceso" required={!!draft.anio_proceso} error={errors.proceso_seleccion}><input name="proceso_seleccion" required={!!draft.anio_proceso} maxLength={100} placeholder="Ej.: CAS-001-2026" value={draft.proceso_seleccion} onChange={set('proceso_seleccion')} /></Campo>
+    <Campo label="Año del proceso" error={errors.anio_proceso}><input name="anio_proceso" type="number" min="1900" max="2100" step="1" placeholder="Ej.: 2026" value={draft.anio_proceso} onChange={set('anio_proceso')} /></Campo>
     <Campo label="Fecha del resultado de selección" error={errors.fecha_resultado_seleccion}><input type="date" max={hoy()} value={draft.fecha_resultado_seleccion} onChange={set('fecha_resultado_seleccion')} /></Campo>
+  </>
+}
+
+// Resolución y contrato pueden coexistir; los archivos se adjuntan al mismo vínculo después de registrarlo.
+export function CamposDocumentoIngreso({ draft, set, errors, tipoPersonal, codigoLey }) {
+  return <>
+    <div className="col-span-full rounded-xl border border-teal-100 bg-teal-50 p-3 text-xs leading-relaxed text-teal-900">
+      {tipoPersonal === 'docente' ? 'Registra los documentos que sustentan la incorporación docente según su condición.' : codigoLey === '1057' || codigoLey?.toUpperCase() === 'CAS' ? 'Para CAS registra el contrato. Si corresponde a confianza, registra también la resolución de designación.' : 'Registra la resolución, el contrato o ambos, según corresponda a la incorporación.'} Los PDF se adjuntan al vínculo después de guardarlo.
+    </div>
+    <div className="col-span-full grid min-w-0 gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2">
+      <h4 className="col-span-full text-xs font-semibold text-slate-800">Resolución</h4>
+      <Campo label="N.º de resolución" required={!!draft.fecha_resolucion} error={errors.numero_resolucion}><input name="numero_resolucion" required={!!draft.fecha_resolucion} maxLength={60} placeholder="Ej.: R-015-2026" value={draft.numero_resolucion} onChange={set('numero_resolucion')} /></Campo>
+      <Campo label="Fecha de resolución" error={errors.fecha_resolucion}><input name="fecha_resolucion" type="date" max={hoy()} value={draft.fecha_resolucion} onChange={set('fecha_resolucion')} /></Campo>
+    </div>
+    <div className="col-span-full grid min-w-0 gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2">
+      <h4 className="col-span-full text-xs font-semibold text-slate-800">Contrato</h4>
+      <Campo label="N.º de contrato" required={!!draft.fecha_contrato} error={errors.numero_contrato}><input name="numero_contrato" required={!!draft.fecha_contrato} maxLength={60} placeholder="Ej.: CONTRATO-028-2026" value={draft.numero_contrato} onChange={set('numero_contrato')} /></Campo>
+      <Campo label="Fecha de contrato" error={errors.fecha_contrato}><input name="fecha_contrato" type="date" max={hoy()} value={draft.fecha_contrato} onChange={set('fecha_contrato')} /></Campo>
+    </div>
+    {draft.numero_documento_vinculo && <p className="col-span-full rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Número del registro anterior: <strong>{draft.numero_documento_vinculo}</strong>. Se conserva como referencia. Completa arriba su clasificación cuando conozcas si corresponde a resolución o contrato.</p>}
+    <div className="col-span-full mt-1"><h4 className="text-xs font-semibold text-slate-800">Proceso de selección</h4><p className="mt-1 text-xs text-slate-500">Copia el código de la convocatoria oficial. El proceso pertenece a la institución actual y puede corresponder a varias incorporaciones.</p></div>
+    <CamposProcesoSeleccion draft={draft} set={set} errors={errors} />
   </>
 }
 
@@ -88,7 +110,7 @@ export function CondicionesPuesto({ draft, poner, errors, nombre = 'vinculo' }) 
 export function CamposVinculo({ draft, set, poner, errors, opciones, tipoPersonal, conCese = false, ceseObligatorio = false, nombre = 'vinculo', children }) {
   return <>
     <CamposVinculoBasicos draft={draft} set={set} poner={poner} errors={errors} opciones={opciones} tipoPersonal={tipoPersonal} conCese={conCese} ceseObligatorio={ceseObligatorio} nombre={nombre}>{children}</CamposVinculoBasicos>
-    <CamposDocumentoIngreso draft={draft} set={set} errors={errors} />
+    <CamposDocumentoIngreso draft={draft} set={set} errors={errors} tipoPersonal={tipoPersonal} codigoLey={opciones?.regimenes?.find(ley => ley.id === draft.regimen_normativo_id)?.codigo} />
     <CondicionesPuesto draft={draft} poner={poner} errors={errors} nombre={nombre} />
   </>
 }

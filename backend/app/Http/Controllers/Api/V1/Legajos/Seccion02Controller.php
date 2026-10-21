@@ -131,7 +131,7 @@ class Seccion02Controller extends Controller
             ->with('registradoPor')->orderByDesc('created_at')->orderBy('id')->get();
 
         return response()->json(['data' => [
-            'vinculos_laborales' => $anulados(VinculoLaboral::class, ['tipo_personal', 'regimen_laboral', 'nombre_puesto', 'numero_documento_vinculo', 'fecha_inicio', 'fecha_fin_prevista', 'fecha_cese']),
+            'vinculos_laborales' => $anulados(VinculoLaboral::class, ['tipo_personal', 'regimen_laboral', 'nombre_puesto', 'numero_documento_vinculo', 'numero_resolucion', 'numero_contrato', 'fecha_inicio', 'fecha_fin_prevista', 'fecha_cese']),
             'vinculo_adendas' => $this->filas($adendas, ['vinculo_laboral_id', 'numero', 'motivo', 'fecha_inicio', 'fecha_fin', 'motivo_anulacion', 'created_at']),
             'inducciones' => $anulados(Induccion::class, ['vinculo_laboral_id', 'tipo', 'fecha', 'responsable']),
             'periodos_prueba' => $anulados(PeriodoPrueba::class, ['vinculo_laboral_id', 'fecha_inicio', 'fecha_fin', 'resultado', 'fecha_resultado']),
@@ -143,6 +143,9 @@ class Seccion02Controller extends Controller
         $this->exigirLegajo($usuario);
         $data = $this->validar($request, [...self::REGLAS_VINCULO, 'documento_id' => 'nullable|uuid']);
         $this->exigirLeyDelTipo($data);
+        if ($errores = ReglasVinculo::erroresIngreso($data)) {
+            throw ValidationException::withMessages($errores);
+        }
         $documento = $this->documento($usuario, $data, 'vinculos_laborales');
 
         // vinculos_laborales no tiene documento_id: el documento (c a f) apunta al vínculo.
@@ -170,6 +173,9 @@ class Seccion02Controller extends Controller
             // Bloqueo del vínculo: los datos del puesto no se registran a la vez que se cambia su tipo de personal.
             $actual = VinculoLaboral::query()->whereKey($registro->id)->lockForUpdate()->firstOrFail();
             $this->exigirTipoSinDatosPuesto($actual, $cambios);
+            if ($errores = ReglasVinculo::erroresIngreso($cambios, $actual)) {
+                throw ValidationException::withMessages($errores);
+            }
             $actual->update($cambios);
         });
 
@@ -344,7 +350,7 @@ class Seccion02Controller extends Controller
         $tiposInduccion = $inducciones->where('vinculo_laboral_id', $vinculo->id)->pluck('tipo')->all();
 
         return [
-            ...$this->fila($vinculo, ['tipo_personal', 'regimen_laboral', 'regimen_normativo_id', 'unidad_organica_id', 'nombre_puesto', 'obligado_djbr', 'exige_colegiatura', 'exige_estudios_basicos', 'tiene_periodo_prueba', 'proceso_seleccion', 'fecha_resultado_seleccion', 'numero_documento_vinculo', 'fecha_inicio', 'fecha_fin_prevista', 'fecha_cese']),
+            ...$this->fila($vinculo, ['tipo_personal', 'regimen_laboral', 'regimen_normativo_id', 'unidad_organica_id', 'nombre_puesto', 'obligado_djbr', 'exige_colegiatura', 'exige_estudios_basicos', 'tiene_periodo_prueba', 'proceso_seleccion', 'anio_proceso', 'fecha_resultado_seleccion', 'numero_documento_vinculo', 'numero_resolucion', 'fecha_resolucion', 'numero_contrato', 'fecha_contrato', 'fecha_inicio', 'fecha_fin_prevista', 'fecha_cese']),
             'regimen_normativo' => $vinculo->regimenNormativo?->nombre,
             // Vínculo anterior con el tipo Sin definir: sugerencia para confirmar al corregirlo (no se guarda sola).
             'tipo_sugerido' => RegimenesLaborales::sugerencia($vinculo),

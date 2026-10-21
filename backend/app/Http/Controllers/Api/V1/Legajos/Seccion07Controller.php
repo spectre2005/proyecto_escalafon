@@ -347,7 +347,7 @@ class Seccion07Controller extends Controller
             return 'Vínculo no encontrado';
         }
 
-        return $vinculo->nombre_puesto.' · '.($vinculo->numero_documento_vinculo ?: 'sin N.º de documento').' · desde '.$vinculo->fecha_inicio?->format('d/m/Y').($vinculo->fecha_cese ? ' (cesado)' : '');
+        return $vinculo->nombre_puesto.' · '.($vinculo->referenciaDocumentos() ?: 'sin N.º de documento').' · desde '.$vinculo->fecha_inicio?->format('d/m/Y').($vinculo->fecha_cese ? ' (cesado)' : '');
     }
 
     private function legajoAbierto(string $usuario): ?Legajo

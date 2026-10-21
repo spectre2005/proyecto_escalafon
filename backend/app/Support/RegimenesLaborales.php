@@ -47,7 +47,9 @@ final class RegimenesLaborales
             $vinculo->regimenNormativo?->codigo === '276' => ['valor' => null, 'motivo' => 'Confirma si es carrera o designado.'],
             (bool) $administrativo?->es_cargo_confianza => ['valor' => 'designado', 'motivo' => 'Cargo de confianza.'],
             $vinculo->regimenNormativo?->codigo === '1057' => ['valor' => 'plazo_determinado', 'motivo' => 'Contrato CAS (D.L. 1057).'],
-            default => ['valor' => null, 'motivo' => 'Los datos del puesto no alcanzan: confirma si es carrera, plazo determinado o designado.'],
+            default => ['valor' => null, 'motivo' => $vinculo->tipo_personal === 'docente'
+                ? 'Confirma el tipo de vínculo según la condición docente: carrera o plazo determinado.'
+                : 'Los datos del puesto no alcanzan: confirma si es carrera, plazo determinado o designado.'],
         };
     }
 

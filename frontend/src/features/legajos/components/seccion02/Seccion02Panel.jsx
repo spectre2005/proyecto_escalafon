@@ -10,7 +10,7 @@ import { anularSeccion02, completarTipoVinculo } from '../../api/seccion02Api'
 import { useNoAplicables } from '../../api/useNoAplicables'
 import { motivoVisible, ofrecerTipo, tiposQueAcreditan } from '../../config/aplicacion'
 import { precargaDesdeRegistro } from '../../config/acreditacion'
-import { pruebaEnNoConDatos, pruebaNoAplica, camposDatosPuesto, coloresEstadoDocumento, estadosDocumento, estadosSubseccion, estadosVencimiento, etiquetaVinculo, formulariosDatos, regimenesLaborales, resultadosPeriodo, subseccionesSeccion02, tiposInduccion, tiposPersonal, tipoVinculo } from '../../config/seccion02'
+import { pruebaEnNoConDatos, pruebaNoAplica, camposDatosPuesto, coloresEstadoDocumento, estadosDocumento, estadosSubseccion, estadosVencimiento, etiquetaVinculo, formulariosDatos, regimenesLaborales, referenciaDocumentos, resultadosPeriodo, subseccionesSeccion02, tiposInduccion, tiposPersonal, tiposVinculoPara, tipoVinculo } from '../../config/seccion02'
 import { etiqueta } from '../../config/seccion01'
 import { folios, textoSubirTipo } from '../../config/documentos'
 import AdjuntarDocumento from '../documentos/AdjuntarDocumento'
@@ -302,7 +302,7 @@ function CompletarTipo({ usuario, vinculo, disabled }) {
     <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">Completar tipo de vínculo
       <select required value={tipo} disabled={disabled || busy} onChange={event => setTipo(event.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
         <option value="">Selecciona</option>
-        {Object.entries(regimenesLaborales).map(([valor, texto]) => <option key={valor} value={valor}>{texto}</option>)}
+        {Object.entries(tiposVinculoPara(vinculo.values.tipo_personal)).map(([valor, texto]) => <option key={valor} value={valor}>{texto}</option>)}
       </select>
     </label>
     {sugerido && tipo !== sugerido && <button type="button" disabled={disabled || busy} onClick={() => setTipo(sugerido)} className={enlace}>Aplicar sugerencia</button>}
@@ -319,13 +319,18 @@ function VinculoCard({ vinculo, aviso, acciones, accionAdenda, destacado, correg
   const v = vinculo.values
   const [estadoTexto, estadoClase] = estadosVencimiento[vinculo.vencimiento.estado]
   return <article className={`rounded-2xl border bg-white p-5 ${destacado ? 'border-teal-300 ring-1 ring-teal-100' : 'border-slate-200'}`}>
-    <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h4 className="font-semibold text-slate-800">{v.nombre_puesto}</h4><p className="mt-1 text-xs text-slate-500">{etiqueta(tiposPersonal, v.tipo_personal)} · {tipoVinculo(v.regimen_laboral)} · {v.numero_documento_vinculo || 'sin N.º de resolución o contrato'}</p></div><Etiqueta clase={estadoClase}>{estadoTexto}</Etiqueta></div>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h4 className="font-semibold text-slate-800">{v.nombre_puesto}</h4><p className="mt-1 text-xs text-slate-500">{etiqueta(tiposPersonal, v.tipo_personal)} · {tipoVinculo(v.regimen_laboral)} · {referenciaDocumentos(v)}</p></div><Etiqueta clase={estadoClase}>{estadoTexto}</Etiqueta></div>
     <div className="mt-4"><AvisoSinDefinir vinculo={vinculo} corregir={corregir} />{completar}<AvisoVencimiento vinculo={vinculo} aviso={aviso} /></div>
     <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
       {[['Inicio', fecha(v.fecha_inicio)], ['Fin efectivo', vinculo.vencimiento.fin_efectivo ? `${fecha(vinculo.vencimiento.fin_efectivo)}${vinculo.vencimiento.por_adenda ? ' (por adenda)' : ''}` : 'Sin fecha de fin'],
         ['Unidad orgánica', vinculo.unidad_organica || 'No registrada'], ['Ley / régimen normativo', vinculo.regimen_normativo || 'Sin definir'],
       ].map(([label, valor]) => <div key={label}><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 break-words text-slate-800">{valor}</dd></div>)}
     </dl>
+    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      {[['Resolución', v.numero_resolucion, v.fecha_resolucion], ['Contrato', v.numero_contrato, v.fecha_contrato]].map(([nombre, numero, emision]) => <div key={nombre} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+        <p className="text-xs font-semibold text-slate-600">{nombre}</p><p className="mt-1 break-words text-sm text-slate-800">{numero || 'Número sin registrar'}</p>{emision && <p className="mt-1 text-xs text-slate-500">Fecha: {fecha(emision)}</p>}
+      </div>)}
+    </div>
     <details className="mt-4 rounded-xl border border-slate-100">
       <summary className="cursor-pointer px-4 py-2.5 text-xs font-semibold text-teal-700">Ver detalle: condiciones del puesto, adendas ({vinculo.adendas.length}) y datos del puesto</summary>
       <div className="border-t border-slate-100 p-4">
@@ -435,7 +440,7 @@ function Formalizacion({ usuario, data, sinLegajo }) {
       <div className="mt-4 space-y-4">{historial.map(v => tarjeta(v, false))}</div>
     </details>}
     <div className="mt-6 flex flex-wrap gap-x-6">
-      <Anulados usuario={usuario} clave="vinculos_laborales" etiqueta="vínculos anulados" titulo={v => v.nombre_puesto} campos={[['Tipo de personal', v => etiqueta(tiposPersonal, v.tipo_personal)], ['Tipo de vínculo', v => tipoVinculo(v.regimen_laboral)], ['N.º de resolución o contrato', v => texto(v.numero_documento_vinculo)], ['Inicio', v => fecha(v.fecha_inicio)]]} />
+      <Anulados usuario={usuario} clave="vinculos_laborales" etiqueta="vínculos anulados" titulo={v => v.nombre_puesto} campos={[['Tipo de personal', v => etiqueta(tiposPersonal, v.tipo_personal)], ['Tipo de vínculo', v => tipoVinculo(v.regimen_laboral)], ['Resolución / Contrato', referenciaDocumentos], ['Inicio', v => fecha(v.fecha_inicio)]]} />
       <Anulados usuario={usuario} clave="vinculo_adendas" etiqueta="adendas anuladas" titulo={v => `Adenda ${v.numero || 'sin número'}`} campos={[['Motivo de la adenda', v => texto(v.motivo)], ['Vigencia', v => `${fecha(v.fecha_inicio)} – ${fecha(v.fecha_fin)}`], ['Vínculo', v => etiquetaVinculo(data.vinculos.find(item => item.id === v.vinculo_laboral_id) || { values: { nombre_puesto: 'Vínculo anulado o no encontrado' } })]]} />
     </div>
   </section>
@@ -451,7 +456,7 @@ function Seleccion({ usuario, data, sinLegajo }) {
     {!vinculos.length && data.vinculos.length > 0 && <Aviso>No hay un vínculo vigente: se muestra el más reciente.</Aviso>}
     <Registros titulo={vinculos.length > 1 ? 'Proceso de selección de los vínculos vigentes' : 'Proceso de selección del vínculo vigente'} vacio="Sin vínculo laboral: los datos de selección se guardan en el vínculo. Primero registra el vínculo en 2.2." registros={principales} bloqueo={sinLegajo}
       tituloRegistro={record => record.values.nombre_puesto} subtitulo={record => etiquetaVinculo(record)}
-      campos={[['Proceso de selección', v => texto(v.proceso_seleccion)], ['Fecha del resultado', v => fecha(v.fecha_resultado_seleccion)]]}
+      campos={[['Código oficial del proceso', v => texto(v.proceso_seleccion)], ['Año del proceso', v => texto(v.anio_proceso)], ['Fecha del resultado', v => fecha(v.fecha_resultado_seleccion)]]}
       corregir={{ etiqueta: 'Registrar o corregir datos de selección', puede: record => !record.cerrado, motivo: 'Vínculo cerrado (con fecha de cese): no se corrige.' }}
       renderForm={props => <SeleccionForm key={props.record.id} usuario={usuario} {...props} />} />
   </>

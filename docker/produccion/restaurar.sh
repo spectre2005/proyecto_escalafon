@@ -16,8 +16,8 @@
 set -eu
 umask 077
 cd "$(dirname "$0")/../.."
+. ./docker/produccion/configuracion-respaldo.sh
 RESPALDO_DIR=${RESPALDO_DIR:-respaldos}
-RESPALDO_DC=${RESPALDO_DC:-docker compose --env-file .env.produccion -f docker-compose.produccion.yml}
 dc() { $RESPALDO_DC "$@" < /dev/null; }
 dc_entrada() { $RESPALDO_DC "$@"; }
 privado=/var/www/html/storage/app/private

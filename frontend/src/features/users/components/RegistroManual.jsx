@@ -202,7 +202,11 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
           <Grupo titulo="Clasificación" ayuda="El tipo de vínculo (carrera, plazo determinado o designado) se indica en el paso 3, con una sugerencia.">
             <label>Tipo de personal *
               <select name="tipo_personal" required value={tipo} aria-invalid={erroresPersonaCampo.tipo_personal ? true : undefined}
-                onChange={event => setDraft({ ...draft, tipo_personal: event.target.value, regimen_normativo_id: '' })}>
+                onChange={event => {
+                  const tipoPersonal = event.target.value
+                  setDraft({ ...draft, tipo_personal: tipoPersonal, regimen_normativo_id: '' })
+                  if (tipoPersonal === 'docente' && vinculo.regimen_laboral === 'designado') ponerVinculo('regimen_laboral')('')
+                }}>
                 <option value="" disabled>Seleccionar tipo de personal</option>
                 {Object.entries(tiposPersonal).map(([valor, texto]) => <option key={valor} value={valor}>{texto}</option>)}
               </select>
@@ -232,8 +236,8 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
             <CamposVinculoBasicos draft={vinculo} set={setCampoVinculo} poner={ponerVinculo} errors={erroresDe(errores, 'vinculo')} opciones={opciones.data?.data} tipoPersonal={tipo} conTipo={false} nombre="alta-vinculo" />
             {notaPuesto && <p role="status" className="col-span-full rounded-lg bg-[#eaf4ee] px-3 py-2 text-[11px] text-[#2c7650]">{notaPuesto}</p>}
           </Grupo>
-          <Grupo titulo="B. Documento de ingreso">
-            <CamposDocumentoIngreso draft={vinculo} set={setCampoVinculo} errors={erroresDe(errores, 'vinculo')} />
+          <Grupo titulo="B. Documentos de ingreso y proceso de selección">
+            <CamposDocumentoIngreso draft={vinculo} set={setCampoVinculo} errors={erroresDe(errores, 'vinculo')} tipoPersonal={tipo} codigoLey={(catalogo || []).find(ley => ley.id === leyElegida)?.codigo} />
           </Grupo>
         </>}
         {paso === 3 && <>
@@ -242,7 +246,7 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
             {notaPuesto && tipo === 'docente' && <p role="status" className="col-span-full rounded-lg bg-[#eaf4ee] px-3 py-2 text-[11px] text-[#2c7650]">{notaPuesto}</p>}
           </Grupo>
           <Grupo titulo="Tipo de vínculo" ayuda="Carrera, plazo determinado o designado. La sugerencia sale de los datos anteriores; puedes elegir otro.">
-            <CampoTipoVinculo draft={vinculo} set={setCampoVinculo} poner={ponerVinculo} errors={erroresDe(errores, 'vinculo')} sugerencia={sugerencia} nombre="alta-vinculo" />
+            <CampoTipoVinculo draft={vinculo} set={setCampoVinculo} poner={ponerVinculo} errors={erroresDe(errores, 'vinculo')} sugerencia={sugerencia} nombre="alta-vinculo" tipoPersonal={tipo} />
           </Grupo>
           <Grupo titulo="Condiciones del puesto" ayuda="Si no lo sabes, deja «Sin responder».">
             <CondicionesPuesto draft={vinculo} poner={ponerVinculo} errors={erroresDe(errores, 'vinculo')} nombre="alta-vinculo" />

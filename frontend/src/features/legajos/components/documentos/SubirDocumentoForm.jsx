@@ -93,7 +93,8 @@ export default function SubirDocumentoForm({ usuario, seccion, tipo, titular, en
     || draft.titular_nombre !== (titular?.nombre || '') || draft.titular_documento !== (titular?.documento || '') || draft.fecha_incorporacion !== hoy()
   // El N.º de resolución va a la vista si el tipo lo exige, si un registro o la subsanación lo proponen o si tiene error;
   // si no, en las opciones adicionales. No depende de lo que se escribe: el campo no cambia de sitio al teclear.
-  const resolucionALaVista = tipo.requiere_num_resolucion || !!errors.num_resolucion || !!ultimaPropuesta.num_resolucion || !!subsanar?.values?.num_resolucion
+  const esContrato = tipo.codigo === 'S02_F_CONTRATO'
+  const resolucionALaVista = esContrato || tipo.requiere_num_resolucion || !!errors.num_resolucion || !!ultimaPropuesta.num_resolucion || !!subsanar?.values?.num_resolucion
   // Al editar el titular el bloque queda abierto aunque el valor vuelva a ser el de partida.
   const setTitular = campo => event => { setCambiarTitular(true); set(campo)(event) }
   return <Formulario modal={modal} titulo={subsanar ? `Subsanar documento: ${nombreTipo}` : `Subir documento: ${nombreTipo}`} guardar={subsanar ? 'Subir documento que subsana' : 'Subir documento'} busy={busy} error={error}
@@ -114,7 +115,7 @@ export default function SubirDocumentoForm({ usuario, seccion, tipo, titular, en
       <Campo label="Emisor" required error={errors.emisor}><input required maxLength={200} value={draft.emisor} onChange={set('emisor')} placeholder="Entidad u oficina que emite" /></Campo>
       <EmisorInstitucion valor={draft.emisor} onUsar={poner('emisor')} />
     </div>
-    {resolucionALaVista && <Campo label="N.º de resolución" required={tipo.requiere_num_resolucion} error={errors.num_resolucion}><input required={tipo.requiere_num_resolucion} maxLength={60} value={draft.num_resolucion} onChange={set('num_resolucion')} /></Campo>}
+    {resolucionALaVista && <Campo label={esContrato ? 'N.º de contrato' : 'N.º de resolución'} required={tipo.requiere_num_resolucion} error={errors.num_resolucion}><input required={tipo.requiere_num_resolucion} maxLength={60} value={draft.num_resolucion} onChange={set('num_resolucion')} /></Campo>}
     <Campo label="Modalidad de presentación" required error={errors.modalidad_presentacion}><select required value={draft.modalidad_presentacion} onChange={set('modalidad_presentacion')}><Opciones lista={modalidadesPresentacion} vacio="Selecciona" /></select></Campo>
     {debeSubsanar && <Campo label="Documento que subsana (este tipo admite uno solo)" required error={errors.subsana_a_documento_id} className="sm:col-span-2">
       <select required value={draft.subsana_a_documento_id} onChange={set('subsana_a_documento_id')}>

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { saveDatosPuesto, saveSeccion02 } from '../../api/seccion02Api'
 import { etiquetaVinculo, regimenesLaborales, resultadosPeriodo, tiposInduccion, tiposPersonal } from '../../config/seccion02'
-import { CamposDatosPuesto, CamposVinculo, OpcionesCatalogo } from './CamposVinculo'
+import { CamposDatosPuesto, CamposProcesoSeleccion, CamposVinculo, OpcionesCatalogo } from './CamposVinculo'
 import { datosPuestoInicial, limpiarDatosPuesto, vinculoInicial, vinculoParaGuardar } from './borradoresVinculo'
 import Campo, { Formulario, Opciones } from '../seccion01/Campo'
 import { hoy, useBorrador, useGuardar } from '../seccion01/useGuardar'
@@ -46,6 +46,7 @@ export function VinculoForm({ usuario, record, documentoId, onSaved, onCancel })
   const cambiarTipoPersonal = event => {
     const tipo = event.target.value
     poner('tipo_personal')(tipo)
+    if (tipo === 'docente' && draft.regimen_laboral === 'designado') poner('regimen_laboral')('')
     if (!(opciones?.regimenes || []).some(ley => ley.id === draft.regimen_normativo_id && ley.aplica_a === tipo)) poner('regimen_normativo_id')('')
   }
   return <Formulario titulo={record ? 'Corregir vínculo laboral' : 'Registrar vínculo laboral'} guardar={historico ? 'Guardar vínculo histórico' : 'Guardar vínculo'} busy={busy} error={error} onSubmit={() => guardar(draft)} onCancel={onCancel}
@@ -69,12 +70,11 @@ export function VinculoForm({ usuario, record, documentoId, onSaved, onCancel })
 
 // 2.1: datos del proceso de selección, que se guardan en el vínculo laboral.
 export function SeleccionForm({ usuario, record, onSaved, onCancel }) {
-  const [draft, set] = useBorrador({ proceso_seleccion: record.values.proceso_seleccion || '', fecha_resultado_seleccion: record.values.fecha_resultado_seleccion || '' })
+  const [draft, set] = useBorrador({ proceso_seleccion: record.values.proceso_seleccion || '', anio_proceso: record.values.anio_proceso ?? '', fecha_resultado_seleccion: record.values.fecha_resultado_seleccion || '' })
   const { busy, error, errors, guardar } = useGuardar(data => saveSeccion02(usuario, 'vinculos-laborales', record.id, data), onSaved)
   return <Formulario titulo={`Proceso de selección: ${record.values.nombre_puesto}`} guardar="Guardar" busy={busy} error={error} onSubmit={() => guardar(draft)} onCancel={onCancel}
     nota="Se guarda en el vínculo laboral. Solo se corrige mientras el vínculo no tenga fecha de cese.">
-    <Campo label="Proceso de selección" error={errors.proceso_seleccion}><input maxLength={100} value={draft.proceso_seleccion} onChange={set('proceso_seleccion')} /></Campo>
-    <Campo label="Fecha del resultado" error={errors.fecha_resultado_seleccion}><input type="date" max={hoy()} value={draft.fecha_resultado_seleccion} onChange={set('fecha_resultado_seleccion')} /></Campo>
+    <CamposProcesoSeleccion draft={draft} set={set} errors={errors} />
   </Formulario>
 }
 

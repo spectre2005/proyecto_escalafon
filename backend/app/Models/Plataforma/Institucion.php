@@ -72,7 +72,7 @@ class Institucion extends Model
      * Último respaldo y si está atrasado: aprovisionada y sin un respaldo correcto en las últimas Respaldo::HORAS_AVISO.
      * Consultas simples por fecha: latestOfMany/ofMany desempatan con MAX(id), que PostgreSQL no tiene para uuid.
      *
-     * @return array{ultimo: ?array<string, mixed>, ultimo_correcto_en: ?string, atrasado: bool}
+     * @return array<string, mixed>
      */
     public function estadoRespaldo(): array
     {
@@ -82,8 +82,19 @@ class Institucion extends Model
         $ultimo = $this->respaldos()->latest('created_at')->latest('carpeta')->first();
         $correcto = $this->respaldos()->where('estado', Respaldo::CORRECTO)->max('created_at');
         $correcto = $correcto === null ? null : Carbon::parse($correcto);
+        $copia = $this->respaldos()->where('estado', Respaldo::CORRECTO)->where('copia_externa', 'correcta')->max('created_at');
+        $copia = $copia === null ? null : Carbon::parse($copia);
+        $estadoNube = match (true) {
+            $ultimo === null => 'sin_respaldos',
+            $ultimo->copia_externa === 'no_configurada' => 'no_configurada',
+            $ultimo->copia_externa === 'fallida' => 'fallida',
+            $ultimo->estado !== Respaldo::CORRECTO => 'fallida',
+            $copia === null || $copia->lt(now()->subHours(Respaldo::HORAS_AVISO)) => 'atrasada',
+            default => 'correcta',
+        };
 
         return $this->estadoRespaldoCalculado = ['ultimo' => $ultimo?->datos(), 'ultimo_correcto_en' => $correcto?->toIso8601String(),
+            'nube' => ['estado' => $estadoNube, 'ultimo_correcto_en' => $copia?->toIso8601String()],
             'atrasado' => $this->aprovisionada() && ($correcto === null || $correcto->lt(now()->subHours(Respaldo::HORAS_AVISO)))];
     }
 

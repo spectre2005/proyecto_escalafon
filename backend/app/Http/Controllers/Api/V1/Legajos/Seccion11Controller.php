@@ -57,7 +57,7 @@ class Seccion11Controller extends Controller
             'titular' => ['nombre' => trim($persona->nombres.' '.$persona->apellido_paterno.' '.$persona->apellido_materno), 'documento' => $persona->numero_doc_identidad],
             'motivos_cese' => Seccion11::MOTIVOS_CESE,
             'vinculos' => $vinculos->map(fn (VinculoLaboral $v): array => [
-                ...$this->fila($v, ['tipo_personal', 'regimen_laboral', 'nombre_puesto', 'numero_documento_vinculo', 'fecha_inicio', 'fecha_fin_prevista', 'fecha_cese']),
+                ...$this->fila($v, ['tipo_personal', 'regimen_laboral', 'nombre_puesto', 'numero_documento_vinculo', 'numero_resolucion', 'numero_contrato', 'fecha_inicio', 'fecha_fin_prevista', 'fecha_cese']),
                 'desvinculacion_id' => $desvinculaciones->firstWhere('vinculo_laboral_id', $v->id)?->id,
                 'documentos' => $documentos->where('vinculo_laboral_id', $v->id)->count(),
             ])->values(),

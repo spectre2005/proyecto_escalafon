@@ -137,9 +137,11 @@ class RespaldosPlataformaTest extends TestCase
 
         $this->getJson("/api/plataforma/instituciones/{$uno->id}")->assertOk()
             ->assertJsonPath('data.respaldo.atrasado', false)->assertJsonPath('data.respaldo.ultimo.copia_externa', 'correcta')
+            ->assertJsonPath('data.respaldo.nube.estado', 'correcta')
             ->assertJsonCount(1, 'data.respaldos');
         $this->getJson("/api/plataforma/instituciones/{$dos->id}")->assertOk()
             ->assertJsonPath('data.respaldo.atrasado', true)->assertJsonPath('data.respaldo.ultimo.estado', 'fallido')
+            ->assertJsonPath('data.respaldo.nube.estado', 'no_configurada')
             ->assertJsonPath('data.respaldos.0.detalle', 'pg_dump falló.')->assertJsonMissingPath('data.respaldos.0.base_sha256');
 
         $resumen = $this->getJson('/api/plataforma/dashboard')->assertOk();
@@ -150,5 +152,22 @@ class RespaldosPlataformaTest extends TestCase
         $this->assertFalse($listado['uno']['respaldo']['atrasado']);
         $this->assertTrue($listado['dos']['respaldo']['atrasado']);
         $this->assertFalse($listado['nueva']['respaldo']['atrasado']);
+    }
+
+    public function test_cloud_status_distinguishes_local_only_failed_and_stale_copies(): void
+    {
+        $uno = $this->institucion(['slug' => 'uno', 'estado' => Institucion::ACTIVA, 'aprovisionada_en' => now()]);
+        $this->assertSame('sin_respaldos', $uno->fresh()->estadoRespaldo()['nube']['estado']);
+        $this->registrar(['--estado' => 'correcto']);
+        $this->assertFalse($uno->fresh()->estadoRespaldo()['atrasado']);
+        $this->assertSame('no_configurada', $uno->fresh()->estadoRespaldo()['nube']['estado']);
+        $this->registrar(['--estado' => 'correcto', '--copia-externa' => 'fallida']);
+        $this->assertSame('fallida', $uno->fresh()->estadoRespaldo()['nube']['estado']);
+        $this->registrar(['--estado' => 'correcto', '--copia-externa' => 'correcta']);
+        $this->assertSame('correcta', $uno->fresh()->estadoRespaldo()['nube']['estado']);
+        $this->travel(27)->hours();
+        $this->assertSame('atrasada', $uno->fresh()->estadoRespaldo()['nube']['estado']);
+        $this->assertTrue($uno->fresh()->estadoRespaldo()['atrasado']);
+        $this->travelBack();
     }
 }

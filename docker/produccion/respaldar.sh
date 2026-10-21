@@ -27,15 +27,7 @@ set -eu
 umask 077
 cd "$(dirname "$0")/../.."
 
-if [ -f .env.produccion ]; then
-	# Solo las líneas RESPALDO_* sin espacios, sin ejecutarlas; las del entorno mandan.
-	for linea in $(grep -E '^RESPALDO_[A-Z_]+=[^ ]*$' .env.produccion || true); do
-		nombre=${linea%%=*}
-		eval "actual=\${$nombre:-}"
-		[ -n "$actual" ] || export "$linea"
-	done
-fi
-RESPALDO_DC=${RESPALDO_DC:-docker compose --env-file .env.produccion -f docker-compose.produccion.yml}
+. ./docker/produccion/configuracion-respaldo.sh
 RESPALDO_REMOTO=${RESPALDO_REMOTO:-}
 RESPALDO_DIR=${RESPALDO_DIR:-respaldos}
 RESPALDO_CONSERVAR=${RESPALDO_CONSERVAR:-}

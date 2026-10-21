@@ -71,7 +71,7 @@ export function sugerenciaTipoVinculo({ tipoPersonal, datosPuesto = {}, codigoLe
   if (codigoLey === '276') return { valor: null, motivo: 'Confirma si es carrera o designado.' }
   if (tipoPersonal === 'administrativo' && datosPuesto.es_cargo_confianza === true) return { valor: 'designado', motivo: 'Cargo de confianza.' }
   if (codigoLey === '1057') return { valor: 'plazo_determinado', motivo: 'Contrato CAS (D.L. 1057).' }
-  return { valor: null, motivo: 'Los datos del puesto no alcanzan: elige si es carrera, plazo determinado o designado.' }
+  return { valor: null, motivo: tipoPersonal === 'docente' ? 'Confirma el tipo de vínculo según la condición docente: carrera o plazo determinado.' : 'Los datos del puesto no alcanzan: elige si es carrera, plazo determinado o designado.' }
 }
 
 /** Ficha de la persona y su sección 02 en 2.2, con la lista de documentos a la vista (Seccion02Panel atiende ir=documentos). */

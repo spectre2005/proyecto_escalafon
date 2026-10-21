@@ -1,3 +1,5 @@
+import { referenciaDocumentos } from './seccion02.js'
+
 // Sección 11 (Desvinculación), Anexo 01 de la directiva: literales a) a g), aceptación de renuncia (Anexo 05) y otros.
 // Dos entradas del menú: la desvinculación de cada vínculo y los documentos. Los valores los valida el backend
 // (App\Support\Seccion11); aquí solo se agregan las etiquetas.
@@ -25,5 +27,5 @@ export const permisosSeccion11 = { registrar: ['legajo.editar'], anular: ['siste
 // Etiqueta de un vínculo en la sección 11.
 export function etiquetaVinculo11(vinculo) {
   const v = vinculo.values
-  return `${v.nombre_puesto} · ${v.numero_documento_vinculo || 'sin N.º de documento'} · desde ${v.fecha_inicio ? v.fecha_inicio.split('-').reverse().join('/') : 'sin fecha'}`
+  return `${v.nombre_puesto} · ${referenciaDocumentos(v)} · desde ${v.fecha_inicio ? v.fecha_inicio.split('-').reverse().join('/') : 'sin fecha'}`
 }

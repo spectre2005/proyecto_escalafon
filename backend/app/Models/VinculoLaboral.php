@@ -32,6 +32,11 @@ class VinculoLaboral extends Model
         'proceso_seleccion',
         'fecha_resultado_seleccion',
         'numero_documento_vinculo',
+        'numero_resolucion',
+        'fecha_resolucion',
+        'numero_contrato',
+        'fecha_contrato',
+        'anio_proceso',
         'fecha_inicio',
         'fecha_fin_prevista',
         'fecha_cese',
@@ -49,6 +54,9 @@ class VinculoLaboral extends Model
             'exige_estudios_basicos' => 'boolean',
             'tiene_periodo_prueba' => 'boolean',
             'fecha_resultado_seleccion' => 'date',
+            'fecha_resolucion' => 'date',
+            'fecha_contrato' => 'date',
+            'anio_proceso' => 'integer',
             'fecha_inicio' => 'date',
             'fecha_fin_prevista' => 'date',
             'fecha_cese' => 'date',
@@ -61,6 +69,13 @@ class VinculoLaboral extends Model
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'usuario_id', 'id');
+    }
+
+    public function referenciaDocumentos(): string
+    {
+        $numeros = array_filter([$this->numero_resolucion, $this->numero_contrato]);
+
+        return $numeros !== [] ? implode(' · ', $numeros) : ($this->numero_documento_vinculo ?? '');
     }
 
     public function regimenNormativo(): BelongsTo

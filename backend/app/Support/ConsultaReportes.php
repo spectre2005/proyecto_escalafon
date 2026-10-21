@@ -391,11 +391,11 @@ final class ConsultaReportes
                             default => 'abierto',
                         };
                         yield [...$datos, 'id' => $vinculo->id, 'fecha' => $vinculo->fecha_inicio?->toDateString(), 'fecha_fin' => $fin?->toDateString(),
-                            'fecha_cese' => $vinculo->fecha_cese?->toDateString(), 'numero' => $vinculo->numero_documento_vinculo, 'adendas' => $vinculo->vinculoAdendas->count(),
+                            'fecha_cese' => $vinculo->fecha_cese?->toDateString(), 'numero' => $vinculo->referenciaDocumentos() ?: null, 'adendas' => $vinculo->vinculoAdendas->count(),
                             'estado_codigo' => $estado, 'estado' => self::catalogo()[$tipo]['estados'][$estado]];
                     } else {
                         yield [...$datos, 'id' => $vinculo->id.':ingreso', 'fecha' => $vinculo->fecha_inicio?->toDateString(),
-                            'estado_codigo' => 'ingreso', 'estado' => 'Ingreso', 'numero' => $vinculo->numero_documento_vinculo, 'motivo' => 'Inicio del vínculo'];
+                            'estado_codigo' => 'ingreso', 'estado' => 'Ingreso', 'numero' => $vinculo->referenciaDocumentos() ?: null, 'motivo' => 'Inicio del vínculo'];
                         $cese = $vinculo->desvinculaciones->first();
                         $fecha = $vinculo->fecha_cese ?? $cese?->fecha_cese;
                         if ($fecha) {

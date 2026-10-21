@@ -31,7 +31,12 @@ export function precargaDesdeRegistro(tipo, registro, { familiares = [] } = {}) 
   const numero = valor => (texto(valor) ? { num_resolucion: texto(valor) } : {})
   const fecha = valor => (fechaEmision(valor) ? { fecha_emision: fechaEmision(valor) } : {})
   switch (tipo?.formulario_datos) {
-    case 'vinculos_laborales': return SIN_NUMERO_DEL_VINCULO.includes(tipo.codigo) ? {} : numero(v.numero_documento_vinculo)
+    case 'vinculos_laborales': {
+      if (SIN_NUMERO_DEL_VINCULO.includes(tipo.codigo)) return {}
+      if (tipo.codigo === 'S02_F_CONTRATO') return { ...numero(v.numero_contrato), ...fecha(v.fecha_contrato) }
+      if (['S02_C_RESOLUCION_DESIGNACION', 'S02_E_RESOLUCION_CARRERA'].includes(tipo.codigo)) return { ...numero(v.numero_resolucion), ...fecha(v.fecha_resolucion) }
+      return {}
+    }
     case 'vinculo_adendas': return numero(v.numero)
     case 'progresiones_carrera': return numero(v.numero_resolucion)
     case 'ratificaciones_docentes': return { ...numero(v.numero_resolucion), ...fecha(v.fecha_resolucion) }

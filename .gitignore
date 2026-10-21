@@ -1,6 +1,7 @@
 .env
 # Secretos y datos de producción: nunca al repositorio.
 .env.produccion
+.env.respaldos
 respaldos/
 # Copias de respaldo de los .env (editores, nano): tienen los mismos datos que el .env.
 *.env.save

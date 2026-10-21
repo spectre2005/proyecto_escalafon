@@ -461,7 +461,7 @@ class ExpedienteController extends Controller
         $relations = self::RELATIONS[class_basename($query->getModel())] ?? [];
         foreach ($relations as $relation) {
             $related = $query->getModel()->{$relation}()->getRelated();
-            $columns = array_values(array_intersect(['id', 'nombre', 'apellidos_nombres', 'nombres', 'apellido_paterno', 'apellido_materno', 'numero_legajo', 'nombre_original', 'codigo', 'descripcion', 'numero_documento_vinculo', 'nombre_puesto', 'fecha_inicio', 'tipo', 'tipo_documento_id', 'num_resolucion'], array_merge(['id'], $related->getFillable())));
+            $columns = array_values(array_intersect(['id', 'nombre', 'apellidos_nombres', 'nombres', 'apellido_paterno', 'apellido_materno', 'numero_legajo', 'nombre_original', 'codigo', 'descripcion', 'numero_documento_vinculo', 'numero_resolucion', 'numero_contrato', 'nombre_puesto', 'fecha_inicio', 'tipo', 'tipo_documento_id', 'num_resolucion'], array_merge(['id'], $related->getFillable())));
             $query->with($relation.':'.implode(',', $columns));
             if ($related instanceof DocumentoUsuario) {
                 $query->with($relation.'.tipoDocumento:id,nombre');
@@ -526,7 +526,7 @@ class ExpedienteController extends Controller
             return implode(' / ', array_filter([$record->region, $record->provincia, $record->distrito]));
         }
         if ($record instanceof VinculoLaboral) {
-            return trim(($record->nombre_puesto ?? 'Vínculo laboral').' '.($record->numero_documento_vinculo ?? ''));
+            return trim(($record->nombre_puesto ?? 'Vínculo laboral').' '.$record->referenciaDocumentos());
         }
         foreach (['nombre', 'apellidos_nombres', 'numero_legajo', 'nombre_original', 'numero_documento_vinculo', 'codigo', 'descripcion', 'tipo'] as $field) {
             if ($record->getAttribute($field)) {

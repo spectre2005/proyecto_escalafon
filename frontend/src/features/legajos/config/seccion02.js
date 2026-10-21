@@ -12,6 +12,10 @@ export const tiposPersonal = { docente: 'Docente', administrativo: 'Administrati
 // Tipo de vínculo (vinculos_laborales.regimen_laboral). Sincronía con backend RegimenesLaborales::TIPOS_VINCULO.
 export const regimenesLaborales = { carrera: 'Carrera', plazo_determinado: 'Plazo determinado', designado: 'Designado (confianza)' }
 
+export const tiposVinculoPara = tipoPersonal => Object.fromEntries(Object.entries(regimenesLaborales).filter(([valor]) => tipoPersonal !== 'docente' || valor !== 'designado'))
+
+export const referenciaDocumentos = vinculo => [vinculo.numero_resolucion, vinculo.numero_contrato].filter(Boolean).join(' · ') || vinculo.numero_documento_vinculo || 'sin N.º de documento'
+
 // null = Sin definir: vínculo anterior cuyo valor era una ley; se confirma en «Corregir vínculo». Nunca es un tipo.
 export const tipoVinculo = valor => regimenesLaborales[valor] || 'Tipo de vínculo sin definir'
 
@@ -80,7 +84,7 @@ export const camposDatosPuesto = {
 export function etiquetaVinculo(vinculo) {
   const v = vinculo.values
   const desde = v.fecha_inicio ? v.fecha_inicio.split('-').reverse().join('/') : 'sin fecha'
-  return `${v.nombre_puesto} · ${v.numero_documento_vinculo || 'sin N.º de documento'} · desde ${desde}`
+  return `${v.nombre_puesto} · ${referenciaDocumentos(v)} · desde ${desde}`
 }
 
 // 2.4: con «Tiene período de prueba» en No solo «no aplica» (pantalla explicativa y entrada atenuada) si no hay períodos

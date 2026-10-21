@@ -59,7 +59,7 @@ class Seccion05Controller extends Controller
         $goces = GoceVacacional::query()->where('usuario_id', $usuario)->where('anulado', false)->with('registradoPor')
             ->orderByDesc('fecha_inicio')->orderBy('id')->get();
         $vinculos = VinculoLaboral::query()->where('usuario_id', $usuario)->where('anulado', false)
-            ->orderByDesc('fecha_inicio')->orderBy('id')->get(['id', 'nombre_puesto', 'numero_documento_vinculo', 'fecha_inicio', 'fecha_cese']);
+            ->orderByDesc('fecha_inicio')->orderBy('id')->get(['id', 'nombre_puesto', 'numero_documento_vinculo', 'numero_resolucion', 'numero_contrato', 'fecha_inicio', 'fecha_cese']);
 
         $documentos = DocumentoUsuario::query()->where('usuario_id', $usuario)->where('seccion_legajo_id', Seccion05::SECCION)
             ->whereIn('legajo_id', Legajo::query()->where('usuario_id', $usuario)->select('id'))
@@ -81,6 +81,7 @@ class Seccion05Controller extends Controller
             'goces' => $this->filas($goces, self::CAMPOS_GOCE),
             'vinculos' => $vinculos->map(fn (VinculoLaboral $vinculo): array => [
                 'id' => $vinculo->id, 'nombre_puesto' => $vinculo->nombre_puesto, 'numero_documento_vinculo' => $vinculo->numero_documento_vinculo,
+                'numero_resolucion' => $vinculo->numero_resolucion, 'numero_contrato' => $vinculo->numero_contrato,
                 'fecha_inicio' => $vinculo->fecha_inicio?->format('Y-m-d'), 'fecha_cese' => $vinculo->fecha_cese?->format('Y-m-d'),
             ])->values(),
         ]]);

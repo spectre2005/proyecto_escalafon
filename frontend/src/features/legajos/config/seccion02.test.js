@@ -1,7 +1,25 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { pruebaEnNoConDatos, pruebaNoAplica } from './seccion02.js'
-import { vinculoParaGuardar } from '../components/seccion02/borradoresVinculo.js'
+import { etiquetaVinculo, pruebaEnNoConDatos, pruebaNoAplica, referenciaDocumentos, tiposVinculoPara } from './seccion02.js'
+import { vinculoInicial, vinculoParaGuardar } from '../components/seccion02/borradoresVinculo.js'
+
+test('teacher choices exclude confidence while administrative choices retain it', () => {
+  assert.deepEqual(Object.keys(tiposVinculoPara('docente')), ['carrera', 'plazo_determinado'])
+  assert.equal(tiposVinculoPara('administrativo').designado, 'Designado (confianza)')
+})
+
+test('the draft keeps independent documents and process year without guessing a legacy number', () => {
+  const antiguo = vinculoInicial({ numero_documento_vinculo: 'ANTIGUO' })
+  assert.equal(antiguo.numero_resolucion, '')
+  assert.equal(antiguo.numero_contrato, '')
+  assert.equal(antiguo.numero_documento_vinculo, 'ANTIGUO')
+  const datos = { numero_resolucion: 'R-1', fecha_resolucion: '2026-01-01', numero_contrato: 'C-2', fecha_contrato: '2026-01-02', anio_proceso: 2026 }
+  const draft = vinculoInicial(datos)
+  for (const [key, value] of Object.entries(datos)) assert.equal(draft[key], value)
+  assert.equal(referenciaDocumentos(draft), 'R-1 · C-2')
+  assert.equal(referenciaDocumentos(antiguo), 'ANTIGUO')
+  assert.match(etiquetaVinculo({ values: { ...draft, nombre_puesto: 'Analista', fecha_inicio: '2026-01-03' } }), /R-1 · C-2/)
+})
 
 test('2.4 does not apply only with the flag in No and nothing registered', () => {
   assert.equal(pruebaNoAplica({ tiene_periodo_prueba: false, prueba_con_datos: false }), true)

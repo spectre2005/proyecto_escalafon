@@ -8,12 +8,14 @@ use App\Models\Legajo;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
 use App\Support\RegimenesLaborales;
+use App\Support\ReglasVinculo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Completar el tipo de vínculo de un vínculo cerrado (con fecha de cese) que quedó Sin definir. Es la única escritura
@@ -43,6 +45,9 @@ class VinculoTipoController extends Controller
             };
             if ($rechazo) {
                 return response()->json(['message' => $rechazo], 409);
+            }
+            if ($errores = ReglasVinculo::erroresIngreso($data, $registro)) {
+                throw ValidationException::withMessages($errores);
             }
             $registro->update(['regimen_laboral' => $data['regimen_laboral']]);
             $this->auditar($registro, $request);

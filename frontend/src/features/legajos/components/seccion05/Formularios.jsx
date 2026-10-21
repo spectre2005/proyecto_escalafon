@@ -1,4 +1,5 @@
 import { registrarSeccion05 } from '../../api/seccion05Api'
+import { referenciaDocumentos } from '../../config/seccion02'
 import { formasPermiso, movimientosLicencia, movimientosVacacion, opcionesLicencia, opcionesMovimiento, opcionesVacacion, tiposGoce, tiposLicencia } from '../../config/seccion05'
 import Campo, { Formulario, Opciones } from '../seccion01/Campo'
 import { useBorrador, useGuardar } from '../seccion01/useGuardar'
@@ -68,7 +69,7 @@ export function PeriodoVacacionalForm({ usuario, vinculos, onSaved, onCancel }) 
   return <Formulario titulo="Registrar período vacacional" guardar="Guardar período" busy={busy} error={error} onSubmit={() => guardar(draft)} onCancel={onCancel} nota={nota}>
     <Campo label="Vínculo laboral" required error={errors.vinculo_laboral_id} className="sm:col-span-2"><select required value={draft.vinculo_laboral_id} onChange={set('vinculo_laboral_id')}>
       <option value="">Selecciona</option>
-      {vinculos.map(vinculo => <option key={vinculo.id} value={vinculo.id}>{vinculo.nombre_puesto} · {vinculo.numero_documento_vinculo || 'sin N.º de documento'} · desde {fecha(vinculo.fecha_inicio)}{vinculo.fecha_cese ? ` (cesado ${fecha(vinculo.fecha_cese)})` : ''}</option>)}
+      {vinculos.map(vinculo => <option key={vinculo.id} value={vinculo.id}>{vinculo.nombre_puesto} · {referenciaDocumentos(vinculo)} · desde {fecha(vinculo.fecha_inicio)}{vinculo.fecha_cese ? ` (cesado ${fecha(vinculo.fecha_cese)})` : ''}</option>)}
     </select></Campo>
     <Campo label="Año del período" required error={errors.periodo_anio}><input type="number" required min={1950} value={draft.periodo_anio} onChange={set('periodo_anio')} /></Campo>
     <Campo label="Días de derecho" required error={errors.dias_derecho}><input type="number" required min={1} max={366} value={draft.dias_derecho} onChange={set('dias_derecho')} /></Campo>

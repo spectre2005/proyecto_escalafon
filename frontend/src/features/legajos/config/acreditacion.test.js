@@ -6,9 +6,13 @@ import { agruparTipos, cantidadDocumentos, indiceNoAplica, tiposQueAcreditan } f
 const tipo = (codigo, formulario_datos, extra = {}) => ({ codigo, formulario_datos, ...extra })
 
 test('the record proposes the resolution number only when it is the same document', () => {
-  const vinculo = { numero_documento_vinculo: 'RES-100-2026' }
-  for (const codigo of ['S02_C_RESOLUCION_DESIGNACION', 'S02_E_RESOLUCION_CARRERA', 'S02_F_CONTRATO']) {
-    assert.deepEqual(precargaDesdeRegistro(tipo(codigo, 'vinculos_laborales'), vinculo), { num_resolucion: 'RES-100-2026' })
+  const vinculo = { numero_documento_vinculo: 'ANTERIOR-SIN-CLASIFICAR', numero_resolucion: 'RES-100-2026', fecha_resolucion: '2025-03-01', numero_contrato: 'CAS-028', fecha_contrato: '2025-03-02' }
+  for (const codigo of ['S02_C_RESOLUCION_DESIGNACION', 'S02_E_RESOLUCION_CARRERA']) {
+    assert.deepEqual(precargaDesdeRegistro(tipo(codigo, 'vinculos_laborales'), vinculo), { num_resolucion: 'RES-100-2026', fecha_emision: '2025-03-01' })
+  }
+  assert.deepEqual(precargaDesdeRegistro(tipo('S02_F_CONTRATO', 'vinculos_laborales'), vinculo), { num_resolucion: 'CAS-028', fecha_emision: '2025-03-02' })
+  for (const codigo of ['S02_C_RESOLUCION_DESIGNACION', 'S02_F_CONTRATO']) {
+    assert.deepEqual(precargaDesdeRegistro(tipo(codigo, 'vinculos_laborales'), { numero_documento_vinculo: 'ANTERIOR-SIN-CLASIFICAR' }), {})
   }
   // La renovación puede tener otro número: no se propone.
   assert.deepEqual(precargaDesdeRegistro(tipo('S02_D_RESOLUCION_RENOVACION', 'vinculos_laborales'), vinculo), {})

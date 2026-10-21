@@ -17,9 +17,10 @@ export function EstadoServicio({ servicio }) {
 /** Respaldo al día o atrasado (respaldo.atrasado: sin un respaldo correcto reciente). Sin aprovisionar no hay qué respaldar. */
 export function EstadoRespaldo({ institucion }) {
   if (!institucion.aprovisionada || !institucion.respaldo) return null
-  const { atrasado, ultimo_correcto_en } = institucion.respaldo
+  const { atrasado, ultimo_correcto_en, nube } = institucion.respaldo
+  const pendienteNube = nube && nube.estado !== 'correcta'
   return <span title={ultimo_correcto_en ? `Último respaldo correcto: ${new Date(ultimo_correcto_en).toLocaleString('es-PE')}` : 'Todavía no hay un respaldo correcto.'}
-    className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${atrasado ? 'bg-rose-50 text-rose-700 ring-rose-200' : 'bg-teal-50 text-teal-800 ring-teal-200'}`}>{atrasado ? 'Sin respaldo reciente' : 'Respaldo al día'}</span>
+    className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${atrasado ? 'bg-rose-50 text-rose-700 ring-rose-200' : pendienteNube ? 'bg-amber-50 text-amber-800 ring-amber-200' : 'bg-teal-50 text-teal-800 ring-teal-200'}`}>{atrasado ? 'Sin respaldo reciente' : pendienteNube ? 'Copia en nube pendiente' : 'Respaldo al día'}</span>
 }
 
 /** Estado de una comprobación técnica (o del resumen de una institución). */

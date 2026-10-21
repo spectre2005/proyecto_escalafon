@@ -75,7 +75,7 @@ export default function ListaDocumentos({ usuario, tipo, enlazado, onSubsanar, o
             ...(subsana ? [['Subsana a', `documento de folios ${folios(subsana.values.folio_inicio, subsana.values.folio_fin)}`]] : []),
           ]
           const detalles = dni ? [] : [
-            ...(tipo.requiere_num_resolucion || v.num_resolucion ? [['N.º resolución', v.num_resolucion || 'No registrado']] : []),
+            ...(tipo.requiere_num_resolucion || v.num_resolucion ? [[tipo.codigo === 'S02_F_CONTRATO' ? 'N.º contrato' : 'N.º resolución', v.num_resolucion || 'No registrado']] : []),
             ['Titular', `${v.titular_nombre || 'No registrado'} ${v.titular_documento || ''} (${etiqueta(relacionesTitular, v.relacion_titular).toLowerCase()})`],
             ['Modalidad', v.modalidad_presentacion ? etiqueta(modalidadesPresentacion, v.modalidad_presentacion) : 'No registrada'],
             ['Incorporado', fecha(v.fecha_incorporacion)],

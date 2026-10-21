@@ -43,6 +43,11 @@ class StoreUsuarioConVinculoRequest extends StoreUsuariosRequest
             $this->vinculo = $this->parte($validator, 'vinculo', array_diff_key(ReglasVinculo::VINCULO, array_flip(ReglasVinculo::NO_EN_ALTA)));
             $tipo = $this->input('usuarios.0.tipo_personal');
             $this->datosPuesto = is_string($tipo) && isset(ReglasVinculo::PERFIL[$tipo]) ? $this->parte($validator, 'datos_puesto', ReglasVinculo::PERFIL[$tipo]) : [];
+            foreach (ReglasVinculo::erroresIngreso([...$this->vinculo, 'tipo_personal' => $tipo]) as $campo => $mensajes) {
+                foreach ($mensajes as $mensaje) {
+                    $validator->errors()->add("vinculo.$campo", $mensaje);
+                }
+            }
         });
     }
 
