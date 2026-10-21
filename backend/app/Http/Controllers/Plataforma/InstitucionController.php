@@ -63,7 +63,8 @@ class InstitucionController extends Controller
         $consulta = Institucion::query()->with('periodos')->orderBy('nombre')->orderBy('id');
         if (! empty($filtros['q'])) {
             $texto = '%'.mb_strtolower(trim($filtros['q'])).'%';
-            $consulta->where(fn ($q) => $q->whereRaw('LOWER(nombre) LIKE ?', [$texto])->orWhereRaw('LOWER(slug) LIKE ?', [$texto]));
+            $consulta->where(fn ($q) => $q->whereRaw('LOWER(nombre) LIKE ?', [$texto])->orWhereRaw('LOWER(slug) LIKE ?', [$texto])
+                ->orWhereRaw('LOWER(razon_social) LIKE ?', [$texto])->orWhere('ruc', 'like', $texto));
         }
         if (! empty($filtros['estado'])) {
             $consulta->where('estado', $filtros['estado']);
@@ -103,11 +104,17 @@ class InstitucionController extends Controller
     /** Se registra sin aprovisionar: base y almacenamiento propuestos a partir del identificador (editables). */
     public function store(Request $request): JsonResponse
     {
-        $this->sinCamposAjenos($request, ['nombre', 'slug', 'base_datos', 'almacenamiento']);
+        $this->sinCamposAjenos($request, ['nombre', 'slug', 'base_datos', 'almacenamiento', 'ruc', 'razon_social']);
         $slug = mb_strtolower(trim((string) $request->input('slug')));
         $request->merge(['slug' => $slug, 'base_datos' => $request->input('base_datos') ?: 'escalafon_'.str_replace('-', '_', $slug),
             'almacenamiento' => $request->input('almacenamiento') ?: 'instituciones/'.$slug]);
-        $data = $request->validate($this->reglas());
+        foreach (['ruc', 'razon_social'] as $campo) {
+            if ($request->has($campo)) {
+                $valor = $request->input($campo);
+                $request->merge([$campo => is_string($valor) ? (trim($valor) ?: null) : $valor]);
+            }
+        }
+        $data = $request->validate([...$this->reglas(), ...$this->reglasIdentificacionFiscal()]);
         $institucion = Institucion::query()->create([...$data, 'nombre' => trim($data['nombre']), 'estado' => Institucion::REGISTRADA]);
         AuditoriaOperaciones::registrar('institucion.registrada', $request, Auth::guard('plataforma')->id(), $institucion->id, null, $this->huella($institucion));
 
@@ -129,14 +136,16 @@ class InstitucionController extends Controller
         }
         // Datos del cliente: sin espacios sobrantes; vacío = sin dato. El correo, en minúsculas.
         foreach (array_intersect(Institucion::DATOS_CLIENTE, array_keys($request->all())) as $campo) {
-            $valor = trim((string) $request->input($campo));
-            $request->merge([$campo => $valor === '' ? null : ($campo === 'contacto_email' ? mb_strtolower($valor) : $valor)]);
+            $valor = $request->input($campo);
+            if (is_string($valor)) {
+                $valor = trim($valor);
+                $request->merge([$campo => $valor === '' ? null : ($campo === 'contacto_email' ? mb_strtolower($valor) : $valor)]);
+            }
         }
         $data = $request->validate([...array_map(fn (array $reglas): array => ['sometimes', ...$reglas], $this->reglas($registro->id)),
             // Días que sigue funcionando (con aviso) después de vencer su tiempo de uso.
             'dias_gracia' => ['sometimes', 'integer', 'min:0', 'max:90'],
-            'razon_social' => ['sometimes', 'nullable', 'string', 'min:3', 'max:200'],
-            'ruc' => ['sometimes', 'nullable', 'string', new Ruc],
+            ...$this->reglasIdentificacionFiscal(),
             'contacto_nombre' => ['sometimes', 'nullable', 'string', 'min:3', 'max:150'],
             'contacto_email' => ['sometimes', 'nullable', 'email:rfc', 'max:255'],
             'contacto_telefono' => ['sometimes', 'nullable', 'string', 'regex:/^\+?[0-9][0-9 ()-]{5,18}$/'],
@@ -228,6 +237,15 @@ class InstitucionController extends Controller
             'slug' => ['required', 'string', 'regex:'.Institucion::PATRON_SLUG, Rule::notIn(Institucion::SLUGS_RESERVADOS), $unico('slug')],
             'base_datos' => ['required', 'string', 'regex:'.Institucion::PATRON_BASE_DATOS, Rule::notIn([config('database.connections.plataforma.database'), 'postgres', 'template0', 'template1']), $unico('base_datos')],
             'almacenamiento' => ['required', 'string', 'regex:'.Institucion::PATRON_ALMACENAMIENTO, $unico('almacenamiento')],
+        ];
+    }
+
+    /** @return array<string, list<mixed>> */
+    private function reglasIdentificacionFiscal(): array
+    {
+        return [
+            'razon_social' => ['sometimes', 'nullable', 'string', 'min:3', 'max:200'],
+            'ruc' => ['sometimes', 'nullable', 'string', new Ruc],
         ];
     }
 

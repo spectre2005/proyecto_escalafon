@@ -38,7 +38,7 @@ export default function InstitucionesPage() {
       <Link to="/plataforma/instituciones/nueva" className={`inline-flex items-center gap-2 ${boton('principal', 'campo')}`}><Icon name="plus" size={16} />Registrar institución</Link>
     </div>
     <form role="search" onSubmit={event => { event.preventDefault(); filtrar({ q: texto.trim(), page: '' }) }} className="mt-6 flex flex-wrap gap-3">
-      <label className="min-w-60 flex-1"><span className="sr-only">Buscar por nombre o identificador</span><input type="search" value={texto} onChange={event => setTexto(event.target.value)} placeholder="Buscar por nombre o identificador" maxLength={150} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" /></label>
+      <label className="min-w-60 flex-1"><span className="sr-only">Buscar por nombre, RUC, razón social o identificador</span><input type="search" value={texto} onChange={event => setTexto(event.target.value)} placeholder="Buscar por nombre, RUC o razón social" maxLength={150} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" /></label>
       <label><span className="sr-only">Estado</span><select value={estadoFiltro} onChange={event => filtrar({ estado: event.target.value, page: '' })} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"><option value="">Todos los estados</option>{Object.entries(ESTADOS).map(([clave, { etiqueta }]) => <option key={clave} value={clave}>{etiqueta}</option>)}</select></label>
       <button type="submit" className={`inline-flex items-center gap-2 ${boton('secundario', 'campo')}`}><Icon name="search" size={16} />Buscar</button>
     </form>
@@ -48,7 +48,7 @@ export default function InstitucionesPage() {
       {data && (data.data.length === 0 ? <p className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">{q || estadoFiltro ? 'Ninguna institución coincide con la búsqueda.' : 'Todavía no hay instituciones registradas.'}</p> : <>
         <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
           {data.data.map(institucion => <li key={institucion.id}><Link to={`/plataforma/instituciones/${institucion.id}`} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 hover:bg-slate-50">
-            <span className="min-w-0"><strong className="block truncate text-sm text-slate-800">{institucion.nombre}</strong><span className="text-xs text-slate-500">{institucion.slug} · registrada {fecha(institucion.created_at)}</span></span>
+            <span className="min-w-0"><strong className="block truncate text-sm text-slate-800">{institucion.nombre}</strong>{institucion.ruc && <span className="mt-1 block text-xs font-medium text-teal-800">RUC {institucion.ruc}{institucion.razon_social && institucion.razon_social !== institucion.nombre ? ` · ${institucion.razon_social}` : ''}</span>}<span className="text-xs text-slate-500">{institucion.slug} · registrada {fecha(institucion.created_at)}</span></span>
             <span className="flex flex-wrap gap-2"><SinAprovisionar institucion={institucion} /><EstadoInstitucion estado={institucion.estado} /><EstadoServicio servicio={institucion.servicio} /><EstadoRespaldo institucion={institucion} /></span>
           </Link></li>)}
         </ul>

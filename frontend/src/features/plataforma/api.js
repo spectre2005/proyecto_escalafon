@@ -74,6 +74,7 @@ export const sesionTerminada = error => [401, 419].includes(error?.response?.sta
 export const listarSuperadmins = signal => plataforma.get('/superadministradores', { signal }).then(r => r.data.data)
 export const crearSuperadmin = datos => plataforma.post('/superadministradores', datos).then(r => r.data.data)
 export const consultarIdentidadDni = (dni, signal) => plataforma.post('/identidad/dni', { dni }, { signal }).then(r => r.data.data)
+export const consultarIdentidadRuc = (ruc, signal, actualizar = false) => plataforma.post('/identidad/ruc', { ruc, ...(actualizar && { actualizar: true }) }, { signal }).then(r => r.data.data)
 export const accionSuperadmin = (id, accion, vence_en) => plataforma.post(`/superadministradores/${id}/${accion}`, accion === 'desactivar' || !vence_en ? {} : { vence_en }).then(r => r.data.data)
 export const cambiarMiPassword = datos => plataforma.put('/auth/password', datos).then(r => r.data.data)
 // Uso y estado técnico de una institución (se guarda unos minutos; actualizar lo vuelve a medir).
