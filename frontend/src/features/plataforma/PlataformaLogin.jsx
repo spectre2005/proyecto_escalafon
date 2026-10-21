@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Icon from '../../components/ui/Icon'
 import { iniciarSesion } from './api'
+import { EntradaPassword } from './ui'
 
 /** Acceso al panel de plataforma. Cuentas propias (no las de una institución); sin registro público. */
 export default function PlataformaLogin() {
@@ -37,7 +38,7 @@ export default function PlataformaLogin() {
         <input type="email" required autoComplete="username" value={email} onChange={event => setEmail(event.target.value)} disabled={busy} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800" />
       </label>
       <label className="mt-4 grid gap-2 text-xs font-medium text-slate-600">Contraseña
-        <input type="password" required autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} disabled={busy} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800" />
+        <EntradaPassword required autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} disabled={busy} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800" />
       </label>
       <button type="submit" disabled={busy} className="mt-6 w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Entrando…' : 'Entrar'}</button>
     </form>

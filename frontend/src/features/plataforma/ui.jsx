@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef } from 'react'
-import { TARJETA, boton } from './estilos'
+import { useEffect, useId, useRef, useState } from 'react'
+import Icon from '../../components/ui/Icon'
+import { ENTRADA, TARJETA, boton } from './estilos'
 
 /**
  * Tarjeta de una sección del panel: título, descripción o detalle opcionales y acciones a la derecha.
@@ -90,4 +91,25 @@ export function PanelPestana({ id, idPestana, activo, children }) {
  */
 export function Campo({ etiqueta, ayuda, children, className = '' }) {
   return <label className={`grid content-start gap-2 text-xs font-medium text-slate-600 ${className}`}>{etiqueta}{children}{ayuda && <span className="font-normal text-slate-500">{ayuda}</span>}</label>
+}
+
+/**
+ * Contraseña con botón para ver lo que se escribe. Va dentro de una etiqueta (Campo): el clic del botón no se reenvía
+ * a la etiqueta (preventDefault). Se oculta de nuevo al vaciarse el campo (envío o error).
+ */
+export function EntradaPassword({ className = ENTRADA, ...props }) {
+  const [visible, setVisible] = useState(false)
+  const [anterior, setAnterior] = useState(props.value)
+  if (props.value !== anterior) {
+    setAnterior(props.value)
+    if (props.value === '') setVisible(false)
+  }
+  return <span className="relative block">
+    <input {...props} type={visible ? 'text' : 'password'} autoCapitalize="off" autoCorrect="off" spellCheck={false} className={`${className} pr-11`} />
+    <button type="button" onClick={event => { event.preventDefault(); setVisible(!visible) }} disabled={props.disabled}
+      aria-label={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'} aria-pressed={visible} title={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+      className="absolute inset-y-0 right-0 grid w-11 place-items-center rounded-r-xl text-slate-400 hover:text-slate-700 disabled:opacity-50">
+      <Icon name={visible ? 'eyeOff' : 'eye'} size={18} />
+    </button>
+  </span>
 }
