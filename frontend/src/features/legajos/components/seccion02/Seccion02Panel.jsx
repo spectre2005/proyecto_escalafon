@@ -1,3 +1,4 @@
+import { coexistenDocenciaYCas, modalidadesIngreso, requisitosIngreso, rotulosIngreso, tieneDocencia } from '../../config/ingresoLaboral'
 import Aviso from '../documentos/AvisoSeccion'
 import AvisosExpediente from '../documentos/AvisosExpediente'
 import DocumentoModal from '../documentos/DocumentoModal'
@@ -24,6 +25,7 @@ import EspacioSeccion, { DocumentoDelRegistro, EnZona, SinAsociar } from '../doc
 import { atajosDe, buscarDocumento, idBloque, idTipo, mostrarEstado, tituloSeccion } from '../../config/espacioSeccion'
 import { AnularForm } from '../seccion01/RegistrosPanel'
 import { AdendaForm, DatosPuestoForm, InduccionForm, PeriodoForm, SeleccionForm, VinculoForm } from './Formularios'
+import { AvisoDocenciaCas } from './CamposVinculo'
 import Registros, { Bloqueo } from './Registros'
 import { textoBandera } from '../../../../shared/banderas'
 
@@ -66,7 +68,7 @@ function Resumen({ data, onNavigate, compacto = false }) {
     })()}
     <details className="mt-2 text-xs text-slate-500">
       <summary className="cursor-pointer font-semibold text-slate-600">¿Cómo se cuenta?</summary>
-      <p className="mt-2">Cargados y recepcionados se muestran por separado: el criterio de completitud del legajo está pendiente de definir. Sin recepción un documento no cuenta como aprobado. Un tipo queda por determinar cuando falta definir una condición del puesto o el régimen laboral registrado no es carrera, plazo determinado ni designado.</p>
+      <p className="mt-2">Cargados y recepcionados se muestran por separado: el criterio de completitud del legajo está pendiente de definir. Sin recepción un documento no cuenta como aprobado. Un tipo queda por determinar cuando falta definir una condición del puesto o el régimen laboral registrado no es carrera, plazo determinado, indeterminado ni designado.</p>
     </details>
     {!compacto && <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">{data.subsecciones.map(sub => {
       const [nombre, clase] = estadosSubseccion[sub.estado]
@@ -318,16 +320,21 @@ function CompletarTipo({ usuario, vinculo, disabled }) {
 function VinculoCard({ vinculo, aviso, acciones, accionAdenda, destacado, corregir, completar, adjuntar, adjuntarAdenda, documentos = [] }) {
   const v = vinculo.values
   const [estadoTexto, estadoClase] = estadosVencimiento[vinculo.vencimiento.estado]
+  const requeridos = requisitosIngreso(v, vinculo.codigo_ley)
+  const rotulos = rotulosIngreso(v.tipo_personal, vinculo.datos_puesto?.[0]?.values.condicion_docente, vinculo.codigo_ley)
+  const documentosIngreso = [[rotulos.resolucion, 'resolucion', v.numero_resolucion, v.fecha_resolucion], [rotulos.contrato, 'contrato', v.numero_contrato, v.fecha_contrato]]
+    .filter(([, tipo, numero, emision]) => !v.modalidad_ingreso || requeridos[tipo] || numero || emision)
   return <article className={`rounded-2xl border bg-white p-5 ${destacado ? 'border-teal-300 ring-1 ring-teal-100' : 'border-slate-200'}`}>
     <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h4 className="font-semibold text-slate-800">{v.nombre_puesto}</h4><p className="mt-1 text-xs text-slate-500">{etiqueta(tiposPersonal, v.tipo_personal)} · {tipoVinculo(v.regimen_laboral)} · {referenciaDocumentos(v)}</p></div><Etiqueta clase={estadoClase}>{estadoTexto}</Etiqueta></div>
     <div className="mt-4"><AvisoSinDefinir vinculo={vinculo} corregir={corregir} />{completar}<AvisoVencimiento vinculo={vinculo} aviso={aviso} /></div>
     <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
       {[['Inicio', fecha(v.fecha_inicio)], ['Fin efectivo', vinculo.vencimiento.fin_efectivo ? `${fecha(vinculo.vencimiento.fin_efectivo)}${vinculo.vencimiento.por_adenda ? ' (por adenda)' : ''}` : 'Sin fecha de fin'],
         ['Unidad orgánica', vinculo.unidad_organica || 'No registrada'], ['Ley / régimen normativo', vinculo.regimen_normativo || 'Sin definir'],
+        ['Modalidad de incorporación', modalidadesIngreso[v.modalidad_ingreso] || 'Pendiente de clasificar'],
       ].map(([label, valor]) => <div key={label}><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 break-words text-slate-800">{valor}</dd></div>)}
     </dl>
     <div className="mt-4 grid gap-3 sm:grid-cols-2">
-      {[['Resolución', v.numero_resolucion, v.fecha_resolucion], ['Contrato', v.numero_contrato, v.fecha_contrato]].map(([nombre, numero, emision]) => <div key={nombre} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+      {documentosIngreso.map(([nombre, , numero, emision]) => <div key={nombre} className={`rounded-xl border border-slate-100 bg-slate-50 p-3 ${documentosIngreso.length === 1 ? 'sm:col-span-2' : ''}`}>
         <p className="text-xs font-semibold text-slate-600">{nombre}</p><p className="mt-1 break-words text-sm text-slate-800">{numero || 'Número sin registrar'}</p>{emision && <p className="mt-1 text-xs text-slate-500">Fecha: {fecha(emision)}</p>}
       </div>)}
     </div>
@@ -338,6 +345,7 @@ function VinculoCard({ vinculo, aviso, acciones, accionAdenda, destacado, correg
       {[['Fin prevista', v.fecha_fin_prevista ? fecha(v.fecha_fin_prevista) : 'Sin fecha de fin'], ['Fecha de cese', fecha(v.fecha_cese)],
         ['Obligado a DJBR', textoBandera(v.obligado_djbr)], ['Exige colegiatura', textoBandera(v.exige_colegiatura)], ['Exige estudios básicos', textoBandera(v.exige_estudios_basicos)], ['Período de prueba', textoBandera(v.tiene_periodo_prueba)],
         ['Registrado por', vinculo.registrado_por || 'No registrado (registro anterior)'],
+        ['Sustento de la incorporación', v.sustento_ingreso || 'No corresponde / no registrado'],
       ].map(([label, valor]) => <div key={label}><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 break-words text-slate-800">{valor}</dd></div>)}
     </dl>
     <div className="mt-5">
@@ -364,7 +372,7 @@ function Formalizacion({ usuario, data, sinLegajo }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState('')
-  const [confirmandoOtro, setConfirmandoOtro] = useState(false)
+  const [confirmandoOtro, setConfirmandoOtro] = useState(null)
   const vigentes = data.vinculos.filter(v => v.vigente)
   const historial = data.vinculos.filter(v => !v.vigente)
   const cerrar = guardado => { setForm(null); setAviso(guardado ? 'Registro guardado.' : '') }
@@ -403,7 +411,7 @@ function Formalizacion({ usuario, data, sinLegajo }) {
   const formulario = form && (form.tipo === 'adenda'
     ? <AdendaForm usuario={usuario} vinculos={[form.vinculo]} onSaved={() => cerrar(true)} onCancel={() => cerrar(false)} />
     : form.tipo === 'puesto' ? <DatosPuestoForm key={form.vinculo.id} usuario={usuario} vinculo={form.vinculo} onSaved={() => cerrar(true)} onCancel={() => cerrar(false)} />
-      : <VinculoForm key={form.record?.id || 'nuevo'} usuario={usuario} record={form.record} onSaved={() => cerrar(true)} onCancel={() => cerrar(false)} />)
+      : <VinculoForm key={form.record?.id || (form.casAdicional ? 'nuevo-cas' : 'nuevo')} usuario={usuario} record={form.record} casAdicional={form.casAdicional} onSaved={() => cerrar(true)} onCancel={() => cerrar(false)} />)
   const corregir = vinculo => puedeRegistrar && !vinculo.cerrado && !sinLegajo && vinculo.tipo_sugerido
     && <button disabled={ocupado} onClick={() => empezar(() => setForm({ tipo: 'vinculo', record: vinculo }))} className={enlace}>Corregir vínculo</button>
   const completar = vinculo => puedeRegistrar && vinculo.cerrado && !sinLegajo && vinculo.values.regimen_laboral === null && !vinculo.values.anulado
@@ -415,19 +423,31 @@ function Formalizacion({ usuario, data, sinLegajo }) {
   const documentosDe = v => data.subsecciones.flatMap(sub => sub.tipos).flatMap(tipo => (tipo.lista || [])
     .filter(documento => documento.values.vinculo_laboral_id === v.id && !documento.subsanado).map(documento => ({ tipo, documento })))
   const tarjeta = (v, destacado) => <VinculoCard key={v.id} documentos={documentosDe(v)} vinculo={v} aviso={data.dias_aviso_vencimiento} destacado={destacado} acciones={acciones(v)} accionAdenda={accionAdenda(v)} corregir={corregir(v)} completar={completar(v)} adjuntar={adjuntar(v)} adjuntarAdenda={adjuntarAdenda} />
-  // Con un vínculo vigente (criterio de la sección 02), registrar otro es una acción secundaria que se confirma: la
-  // posibilidad de varios vínculos vigentes está pendiente de confirmar y no se bloquea.
-  const registrarVinculo = () => empezar(() => { setConfirmandoOtro(false); setForm({ tipo: 'vinculo' }) })
+  // La vigencia se calcula por fechas; la compatibilidad del segundo empleo la evalúa la entidad.
+  const registrarVinculo = (casAdicional = false) => empezar(() => { setConfirmandoOtro(null); setForm({ tipo: 'vinculo', casAdicional }) })
+  const solicitarVinculo = (casAdicional = false) => vigentes.length
+    ? empezar(() => setConfirmandoOtro({ casAdicional }))
+    : registrarVinculo(casAdicional)
   const botonRegistrar = vigentes.length
-    ? <button disabled={ocupado || !!sinLegajo} onClick={() => { setAviso(''); setError(''); setConfirmandoOtro(true) }} className={enlace}>Registrar otro vínculo</button>
-    : <button disabled={ocupado || !!sinLegajo} onClick={registrarVinculo} className={boton}>Registrar vínculo</button>
+    ? <button disabled={ocupado || !!sinLegajo} onClick={() => solicitarVinculo()} className={enlace}>Registrar otro vínculo</button>
+    : <button disabled={ocupado || !!sinLegajo} onClick={() => solicitarVinculo()} className={boton}>Registrar vínculo</button>
   return <section aria-label="Vínculos laborales" className="mb-8">
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h3 className="text-base font-semibold text-slate-800">Vínculos laborales</h3>{puedeRegistrar && <div className="flex flex-wrap items-center gap-3">{sinLegajo && <Bloqueo>{sinLegajo}</Bloqueo>}{botonRegistrar}</div>}</div>
-    {confirmandoOtro && <DocumentoModal titulo="Registrar otro vínculo" onCancel={() => setConfirmandoOtro(false)}><Aviso accion={<div className="flex flex-wrap gap-3"><button onClick={registrarVinculo} className={enlace}>Sí, registrar otro vínculo</button><button onClick={() => setConfirmandoOtro(false)} className="text-sm text-slate-600">Cancelar</button></div>}>
-      La persona ya tiene {vigentes.length === 1 ? 'un vínculo vigente' : `${vigentes.length} vínculos vigentes`}: {vigentes.map(v => v.values.nombre_puesto).join(', ')}. Para corregirlo usa «Corregir» en su tarjeta; registra otro solo si es un vínculo distinto (por ejemplo, simultáneo).</Aviso></DocumentoModal>}
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h3 className="text-base font-semibold text-slate-800">Vínculos laborales</h3>{puedeRegistrar && <div className="flex flex-wrap items-center gap-3">{sinLegajo && <Bloqueo>{sinLegajo}</Bloqueo>}{botonRegistrar}
+      {tieneDocencia(data) && <button disabled={ocupado || !!sinLegajo} onClick={() => solicitarVinculo(true)} className="rounded-xl border border-teal-200 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50 disabled:opacity-50">Registrar vínculo CAS adicional</button>}
+    </div>}</div>
+    {confirmandoOtro && <DocumentoModal titulo={confirmandoOtro.casAdicional ? 'Registrar vínculo CAS adicional' : 'Registrar otro vínculo'} onCancel={() => setConfirmandoOtro(null)}><div className="space-y-4 text-sm leading-relaxed text-slate-700">
+      <p>La persona ya tiene {vigentes.length === 1 ? 'un vínculo vigente' : `${vigentes.length} vínculos vigentes`}: {vigentes.map(v => v.values.nombre_puesto).join(', ')}. Para corregirlo usa «Corregir» en su tarjeta; registra otro solo si es una relación laboral distinta.</p>
+      <p className="mt-2">Si coexistirá docencia y un puesto CAS, Recursos Humanos debe verificar docencia efectiva, compatibilidad horaria y las demás restricciones aplicables. Registrar otro vínculo conserva los anteriores y no autoriza por sí solo la doble percepción.</p>
+      <div className="flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-4"><button onClick={() => setConfirmandoOtro(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm">Cancelar</button><button onClick={() => registrarVinculo(confirmandoOtro.casAdicional)} className={boton}>Continuar con el nuevo vínculo</button></div>
+    </div></DocumentoModal>}
+    {coexistenDocenciaYCas(data.vinculos) && <div role="note" className="mb-4 space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-relaxed text-amber-950">
+      <p className="font-semibold">Docencia y CAS: vínculos independientes con vigencia por fechas</p>
+      <p>El sistema conserva los documentos y datos de cada puesto por separado. Recursos Humanos debe evaluar la compatibilidad del segundo empleo; este panel no acredita una autorización de doble percepción.</p>
+      <AvisoDocenciaCas />
+    </div>}
     {aviso && <p role="status" className="mb-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
     {error && <p role="alert" className="mb-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
-    {formulario && <EnZona titulo={form.tipo === 'adenda' ? `Registrar adenda: ${form.vinculo.values.nombre_puesto}` : form.tipo === 'puesto' ? `Datos del puesto: ${form.vinculo.values.nombre_puesto}` : form.record ? `Corregir vínculo: ${form.record.values.nombre_puesto}` : 'Registrar vínculo'}>{formulario}</EnZona>}
+    {formulario && <EnZona titulo={form.tipo === 'adenda' ? `Registrar adenda: ${form.vinculo.values.nombre_puesto}` : form.tipo === 'puesto' ? `Datos del puesto: ${form.vinculo.values.nombre_puesto}` : form.record ? `Corregir vínculo: ${form.record.values.nombre_puesto}` : form.casAdicional ? 'Registrar vínculo CAS adicional' : 'Registrar vínculo'}>{formulario}</EnZona>}
     <p className="mb-4 text-xs text-slate-500">Vínculos y adendas no se eliminan: si hay un error, se anulan con motivo (administración) y se registran de nuevo. Las adendas no se corrigen.</p>
     {data.vinculos.length === 0 && <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">No hay vínculos laborales registrados. {sinLegajo ? 'Primero se debe abrir el legajo.' : 'Registra el vínculo (resolución o contrato) para habilitar adendas, inducciones y período de prueba.'}</p>}
     {data.vinculos.length > 0 && vigentes.length === 0 && <div role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -456,8 +476,8 @@ function Seleccion({ usuario, data, sinLegajo }) {
     {!vinculos.length && data.vinculos.length > 0 && <Aviso>No hay un vínculo vigente: se muestra el más reciente.</Aviso>}
     <Registros titulo={vinculos.length > 1 ? 'Proceso de selección de los vínculos vigentes' : 'Proceso de selección del vínculo vigente'} vacio="Sin vínculo laboral: los datos de selección se guardan en el vínculo. Primero registra el vínculo en 2.2." registros={principales} bloqueo={sinLegajo}
       tituloRegistro={record => record.values.nombre_puesto} subtitulo={record => etiquetaVinculo(record)}
-      campos={[['Código oficial del proceso', v => texto(v.proceso_seleccion)], ['Año del proceso', v => texto(v.anio_proceso)], ['Fecha del resultado', v => fecha(v.fecha_resultado_seleccion)]]}
-      corregir={{ etiqueta: 'Registrar o corregir datos de selección', puede: record => !record.cerrado, motivo: 'Vínculo cerrado (con fecha de cese): no se corrige.' }}
+      campos={[['Modalidad de incorporación', v => modalidadesIngreso[v.modalidad_ingreso] || 'Pendiente de clasificar'], ['Código oficial del proceso', v => v.modalidad_ingreso && v.modalidad_ingreso !== 'concurso_publico' ? 'No corresponde a esta modalidad' : texto(v.proceso_seleccion)], ['Año del proceso', v => v.modalidad_ingreso && v.modalidad_ingreso !== 'concurso_publico' ? 'No corresponde' : texto(v.anio_proceso)], ['Fecha del resultado', v => v.modalidad_ingreso && v.modalidad_ingreso !== 'concurso_publico' ? 'No corresponde' : fecha(v.fecha_resultado_seleccion)]]}
+      corregir={{ etiqueta: 'Registrar o corregir datos de selección', puede: record => !record.cerrado && (!record.values.modalidad_ingreso || record.values.modalidad_ingreso === 'concurso_publico'), motivo: 'La selección solo se registra en vínculos abiertos que ingresaron por concurso. Revisa la modalidad en 2.2.' }}
       renderForm={props => <SeleccionForm key={props.record.id} usuario={usuario} {...props} />} />
   </>
 }

@@ -7,10 +7,11 @@ use App\Models\SubseccionLegajo;
 use App\Models\TipoDocumento;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Catálogo de la sección 02 (Incorporación) según la Directiva N° 001-2023-SERVIR-GDSRH:
- * 4 subsecciones (2.1 a 2.4) y 13 tipos de documento (literales a a m).
+ * 4 subsecciones (2.1 a 2.4), 13 tipos de la directiva (literales a a m) y una resolución docente adicional.
  *
  * Idempotente: se puede correr varias veces sin duplicar. Reglas:
  * - Un tipo se identifica por (sección 2, código, activo). Si no existe, se crea.
@@ -22,6 +23,12 @@ use Illuminate\Support\Facades\DB;
 class Seccion02CatalogoSeeder extends Seeder
 {
     public const SECCION = 2;
+
+    public const RESOLUCION_DOCENTE = 'S02_RESOLUCION_DOCENTE';
+
+    private const TIPO_DOCENTE = ['2.2', self::RESOLUCION_DOCENTE, 'Resolución de incorporación docente',
+        'Resolución de nombramiento, contratación o incorporación docente, según su condición.',
+        ['requiere_docente' => true, 'requiere_num_resolucion' => true, 'formulario_datos' => 'vinculos_laborales', 'es_hook_universidad' => true]];
 
     public const SUBSECCIONES = [
         '2.1' => 'Documentación del proceso de selección',
@@ -51,6 +58,7 @@ class Seccion02CatalogoSeeder extends Seeder
         ['2.3', 'S02_K_CARGO_CODIGO_ETICA', 'Cargo de entrega del código de conducta y ética', null, []],
         ['2.3', 'S02_L_OTROS_INDUCCION', 'Otros documentos de inducción', 'Otros similares requeridos por la universidad.', ['permite_multiples' => true, 'obligatorio' => false, 'es_hook_universidad' => true]],
         ['2.4', 'S02_M_EVALUACION_PERIODO_PRUEBA', 'Evaluación y resultados del período de prueba', null, ['requiere_periodo_prueba' => true, 'tiene_banderas' => true, 'formulario_datos' => 'periodos_prueba']],
+        self::TIPO_DOCENTE,
     ];
 
     /** Valores comunes; cada tipo sobrescribe los suyos. */
@@ -93,6 +101,15 @@ class Seccion02CatalogoSeeder extends Seeder
         }
     }
 
+    /** Incorpora solo la resolución docente durante el despliegue; no modifica los demás tipos ni sus archivos. */
+    public function incorporarResolucionDocente(): void
+    {
+        [$codigoSub, $codigo, $nombre, $descripcion, $valores] = self::TIPO_DOCENTE;
+        $subseccion = SubseccionLegajo::query()->where('seccion_legajo_id', self::SECCION)->where('codigo', $codigoSub)->firstOrFail();
+        $this->tipo($codigo, [...self::BASE, ...$valores, 'seccion_legajo_id' => self::SECCION, 'subseccion_legajo_id' => $subseccion->id,
+            'codigo' => $codigo, 'nombre' => $nombre, 'descripcion' => $descripcion, 'orden' => count(self::TIPOS)]);
+    }
+
     /** @return array<string, string> código => id */
     private function subsecciones(): array
     {
@@ -117,6 +134,9 @@ class Seccion02CatalogoSeeder extends Seeder
 
     private function tipo(string $codigo, array $valores): void
     {
+        if ($codigo === self::RESOLUCION_DOCENTE && Schema::hasColumn('tipos_documento', 'aplica_tipo_personal')) {
+            $valores['aplica_tipo_personal'] = 'docente';
+        }
         $existente = TipoDocumento::query()->where('seccion_legajo_id', self::SECCION)->where('codigo', $codigo)->where('activo', true)->first();
         if (! $existente) {
             TipoDocumento::query()->create($valores);

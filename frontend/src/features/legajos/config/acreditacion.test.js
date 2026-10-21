@@ -7,7 +7,7 @@ const tipo = (codigo, formulario_datos, extra = {}) => ({ codigo, formulario_dat
 
 test('the record proposes the resolution number only when it is the same document', () => {
   const vinculo = { numero_documento_vinculo: 'ANTERIOR-SIN-CLASIFICAR', numero_resolucion: 'RES-100-2026', fecha_resolucion: '2025-03-01', numero_contrato: 'CAS-028', fecha_contrato: '2025-03-02' }
-  for (const codigo of ['S02_C_RESOLUCION_DESIGNACION', 'S02_E_RESOLUCION_CARRERA']) {
+  for (const codigo of ['S02_C_RESOLUCION_DESIGNACION', 'S02_E_RESOLUCION_CARRERA', 'S02_RESOLUCION_DOCENTE']) {
     assert.deepEqual(precargaDesdeRegistro(tipo(codigo, 'vinculos_laborales'), vinculo), { num_resolucion: 'RES-100-2026', fecha_emision: '2025-03-01' })
   }
   assert.deepEqual(precargaDesdeRegistro(tipo('S02_F_CONTRATO', 'vinculos_laborales'), vinculo), { num_resolucion: 'CAS-028', fecha_emision: '2025-03-02' })

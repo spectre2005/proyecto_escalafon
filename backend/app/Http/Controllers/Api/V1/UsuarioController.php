@@ -11,6 +11,7 @@ use App\Models\VinculoLaboral;
 use App\Support\AperturaLegajo;
 use App\Support\CambioDiscapacidad;
 use App\Support\ConfiguracionFuncionalidades;
+use App\Support\IngresoLaboral;
 use App\Support\RegimenesLaborales;
 use App\Support\SituacionLaboral;
 use Illuminate\Database\QueryException;
@@ -145,7 +146,8 @@ class UsuarioController extends Controller
             $this->insertar([$registro], $request);
             $legajo = AperturaLegajo::abrir($registro['id']);
             // El tipo de personal y la ley del vínculo son los de la persona; el tipo de vínculo, el que se indicó.
-            $vinculo = VinculoLaboral::query()->create([...$request->vinculo(), 'usuario_id' => $registro['id'], 'tipo_personal' => $registro['tipo_personal'],
+            $datosVinculo = IngresoLaboral::vincularProceso([...$request->vinculo(), 'regimen_normativo_id' => $registro['regimen_normativo_id']]);
+            $vinculo = VinculoLaboral::query()->create([...$datosVinculo, 'usuario_id' => $registro['id'], 'tipo_personal' => $registro['tipo_personal'],
                 'regimen_normativo_id' => $registro['regimen_normativo_id'], 'registrado_por' => $actor->getAuthIdentifier()]);
             ($registro['tipo_personal'] === 'docente' ? $vinculo->perfilDocente() : $vinculo->perfilAdministrativo())->create($request->datosPuesto());
 

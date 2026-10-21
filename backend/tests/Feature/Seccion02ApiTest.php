@@ -29,6 +29,7 @@ class Seccion02ApiTest extends TestCase
         return [...[
             'tipo_personal' => 'administrativo', 'regimen_laboral' => 'plazo_determinado',
             'regimen_normativo_id' => RegimenNormativo::factory()->create(['aplica_a' => 'administrativo'])->id, 'nombre_puesto' => 'Especialista',
+            'modalidad_ingreso' => 'concurso_publico', 'anio_proceso' => 2025, 'numero_contrato' => 'CONTRATO 010-2025', 'fecha_contrato' => '2025-01-25',
             'tiene_periodo_prueba' => true, 'proceso_seleccion' => 'CAS 001-2025', 'fecha_resultado_seleccion' => '2025-01-20',
             'numero_documento_vinculo' => 'CONTRATO 010-2025', 'fecha_inicio' => '2025-02-01', 'fecha_fin_prevista' => '2025-12-31',
         ], ...$cambios];
@@ -45,7 +46,7 @@ class Seccion02ApiTest extends TestCase
         $response = $this->getJson($this->url($persona, 'seccion-02'))->assertOk()
             ->assertJsonPath('data.legajo', null)->assertJsonPath('data.tiene_periodo_prueba', false)
             ->assertJsonCount(4, 'data.subsecciones')->assertJsonCount(2, 'data.subsecciones.0.tipos')
-            ->assertJsonCount(5, 'data.subsecciones.1.tipos')->assertJsonCount(5, 'data.subsecciones.2.tipos')
+            ->assertJsonCount(6, 'data.subsecciones.1.tipos')->assertJsonCount(5, 'data.subsecciones.2.tipos')
             ->assertJsonPath('data.subsecciones.0.tipos.0.literal', 'a')->assertJsonPath('data.subsecciones.0.tipos.0.estado', 'pendiente')
             ->assertJsonPath('data.subsecciones.0.tipos.0.exigido', true)
             // d) es opcional; m) depende de tiene_periodo_prueba.
@@ -79,7 +80,7 @@ class Seccion02ApiTest extends TestCase
         $this->postJson($url, $this->vinculoValido(['usuario_id' => Usuario::factory()->create()->id]))->assertUnprocessable()->assertJsonValidationErrors('usuario_id');
         $id = $this->postJson($url, $this->vinculoValido())->assertCreated()->assertJsonPath('data.usuario_id', $persona->id)->json('data.id');
 
-        $this->patchJson($url.'/'.$id, ['proceso_seleccion' => 'CAS 002-2025'])->assertOk()->assertJsonPath('data.proceso_seleccion', 'CAS 002-2025');
+        $this->patchJson($url.'/'.$id, ['proceso_seleccion_id' => null, 'proceso_seleccion' => 'CAS 002-2025'])->assertOk()->assertJsonPath('data.proceso_seleccion', 'CAS 002-2025');
         $this->patchJson($url.'/'.$id, ['fecha_cese' => '2025-01-01'])->assertUnprocessable()->assertJsonValidationErrors('fecha_cese');
         $this->patchJson($url.'/'.$id, ['fecha_cese' => '2025-06-30'])->assertOk();
         $this->patchJson($url.'/'.$id, ['nombre_puesto' => 'Otro'])->assertConflict();

@@ -29,6 +29,9 @@ class VinculoLaboral extends Model
         'exige_colegiatura',
         'exige_estudios_basicos',
         'tiene_periodo_prueba',
+        'modalidad_ingreso',
+        'sustento_ingreso',
+        'proceso_seleccion_id',
         'proceso_seleccion',
         'fecha_resultado_seleccion',
         'numero_documento_vinculo',
@@ -76,6 +79,11 @@ class VinculoLaboral extends Model
         $numeros = array_filter([$this->numero_resolucion, $this->numero_contrato]);
 
         return $numeros !== [] ? implode(' · ', $numeros) : ($this->numero_documento_vinculo ?? '');
+    }
+
+    public function procesoSeleccion(): BelongsTo
+    {
+        return $this->belongsTo(ProcesoSeleccion::class);
     }
 
     public function regimenNormativo(): BelongsTo

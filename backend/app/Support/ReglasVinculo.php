@@ -13,7 +13,7 @@ final class ReglasVinculo
 {
     public const VINCULO = [
         'tipo_personal' => 'required|in:docente,administrativo',
-        'regimen_laboral' => 'required|in:carrera,plazo_determinado,designado',
+        'regimen_laboral' => 'required|in:carrera,plazo_determinado,plazo_indeterminado,designado',
         'regimen_normativo_id' => 'required|uuid|exists:regimenes_normativos,id',
         'unidad_organica_id' => 'nullable|uuid|exists:unidades_organicas,id',
         'nombre_puesto' => 'required|string|max:150',
@@ -21,6 +21,9 @@ final class ReglasVinculo
         'exige_colegiatura' => 'sometimes|nullable|boolean',
         'exige_estudios_basicos' => 'sometimes|nullable|boolean',
         'tiene_periodo_prueba' => 'sometimes|nullable|boolean',
+        'modalidad_ingreso' => 'nullable|in:concurso_publico,designacion_confianza,otro_sustentado',
+        'sustento_ingreso' => 'nullable|string|max:500',
+        'proceso_seleccion_id' => 'nullable|uuid|exists:procesos_seleccion,id',
         'proceso_seleccion' => 'nullable|string|max:100',
         'anio_proceso' => 'nullable|integer|between:1900,2100',
         'fecha_resultado_seleccion' => 'nullable|date_format:Y-m-d|before_or_equal:today',
@@ -87,6 +90,6 @@ final class ReglasVinculo
             }
         }
 
-        return $errores;
+        return [...$errores, ...IngresoLaboral::errores($cambios, $actual)];
     }
 }

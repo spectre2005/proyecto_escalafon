@@ -45,7 +45,8 @@ class RegistroConVinculoTest extends TestCase
                 'email_institucional' => 'rosa.alta@example.test', 'tipo_personal' => $tipo, 'regimen_normativo_id' => $this->ley($tipo === 'docente' ? '30220' : '1057'),
                 ...$persona,
             ]],
-            'vinculo' => ['regimen_laboral' => $tipo === 'docente' ? 'carrera' : 'plazo_determinado', 'nombre_puesto' => $tipo === 'docente' ? 'Docente del departamento' : 'Asistente administrativo',
+            'vinculo' => ['modalidad_ingreso' => 'concurso_publico', 'proceso_seleccion' => 'CONCURSO-001-2026', 'anio_proceso' => 2026,
+                ...($tipo === 'docente' ? ['numero_resolucion' => 'R-001', 'fecha_resolucion' => '2026-02-25'] : ['numero_contrato' => 'C-001', 'fecha_contrato' => '2026-02-25']), 'regimen_laboral' => $tipo === 'docente' ? 'carrera' : 'plazo_determinado', 'nombre_puesto' => $tipo === 'docente' ? 'Docente del departamento' : 'Asistente administrativo',
                 'unidad_organica_id' => UnidadOrganica::factory()->create(['nombre' => 'Unidad de prueba'])->id, 'fecha_inicio' => '2026-03-01',
                 'fecha_fin_prevista' => $tipo === 'docente' ? null : '2026-12-31', 'numero_documento_vinculo' => 'RES-123-2026', 'tiene_periodo_prueba' => true, ...$vinculo],
             'datos_puesto' => $puesto ?? ($tipo === 'docente'

@@ -124,7 +124,7 @@ class CierreLegajoTest extends TestCase
         $this->abrir();
         $this->getJson($this->url)->assertOk()->assertJsonPath('data.usuario.values.activo', true);
         $this->postJson($this->url.'/documentos/'.$documento.'/recepcionar')->assertConflict();
-        $this->patchJson($this->url, ['nombres' => 'Nombre actualizado'])->assertOk();
+        $this->patchJson($this->url, ['telefono' => '912345678'])->assertOk();
         $this->assertNull(DocumentoUsuario::query()->findOrFail($documento)->fecha_recepcion);
     }
 
@@ -141,7 +141,7 @@ class CierreLegajoTest extends TestCase
         $this->assertDatabaseCount('legajos', 1);
         $this->assertSame($legajo->fecha_apertura->toDateString(), $legajo->refresh()->fecha_apertura->toDateString());
         $this->getJson($this->url)->assertOk()->assertJsonPath('data.usuario.values.activo', true);
-        $this->patchJson($this->url, ['nombres' => 'Servidor reincorporado'])->assertOk();
+        $this->patchJson($this->url, ['telefono' => '912345678'])->assertOk();
         $this->postJson($this->url.'/documentos/'.$documento.'/recepcionar')->assertOk();
         $this->subir($this->persona, $this->metadatos($tipo, 3, 4, ['subsana_a_documento_id' => $documento]))
             ->assertCreated()->assertJsonPath('data.folio_inicio', 3);

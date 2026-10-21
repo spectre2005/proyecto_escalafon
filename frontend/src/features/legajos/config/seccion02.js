@@ -10,9 +10,9 @@ export const subseccionesSeccion02 = {
 export const tiposPersonal = { docente: 'Docente', administrativo: 'Administrativo' }
 
 // Tipo de vínculo (vinculos_laborales.regimen_laboral). Sincronía con backend RegimenesLaborales::TIPOS_VINCULO.
-export const regimenesLaborales = { carrera: 'Carrera', plazo_determinado: 'Plazo determinado', designado: 'Designado (confianza)' }
+export const regimenesLaborales = { carrera: 'Carrera', plazo_determinado: 'Plazo determinado', plazo_indeterminado: 'Plazo indeterminado', designado: 'Designado (confianza)' }
 
-export const tiposVinculoPara = tipoPersonal => Object.fromEntries(Object.entries(regimenesLaborales).filter(([valor]) => tipoPersonal !== 'docente' || valor !== 'designado'))
+export const tiposVinculoPara = (tipoPersonal, codigoLey = '') => Object.fromEntries(Object.entries(regimenesLaborales).filter(([valor]) => (tipoPersonal !== 'docente' || valor !== 'designado') && (!['1057', 'CAS'].includes(codigoLey) || valor !== 'carrera')))
 
 export const referenciaDocumentos = vinculo => [vinculo.numero_resolucion, vinculo.numero_contrato].filter(Boolean).join(' · ') || vinculo.numero_documento_vinculo || 'sin N.º de documento'
 

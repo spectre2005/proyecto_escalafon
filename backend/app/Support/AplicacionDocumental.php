@@ -17,11 +17,11 @@ use Illuminate\Support\Collection;
  * se exigen. Es la única fuente de las banderas: PerfilDocumental (lo exigido) y las secciones la consultan.
  *
  * - Tipo de personal: tipos_documento.aplica_tipo_personal (ambos, docente o administrativo).
- * - Régimen: aplica_carrera / aplica_plazo_determinado / aplica_designado.
+ * - Régimen: aplica_carrera / aplica_plazo_determinado / aplica_plazo_indeterminado / aplica_designado.
  * - Fuente: todos los vínculos no anulados, también los cesados (el legajo guarda la historia y al digitalizarlo se
  *   cargan documentos de vínculos anteriores); sin vínculos, el tipo de personal de la persona. El tipo de vínculo sale
  *   solo de los vínculos: sin vínculos, o con uno sin tipo, está Sin definir y no se oculta nada por régimen.
- * - Si no se puede saber (sin tipo de personal, o con un régimen que no es carrera, plazo determinado ni designado),
+ * - Si no se puede saber (sin tipo de personal, o con un régimen que no es carrera, plazo determinado, indeterminado ni designado),
  *   el tipo se ofrece: nunca se impide cargar algo legítimo por falta de datos.
  * - El cargo (puesto) no se usa: el catálogo no relaciona documentos con puestos (pendiente U4).
  *

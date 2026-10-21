@@ -7,6 +7,7 @@ use App\Models\TipoDocumento;
 use App\Support\Seccion11;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Catálogo de la sección 11 (Desvinculación) según el Anexo 01 de la Directiva N° 001-2023-SERVIR-GDSRH: literales a) a g),
@@ -79,6 +80,9 @@ class Seccion11CatalogoSeeder extends Seeder
 
     private function tipo(string $codigo, array $valores): void
     {
+        if (Schema::hasColumn('tipos_documento', 'aplica_plazo_indeterminado')) {
+            $valores['aplica_plazo_indeterminado'] = $valores['aplica_carrera'] && $valores['aplica_plazo_determinado'] && $valores['aplica_designado'];
+        }
         $existente = TipoDocumento::query()->where('seccion_legajo_id', self::SECCION)->where('codigo', $codigo)->where('activo', true)->first();
         if (! $existente) {
             TipoDocumento::query()->create($valores);

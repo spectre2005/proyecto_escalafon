@@ -1,4 +1,5 @@
 import { valorBandera } from '../../../../shared/banderas.js'
+import { leyesDelTipo } from '../../../users/utils/leyes.js'
 
 // Borradores del vínculo y de los datos del puesto, compartidos por la sección 02 y el registro manual de personal.
 
@@ -9,9 +10,20 @@ export function vinculoInicial(v = {}) {
     numero_documento_vinculo: v.numero_documento_vinculo || '', fecha_inicio: v.fecha_inicio || '', fecha_fin_prevista: v.fecha_fin_prevista || '',
     numero_resolucion: v.numero_resolucion || '', fecha_resolucion: v.fecha_resolucion || '',
     numero_contrato: v.numero_contrato || '', fecha_contrato: v.fecha_contrato || '', anio_proceso: v.anio_proceso ?? '',
+    modalidad_ingreso: v.modalidad_ingreso || '', sustento_ingreso: v.sustento_ingreso || '', proceso_seleccion_id: v.proceso_seleccion_id || '',
     proceso_seleccion: v.proceso_seleccion || '', fecha_resultado_seleccion: v.fecha_resultado_seleccion || '',
     obligado_djbr: valorBandera(v.obligado_djbr), exige_colegiatura: valorBandera(v.exige_colegiatura), exige_estudios_basicos: valorBandera(v.exige_estudios_basicos), tiene_periodo_prueba: valorBandera(v.tiene_periodo_prueba),
   }
+}
+
+// Un CAS adicional pertenece a la misma persona; no hereda la resolución, la convocatoria ni el perfil docente.
+export function nuevoVinculoInicial(persona, catalogo, { casAdicional = false } = {}) {
+  const tipo = casAdicional ? 'administrativo' : persona?.usuario?.values?.tipo_personal || ''
+  const leyes = leyesDelTipo(catalogo, tipo)
+  const ley = casAdicional
+    ? leyes.find(item => ['1057', 'CAS'].includes(String(item.codigo).toUpperCase()))
+    : leyes.find(item => item.id === persona?.edit_values?.regimen_normativo_id)
+  return { ...vinculoInicial(), tipo_personal: tipo, regimen_normativo_id: ley?.id || '', fecha_cese: '' }
 }
 
 // Un alta normal no lleva cese, incluso si quedó una fecha en un borrador histórico anterior.

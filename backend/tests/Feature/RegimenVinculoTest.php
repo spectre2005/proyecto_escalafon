@@ -66,7 +66,7 @@ class RegimenVinculoTest extends TestCase
         $this->persona->update(['regimen_laboral' => 'plazo_determinado']);
         $exigencia = $this->exigencia($this->soloPara('carrera'));
         $this->assertNull($exigencia['exigido']);
-        $this->assertStringContainsString('tipo de vínculo (carrera, plazo determinado o designado) está sin definir', $exigencia['motivo']);
+        $this->assertStringContainsString('tipo de vínculo (carrera, plazo determinado, indeterminado o designado) está sin definir', $exigencia['motivo']);
         $this->assertNull($this->noAplica($this->soloPara('carrera')));
     }
 
@@ -94,7 +94,7 @@ class RegimenVinculoTest extends TestCase
     {
         $this->actuarComo();
         $url = '/api/v1/expedientes/'.$this->persona->id.'/vinculos-laborales';
-        $datos = ['tipo_personal' => 'administrativo', 'regimen_normativo_id' => $this->ley('276')->id, 'nombre_puesto' => 'Analista', 'fecha_inicio' => '2026-01-01'];
+        $datos = ['modalidad_ingreso' => 'concurso_publico', 'proceso_seleccion' => 'CONCURSO-001-2026', 'anio_proceso' => 2026, 'numero_resolucion' => 'R-001', 'fecha_resolucion' => '2025-12-30', 'tipo_personal' => 'administrativo', 'regimen_normativo_id' => $this->ley('276')->id, 'nombre_puesto' => 'Analista', 'fecha_inicio' => '2026-01-01'];
         $this->postJson($url, $datos)->assertUnprocessable()->assertJsonValidationErrors('regimen_laboral');
         $this->postJson($url, [...$datos, 'regimen_laboral' => '276'])->assertUnprocessable()->assertJsonValidationErrors('regimen_laboral');
         $this->postJson($url, [...$datos, 'regimen_laboral' => 'carrera'])->assertCreated();
@@ -165,7 +165,7 @@ class RegimenVinculoTest extends TestCase
         $cas = $this->vinculo(null, ['regimen_normativo_id' => $this->ley('1057')->id]);
         $dl276 = $this->vinculo(null, ['regimen_normativo_id' => $this->ley('276')->id]);
         $this->assertSame('carrera', RegimenesLaborales::sugerencia($docente->fresh())['valor']);
-        $this->assertSame('plazo_determinado', RegimenesLaborales::sugerencia($cas->fresh())['valor']);
+        $this->assertNull(RegimenesLaborales::sugerencia($cas->fresh())['valor']);
         $this->assertSame(['valor' => null, 'motivo' => 'Confirma si es carrera o designado.'], RegimenesLaborales::sugerencia($dl276->fresh()));
         $this->assertNull(RegimenesLaborales::sugerencia($this->vinculo('carrera')));
         $this->assertNull($docente->fresh()->regimen_laboral);
@@ -173,7 +173,7 @@ class RegimenVinculoTest extends TestCase
         // Por HTTP (2.2), con la ley cargada desde el listado de vínculos.
         $this->actuarComo();
         $vinculos = collect($this->getJson('/api/v1/expedientes/'.$this->persona->id.'/seccion-02')->assertOk()->json('data.vinculos'))->keyBy('id');
-        $this->assertSame(['valor' => 'plazo_determinado', 'motivo' => 'Contrato CAS (D.L. 1057).'], $vinculos[$cas->id]['tipo_sugerido']);
+        $this->assertSame(['valor' => null, 'motivo' => 'CAS puede ser determinado o indeterminado. Confirma la duración según el contrato.'], $vinculos[$cas->id]['tipo_sugerido']);
         $this->assertSame(['valor' => null, 'motivo' => 'Confirma si es carrera o designado.'], $vinculos[$dl276->id]['tipo_sugerido']);
     }
 }

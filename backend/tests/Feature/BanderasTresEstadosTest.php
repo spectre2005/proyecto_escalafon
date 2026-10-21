@@ -269,7 +269,7 @@ class BanderasTresEstadosTest extends TestCase
     public function test_link_form_keeps_puesto_flags_unanswered_by_default(): void
     {
         $this->actuarComo();
-        $datos = ['tipo_personal' => 'administrativo', 'regimen_laboral' => 'plazo_determinado', 'regimen_normativo_id' => RegimenNormativo::factory()->create(['aplica_a' => 'administrativo'])->id,
+        $datos = ['modalidad_ingreso' => 'concurso_publico', 'proceso_seleccion' => 'CONCURSO-001-2026', 'anio_proceso' => 2026, 'numero_contrato' => 'C-001', 'fecha_contrato' => '2025-12-30', 'tipo_personal' => 'administrativo', 'regimen_laboral' => 'plazo_determinado', 'regimen_normativo_id' => RegimenNormativo::factory()->create(['aplica_a' => 'administrativo'])->id,
             'nombre_puesto' => 'Analista', 'fecha_inicio' => '2026-01-01'];
         $id = $this->postJson('/api/v1/expedientes/'.$this->persona->id.'/vinculos-laborales', $datos)->assertCreated()->json('data.id');
         $vinculo = VinculoLaboral::query()->findOrFail($id);

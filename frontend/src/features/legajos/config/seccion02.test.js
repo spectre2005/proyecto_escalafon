@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { etiquetaVinculo, pruebaEnNoConDatos, pruebaNoAplica, referenciaDocumentos, tiposVinculoPara } from './seccion02.js'
-import { vinculoInicial, vinculoParaGuardar } from '../components/seccion02/borradoresVinculo.js'
+import { nuevoVinculoInicial, vinculoInicial, vinculoParaGuardar } from '../components/seccion02/borradoresVinculo.js'
 
 test('teacher choices exclude confidence while administrative choices retain it', () => {
-  assert.deepEqual(Object.keys(tiposVinculoPara('docente')), ['carrera', 'plazo_determinado'])
+  assert.deepEqual(Object.keys(tiposVinculoPara('docente')), ['carrera', 'plazo_determinado', 'plazo_indeterminado'])
   assert.equal(tiposVinculoPara('administrativo').designado, 'Designado (confianza)')
 })
 
@@ -52,4 +52,29 @@ test('a historical registration explicitly preserves the real cese date', () => 
 test('correcting an open link can still register its cese and blank dates remain null', () => {
   assert.equal(vinculoParaGuardar({ fecha_cese: '2026-10-19' }, { correccion: true }).fecha_cese, '2026-10-19')
   assert.equal(vinculoParaGuardar({ fecha_cese: '' }, { correccion: true }).fecha_cese, null)
+})
+
+test('an additional CAS starts with the same person and independent employment documents', () => {
+  const persona = { usuario: { values: { tipo_personal: 'docente' } }, edit_values: { regimen_normativo_id: 'ley-docente' } }
+  const catalogo = [
+    { id: 'ley-docente', codigo: '30220', aplica_a: 'docente', activo: true },
+    { id: 'ley-cas', codigo: '1057', aplica_a: 'administrativo', activo: true },
+  ]
+  const copia = structuredClone(persona)
+  const normal = nuevoVinculoInicial(persona, catalogo)
+  assert.equal(normal.tipo_personal, 'docente')
+  assert.equal(normal.regimen_normativo_id, 'ley-docente')
+  const cas = nuevoVinculoInicial(persona, catalogo, { casAdicional: true })
+  assert.equal(cas.tipo_personal, 'administrativo')
+  assert.equal(cas.regimen_normativo_id, 'ley-cas')
+  for (const campo of ['regimen_laboral', 'modalidad_ingreso', 'numero_resolucion', 'numero_contrato', 'proceso_seleccion_id', 'proceso_seleccion', 'fecha_cese']) assert.equal(cas[campo], '')
+  assert.deepEqual(persona, copia)
+})
+
+test('additional CAS never picks an inactive or incorrectly classified regime', () => {
+  for (const ley of [
+    { codigo: '1057', aplica_a: 'administrativo', activo: false },
+    { codigo: '1057', aplica_a: 'docente', activo: true },
+    { codigo: '276', aplica_a: 'administrativo', activo: true },
+  ]) assert.equal(nuevoVinculoInicial({}, [{ id: 'ley', ...ley }], { casAdicional: true }).regimen_normativo_id, '')
 })

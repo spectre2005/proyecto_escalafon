@@ -4,9 +4,10 @@ import Icon from '../../../components/ui/Icon'
 import TresEstados from '../../../components/ui/TresEstados'
 import UbigeoFields from '../../../components/ui/UbigeoFields'
 import { advanceOnEnter } from '../../../shared/forms/advanceOnEnter'
-import { CampoTipoVinculo, CamposDatosPuesto, CamposDocumentoIngreso, CamposVinculoBasicos, CondicionesPuesto } from '../../legajos/components/seccion02/CamposVinculo'
+import { CampoTipoVinculo, CamposDatosPuesto, CamposDocumentoIngreso, CamposModalidadIngreso, CamposVinculoBasicos, CondicionesPuesto } from '../../legajos/components/seccion02/CamposVinculo'
 import { datosPuestoInicial, vinculoInicial } from '../../legajos/components/seccion02/borradoresVinculo'
 import { completarDesdePuesto, equivalenciaPuesto } from '../../legajos/config/puestosSugeridos'
+import { cambiarModalidad, cambiarTipoVinculo, sinProceso } from '../../legajos/config/ingresoLaboral'
 import { categoriasDocente, condicionesDocente } from '../../legajos/config/seccion02'
 import { leyesDelTipo, leyInicial } from '../utils/leyes'
 import { columns } from '../utils/usuariosCsv'
@@ -15,8 +16,7 @@ import { useDniPersonal } from '../hooks/useDniPersonal'
 import { ubicacionDelRegistro } from '../utils/identidadDni'
 import { armarRegistro, erroresDe, erroresPersona, PASOS, personaDelPaso, personaExistente, primerPasoConError, rutaFicha, sugerenciaTipoVinculo } from '../utils/registroPasos'
 
-// Registro manual en tres pasos dentro de la ventana «Agregar personal»: persona, primer vínculo laboral y datos del
-// puesto. Los valores se conservan al avanzar y retroceder; cada paso se valida antes de continuar y todo se envía en una
+// Registro manual en tres pasos dentro de la ventana «Agregar personal»: persona, modalidad del vínculo y documentos de ingreso. Los valores se conservan al avanzar y retroceder; cada paso se valida antes de continuar y todo se envía en una
 // sola operación al final (onGuardar → POST /usuarios/con-vinculo, transaccional).
 
 // Sin selección inicial: el tipo de personal lo elige el usuario. La ley se toma sola solo si su tipo tiene una única ley.
@@ -81,15 +81,20 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   const catalogo = opciones.data?.data.regimenes
   const tipo = draft.tipo_personal
   const leyElegida = draft.regimen_normativo_id || leyInicial(catalogo, tipo)
+  const codigoLey = (catalogo || []).find(ley => ley.id === leyElegida)?.codigo || ''
   const erroresPersonaCampo = erroresDe(errores, 'usuarios.0')
   const existenteConocida = personaExistente(draft, usuarios) || (existenteBackend?.dni === draft.numero_doc_identidad.trim() ? existenteBackend.persona : null)
   const consultaDni = useDniPersonal(draft.numero_doc_identidad, setDraft, dominioCorreo, puedeRegistrar && !bloqueado && !existenteConocida)
   const { value: ubicacion, id: ubigeoId } = ubicacionDelRegistro(draft.numero_doc_identidad, ubicacionManual, consultaDni.estado)
   const existente = existenteConocida || (consultaDni.estado.tipo === 'existente' ? consultaDni.estado.persona : null)
-  const sugerencia = tipo ? sugerenciaTipoVinculo({ tipoPersonal: tipo, datosPuesto: puestos[tipo], codigoLey: (catalogo || []).find(ley => ley.id === leyElegida)?.codigo }) : null
+  const sugerencia = tipo ? sugerenciaTipoVinculo({ tipoPersonal: tipo, datosPuesto: puestos[tipo], codigoLey }) : null
 
   const ponerVinculo = key => valor => {
-    setVinculo(previo => ({ ...previo, [key]: valor }))
+    setVinculo(previo => key === 'modalidad_ingreso' ? cambiarModalidad(previo, valor) : key === 'regimen_laboral' ? cambiarTipoVinculo(previo, valor) : { ...previo, [key]: valor })
+    if (tipo === 'administrativo' && ['modalidad_ingreso', 'regimen_laboral'].includes(key)) {
+      const confianza = key === 'modalidad_ingreso' ? valor === 'designacion_confianza' : valor === 'designado'
+      setPuestos(previos => ({ ...previos, administrativo: { ...previos.administrativo, es_cargo_confianza: confianza } }))
+    }
     if (key === 'nombre_puesto') completarPerfil(valor)
   }
   const setCampoVinculo = key => event => ponerVinculo(key)(event.target.value)
@@ -108,7 +113,7 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
       setPuestos(previos => ({ ...previos, docente: datos }))
       setNotaPuesto(`Se completó desde el puesto: ${texto(completados)}. Puedes cambiarlo.`)
     } else {
-      setNotaPuesto(distintos.length ? 'El puesto elegido no coincide con la condición o la categoría ya indicadas en el paso 3: revísalas.' : '')
+      setNotaPuesto(distintos.length ? 'El puesto elegido no coincide con la condición o la categoría ya indicadas en el paso 2: revísalas.' : '')
     }
   }
 
@@ -199,13 +204,13 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
               {campo('telefono', 'Teléfono', false)}
             </div>
           </Grupo>
-          <Grupo titulo="Clasificación" ayuda="El tipo de vínculo (carrera, plazo determinado o designado) se indica en el paso 3, con una sugerencia.">
+          <Grupo titulo="Clasificación" ayuda="La modalidad y duración del vínculo se definen en el paso 2; los documentos se solicitan después.">
             <label>Tipo de personal *
               <select name="tipo_personal" required value={tipo} aria-invalid={erroresPersonaCampo.tipo_personal ? true : undefined}
                 onChange={event => {
                   const tipoPersonal = event.target.value
                   setDraft({ ...draft, tipo_personal: tipoPersonal, regimen_normativo_id: '' })
-                  if (tipoPersonal === 'docente' && vinculo.regimen_laboral === 'designado') ponerVinculo('regimen_laboral')('')
+                  setVinculo(previo => ({ ...sinProceso(previo), modalidad_ingreso: '', sustento_ingreso: '', regimen_laboral: '' }))
                 }}>
                 <option value="" disabled>Seleccionar tipo de personal</option>
                 {Object.entries(tiposPersonal).map(([valor, texto]) => <option key={valor} value={valor}>{texto}</option>)}
@@ -214,7 +219,10 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
             </label>
             <label className="sm:col-span-1 lg:col-span-2">Ley / régimen normativo *
               <select name="regimen_normativo_id" required disabled={!catalogo || !tipo} value={leyElegida} aria-invalid={erroresPersonaCampo.regimen_normativo_id ? true : undefined}
-                onChange={event => setDraft({ ...draft, regimen_normativo_id: event.target.value })}>
+                onChange={event => {
+                  setDraft({ ...draft, regimen_normativo_id: event.target.value })
+                  setVinculo(previo => ({ ...sinProceso(previo), regimen_laboral: '' }))
+                }}>
                 <option value="" disabled>{!catalogo ? 'Cargando leyes…' : tipo ? 'Seleccionar ley' : 'Primero elige el tipo de personal'}</option>
                 {leyesDelTipo(catalogo, tipo).map(ley => <option key={ley.id} value={ley.id}>{ley.nombre}</option>)}
               </select>
@@ -231,27 +239,29 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
           </Grupo>
         </>}
         {paso === 2 && <>
-          <p className="text-[11px] text-[#7b9181]">Resolución o contrato con el que la persona está vinculada. Se registra junto con ella y abre su legajo. Tipo de personal: <strong>{tiposPersonal[tipo]}</strong>; la ley es la del paso 1.</p>
-          <Grupo titulo="A. Información del vínculo" ayuda="Las sugerencias de puesto son provisionales.">
+          <p className="rounded-lg bg-teal-50 px-4 py-3 text-xs leading-relaxed text-teal-900"><strong>{tiposPersonal[tipo]}</strong> · {(catalogo || []).find(ley => ley.id === leyElegida)?.nombre}. Define cómo ingresó la persona y la duración de su vínculo; con esto se solicitarán los documentos en el siguiente paso.</p>
+          <Grupo titulo="A. Puesto y fechas" ayuda="Las sugerencias de puesto son provisionales.">
             <CamposVinculoBasicos draft={vinculo} set={setCampoVinculo} poner={ponerVinculo} errors={erroresDe(errores, 'vinculo')} opciones={opciones.data?.data} tipoPersonal={tipo} conTipo={false} nombre="alta-vinculo" />
             {notaPuesto && <p role="status" className="col-span-full rounded-lg bg-[#eaf4ee] px-3 py-2 text-[11px] text-[#2c7650]">{notaPuesto}</p>}
           </Grupo>
-          <Grupo titulo="B. Documentos de ingreso y proceso de selección">
-            <CamposDocumentoIngreso draft={vinculo} set={setCampoVinculo} errors={erroresDe(errores, 'vinculo')} tipoPersonal={tipo} codigoLey={(catalogo || []).find(ley => ley.id === leyElegida)?.codigo} />
+          <Grupo titulo="B. Modalidad de incorporación y vínculo">
+            <CampoTipoVinculo draft={vinculo} set={setCampoVinculo} poner={ponerVinculo} errors={erroresDe(errores, 'vinculo')} sugerencia={sugerencia} nombre="alta-vinculo" tipoPersonal={tipo} codigoLey={codigoLey} />
+            <CamposModalidadIngreso draft={vinculo} set={setCampoVinculo} errors={erroresDe(errores, 'vinculo')} tipoPersonal={tipo} />
           </Grupo>
-        </>}
-        {paso === 3 && <>
-          <Grupo titulo={`Datos del puesto · ${tiposPersonal[tipo]?.toLowerCase() || ''}`} ayuda={`Puesto: ${vinculo.nombre_puesto || 'sin indicar'}. Se pueden corregir después en la sección 02 mientras el vínculo esté abierto.`}>
-            <CamposDatosPuesto docente={tipo === 'docente'} draft={puestos[tipo]} set={setCampoPuesto} errors={erroresDe(errores, 'datos_puesto')} />
-            {notaPuesto && tipo === 'docente' && <p role="status" className="col-span-full rounded-lg bg-[#eaf4ee] px-3 py-2 text-[11px] text-[#2c7650]">{notaPuesto}</p>}
-          </Grupo>
-          <Grupo titulo="Tipo de vínculo" ayuda="Carrera, plazo determinado o designado. La sugerencia sale de los datos anteriores; puedes elegir otro.">
-            <CampoTipoVinculo draft={vinculo} set={setCampoVinculo} poner={ponerVinculo} errors={erroresDe(errores, 'vinculo')} sugerencia={sugerencia} nombre="alta-vinculo" tipoPersonal={tipo} />
+          <Grupo titulo={`C. Datos del puesto · ${tiposPersonal[tipo]?.toLowerCase() || ''}`} ayuda="Se guardan en el vínculo laboral.">
+            <CamposDatosPuesto docente={tipo === 'docente'} draft={puestos[tipo]} set={setCampoPuesto} errors={erroresDe(errores, 'datos_puesto')} confianzaFija={vinculo.modalidad_ingreso === 'designacion_confianza'} />
           </Grupo>
           <Grupo titulo="Condiciones del puesto" ayuda="Si no lo sabes, deja «Sin responder».">
             <CondicionesPuesto draft={vinculo} poner={ponerVinculo} errors={erroresDe(errores, 'vinculo')} nombre="alta-vinculo" />
           </Grupo>
         </>}
+        {paso === 3 && <>
+          <div className="rounded-xl border border-teal-100 bg-teal-50 p-4 text-xs leading-relaxed text-teal-900"><strong>{vinculo.nombre_puesto}</strong><p className="mt-1">{(catalogo || []).find(ley => ley.id === leyElegida)?.nombre} · Inicio: {vinculo.fecha_inicio.split('-').reverse().join('/')}</p><button type="button" className="mt-2 font-semibold underline" onClick={() => irA(2)}>Revisar modalidad y datos del vínculo</button></div>
+          <Grupo titulo="Documentos de ingreso y convocatoria">
+            <CamposDocumentoIngreso draft={vinculo} set={setCampoVinculo} poner={ponerVinculo} errors={erroresDe(errores, 'vinculo')} tipoPersonal={tipo} codigoLey={codigoLey} regimenId={leyElegida} condicionDocente={puestos.docente.condicion_docente} />
+          </Grupo>
+        </>}
+
       </fieldset>
     </div>
     <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[#e9efec] bg-white px-4 py-3 md:px-6">

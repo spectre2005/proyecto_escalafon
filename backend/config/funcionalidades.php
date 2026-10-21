@@ -116,7 +116,7 @@ return [
             'esencial' => ['motivo' => 'Los vínculos solo se crean en la sección 02',
                 'permanente' => ['PerfilDocumental calcula lo exigido en todas las secciones a partir de los vínculos.']],
             'depende_de' => [], 'bloqueo' => null, 'menu' => ['s02-vinculo'],
-            'documentos' => ['S02_C_RESOLUCION_DESIGNACION', 'S02_D_RESOLUCION_RENOVACION', 'S02_E_RESOLUCION_CARRERA', 'S02_F_CONTRATO', 'S02_G_ADENDA'],
+            'documentos' => ['S02_C_RESOLUCION_DESIGNACION', 'S02_D_RESOLUCION_RENOVACION', 'S02_E_RESOLUCION_CARRERA', 'S02_F_CONTRATO', 'S02_G_ADENDA', 'S02_RESOLUCION_DOCENTE'],
             'rutas_escritura' => ["POST {$expediente}/vinculos-laborales", "PATCH {$expediente}/vinculos-laborales/{vinculo}",
                 "PUT {$expediente}/vinculos-laborales/{vinculo}/datos-puesto", "POST {$expediente}/vinculo-adendas"],
             'tablas' => ['vinculos_laborales', 'vinculo_adendas'],

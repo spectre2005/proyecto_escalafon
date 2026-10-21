@@ -8,7 +8,7 @@ const subscribe = listener => catalog.subscribe(catalogUrl, listener)
 const snapshot = () => catalog.snapshot(catalogUrl)
 const selectClass = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-teal-600 disabled:bg-slate-50 disabled:text-slate-400'
 
-export default function UbigeoFields({ value, onChange, disabled = false, required = false }) {
+export default function UbigeoFields({ value, onChange, disabled = false, required = false, bloqueados = [] }) {
   const request = useSyncExternalStore(subscribe, snapshot)
   const rows = request.data || []
   const regions = [...new Set(rows.map(row => row.region))]
@@ -29,7 +29,7 @@ export default function UbigeoFields({ value, onChange, disabled = false, requir
         ['distrito', 'Distrito', districts.map(row => row.distrito), !value.provincia],
       ].map(([field, title, options, needsParent]) => <label key={field} className="flex flex-col gap-2 text-xs font-medium text-slate-600">
         {title}{required ? ' *' : ''}
-        <select name={field} className={selectClass} value={value[field]} required={required} disabled={disabled || needsParent || request.loading || !!request.error} onChange={event => change(field, event.target.value)}>
+        <select name={field} className={selectClass} value={value[field]} required={required} disabled={disabled || bloqueados.includes(field) || needsParent || request.loading || !!request.error} onChange={event => change(field, event.target.value)}>
           <option value="">Selecciona {title.toLowerCase()}</option>
           {value[field] && !options.includes(value[field]) && <option value={value[field]}>{value[field]} (valor actual fuera del catálogo)</option>}
           {options.map(option => <option key={option} value={option}>{option}</option>)}

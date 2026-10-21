@@ -6,8 +6,8 @@ use App\Models\Afiliacion;
 use App\Models\ArchivoDocumento;
 use App\Models\ConfiguracionFuncionalidad;
 use App\Models\Controversia;
-use App\Models\Desvinculacion;
 use App\Models\Desplazamiento;
+use App\Models\Desvinculacion;
 use App\Models\DocumentoUsuario;
 use App\Models\EvaluacionDesempeno;
 use App\Models\Familiar;
@@ -20,6 +20,7 @@ use App\Models\PerfilAdministrativo;
 use App\Models\PerfilDocente;
 use App\Models\PeriodoPrueba;
 use App\Models\PeriodoVacacional;
+use App\Models\ProcesoSeleccion;
 use App\Models\ProgresionCarrera;
 use App\Models\RatificacionDocente;
 use App\Models\Reconocimiento;
@@ -69,6 +70,9 @@ class ResourceApiTest extends TestCase
      */
     private const SIN_CRUD_GENERICO = [RecursoImpugnatorio::class, ConfiguracionFuncionalidad::class];
 
+    /** Catálogos con consulta filtrada y creación transaccional desde su proceso de negocio. */
+    private const CATALOGOS_ESPECIFICOS = [ProcesoSeleccion::class];
+
     /** Sección 10: igual, se registran desde Legajos\Seccion10Controller (el CRUD genérico exige además datos_sensibles.ver). */
     private const SECCION_10 = [RegistroSstBienestar::class];
 
@@ -81,7 +85,7 @@ class ResourceApiTest extends TestCase
         foreach (glob(__DIR__.'/../../app/Models/*.php') as $path) {
             $name = pathinfo($path, PATHINFO_FILENAME);
             if (! ctype_alnum($name) || in_array($name, ['Usuario', 'User', ...array_keys(self::anulables())], true)
-                || in_array('App\\Models\\'.$name, self::SIN_CRUD_GENERICO, true)) {
+                || in_array('App\\Models\\'.$name, [...self::SIN_CRUD_GENERICO, ...self::CATALOGOS_ESPECIFICOS], true)) {
                 continue;
             }
             $resources[$name] = ['App\\Models\\'.$name];
@@ -109,6 +113,18 @@ class ResourceApiTest extends TestCase
         $this->patchJson($uri.'/'.$model->getKey(), [])->assertNotFound();
         $this->deleteJson($uri.'/'.$model->getKey())->assertNotFound();
         $this->assertDatabaseHas($model->getTable(), ['id' => $model->getKey()]);
+    }
+
+    public function test_selection_processes_are_only_exposed_through_the_filtered_read_only_catalog(): void
+    {
+        $proceso = ProcesoSeleccion::factory()->create();
+        $uri = '/api/v1/procesos-seleccion';
+        $this->getJson($uri)->assertUnprocessable()->assertJsonValidationErrors('regimen_normativo_id');
+        $this->getJson($uri.'?regimen_normativo_id='.$proceso->regimen_normativo_id)->assertOk()->assertJsonPath('data.0.id', $proceso->id);
+        $this->postJson($uri, $proceso->only(['codigo', 'anio', 'regimen_normativo_id']))->assertStatus(405);
+        $this->patchJson($uri.'/'.$proceso->id, ['codigo' => 'OTRO'])->assertNotFound();
+        $this->deleteJson($uri.'/'.$proceso->id)->assertNotFound();
+        $this->assertDatabaseHas('procesos_seleccion', ['id' => $proceso->id, 'codigo' => $proceso->codigo]);
     }
 
     /** Sección 01: registros que solo se crean y se anulan. Los de la 07 pasaron a solo lectura (SECCION_07). */

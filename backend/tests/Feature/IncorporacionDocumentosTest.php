@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\DocumentoUsuario;
 use App\Models\Legajo;
 use App\Models\RegimenNormativo;
+use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
 use Database\Seeders\Seccion02CatalogoSeeder;
@@ -39,7 +40,7 @@ class IncorporacionDocumentosTest extends TestCase
     private function datos(array $cambios = []): array
     {
         return ['tipo_personal' => 'administrativo', 'regimen_normativo_id' => RegimenNormativo::query()->where('codigo', '1057')->value('id'),
-            'regimen_laboral' => 'designado', 'nombre_puesto' => 'Jefe de oficina', 'fecha_inicio' => '2026-10-01',
+            'regimen_laboral' => 'plazo_determinado', 'modalidad_ingreso' => 'concurso_publico', 'nombre_puesto' => 'Jefe de oficina', 'fecha_inicio' => '2026-10-01',
             'numero_resolucion' => 'R-015-2026', 'fecha_resolucion' => '2026-09-25',
             'numero_contrato' => 'CAS-028-2026', 'fecha_contrato' => '2026-09-26',
             'proceso_seleccion' => 'CAS-001-2026', 'anio_proceso' => 2026, ...$cambios];
@@ -71,8 +72,8 @@ class IncorporacionDocumentosTest extends TestCase
         $this->patchJson($this->url($id), ['numero_contrato' => null])->assertUnprocessable()->assertJsonValidationErrors('numero_contrato');
         $this->patchJson($this->url($id), ['fecha_contrato' => '2026-09-27'])->assertOk();
         $this->patchJson($this->url($id), ['proceso_seleccion' => null])->assertUnprocessable()->assertJsonValidationErrors('proceso_seleccion');
-        $this->patchJson($this->url($id), ['numero_contrato' => null, 'fecha_contrato' => null])->assertOk()->assertJsonPath('data.numero_resolucion', 'R-CORREGIDA');
-        $this->patchJson($this->url($id), ['fecha_contrato' => '2026-09-27'])->assertUnprocessable()->assertJsonValidationErrors('numero_contrato');
+        $this->patchJson($this->url($id), ['numero_contrato' => null, 'fecha_contrato' => null])->assertUnprocessable()->assertJsonValidationErrors('numero_contrato');
+        $this->patchJson($this->url($id), ['fecha_contrato' => '2026-09-27'])->assertOk();
     }
 
     public function test_invalid_document_and_process_fields_are_rejected_without_creating_a_link(): void
@@ -98,7 +99,7 @@ class IncorporacionDocumentosTest extends TestCase
     public function test_teacher_confidence_is_rejected_on_creation_and_partial_correction(): void
     {
         $ley = RegimenNormativo::query()->where('codigo', '30220')->value('id');
-        $datos = $this->datos(['tipo_personal' => 'docente', 'regimen_normativo_id' => $ley]);
+        $datos = $this->datos(['tipo_personal' => 'docente', 'regimen_normativo_id' => $ley, 'regimen_laboral' => 'designado']);
         $this->postJson($this->url(), $datos)->assertUnprocessable()->assertJsonValidationErrors('regimen_laboral');
         $id = $this->postJson($this->url(), [...$datos, 'regimen_laboral' => 'carrera'])->assertCreated()->json('data.id');
         $this->patchJson($this->url($id), ['regimen_laboral' => 'designado'])->assertUnprocessable()->assertJsonValidationErrors('regimen_laboral');
@@ -120,6 +121,7 @@ class IncorporacionDocumentosTest extends TestCase
             'email_institucional' => 'rosa.registro@example.test', 'tipo_personal' => 'docente',
             'regimen_normativo_id' => RegimenNormativo::query()->where('codigo', '30220')->value('id')];
         $vinculo = array_diff_key($this->datos(), array_flip(['tipo_personal', 'regimen_normativo_id']));
+        $vinculo['regimen_laboral'] = 'designado';
         $datos = ['usuarios' => [$persona], 'vinculo' => $vinculo, 'datos_puesto' => ['condicion_docente' => 'contratado']];
         $this->postJson('/api/v1/usuarios/con-vinculo', $datos)->assertUnprocessable()->assertJsonValidationErrors('vinculo.regimen_laboral');
         $this->assertDatabaseMissing('usuarios', ['numero_doc_identidad' => '71000001']);
@@ -133,7 +135,7 @@ class IncorporacionDocumentosTest extends TestCase
     {
         $this->postJson($this->url(), $this->datos())->assertCreated();
         $this->postJson($this->url(), $this->datos(['nombre_puesto' => 'Otro puesto']))->assertCreated();
-        $this->postJson($this->url(), $this->datos(['proceso_seleccion' => 'CONCURSO 01 / RRHH', 'anio_proceso' => null]))->assertCreated();
+        $this->postJson($this->url(), $this->datos(['proceso_seleccion' => 'CONCURSO 01 / RRHH', 'anio_proceso' => 2026]))->assertCreated();
         $this->assertDatabaseCount('vinculos_laborales', 3);
     }
 
@@ -146,5 +148,17 @@ class IncorporacionDocumentosTest extends TestCase
             ->assertJsonPath('data.vinculos.0.values.numero_resolucion', 'R-015-2026')->assertJsonPath('data.vinculos.0.values.numero_contrato', 'CAS-028-2026');
         $this->getJson('/api/v1/reportes/contratos')->assertOk()->assertJsonPath('data.0.numero', 'R-015-2026 · CAS-028-2026');
         $this->getJson('/api/v1/reportes/movimientos?estado=ingreso')->assertOk()->assertJsonPath('data.0.numero', 'R-015-2026 · CAS-028-2026');
+    }
+
+    public function test_the_teaching_resolution_pdf_is_linked_to_its_teaching_admission(): void
+    {
+        $ley = RegimenNormativo::query()->where('codigo', '30220')->value('id');
+        $this->persona->update(['tipo_personal' => 'docente', 'regimen_normativo_id' => $ley]);
+        $id = $this->postJson($this->url(), $this->datos(['tipo_personal' => 'docente', 'regimen_normativo_id' => $ley,
+            'regimen_laboral' => 'carrera', 'proceso_seleccion' => 'DOCENTE-001-2026', 'numero_contrato' => null, 'fecha_contrato' => null]))->assertCreated()->json('data.id');
+        $tipo = TipoDocumento::query()->where('codigo', Seccion02CatalogoSeeder::RESOLUCION_DOCENTE)->where('activo', true)->sole();
+        $this->assertSame('docente', $tipo->aplica_tipo_personal);
+        $documento = $this->subir($this->persona, $this->metadatos($tipo, 1, 2, ['enlace_id' => $id, 'num_resolucion' => 'R-015-2026', 'fecha_emision' => '2026-09-25']))->assertCreated()->json('data.id');
+        $this->assertDatabaseHas('documentos_usuario', ['id' => $documento, 'vinculo_laboral_id' => $id, 'tipo_documento_id' => $tipo->id]);
     }
 }

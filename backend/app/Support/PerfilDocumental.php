@@ -17,7 +17,7 @@ use Illuminate\Support\Collection;
 final class PerfilDocumental
 {
     /** Régimen laboral (enum del esquema) => columna aplica_* de tipos_documento. */
-    public const APLICA = ['carrera' => 'aplica_carrera', 'plazo_determinado' => 'aplica_plazo_determinado', 'designado' => 'aplica_designado'];
+    public const APLICA = ['carrera' => 'aplica_carrera', 'plazo_determinado' => 'aplica_plazo_determinado', 'plazo_indeterminado' => 'aplica_plazo_indeterminado', 'designado' => 'aplica_designado'];
 
     /**
      * @param  list<string>  $regimenes
@@ -26,7 +26,7 @@ final class PerfilDocumental
      * @param  list<string>  $puestos
      */
     private function __construct(public readonly array $regimenes, public readonly array $tiposPersonal, public readonly array $banderas, public readonly array $puestos,
-        public readonly AplicacionDocumental $aplicacion) {}
+        public readonly AplicacionDocumental $aplicacion, private readonly Collection $vinculos) {}
 
     /** @param Collection<int, VinculoLaboral> $vinculos */
     public static function de(Usuario $usuario, Collection $vinculos): self
@@ -44,6 +44,7 @@ final class PerfilDocumental
             $aplicacion->banderas,
             $origen->pluck('nombre_puesto')->filter()->unique()->values()->all(),
             $aplicacion,
+            $vigentes,
         );
     }
 
@@ -51,6 +52,26 @@ final class PerfilDocumental
     public function regimenesClasificados(): array
     {
         return array_values(array_intersect($this->regimenes, array_keys(self::APLICA)));
+    }
+
+    /** Los vínculos anteriores sin modalidad conservan el criterio del catálogo hasta que se complete su clasificación. */
+    private function exigenciaIngreso(TipoDocumento $tipo): ?array
+    {
+        if (! in_array($tipo->codigo, ['S02_RESOLUCION_DOCENTE', 'S02_A_RESULTADO_SELECCION', 'S02_B_INFORME_REQUISITOS_PUESTO', 'S02_C_RESOLUCION_DESIGNACION', 'S02_E_RESOLUCION_CARRERA', 'S02_F_CONTRATO'], true)
+            || $this->vinculos->isEmpty() || $this->vinculos->contains(fn (VinculoLaboral $vinculo): bool => ! $vinculo->modalidad_ingreso)) {
+            return $tipo->codigo === 'S02_RESOLUCION_DOCENTE' ? ['exigido' => false, 'motivo' => 'Resolución docente adicional: completa la modalidad del vínculo para determinar su exigencia.'] : null;
+        }
+        $exigido = $this->vinculos->contains(function (VinculoLaboral $vinculo) use ($tipo): bool {
+            return match ($tipo->codigo) {
+                'S02_A_RESULTADO_SELECCION' => $vinculo->modalidad_ingreso === 'concurso_publico',
+                'S02_B_INFORME_REQUISITOS_PUESTO', 'S02_C_RESOLUCION_DESIGNACION' => $vinculo->modalidad_ingreso === 'designacion_confianza',
+                'S02_RESOLUCION_DOCENTE' => $vinculo->tipo_personal === 'docente',
+                'S02_E_RESOLUCION_CARRERA' => $vinculo->tipo_personal === 'administrativo' && $vinculo->regimen_laboral === 'carrera',
+                'S02_F_CONTRATO' => $vinculo->regimenNormativo?->codigo === '1057' || in_array($vinculo->regimen_laboral, ['plazo_determinado', 'plazo_indeterminado'], true),
+            };
+        });
+
+        return ['exigido' => $exigido, 'motivo' => $exigido ? 'Se exige según el régimen y la modalidad de incorporación registrados.' : 'Opcional para la modalidad de incorporación registrada.'];
     }
 
     /**
@@ -76,10 +97,13 @@ final class PerfilDocumental
         if (($porBandera = $this->aplicacion->exigencia($tipo)) !== null) {
             return $porBandera;
         }
+        if (($ingreso = $this->exigenciaIngreso($tipo)) !== null) {
+            return $ingreso;
+        }
         $aplica = array_filter(self::APLICA, fn (string $columna): bool => (bool) $tipo->{$columna});
         if (count($aplica) < count(self::APLICA)) {
             $clasificados = $this->regimenesClasificados();
-            $sinDefinir = 'No se puede determinar: el tipo de vínculo (carrera, plazo determinado o designado) está sin definir. '
+            $sinDefinir = 'No se puede determinar: el tipo de vínculo (carrera, plazo determinado, indeterminado o designado) está sin definir. '
                 .'Se define al registrar o corregir el vínculo en la sección 02.';
             if ($clasificados === []) {
                 return ['exigido' => null, 'motivo' => $sinDefinir];

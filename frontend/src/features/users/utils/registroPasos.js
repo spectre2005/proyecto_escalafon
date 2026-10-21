@@ -1,4 +1,3 @@
-import { banderasPuesto } from '../../../shared/banderas.js'
 import { limpiarDatosPuesto } from '../../legajos/components/seccion02/borradoresVinculo.js'
 import { validateUser } from './usuariosCsv.js'
 import { conLey } from './leyes.js'
@@ -7,17 +6,15 @@ import { conLey } from './leyes.js'
 // solo ordenan la pantalla. Los errores del backend llegan como usuarios.0.*, vinculo.* y datos_puesto.*.
 export const PASOS = [
   { numero: 1, titulo: 'Datos de la persona', resumen: 'Identificación, contacto, tipo de personal y ley' },
-  { numero: 2, titulo: 'Primer vínculo laboral', resumen: 'Puesto, unidad, fechas y documento de ingreso' },
-  { numero: 3, titulo: 'Cargo y datos del puesto', resumen: 'Perfil, tipo de vínculo y condiciones' },
+  { numero: 2, titulo: 'Vínculo y modalidad', resumen: 'Puesto, duración y modalidad de incorporación' },
+  { numero: 3, titulo: 'Documentos de ingreso', resumen: 'Resolución, contrato y convocatoria según corresponda' },
 ]
+const EN_PASO_3 = ['proceso_seleccion_id', 'proceso_seleccion', 'anio_proceso', 'fecha_resultado_seleccion', 'numero_documento_vinculo', 'numero_resolucion', 'fecha_resolucion', 'numero_contrato', 'fecha_contrato']
 
-// El tipo de vínculo se elige en el paso 3, después de los datos del puesto que permiten sugerirlo.
-const EN_PASO_3 = [...banderasPuesto, 'regimen_laboral']
-
-/** Paso donde está el campo de un error del backend (las condiciones del puesto se muestran en el paso 3). */
+/** Paso donde está el campo de un error del backend. */
 export function pasoDeError(clave) {
   if (clave === 'usuarios' || clave.startsWith('usuarios.')) return 1
-  if (clave === 'datos_puesto' || clave.startsWith('datos_puesto.')) return 3
+  if (clave === 'datos_puesto' || clave.startsWith('datos_puesto.')) return 2
   if (clave === 'vinculo' || clave.startsWith('vinculo.')) return EN_PASO_3.includes(clave.slice('vinculo.'.length)) ? 3 : 2
   return null
 }
@@ -60,8 +57,7 @@ export function personaExistente(persona, usuarios = []) {
 /**
  * Sugerencia del tipo de vínculo con los datos del registro. Es la misma regla de App\Support\RegimenesLaborales::sugerencia
  * (backend), en el mismo orden y sin equivalencias nuevas: docente ordinario → carrera; docente contratado → plazo
- * determinado; D.L. 276 → sin sugerencia (carrera o designado); cargo de confianza → designado; CAS (1057) → plazo
- * determinado. Solo propone: el tipo lo elige el usuario y se puede cambiar.
+ * determinado; D.L. 276 → sin sugerencia (carrera o designado); cargo de confianza → designado; CAS (1057) requiere confirmar la duración. Solo propone: el tipo lo elige el usuario y se puede cambiar.
  *
  * @returns {{ valor: string|null, motivo: string }}
  */
@@ -70,7 +66,7 @@ export function sugerenciaTipoVinculo({ tipoPersonal, datosPuesto = {}, codigoLe
   if (tipoPersonal === 'docente' && datosPuesto.condicion_docente === 'contratado') return { valor: 'plazo_determinado', motivo: 'Docente contratado.' }
   if (codigoLey === '276') return { valor: null, motivo: 'Confirma si es carrera o designado.' }
   if (tipoPersonal === 'administrativo' && datosPuesto.es_cargo_confianza === true) return { valor: 'designado', motivo: 'Cargo de confianza.' }
-  if (codigoLey === '1057') return { valor: 'plazo_determinado', motivo: 'Contrato CAS (D.L. 1057).' }
+  if (codigoLey === '1057') return { valor: null, motivo: 'CAS puede ser determinado o indeterminado. Confirma la duración según el contrato.' }
   return { valor: null, motivo: tipoPersonal === 'docente' ? 'Confirma el tipo de vínculo según la condición docente: carrera o plazo determinado.' : 'Los datos del puesto no alcanzan: elige si es carrera, plazo determinado o designado.' }
 }
 

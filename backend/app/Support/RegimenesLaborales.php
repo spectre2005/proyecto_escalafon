@@ -9,14 +9,14 @@ use App\Models\VinculoLaboral;
  * Régimen de una persona en dos datos distintos:
  * - Ley (régimen normativo): catálogo regimenes_normativos, con aplica_a = docente o administrativo. En la persona va en
  *   usuarios.regimen_normativo_id; usuarios.regimen_laboral guarda el código como respaldo de lectura.
- * - Tipo de vínculo: carrera, plazo determinado o designado, en vinculos_laborales.regimen_laboral (NULL = Sin definir,
+ * - Tipo de vínculo: carrera, plazo determinado, indeterminado o designado, en vinculos_laborales.regimen_laboral (NULL = Sin definir,
  *   solo en vínculos anteriores). La ley no lo determina: un 276 puede ser carrera o designado.
  *
  * Mantener los tipos en sincronía con frontend/src/features/legajos/config/seccion02.js.
  */
 final class RegimenesLaborales
 {
-    public const TIPOS_VINCULO = ['carrera' => 'Carrera', 'plazo_determinado' => 'Plazo determinado', 'designado' => 'Designado (confianza)'];
+    public const TIPOS_VINCULO = ['carrera' => 'Carrera', 'plazo_determinado' => 'Plazo determinado', 'plazo_indeterminado' => 'Plazo indeterminado', 'designado' => 'Designado (confianza)'];
 
     /** Códigos de ley que se aceptan con otro nombre (el catálogo usa 1057 para el CAS). */
     public const ALIAS_LEY = ['CAS' => '1057'];
@@ -46,7 +46,7 @@ final class RegimenesLaborales
             // D.L. 276 admite carrera o designado: no se sugiere ninguno.
             $vinculo->regimenNormativo?->codigo === '276' => ['valor' => null, 'motivo' => 'Confirma si es carrera o designado.'],
             (bool) $administrativo?->es_cargo_confianza => ['valor' => 'designado', 'motivo' => 'Cargo de confianza.'],
-            $vinculo->regimenNormativo?->codigo === '1057' => ['valor' => 'plazo_determinado', 'motivo' => 'Contrato CAS (D.L. 1057).'],
+            $vinculo->regimenNormativo?->codigo === '1057' => ['valor' => null, 'motivo' => 'CAS puede ser determinado o indeterminado. Confirma la duración según el contrato.'],
             default => ['valor' => null, 'motivo' => $vinculo->tipo_personal === 'docente'
                 ? 'Confirma el tipo de vínculo según la condición docente: carrera o plazo determinado.'
                 : 'Los datos del puesto no alcanzan: confirma si es carrera, plazo determinado o designado.'],
@@ -68,6 +68,7 @@ final class RegimenesLaborales
     {
         return match (true) {
             $ley === null => 'Indica la ley (régimen normativo) de la persona'.(self::codigos($tipoPersonal) ? ': '.implode(', ', self::codigos($tipoPersonal)) : '').'.',
+            $tipoPersonal === 'docente' && in_array(strtoupper($ley->codigo), ['1057', 'CAS'], true) => 'Para el vínculo docente selecciona su régimen docente. Si la misma persona ocupa otro puesto CAS, registra un vínculo administrativo independiente en la sección 02; su compatibilidad debe ser evaluada por la entidad.',
             ! $ley->activo => "La ley {$ley->nombre} está inactiva en el catálogo.",
             is_string($tipoPersonal) && $ley->aplica_a !== $tipoPersonal => "La ley {$ley->nombre} corresponde al personal {$ley->aplica_a}, no al {$tipoPersonal}.",
             default => null,
@@ -86,7 +87,9 @@ final class RegimenesLaborales
         if (! is_string($tipoPersonal)) {
             return [];
         }
-        $codigos = RegimenNormativo::query()->where('aplica_a', $tipoPersonal)->where('activo', true)->orderBy('codigo')->pluck('codigo')->all();
+        $codigos = RegimenNormativo::query()->where('aplica_a', $tipoPersonal)->where('activo', true)
+            ->when($tipoPersonal === 'docente', fn ($query) => $query->whereNotIn('codigo', ['1057', 'CAS']))
+            ->orderBy('codigo')->pluck('codigo')->all();
 
         return array_values(array_map(fn (string $codigo): string => (string) (array_search($codigo, self::ALIAS_LEY, true) ?: $codigo), $codigos));
     }

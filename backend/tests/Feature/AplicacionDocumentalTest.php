@@ -49,9 +49,10 @@ class AplicacionDocumentalTest extends TestCase
         $this->vinculo($otra, ['tipo_personal' => 'docente', 'regimen_laboral' => 'carrera', 'anulado' => true]);
         $this->assertSame('Solo para personal docente.', AplicacionDocumental::para($otra)->noAplica($tipo));
 
-        // «ambos» (valor por defecto de todo el catálogo) se ofrece a cualquiera.
+        $this->assertSame('docente', $this->tipo('S02_RESOLUCION_DOCENTE')->aplica_tipo_personal);
+        // Los tipos generales se ofrecen a cualquiera; la resolución docente pertenece al perfil docente.
         $this->assertSame([], array_filter(TipoDocumento::query()->where('activo', true)->pluck('aplica_tipo_personal', 'codigo')->all(),
-            fn (string $valor, string $codigo): bool => $valor !== 'ambos' && $codigo !== 'FORM_CAPACITACION', ARRAY_FILTER_USE_BOTH));
+            fn (string $valor, string $codigo): bool => $valor !== 'ambos' && ! in_array($codigo, ['FORM_CAPACITACION', 'S02_RESOLUCION_DOCENTE'], true), ARRAY_FILTER_USE_BOTH));
     }
 
     public function test_regime_filters_only_when_every_regime_is_known(): void

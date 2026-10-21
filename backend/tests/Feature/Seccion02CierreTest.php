@@ -54,7 +54,7 @@ class Seccion02CierreTest extends TestCase
         $autor = $this->actuarComo();
         $persona = $this->personaDemo();
 
-        $id = $this->postJson($this->url($persona, 'vinculos-laborales'), ['tipo_personal' => 'administrativo', 'regimen_laboral' => 'designado',
+        $id = $this->postJson($this->url($persona, 'vinculos-laborales'), ['modalidad_ingreso' => 'designacion_confianza', 'numero_resolucion' => 'R-001', 'fecha_resolucion' => '2025-12-30', 'tipo_personal' => 'administrativo', 'regimen_laboral' => 'designado',
             'regimen_normativo_id' => RegimenNormativo::factory()->create(['aplica_a' => 'administrativo'])->id, 'nombre_puesto' => 'Jefe de oficina', 'fecha_inicio' => today()->toDateString()])
             ->assertCreated()->assertJsonPath('data.registrado_por', $autor->id)->json('data.id');
         $fila = collect($this->getJson($this->url($persona, 'seccion-02'))->json('data.vinculos'))->firstWhere('id', $id);

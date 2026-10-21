@@ -3,6 +3,8 @@
 namespace App\Http\Requests;
 
 use App\Models\Usuario;
+use App\Support\IngresoLaboral;
+use App\Support\RegimenesLaborales;
 use App\Support\ReglasVinculo;
 use Illuminate\Contracts\Validation\Validator as ValidatorContract;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -43,7 +45,17 @@ class StoreUsuarioConVinculoRequest extends StoreUsuariosRequest
             $this->vinculo = $this->parte($validator, 'vinculo', array_diff_key(ReglasVinculo::VINCULO, array_flip(ReglasVinculo::NO_EN_ALTA)));
             $tipo = $this->input('usuarios.0.tipo_personal');
             $this->datosPuesto = is_string($tipo) && isset(ReglasVinculo::PERFIL[$tipo]) ? $this->parte($validator, 'datos_puesto', ReglasVinculo::PERFIL[$tipo]) : [];
-            foreach (ReglasVinculo::erroresIngreso([...$this->vinculo, 'tipo_personal' => $tipo]) as $campo => $mensajes) {
+            $this->vinculo = IngresoLaboral::completarProceso($this->vinculo);
+            $leyId = $this->input('usuarios.0.regimen_normativo_id');
+            $codigo = $this->input('usuarios.0.regimen_laboral');
+            $ley = RegimenesLaborales::ley(is_string($leyId) ? $leyId : null, is_string($codigo) ? $codigo : null);
+            $contexto = [...$this->vinculo, 'tipo_personal' => $tipo, 'regimen_normativo_id' => $ley?->id];
+            foreach (IngresoLaboral::erroresPerfil($contexto, $this->datosPuesto) as $campo => $mensajes) {
+                foreach ($mensajes as $mensaje) {
+                    $validator->errors()->add("datos_puesto.$campo", $mensaje);
+                }
+            }
+            foreach (ReglasVinculo::erroresIngreso($contexto) as $campo => $mensajes) {
                 foreach ($mensajes as $mensaje) {
                     $validator->errors()->add("vinculo.$campo", $mensaje);
                 }

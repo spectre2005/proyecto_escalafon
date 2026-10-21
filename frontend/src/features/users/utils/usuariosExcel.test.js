@@ -57,7 +57,7 @@ test('requires complete catalog locations and normalizes personnel options', () 
 test('the law comes from the catalog and must match the personnel type', () => {
   assert.equal(errorLey(catalogo, { tipo_personal: 'administrativo', ley: '1057' }), null)
   assert.equal(errorLey(catalogo, { tipo_personal: 'administrativo', regimen_normativo_id: 'ley-276' }), null)
-  assert.match(errorLey(catalogo, { tipo_personal: 'docente', ley: 'CAS' }), /corresponde al personal administrativo/)
+  assert.match(errorLey(catalogo, { tipo_personal: 'docente', ley: 'CAS' }), /vínculo administrativo independiente/)
   assert.match(errorLey(catalogo, { tipo_personal: 'administrativo', ley: '999' }), /inactiva/)
   assert.equal(errorLey(catalogo, { tipo_personal: 'administrativo', ley: '' }), 'Indica la ley (régimen normativo): CAS, 276.')
   assert.match(errorLey(null, { tipo_personal: 'docente', ley: '30220' }), /Cargando/)

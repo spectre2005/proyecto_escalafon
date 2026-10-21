@@ -15,14 +15,14 @@ class Seccion02CatalogoSeederTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_seeds_four_subsections_and_thirteen_types_repeatably(): void
+    public function test_it_seeds_four_subsections_directive_types_and_the_teacher_resolution_repeatably(): void
     {
         $this->seed(Seccion02CatalogoSeeder::class);
         $this->seed(Seccion02CatalogoSeeder::class);
 
         $this->assertSame(['2.1', '2.2', '2.3', '2.4'], SubseccionLegajo::query()->where('seccion_legajo_id', 2)->orderBy('orden')->pluck('codigo')->all());
         $tipos = TipoDocumento::query()->where('seccion_legajo_id', 2)->with('subseccionLegajo')->orderBy('orden')->get();
-        $this->assertCount(13, $tipos);
+        $this->assertCount(14, $tipos);
         $this->assertSame([
             'S02_A_RESULTADO_SELECCION' => ['2.1', null], 'S02_B_INFORME_REQUISITOS_PUESTO' => ['2.1', null],
             'S02_C_RESOLUCION_DESIGNACION' => ['2.2', 'vinculos_laborales'], 'S02_D_RESOLUCION_RENOVACION' => ['2.2', 'vinculos_laborales'],
@@ -31,6 +31,7 @@ class Seccion02CatalogoSeederTest extends TestCase
             'S02_I_CARGO_PERFIL_PUESTO' => ['2.3', null], 'S02_J_CARGO_REGLAMENTO_INTERNO' => ['2.3', null],
             'S02_K_CARGO_CODIGO_ETICA' => ['2.3', null], 'S02_L_OTROS_INDUCCION' => ['2.3', null],
             'S02_M_EVALUACION_PERIODO_PRUEBA' => ['2.4', 'periodos_prueba'],
+            'S02_RESOLUCION_DOCENTE' => ['2.2', 'vinculos_laborales'],
         ], $tipos->mapWithKeys(fn (TipoDocumento $tipo): array => [$tipo->codigo => [$tipo->subseccionLegajo->codigo, $tipo->formulario_datos]])->all());
         $this->assertSame(['S02_D_RESOLUCION_RENOVACION', 'S02_G_ADENDA', 'S02_H_REGISTRO_INDUCCION', 'S02_L_OTROS_INDUCCION'], $tipos->where('permite_multiples', true)->pluck('codigo')->values()->all());
         $this->assertSame(['S02_M_EVALUACION_PERIODO_PRUEBA'], $tipos->where('requiere_periodo_prueba', true)->pluck('codigo')->values()->all());
@@ -57,7 +58,7 @@ class Seccion02CatalogoSeederTest extends TestCase
         $nueva = TipoDocumento::query()->where('codigo', 'S02_G_ADENDA')->where('activo', true)->sole();
         $this->assertSame('2.2', $nueva->subseccionLegajo->codigo);
         $this->assertFalse($extra->refresh()->activo);
-        $this->assertSame(13, TipoDocumento::query()->where('seccion_legajo_id', 2)->where('activo', true)->count());
+        $this->assertSame(14, TipoDocumento::query()->where('seccion_legajo_id', 2)->where('activo', true)->count());
     }
 
     public function test_demo_seeder_is_repeatable(): void

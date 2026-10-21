@@ -1,3 +1,4 @@
+import { leyesDelTipo, errorLey } from './leyes.js'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { datosPuestoInicial, vinculoInicial } from '../../legajos/components/seccion02/borradoresVinculo.js'
@@ -10,22 +11,22 @@ const catalogo = [
 const persona = { numero_doc_identidad: '71000001', nombres: ' Rosa ', apellido_paterno: 'Alta', apellido_materno: '', email_institucional: 'rosa.alta@example.test', tipo_personal: 'docente', ley: '', telefono: '', regimen_normativo_id: '' }
 
 test('the wizard has three steps in order', () => {
-  assert.deepEqual(PASOS.map(paso => [paso.numero, paso.titulo]), [[1, 'Datos de la persona'], [2, 'Primer vínculo laboral'], [3, 'Cargo y datos del puesto']])
+  assert.deepEqual(PASOS.map(paso => [paso.numero, paso.titulo]), [[1, 'Datos de la persona'], [2, 'Vínculo y modalidad'], [3, 'Documentos de ingreso']])
 })
 
 test('backend errors lead to the step that holds the field', () => {
   assert.equal(pasoDeError('usuarios.0.email_institucional'), 1)
   assert.equal(pasoDeError('usuarios'), 1)
   assert.equal(pasoDeError('vinculo.nombre_puesto'), 2)
-  assert.equal(pasoDeError('vinculo.numero_documento_vinculo'), 2)
-  assert.equal(pasoDeError('vinculo.tiene_periodo_prueba'), 3)
-  // El tipo de vínculo se elige en el paso 3, con los datos del puesto.
-  assert.equal(pasoDeError('vinculo.regimen_laboral'), 3)
-  assert.equal(pasoDeError('datos_puesto.categoria'), 3)
+  assert.equal(pasoDeError('vinculo.numero_documento_vinculo'), 3)
+  assert.equal(pasoDeError('vinculo.tiene_periodo_prueba'), 2)
+  // El tipo de vínculo se elige en el paso 2, con los datos del puesto.
+  assert.equal(pasoDeError('vinculo.regimen_laboral'), 2)
+  assert.equal(pasoDeError('datos_puesto.categoria'), 2)
   assert.equal(pasoDeError('otro'), null)
   assert.equal(primerPasoConError({ 'datos_puesto.categoria': ['x'], 'vinculo.fecha_inicio': ['x'] }), 2)
   assert.equal(primerPasoConError({ 'datos_puesto.categoria': ['x'], 'usuarios.0.numero_doc_identidad': ['x'] }), 1)
-  assert.equal(primerPasoConError({ 'vinculo.obligado_djbr': ['x'] }), 3)
+  assert.equal(primerPasoConError({ 'vinculo.obligado_djbr': ['x'] }), 2)
   // Un 403 o un 409 no trae campos: se queda en el paso actual.
   assert.equal(primerPasoConError({}), null)
   assert.equal(primerPasoConError(undefined), null)
@@ -65,7 +66,7 @@ test('the link type suggestion follows the backend rule and only proposes', () =
   // Extraordinario: los datos no alcanzan.
   assert.equal(sugerir('docente', { condicion_docente: 'extraordinario' }, '30220'), null)
   assert.equal(sugerir('administrativo', { es_cargo_confianza: true }, '1057'), 'designado')
-  assert.equal(sugerir('administrativo', { es_cargo_confianza: false }, '1057'), 'plazo_determinado')
+  assert.equal(sugerir('administrativo', { es_cargo_confianza: false }, '1057'), null)
   // D.L. 276 admite carrera o designado: no se sugiere ninguno, aunque sea de confianza.
   assert.equal(sugerir('administrativo', { es_cargo_confianza: true }, '276'), null)
   assert.equal(sugerir('administrativo', {}, ''), null)
@@ -93,4 +94,10 @@ test('the final call carries every step and only the job data of the person type
   // Lo escrito para el otro tipo se conserva en el borrador y no se envía.
   assert.equal(puestos.administrativo.cargo_estructural, 'Escrito antes de cambiar de tipo')
   assert.equal('cargo_estructural' in registro.datos_puesto, false)
+})
+
+test('CAS stays outside teaching choices even if its catalog classification was misconfigured', () => {
+  const modificado = catalogo.map(ley => ({ ...ley, aplica_a: 'docente' }))
+  assert.deepEqual(leyesDelTipo(modificado, 'docente').map(ley => ley.codigo), ['30220'])
+  assert.match(errorLey(modificado, { tipo_personal: 'docente', regimen_normativo_id: 'ley-1057' }), /vínculo administrativo independiente/)
 })

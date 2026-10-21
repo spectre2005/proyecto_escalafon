@@ -8,6 +8,7 @@ use App\Models\TipoDocumento;
 use App\Support\Seccion07;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Catálogo de la sección 07 (Evaluación de desempeño, progresión en la carrera y desplazamiento) según el Anexo 01
@@ -118,6 +119,9 @@ class Seccion07CatalogoSeeder extends Seeder
 
     private function tipo(string $codigo, array $valores): void
     {
+        if (Schema::hasColumn('tipos_documento', 'aplica_plazo_indeterminado')) {
+            $valores['aplica_plazo_indeterminado'] = $valores['aplica_carrera'] && $valores['aplica_plazo_determinado'] && $valores['aplica_designado'];
+        }
         $existente = TipoDocumento::query()->where('seccion_legajo_id', self::SECCION)->where('codigo', $codigo)->where('activo', true)->first();
         if (! $existente) {
             TipoDocumento::query()->create($valores);

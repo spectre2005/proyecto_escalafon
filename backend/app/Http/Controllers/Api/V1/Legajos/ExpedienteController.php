@@ -58,6 +58,7 @@ use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
 use App\Support\AplicacionDocumental;
 use App\Support\CambioDiscapacidad;
+use App\Support\IdentidadPersonal;
 use App\Support\PerfilPendiente;
 use App\Support\PuestoActual;
 use App\Support\RegimenesLaborales;
@@ -240,6 +241,7 @@ class ExpedienteController extends Controller
             'datos_sensibles_ocultos' => ! $veSensibles,
             'usuario' => $presented,
             'edit_values' => $person->only(['unidad_organica_id', 'regimen_normativo_id']),
+            'campos_identidad_bloqueados' => $veSensibles ? IdentidadPersonal::camposBloqueados($person) : [],
             'regimen' => $this->regimen($person),
             'puesto_actual' => PuestoActual::de($person),
             'nombre' => trim($person->nombres.' '.$person->apellido_paterno.' '.$person->apellido_materno),
@@ -284,6 +286,7 @@ class ExpedienteController extends Controller
                 if ($request->hasHeader('If-Match') && ! hash_equals($this->version($person), $request->header('If-Match'))) {
                     abort(409, 'Los datos cambiaron mientras editabas. Cancela y vuelve a editar la ficha actualizada.');
                 }
+                IdentidadPersonal::validarCambios($person, $data);
                 $discapacidad = array_key_exists(CambioDiscapacidad::CAMPO, $data) ? [$person->con_discapacidad, CambioDiscapacidad::valor($data[CambioDiscapacidad::CAMPO])] : null;
                 if ($discapacidad) {
                     CambioDiscapacidad::autorizar($request->user(), ...$discapacidad);

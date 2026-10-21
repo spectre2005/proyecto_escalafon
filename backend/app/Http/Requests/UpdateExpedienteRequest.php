@@ -29,11 +29,12 @@ class UpdateExpedienteRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tipo_doc_identidad' => ['sometimes', 'required', Rule::in(Catalogos::TIPOS_DOC_IDENTIDAD)],
+            'tipo_doc_identidad' => ['sometimes', 'required', Rule::in(['dni'])],
             'numero_doc_identidad' => ['sometimes', 'required', 'string', 'max:20', Rule::unique('usuarios', 'numero_doc_identidad')->ignore($this->route('usuario'))],
             'nombres' => 'sometimes|required|string|max:120',
             'apellido_paterno' => 'sometimes|required|string|max:80',
             'apellido_materno' => 'sometimes|nullable|string|max:80',
+            'nacionalidad' => 'sometimes|nullable|string|max:60',
             'fecha_nacimiento' => 'sometimes|nullable|date_format:Y-m-d|before_or_equal:today',
             'estado_civil' => ['sometimes', 'nullable', Rule::in(Catalogos::ESTADOS_CIVILES)],
             'domicilio' => 'sometimes|nullable|string|max:250',

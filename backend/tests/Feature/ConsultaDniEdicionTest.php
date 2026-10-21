@@ -37,10 +37,10 @@ class ConsultaDniEdicionTest extends TestCase
         ]])]);
     }
 
-    public function test_own_dni_can_be_consulted_without_changing_the_person_until_the_edit_is_saved(): void
+    public function test_lookup_cannot_replace_registered_identity_but_missing_data_can_be_completed(): void
     {
         $this->actuarComo();
-        $persona = Usuario::factory()->create(['numero_doc_identidad' => '01234567', 'nombres' => 'Nombre anterior', 'telefono' => '987654321']);
+        $persona = Usuario::factory()->create(['numero_doc_identidad' => '01234567', 'nombres' => 'Nombre anterior', 'apellido_materno' => null, 'telefono' => '987654321']);
         $ubicacion = Ubigeo::factory()->create(['region' => 'Cusco', 'provincia' => 'La Convención', 'distrito' => 'Santa Ana']);
         $antes = $persona->refresh()->getAttributes();
         $ficha = '/api/v1/expedientes/'.$persona->id;
@@ -55,7 +55,13 @@ class ConsultaDniEdicionTest extends TestCase
         $this->withHeader('If-Match', $version)->patchJson($ficha, [
             'nombres' => $datos['nombres'], 'apellido_paterno' => $datos['apellido_paterno'], 'apellido_materno' => $datos['apellido_materno'],
             'ubicacion' => $ubicacion->only(['region', 'provincia', 'distrito']),
-        ])->assertOk()->assertJsonPath('data.usuario.values.nombres', 'ANA MARÍA');
+        ])->assertUnprocessable()->assertJsonValidationErrors(['nombres', 'apellido_paterno']);
+        $this->assertSame($antes, $persona->refresh()->getAttributes());
+        $this->withHeader('If-Match', $version)->patchJson($ficha, [
+            'apellido_materno' => $datos['apellido_materno'],
+            'ubicacion' => $ubicacion->only(['region', 'provincia', 'distrito']),
+        ])->assertOk()->assertJsonPath('data.usuario.values.nombres', 'Nombre anterior')
+            ->assertJsonPath('data.usuario.values.apellido_materno', 'FLORES');
         $this->assertSame('987654321', $persona->refresh()->telefono);
         $this->assertSame($ubicacion->id, $persona->ubigeo_id);
     }

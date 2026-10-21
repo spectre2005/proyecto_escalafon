@@ -60,6 +60,7 @@ use App\Http\Controllers\Api\V1\PerfilDocenteController;
 use App\Http\Controllers\Api\V1\PeriodoPruebaController;
 use App\Http\Controllers\Api\V1\PeriodoVacacionalController;
 use App\Http\Controllers\Api\V1\ProcesoFiscalizacionController;
+use App\Http\Controllers\Api\V1\ProcesoSeleccionController;
 use App\Http\Controllers\Api\V1\ProgresionCarreraController;
 use App\Http\Controllers\Api\V1\RatificacionDocenteController;
 use App\Http\Controllers\Api\V1\ReconocimientoController;
@@ -137,6 +138,7 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
     Route::middleware('can:legajo.ver')->group(function (): void {
         Route::get('expedientes', [ExpedienteController::class, 'index']);
         Route::get('ubicaciones', [ExpedienteController::class, 'locations']);
+        Route::get('procesos-seleccion', [ProcesoSeleccionController::class, 'index']);
         Route::get('expediente-opciones', [ExpedienteController::class, 'editOptions']);
         Route::get('expedientes/{usuario}', [ExpedienteController::class, 'show'])->whereUuid('usuario');
         Route::get('expedientes/{usuario}/foto', [FotoPersonalController::class, 'show'])->whereUuid('usuario');

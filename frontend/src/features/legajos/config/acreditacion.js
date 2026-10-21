@@ -34,7 +34,7 @@ export function precargaDesdeRegistro(tipo, registro, { familiares = [] } = {}) 
     case 'vinculos_laborales': {
       if (SIN_NUMERO_DEL_VINCULO.includes(tipo.codigo)) return {}
       if (tipo.codigo === 'S02_F_CONTRATO') return { ...numero(v.numero_contrato), ...fecha(v.fecha_contrato) }
-      if (['S02_C_RESOLUCION_DESIGNACION', 'S02_E_RESOLUCION_CARRERA'].includes(tipo.codigo)) return { ...numero(v.numero_resolucion), ...fecha(v.fecha_resolucion) }
+      if (['S02_C_RESOLUCION_DESIGNACION', 'S02_E_RESOLUCION_CARRERA', 'S02_RESOLUCION_DOCENTE'].includes(tipo.codigo)) return { ...numero(v.numero_resolucion), ...fecha(v.fecha_resolucion) }
       return {}
     }
     case 'vinculo_adendas': return numero(v.numero)

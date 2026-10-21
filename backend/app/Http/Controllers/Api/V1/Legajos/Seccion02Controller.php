@@ -16,6 +16,7 @@ use App\Models\VinculoLaboral;
 use App\Support\AplicacionDocumental;
 use App\Support\Documentos\EstadoDocumento;
 use App\Support\Documentos\FormulariosDatos;
+use App\Support\IngresoLaboral;
 use App\Support\Parametros;
 use App\Support\PerfilDocumental;
 use App\Support\RegimenesLaborales;
@@ -81,7 +82,7 @@ class Seccion02Controller extends Controller
             ->whereIn('legajo_id', Legajo::query()->where('usuario_id', $usuario)->select('id'))
             ->with(['archivo', 'recepcionadoPor', 'createdBy'])->orderByDesc('created_at')->orderByDesc('id')->get()->groupBy('tipo_documento_id');
         $datos = [
-            '2.1' => $this->nivel($vigentes->contains(fn (array $v): bool => $v['values']['proceso_seleccion'] && $v['values']['fecha_resultado_seleccion']),
+            '2.1' => $this->nivel($vigentes->contains(fn (array $v): bool => ($v['values']['modalidad_ingreso'] && $v['values']['modalidad_ingreso'] !== 'concurso_publico') || ($v['values']['proceso_seleccion'] && $v['values']['fecha_resultado_seleccion'])),
                 $filasVinculos->contains(fn (array $v): bool => $v['values']['proceso_seleccion'] || $v['values']['fecha_resultado_seleccion'])),
             '2.2' => $this->nivel($vigentes->isNotEmpty(), $filasVinculos->isNotEmpty()),
             '2.3' => $this->nivel($vigentes->isNotEmpty() && $vigentes->every(fn (array $v): bool => $v['inducciones_faltantes'] === []), $inducciones->isNotEmpty()),
@@ -141,7 +142,7 @@ class Seccion02Controller extends Controller
     public function storeVinculo(Request $request, string $usuario): JsonResponse
     {
         $this->exigirLegajo($usuario);
-        $data = $this->validar($request, [...self::REGLAS_VINCULO, 'documento_id' => 'nullable|uuid']);
+        $data = IngresoLaboral::completarProceso($this->validar($request, [...self::REGLAS_VINCULO, 'documento_id' => 'nullable|uuid']));
         $this->exigirLeyDelTipo($data);
         if ($errores = ReglasVinculo::erroresIngreso($data)) {
             throw ValidationException::withMessages($errores);
@@ -150,6 +151,7 @@ class Seccion02Controller extends Controller
 
         // vinculos_laborales no tiene documento_id: el documento (c a f) apunta al vínculo.
         return $this->creado(DB::transaction(function () use ($data, $usuario, $documento, $request): VinculoLaboral {
+            $data = IngresoLaboral::vincularProceso($data);
             $vinculo = VinculoLaboral::query()->create([...collect($data)->except('documento_id')->all(), 'usuario_id' => $usuario, 'registrado_por' => $request->user()->getAuthIdentifier()]);
             // Enlace de una sola vez: si otra carga ya lo enlazó entre tanto, no se pisa.
             if ($documento && DocumentoUsuario::query()->whereKey($documento->id)->whereNull('vinculo_laboral_id')->update(['vinculo_laboral_id' => $vinculo->id]) !== 1) {
@@ -167,16 +169,21 @@ class Seccion02Controller extends Controller
         if ($registro->anulado || $registro->fecha_cese !== null) {
             return response()->json(['message' => $registro->anulado ? 'El vínculo está anulado: no se corrige.' : 'El vínculo tiene fecha de cese: es un registro cerrado y no se corrige.'], 409);
         }
-        $cambios = $this->validarCambios($request, $registro, self::REGLAS_VINCULO);
+        $cambios = IngresoLaboral::completarProceso($this->validarCambios($request, $registro, self::REGLAS_VINCULO));
         $this->exigirLeyDelTipo($cambios, $registro);
         DB::transaction(function () use ($registro, $cambios): void {
             // Bloqueo del vínculo: los datos del puesto no se registran a la vez que se cambia su tipo de personal.
             $actual = VinculoLaboral::query()->whereKey($registro->id)->lockForUpdate()->firstOrFail();
+            abort_if($actual->anulado || $actual->fecha_cese !== null, 409, 'El vínculo está cerrado o anulado.');
             $this->exigirTipoSinDatosPuesto($actual, $cambios);
             if ($errores = ReglasVinculo::erroresIngreso($cambios, $actual)) {
                 throw ValidationException::withMessages($errores);
             }
-            $actual->update($cambios);
+            $perfil = $actual->perfilAdministrativo()->first();
+            if ($perfil && array_key_exists('modalidad_ingreso', $cambios) && filled($cambios['modalidad_ingreso'])) {
+                $perfil->update(['es_cargo_confianza' => $cambios['modalidad_ingreso'] === 'designacion_confianza']);
+            }
+            $actual->update(IngresoLaboral::vincularProceso($cambios, $actual));
         });
 
         return new JsonResource($registro->refresh());
@@ -233,15 +240,25 @@ class Seccion02Controller extends Controller
         }
         $docente = $registro->tipo_personal === 'docente';
         $data = $this->validar($request, self::REGLAS_PERFIL[$docente ? 'docente' : 'administrativo']);
-        $perfiles = $docente ? $registro->perfilDocente() : $registro->perfilAdministrativo();
-        $perfil = $perfiles->orderBy('created_at')->orderBy('id')->first();
-        if ($perfil) {
-            $perfil->update($data);
+        [$perfil, $creado] = DB::transaction(function () use ($registro, $data, $docente): array {
+            $actual = VinculoLaboral::query()->lockForUpdate()->findOrFail($registro->id);
+            abort_if($actual->anulado || $actual->fecha_cese !== null, 409, 'El vínculo está cerrado o anulado.');
+            abort_if($actual->tipo_personal !== $registro->tipo_personal, 409, 'El tipo de personal cambió. Vuelve a abrir el formulario.');
+            $perfiles = $docente ? $actual->perfilDocente() : $actual->perfilAdministrativo();
+            $perfil = $perfiles->orderBy('created_at')->orderBy('id')->first();
+            if ($errores = IngresoLaboral::erroresPerfil($actual->getRawOriginal(), [...($perfil?->getAttributes() ?? []), ...$data])) {
+                throw ValidationException::withMessages($errores);
+            }
+            if ($perfil) {
+                $perfil->update($data);
 
-            return new JsonResource($perfil->refresh());
-        }
+                return [$perfil->refresh(), false];
+            }
 
-        return $this->creado($perfiles->create($data));
+            return [$perfiles->create($data), true];
+        });
+
+        return $creado ? $this->creado($perfil) : new JsonResource($perfil);
     }
 
     public function storeAdenda(Request $request, string $usuario): JsonResponse
@@ -330,6 +347,7 @@ class Seccion02Controller extends Controller
      * Vínculo con su vigencia, sus adendas en orden cronológico y su fin efectivo.
      * TODO pendiente de confirmar con el cliente: se toma como fin efectivo la fecha_fin de la última adenda
      * (la de inicio más reciente) y, si no hay adendas, la fecha_fin_prevista del vínculo.
+     * El plazo indeterminado no vence por la fecha de una adenda; su fin efectivo solo lo determina el cese.
      *
      * @param  Collection<int, Induccion>  $inducciones
      */
@@ -337,7 +355,7 @@ class Seccion02Controller extends Controller
     {
         $hoy = today();
         $adendas = $vinculo->vinculoAdendas;
-        $fin = $vinculo->fecha_cese ?? $adendas->last()?->fecha_fin ?? $vinculo->fecha_fin_prevista;
+        $fin = $vinculo->fecha_cese ?? ($vinculo->regimen_laboral === 'plazo_indeterminado' ? null : ($adendas->last()?->fecha_fin ?? $vinculo->fecha_fin_prevista));
         $dias = $fin ? (int) $hoy->diffInDays($fin, false) : null;
         $estado = match (true) {
             $vinculo->fecha_cese !== null => 'cesado',
@@ -350,15 +368,16 @@ class Seccion02Controller extends Controller
         $tiposInduccion = $inducciones->where('vinculo_laboral_id', $vinculo->id)->pluck('tipo')->all();
 
         return [
-            ...$this->fila($vinculo, ['tipo_personal', 'regimen_laboral', 'regimen_normativo_id', 'unidad_organica_id', 'nombre_puesto', 'obligado_djbr', 'exige_colegiatura', 'exige_estudios_basicos', 'tiene_periodo_prueba', 'proceso_seleccion', 'anio_proceso', 'fecha_resultado_seleccion', 'numero_documento_vinculo', 'numero_resolucion', 'fecha_resolucion', 'numero_contrato', 'fecha_contrato', 'fecha_inicio', 'fecha_fin_prevista', 'fecha_cese']),
+            ...$this->fila($vinculo, ['tipo_personal', 'regimen_laboral', 'regimen_normativo_id', 'unidad_organica_id', 'nombre_puesto', 'obligado_djbr', 'exige_colegiatura', 'exige_estudios_basicos', 'tiene_periodo_prueba', 'modalidad_ingreso', 'sustento_ingreso', 'proceso_seleccion_id', 'proceso_seleccion', 'anio_proceso', 'fecha_resultado_seleccion', 'numero_documento_vinculo', 'numero_resolucion', 'fecha_resolucion', 'numero_contrato', 'fecha_contrato', 'fecha_inicio', 'fecha_fin_prevista', 'fecha_cese']),
             'regimen_normativo' => $vinculo->regimenNormativo?->nombre,
+            'codigo_ley' => $vinculo->regimenNormativo?->codigo,
             // Vínculo anterior con el tipo Sin definir: sugerencia para confirmar al corregirlo (no se guarda sola).
             'tipo_sugerido' => RegimenesLaborales::sugerencia($vinculo),
             'registrado_por' => $this->nombre($vinculo->registradoPor),
             'unidad_organica' => $vinculo->unidadOrganica?->nombre,
             'cerrado' => $vinculo->fecha_cese !== null,
             'vigente' => in_array($estado, ['sin_fin', 'vigente', 'por_vencer'], true),
-            'vencimiento' => ['estado' => $estado, 'fin_efectivo' => $fin?->format('Y-m-d'), 'por_adenda' => $vinculo->fecha_cese === null && $adendas->isNotEmpty(), 'dias' => $dias],
+            'vencimiento' => ['estado' => $estado, 'fin_efectivo' => $fin?->format('Y-m-d'), 'por_adenda' => $vinculo->regimen_laboral !== 'plazo_indeterminado' && $vinculo->fecha_cese === null && $adendas->isNotEmpty(), 'dias' => $dias],
             'adendas' => $this->filas($adendas, ['numero', 'motivo', 'fecha_inicio', 'fecha_fin', 'documento_id', 'created_at']),
             'inducciones_faltantes' => array_values(array_diff(['general', 'especifica'], $tiposInduccion)),
             // Datos del puesto según el tipo de personal del vínculo.

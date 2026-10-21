@@ -41,7 +41,7 @@ class VinculoCoherenciaTest extends TestCase
 
     private function vinculo(array $cambios = []): array
     {
-        return ['tipo_personal' => 'administrativo', 'regimen_laboral' => 'plazo_determinado', 'nombre_puesto' => 'Especialista', 'fecha_inicio' => '2025-02-01', ...$cambios];
+        return ['modalidad_ingreso' => 'otro_sustentado', 'sustento_ingreso' => 'Mandato judicial de prueba.', 'numero_contrato' => 'C-001', 'fecha_contrato' => '2025-01-30', 'tipo_personal' => 'administrativo', 'regimen_laboral' => 'plazo_determinado', 'nombre_puesto' => 'Especialista', 'fecha_inicio' => '2025-02-01', ...$cambios];
     }
 
     public function test_a_law_of_another_staff_type_is_rejected_when_registering(): void
@@ -66,7 +66,9 @@ class VinculoCoherenciaTest extends TestCase
         $this->patchJson($this->url($id), ['tipo_personal' => 'docente'])->assertUnprocessable()->assertJsonValidationErrors('regimen_normativo_id');
         $this->assertDatabaseHas('vinculos_laborales', ['id' => $id, 'tipo_personal' => 'administrativo', 'regimen_normativo_id' => $ley->id]);
 
-        $this->patchJson($this->url($id), ['tipo_personal' => 'docente', 'regimen_normativo_id' => $this->ley('docente')->id])->assertOk();
+        $leyDocente = $this->ley('docente')->id;
+        $this->patchJson($this->url($id), ['tipo_personal' => 'docente', 'regimen_normativo_id' => $leyDocente])->assertUnprocessable()->assertJsonValidationErrors('numero_resolucion');
+        $this->patchJson($this->url($id), ['tipo_personal' => 'docente', 'regimen_normativo_id' => $leyDocente, 'numero_resolucion' => 'R-DOC-001', 'fecha_resolucion' => '2025-01-30'])->assertOk();
     }
 
     public function test_an_unchanged_inactive_law_does_not_block_other_corrections(): void

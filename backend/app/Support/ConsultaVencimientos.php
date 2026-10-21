@@ -87,7 +87,7 @@ final class ConsultaVencimientos
         }
         $adenda = DB::table('vinculo_adendas')->select('fecha_fin')->whereColumn('vinculo_laboral_id', 'v.id')->where('anulado', false)
             ->orderByDesc('fecha_inicio')->orderByDesc('created_at')->orderByDesc('id')->limit(1);
-        $vinculos = DB::table('vinculos_laborales as v')->where('v.anulado', false)->whereNull('v.fecha_cese')
+        $vinculos = DB::table('vinculos_laborales as v')->where(fn ($query) => $query->whereNull('v.regimen_laboral')->orWhere('v.regimen_laboral', '!=', 'plazo_indeterminado'))->where('v.anulado', false)->whereNull('v.fecha_cese')
             ->whereDate('v.fecha_inicio', '<=', $hoy->toDateString())
             ->whereExists(fn (Builder $q) => $q->selectRaw('1')->from('legajos as l')->whereColumn('l.usuario_id', 'v.usuario_id')->where('l.estado_legajo', 'activo'))
             ->selectRaw("v.usuario_id, v.id as alerta_id, 'contrato' as origen, COALESCE(({$adenda->toSql()}), v.fecha_fin_prevista) as fecha, v.nombre_puesto as detalle", $adenda->getBindings());

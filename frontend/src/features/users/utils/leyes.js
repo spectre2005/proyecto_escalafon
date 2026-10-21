@@ -6,7 +6,7 @@ export const aliasLey = { CAS: '1057' }
 export const SIN_DEFINIR = 'Sin definir'
 
 export function leyesDelTipo(catalogo, tipoPersonal) {
-  return (catalogo || []).filter(ley => ley.aplica_a === tipoPersonal && ley.activo)
+  return (catalogo || []).filter(ley => ley.aplica_a === tipoPersonal && ley.activo && (tipoPersonal !== 'docente' || !['1057', 'CAS'].includes(String(ley.codigo).toUpperCase())))
 }
 
 /** Código que se escribe en la plantilla (el alias, si lo tiene: 1057 se escribe CAS). */
@@ -38,6 +38,7 @@ export function errorLey(catalogo, user) {
   const ley = leyDelRegistro(catalogo, user)
   const codigos = leyesDelTipo(catalogo, user.tipo_personal).map(codigoVisible)
   if (!ley) return `Indica la ley (régimen normativo)${codigos.length ? `: ${codigos.join(', ')}` : ''}.`
+  if (user.tipo_personal === 'docente' && ['1057', 'CAS'].includes(String(ley.codigo).toUpperCase())) return 'Para el vínculo docente selecciona su régimen docente. Si la misma persona ocupa otro puesto CAS, registra un vínculo administrativo independiente en la sección 02; su compatibilidad debe ser evaluada por la entidad.'
   if (!ley.activo) return `La ley ${ley.nombre} está inactiva en el catálogo.`
   if (ley.aplica_a !== user.tipo_personal) return `La ley ${ley.nombre} corresponde al personal ${ley.aplica_a}, no al ${user.tipo_personal}.`
   return null

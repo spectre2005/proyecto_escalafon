@@ -178,7 +178,7 @@ class DocumentoLegajoApiTest extends TestCase
         // f) sin vínculo previo: se abre el formulario y el vínculo nuevo queda enlazado al documento.
         $f = $this->subir($persona, $this->metadatos($this->tipo02('f'), 4, 4))->assertCreated()->assertJsonPath('data.enlazado', false)
             ->assertJsonPath('data.formulario_datos', 'vinculos_laborales')->json('data.id');
-        $nuevo = $this->postJson($url.'/vinculos-laborales', ['tipo_personal' => 'administrativo', 'regimen_laboral' => 'plazo_determinado', 'regimen_normativo_id' => RegimenNormativo::factory()->create(['aplica_a' => 'administrativo'])->id,
+        $nuevo = $this->postJson($url.'/vinculos-laborales', ['modalidad_ingreso' => 'concurso_publico', 'proceso_seleccion' => 'CONCURSO-001-2026', 'anio_proceso' => 2026, 'numero_contrato' => 'C-001', 'fecha_contrato' => '2025-12-30', 'tipo_personal' => 'administrativo', 'regimen_laboral' => 'plazo_determinado', 'regimen_normativo_id' => RegimenNormativo::factory()->create(['aplica_a' => 'administrativo'])->id,
             'nombre_puesto' => 'Analista', 'fecha_inicio' => today()->toDateString(), 'documento_id' => $f])->assertCreated()->json('data.id');
         $this->assertSame($nuevo, DocumentoUsuario::query()->findOrFail($f)->vinculo_laboral_id);
 
@@ -197,7 +197,7 @@ class DocumentoLegajoApiTest extends TestCase
         $this->subir($persona, $this->metadatos($this->tipo02('h'), 9, 9, ['enlace_id' => $induccion->id]))->assertUnprocessable()->assertJsonValidationErrors('enlace_id');
         $this->postJson($url.'/inducciones', ['vinculo_laboral_id' => $vinculo->id, 'tipo' => 'general', 'fecha' => today()->toDateString(), 'documento_id' => $g])
             ->assertUnprocessable()->assertJsonValidationErrors('documento_id');
-        $this->postJson($url.'/vinculos-laborales', ['tipo_personal' => 'administrativo', 'regimen_laboral' => 'plazo_determinado', 'regimen_normativo_id' => RegimenNormativo::factory()->create(['aplica_a' => 'administrativo'])->id,
+        $this->postJson($url.'/vinculos-laborales', ['modalidad_ingreso' => 'concurso_publico', 'proceso_seleccion' => 'CONCURSO-001-2026', 'anio_proceso' => 2026, 'numero_contrato' => 'C-001', 'fecha_contrato' => '2025-12-30', 'tipo_personal' => 'administrativo', 'regimen_laboral' => 'plazo_determinado', 'regimen_normativo_id' => RegimenNormativo::factory()->create(['aplica_a' => 'administrativo'])->id,
             'nombre_puesto' => 'Otro', 'fecha_inicio' => today()->toDateString(), 'documento_id' => $f])->assertUnprocessable()->assertJsonValidationErrors('documento_id');
     }
 

@@ -175,7 +175,7 @@ final class ConsultaReportes
             'origen_puesto' => $actual ? 'Vínculo laboral' : 'Ficha personal (histórico)',
             'regimen_id' => $actual?->regimen_normativo_id ?? $persona->regimen_normativo_id,
             'ley' => $actual?->regimenNormativo?->codigo ?? $persona->regimenNormativo?->codigo ?? $persona->regimen_laboral ?? 'Sin definir',
-            'tipo_vinculo' => $actual?->regimen_laboral ? (['carrera' => 'Carrera', 'plazo_determinado' => 'Plazo determinado', 'designado' => 'Designado'][$actual->regimen_laboral] ?? $actual->regimen_laboral) : 'Sin definir',
+            'tipo_vinculo' => $actual?->regimen_laboral ? (['carrera' => 'Carrera', 'plazo_determinado' => 'Plazo determinado', 'plazo_indeterminado' => 'Plazo indeterminado', 'designado' => 'Designado'][$actual->regimen_laboral] ?? $actual->regimen_laboral) : 'Sin definir',
             'vinculos' => $vigentes->count()];
     }
 
@@ -382,7 +382,7 @@ final class ConsultaReportes
                         continue;
                     }
                     if ($tipo === 'contratos') {
-                        $fin = $vinculo->vinculoAdendas->first()?->fecha_fin ?? $vinculo->fecha_fin_prevista;
+                        $fin = $vinculo->regimen_laboral === 'plazo_indeterminado' ? null : ($vinculo->vinculoAdendas->first()?->fecha_fin ?? $vinculo->fecha_fin_prevista);
                         $hoy = today('America/Lima');
                         $estado = match (true) {
                             $vinculo->fecha_cese !== null => 'cesado',
