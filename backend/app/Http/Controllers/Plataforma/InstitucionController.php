@@ -7,6 +7,7 @@ use App\Models\Plataforma\AuditoriaPlataforma;
 use App\Models\Plataforma\Institucion;
 use App\Models\Plataforma\Respaldo;
 use App\Rules\Ruc;
+use App\Support\ConsultaRuc;
 use App\Support\Plataforma\Aprovisionamiento;
 use App\Support\Plataforma\AprovisionamientoRechazado;
 use App\Support\Plataforma\AuditoriaOperaciones;
@@ -62,7 +63,8 @@ class InstitucionController extends Controller
         $consulta = Institucion::query()->with('periodos')->orderBy('nombre')->orderBy('id');
         if (! empty($filtros['q'])) {
             $texto = '%'.mb_strtolower(trim($filtros['q'])).'%';
-            $consulta->where(fn ($q) => $q->whereRaw('LOWER(nombre) LIKE ?', [$texto])->orWhereRaw('LOWER(slug) LIKE ?', [$texto]));
+            $consulta->where(fn ($q) => $q->whereRaw('LOWER(nombre) LIKE ?', [$texto])->orWhereRaw('LOWER(slug) LIKE ?', [$texto])
+                ->orWhereRaw('LOWER(razon_social) LIKE ?', [$texto])->orWhere('ruc', 'like', $texto));
         }
         if (! empty($filtros['estado'])) {
             $consulta->where('estado', $filtros['estado']);
@@ -102,12 +104,19 @@ class InstitucionController extends Controller
     /** Se registra sin aprovisionar: base y almacenamiento propuestos a partir del identificador (editables). */
     public function store(Request $request): JsonResponse
     {
-        $this->sinCamposAjenos($request, ['nombre', 'slug', 'base_datos', 'almacenamiento']);
+        $this->sinCamposAjenos($request, ['nombre', 'slug', 'base_datos', 'almacenamiento', 'ruc', 'razon_social']);
         $slug = mb_strtolower(trim((string) $request->input('slug')));
         $request->merge(['slug' => $slug, 'base_datos' => $request->input('base_datos') ?: 'escalafon_'.str_replace('-', '_', $slug),
             'almacenamiento' => $request->input('almacenamiento') ?: 'instituciones/'.$slug]);
-        $data = $request->validate($this->reglas());
-        $institucion = Institucion::query()->create([...$data, 'nombre' => trim($data['nombre']), 'estado' => Institucion::REGISTRADA]);
+        foreach (['ruc', 'razon_social'] as $campo) {
+            if ($request->has($campo)) {
+                $valor = $request->input($campo);
+                $request->merge([$campo => is_string($valor) ? (trim($valor) ?: null) : $valor]);
+            }
+        }
+        $data = $request->validate([...$this->reglas(), ...$this->reglasIdentificacionFiscal()]);
+        $institucion = new Institucion([...$data, 'nombre' => trim($data['nombre']), 'estado' => Institucion::REGISTRADA]);
+        $institucion->forceFill($this->datosSunat($data['ruc'] ?? null))->save();
         AuditoriaOperaciones::registrar('institucion.registrada', $request, Auth::guard('plataforma')->id(), $institucion->id, null, $this->huella($institucion));
 
         return response()->json(['data' => $institucion->refresh()->datos()], 201);
@@ -128,14 +137,16 @@ class InstitucionController extends Controller
         }
         // Datos del cliente: sin espacios sobrantes; vacío = sin dato. El correo, en minúsculas.
         foreach (array_intersect(Institucion::DATOS_CLIENTE, array_keys($request->all())) as $campo) {
-            $valor = trim((string) $request->input($campo));
-            $request->merge([$campo => $valor === '' ? null : ($campo === 'contacto_email' ? mb_strtolower($valor) : $valor)]);
+            $valor = $request->input($campo);
+            if (is_string($valor)) {
+                $valor = trim($valor);
+                $request->merge([$campo => $valor === '' ? null : ($campo === 'contacto_email' ? mb_strtolower($valor) : $valor)]);
+            }
         }
         $data = $request->validate([...array_map(fn (array $reglas): array => ['sometimes', ...$reglas], $this->reglas($registro->id)),
             // Días que sigue funcionando (con aviso) después de vencer su tiempo de uso.
             'dias_gracia' => ['sometimes', 'integer', 'min:0', 'max:90'],
-            'razon_social' => ['sometimes', 'nullable', 'string', 'min:3', 'max:200'],
-            'ruc' => ['sometimes', 'nullable', 'string', new Ruc],
+            ...$this->reglasIdentificacionFiscal(),
             'contacto_nombre' => ['sometimes', 'nullable', 'string', 'min:3', 'max:150'],
             'contacto_email' => ['sometimes', 'nullable', 'email:rfc', 'max:255'],
             'contacto_telefono' => ['sometimes', 'nullable', 'string', 'regex:/^\+?[0-9][0-9 ()-]{5,18}$/'],
@@ -143,7 +154,9 @@ class InstitucionController extends Controller
             'contrato_inicio' => ['sometimes', 'nullable', 'date_format:Y-m-d', 'after_or_equal:2000-01-01', 'before_or_equal:2100-12-31']],
             ['contacto_telefono.regex' => 'El teléfono solo puede tener dígitos, espacios, guiones, paréntesis y un + inicial.']);
         $antes = $this->huella($registro);
-        $registro->update(isset($data['nombre']) ? [...$data, 'nombre' => trim($data['nombre'])] : $data);
+        // Con el RUC que tenía antes de este cambio.
+        $sunat = array_key_exists('ruc', $data) ? $this->datosSunat($data['ruc'], $registro) : [];
+        $registro->fill(isset($data['nombre']) ? [...$data, 'nombre' => trim($data['nombre'])] : $data)->forceFill($sunat)->save();
         AuditoriaOperaciones::registrar('institucion.editada', $request, Auth::guard('plataforma')->id(), $registro->id, $antes, $this->huella($registro));
 
         return response()->json(['data' => $registro->refresh()->datos()]);
@@ -226,6 +239,33 @@ class InstitucionController extends Controller
         ];
     }
 
+    /**
+     * Datos tributarios que se guardan con el RUC, tomados de la consulta que guardó el servidor (ConsultaRuc), nunca
+     * de la petición. RUC nuevo o distinto: los de su consulta, o vacíos si no se consultó (no quedan los del RUC
+     * anterior). Mismo RUC: solo se reemplazan con una consulta más reciente; sin ella se conservan.
+     *
+     * @return array<string, mixed>
+     */
+    private function datosSunat(?string $ruc, ?Institucion $registro = null): array
+    {
+        $consulta = ConsultaRuc::guardada($ruc);
+        if ($registro !== null && $registro->ruc === $ruc
+            && ($consulta === null || ($registro->sunat_consultado_en !== null && $registro->sunat_consultado_en->gte($consulta['consultado_en'])))) {
+            return [];
+        }
+
+        return collect(Institucion::DATOS_SUNAT)->map(fn (string $campo): mixed => $consulta[$campo] ?? null)->all();
+    }
+
+    /** @return array<string, list<mixed>> */
+    private function reglasIdentificacionFiscal(): array
+    {
+        return [
+            'razon_social' => ['sometimes', 'nullable', 'string', 'min:3', 'max:200'],
+            'ruc' => ['sometimes', 'nullable', 'string', new Ruc],
+        ];
+    }
+
     private function sinCamposAjenos(Request $request, array $permitidos): void
     {
         $ajenos = array_diff(array_keys($request->all()), $permitidos);
@@ -239,7 +279,7 @@ class InstitucionController extends Controller
     {
         return [...$institucion->only(['nombre', 'slug', 'estado', 'base_datos', 'almacenamiento', 'motivo_suspension', 'dias_gracia',
             'razon_social', 'ruc', 'contacto_nombre', 'contacto_email', 'contacto_telefono', 'contrato_numero']),
-            'contrato_inicio' => $institucion->contrato_inicio?->toDateString()];
+            'contrato_inicio' => $institucion->contrato_inicio?->toDateString(), 'sunat' => $institucion->datosSunat()];
     }
 
     /** @return array<string, mixed> */

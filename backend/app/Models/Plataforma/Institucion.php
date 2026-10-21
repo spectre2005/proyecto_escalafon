@@ -54,10 +54,18 @@ class Institucion extends Model
     /** Datos del cliente y del contrato, editables en el panel en cualquier estado. */
     public const DATOS_CLIENTE = ['razon_social', 'ruc', 'contacto_nombre', 'contacto_email', 'contacto_telefono', 'contrato_numero', 'contrato_inicio'];
 
+    /**
+     * Datos tributarios del RUC según la última consulta guardada (columna => campo de ConsultaRuc). Fuera de $fillable:
+     * solo los escribe el servidor (forceFill), desde su propia consulta; nunca llegan del navegador.
+     */
+    public const DATOS_SUNAT = ['sunat_tipo_contribuyente' => 'tipo_contribuyente', 'sunat_estado' => 'estado', 'sunat_condicion' => 'condicion',
+        'sunat_direccion' => 'direccion', 'sunat_direccion_completa' => 'direccion_completa', 'sunat_departamento' => 'departamento',
+        'sunat_provincia' => 'provincia', 'sunat_distrito' => 'distrito', 'sunat_ubigeo' => 'ubigeo_sunat', 'sunat_consultado_en' => 'consultado_en'];
+
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['modulos_sistema' => 'array', 'aprovisionada_en' => 'datetime', 'suspendida_en' => 'datetime', 'dias_gracia' => 'integer', 'contrato_inicio' => 'date:Y-m-d'];
+        return ['modulos_sistema' => 'array', 'aprovisionada_en' => 'datetime', 'suspendida_en' => 'datetime', 'dias_gracia' => 'integer', 'contrato_inicio' => 'date:Y-m-d', 'sunat_consultado_en' => 'datetime'];
     }
 
     public function respaldos(): HasMany
@@ -178,12 +186,24 @@ class Institucion extends Model
     }
 
     /** @return array<string, mixed> */
+    /** Datos tributarios guardados, con los nombres de ConsultaRuc; null si nunca se guardó una consulta. */
+    public function datosSunat(): ?array
+    {
+        if ($this->sunat_consultado_en === null) {
+            return null;
+        }
+
+        return [...collect(self::DATOS_SUNAT)->except('sunat_consultado_en')->mapWithKeys(fn (string $campo, string $columna): array => [$campo => $this->{$columna}])->all(),
+            'consultado_en' => $this->sunat_consultado_en->toIso8601String()];
+    }
+
     public function datos(): array
     {
         return [
             ...$this->only(['id', 'nombre', 'slug', 'estado', 'base_datos', 'almacenamiento', 'motivo_suspension',
                 'razon_social', 'ruc', 'contacto_nombre', 'contacto_email', 'contacto_telefono', 'contrato_numero']),
             'contrato_inicio' => $this->contrato_inicio?->toDateString(),
+            'sunat' => $this->datosSunat(),
             'aprovisionada' => $this->aprovisionada(),
             'aprovisionada_en' => $this->aprovisionada_en?->toIso8601String(),
             'suspendida_en' => $this->suspendida_en?->toIso8601String(),

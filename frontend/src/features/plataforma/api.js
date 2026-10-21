@@ -74,6 +74,7 @@ export const sesionTerminada = error => [401, 419].includes(error?.response?.sta
 export const listarSuperadmins = signal => plataforma.get('/superadministradores', { signal }).then(r => r.data.data)
 export const crearSuperadmin = datos => plataforma.post('/superadministradores', datos).then(r => r.data.data)
 export const accionSuperadmin = (id, accion) => plataforma.post(`/superadministradores/${id}/${accion}`).then(r => r.data.data)
+export const consultarRuc = (ruc, signal, actualizar = false) => plataforma.post('/identidad/ruc', { ruc, ...(actualizar && { actualizar: true }) }, { signal }).then(r => r.data.data)
 export const cambiarMiPassword = datos => plataforma.put('/auth/password', datos).then(r => r.data.data)
 // Mi cuenta: datos y actividad propia, nombre y cierre de las demás sesiones.
 export const verMiCuenta = signal => plataforma.get('/auth/cuenta', { signal }).then(r => r.data.data)

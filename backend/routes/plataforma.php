@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\ModuloSistemaController;
 use App\Http\Controllers\Plataforma\AdministradorInstitucionController;
 use App\Http\Controllers\Plataforma\AuthController;
+use App\Http\Controllers\Plataforma\IdentidadRucController;
 use App\Http\Controllers\Plataforma\InstitucionController;
 use App\Http\Controllers\Plataforma\PeriodoServicioController;
 use App\Http\Controllers\Plataforma\SuperadministradorController;
@@ -30,6 +31,8 @@ Route::middleware(ApiHabilitada::class)->group(function (): void {
         Route::get('auth/cuenta', [AuthController::class, 'cuenta']);
         Route::patch('auth/cuenta', [AuthController::class, 'actualizarCuenta']);
         Route::post('auth/cerrar-otras-sesiones', [AuthController::class, 'cerrarOtrasSesiones'])->middleware('throttle:10,1');
+        // Datos tributarios de un RUC (Factiliza), para registrar o editar una institución.
+        Route::post('identidad/ruc', IdentidadRucController::class)->middleware('throttle:20,1');
         // Cuentas de superadministrador: no se borran; se desactivan.
         Route::get('superadministradores', [SuperadministradorController::class, 'index']);
         Route::post('superadministradores', [SuperadministradorController::class, 'store']);
