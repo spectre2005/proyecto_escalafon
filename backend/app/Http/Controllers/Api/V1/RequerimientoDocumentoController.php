@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Models\RequerimientoDocumento;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -49,6 +51,22 @@ class RequerimientoDocumentoController extends ResourceController
                 'origenes' => RequerimientoDocumento::query()->whereNotNull('origen')->distinct()->orderBy('origen')->pluck('origen'),
             ],
         ]);
+    }
+
+    public function update(Request $request, string $record): JsonResource|JsonResponse
+    {
+        abort_if(RequerimientoDocumento::query()->findOrFail($record)->seguimiento !== null, 409,
+            'Gestiona esta solicitud desde Requerimientos para conservar su historial.');
+
+        return parent::update($request, $record);
+    }
+
+    public function destroy(string $record): JsonResponse
+    {
+        abort_if(RequerimientoDocumento::query()->findOrFail($record)->seguimiento !== null, 409,
+            'Las solicitudes con seguimiento se cancelan y conservan su historial.');
+
+        return parent::destroy($record);
     }
 
     protected array $rules = [

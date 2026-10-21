@@ -234,6 +234,25 @@ final class ConsultaReportes
         }
     }
 
+    /** @return Generator<int, array<string, mixed>> */
+    public static function pendientesAutomaticos(Usuario $actor): Generator
+    {
+        foreach (self::filas($actor, 'pendientes', []) as $fila) {
+            if (in_array($fila['estado_codigo'], ['faltante', 'observado'], true)) {
+                yield $fila;
+            }
+        }
+        foreach (self::filas($actor, 'vencimientos', ['dias' => 0]) as $fila) {
+            if ($fila['estado_codigo'] !== 'vencido' || $fila['origen'] !== 'Documento') {
+                continue;
+            }
+            $documento = DocumentoUsuario::query()->find($fila['id']);
+            if ($documento && $documento->tipoDocumento->activo && ConfiguracionFuncionalidades::tipoActivo((string) $documento->tipoDocumento->codigo, $documento->seccion_legajo_id)) {
+                yield [...$fila, 'legajo_id' => $documento->legajo_id, 'tipo_documento_id' => $documento->tipo_documento_id];
+            }
+        }
+    }
+
     private static function pendientes(Usuario $actor, Usuario $persona, array $base, Collection $tipos): Generator
     {
         $perfil = PerfilDocumental::de($persona, $persona->vinculosLaborales);
@@ -279,7 +298,7 @@ final class ConsultaReportes
 
     private static function pendienteTipo(array $base, Legajo $legajo, TipoDocumento $tipo, array $exigencia, Collection $documentos, ?string $familiar = null): Generator
     {
-        $comun = [...$base, 'legajo' => $legajo->numero_legajo, 'seccion' => str_pad((string) $tipo->seccion_legajo_id, 2, '0', STR_PAD_LEFT),
+        $comun = [...$base, 'legajo_id' => $legajo->id, 'tipo_documento_id' => $tipo->id, 'legajo' => $legajo->numero_legajo, 'seccion' => str_pad((string) $tipo->seccion_legajo_id, 2, '0', STR_PAD_LEFT),
             'detalle' => $tipo->nombre.($familiar ? ' · '.$familiar : ''), 'fecha' => null];
         $cargados = $documentos->filter(fn ($d): bool => $d->archivo_id !== null && ! in_array($d->estado, ['anulado', 'falso'], true));
         if ($documentos->isEmpty() || $cargados->isEmpty() && ! $documentos->contains('estado', 'observado') && ! $documentos->contains('estado', 'falso')) {

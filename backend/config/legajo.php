@@ -8,6 +8,8 @@
 */
 
 return [
+    'requerimiento_plazo_dias_calendario' => 7,
+
     'exp_dias_por_mes' => 30,
     'exp_dias_por_anio' => 360,
     'exp_hueco_largo_dias' => 90,

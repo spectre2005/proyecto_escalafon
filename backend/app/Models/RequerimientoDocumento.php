@@ -18,7 +18,13 @@ class RequerimientoDocumento extends Model
 
     protected $table = 'requerimientos_documentos';
 
+    protected $hidden = ['seguimiento'];
+
     protected $fillable = [
+        'clave_automatica',
+        'clase',
+        'seguimiento',
+        'recordado_en',
         'usuario_id',
         'tipo_documento_id',
         'origen',
@@ -37,6 +43,8 @@ class RequerimientoDocumento extends Model
     protected function casts(): array
     {
         return [
+            'seguimiento' => 'array',
+            'recordado_en' => 'datetime',
             'fecha_requerimiento' => 'date',
             'plazo_dias_habiles' => 'integer',
             'fecha_limite' => 'date',

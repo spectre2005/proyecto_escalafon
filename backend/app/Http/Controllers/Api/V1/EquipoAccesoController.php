@@ -17,7 +17,7 @@ use Illuminate\Validation\ValidationException;
 
 class EquipoAccesoController extends Controller
 {
-    private const PERFILES = ['asistente_legajo' => 'Asistente de legajos', 'suplente_legajo' => 'Suplente de administración'];
+    private const PERFILES = ['autoservicio_legajo' => 'Docente / personal: solicitudes de su propio legajo', 'asistente_legajo' => 'Asistente de legajos', 'suplente_legajo' => 'Suplente de administración'];
 
     public function index(): JsonResponse
     {
@@ -35,7 +35,7 @@ class EquipoAccesoController extends Controller
 
     public function personas(Request $request): JsonResponse
     {
-        $data = $request->validate(['q' => 'required|string|min:3|max:100']);
+        $data = $request->validate(['q' => 'required|string|min:1|max:100']);
         $termino = mb_strtolower(trim($data['q']));
         $personas = Usuario::query()->where('activo', true)->whereKeyNot($request->user()->id)
             ->where(function (Builder $query) use ($termino): void {

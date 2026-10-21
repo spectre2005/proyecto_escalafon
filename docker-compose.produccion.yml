@@ -45,6 +45,16 @@ services:
     depends_on:
       - app
 
+  scheduler:
+    image: escalafon-php
+    restart: unless-stopped
+    env_file: .env.produccion
+    command: ["php", "artisan", "schedule:work"]
+    volumes:
+      - storage:/var/www/html/storage
+    depends_on:
+      - app
+
   db:
     image: postgres:16-alpine
     restart: unless-stopped

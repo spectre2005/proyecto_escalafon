@@ -13,7 +13,7 @@ export default function InstitucionesPage() {
   const q = params.get('q') || ''
   const estadoFiltro = params.get('estado') || ''
   const pagina = Number(params.get('page')) || 1
-  const [texto, setTexto] = useState(q)
+  const texto = q
   const [estado, setEstado] = useState({ loading: true })
   const [intento, setIntento] = useState(0)
   useEffect(() => {
@@ -26,11 +26,11 @@ export default function InstitucionesPage() {
     })
     return () => controller.abort()
   }, [q, estadoFiltro, pagina, intento, terminada])
-  function filtrar(cambio) {
+  function filtrar(cambio, reemplazar = false) {
     const { siguiente, igual } = siguienteFiltro(params, cambio)
     setEstado({ loading: true })
     if (igual) setIntento(valor => valor + 1)
-    else setParams(siguiente)
+    else setParams(siguiente, { replace: reemplazar })
   }
   const { data } = estado
   return <section aria-labelledby="titulo-instituciones" aria-busy={Boolean(estado.loading)}>
@@ -39,7 +39,7 @@ export default function InstitucionesPage() {
       <Link to="/plataforma/instituciones/nueva" className={`inline-flex items-center gap-2 ${boton('principal', 'campo')}`}><Icon name="plus" size={16} />Registrar institución</Link>
     </div>
     <form role="search" onSubmit={event => { event.preventDefault(); filtrar({ q: texto.trim(), page: '' }) }} className="mt-6 flex flex-wrap gap-3">
-      <label className="min-w-60 flex-1"><span className="sr-only">Buscar por nombre o identificador</span><input type="search" value={texto} onChange={event => setTexto(event.target.value)} placeholder="Buscar por nombre o identificador" maxLength={150} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" /></label>
+      <label className="min-w-60 flex-1"><span className="sr-only">Buscar por nombre o identificador</span><input type="search" value={texto} onChange={event => filtrar({ q: event.target.value, page: '' }, true)} placeholder="Buscar por nombre o identificador" maxLength={150} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" /></label>
       <label><span className="sr-only">Estado</span><select value={estadoFiltro} onChange={event => filtrar({ estado: event.target.value, page: '' })} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"><option value="">Todos los estados</option>{Object.entries(ESTADOS).map(([clave, { etiqueta }]) => <option key={clave} value={clave}>{etiqueta}</option>)}</select></label>
       <button type="submit" className={`inline-flex items-center gap-2 ${boton('secundario', 'campo')}`}><Icon name="search" size={16} />Buscar</button>
     </form>

@@ -73,6 +73,7 @@ use App\Http\Controllers\Api\V1\SancionController;
 use App\Http\Controllers\Api\V1\SeccionLegajoController;
 use App\Http\Controllers\Api\V1\SolicitudAccesoLegajoController;
 use App\Http\Controllers\Api\V1\SolicitudFiscalizacionController;
+use App\Http\Controllers\Api\V1\SolicitudLegajoController;
 use App\Http\Controllers\Api\V1\SubseccionLegajoController;
 use App\Http\Controllers\Api\V1\TiempoServicioReconocidoController;
 use App\Http\Controllers\Api\V1\TipoDocumentoController;
@@ -100,6 +101,17 @@ Route::prefix('v1/auth')->middleware(ApiHabilitada::class)->group(function (): v
 
 // FuncionalidadActiva: con una funcionalidad desactivada, sus rutas de creación y modificación responden 409.
 Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCambioPassword::class, FuncionalidadActiva::class, LegajoSoloLectura::class])->group(function (): void {
+    Route::prefix('solicitudes-legajo')->middleware('can:solicitudes.propias')->controller(SolicitudLegajoController::class)->group(function (): void {
+        Route::get('/', 'index');
+        Route::get('opciones', 'opciones');
+        Route::get('sugerencias', 'sugerencias');
+        Route::post('/', 'store');
+        Route::post('sincronizar', 'sincronizar')->middleware('throttle:10,1');
+        Route::post('{record}/responder', 'responder')->whereUuid('record');
+        Route::post('{record}/gestionar', 'gestionar')->whereUuid('record');
+        Route::get('{record}/documentos', 'documentos')->whereUuid('record');
+        Route::get('{record}/archivos/{indice}', 'archivo')->whereUuid('record')->whereNumber('indice');
+    });
     Route::get('reportes/opciones', [ReporteController::class, 'opciones']);
     Route::get('reportes/{tipo}', [ReporteController::class, 'show'])->whereIn('tipo', array_keys(ConsultaReportes::catalogo()));
     Route::get('vencimientos', VencimientosController::class)->middleware('can:legajo.ver');

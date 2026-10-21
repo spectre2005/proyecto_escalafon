@@ -1,15 +1,14 @@
-import { useState } from 'react'
 import Icon from '../../../components/ui/Icon'
 
 const control = 'rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-teal-600 disabled:opacity-40'
 
 export default function Seccion07Filtros({ tipo, params, opciones, onChange }) {
-  const [search, setSearch] = useState(params.get('q') || '')
+  const search = params.get('q') || ''
   const anios = opciones?.anios?.[tipo.key] || []
   const unidades = opciones?.unidades || []
   return <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5" aria-label="Filtros de la sección 07">
     <form onSubmit={event => { event.preventDefault(); onChange('q', search.trim()) }} className="flex flex-wrap gap-3">
-      <label className="flex min-w-60 flex-1 items-center gap-2 rounded-xl border border-slate-200 px-3"><Icon name="search" size={18} /><input className="w-full py-3 text-sm outline-none" aria-label="Buscar por nombre o DNI" placeholder="Nombre o DNI" value={search} onChange={event => setSearch(event.target.value)} /></label>
+      <label className="flex min-w-60 flex-1 items-center gap-2 rounded-xl border border-slate-200 px-3"><Icon name="search" size={18} /><input className="w-full py-3 text-sm outline-none" aria-label="Buscar por nombre o DNI" placeholder="Nombre o DNI" value={search} onChange={event => onChange('q', event.target.value)} /></label>
       <select aria-label={tipo.anio} className={control} value={params.get('anio') || ''} onChange={event => onChange('anio', event.target.value)}>
         <option value="">{tipo.anio === 'Ciclo' ? 'Todos los ciclos' : 'Todos los años'}</option>
         {anios.map(anio => <option key={anio} value={anio}>{tipo.anio} {anio}</option>)}

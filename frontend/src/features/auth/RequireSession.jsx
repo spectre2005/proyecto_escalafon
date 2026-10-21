@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import api, { mensajeInstitucion } from '../../axios'
 import AdminLayout from '../../layouts/AdminLayout'
 import CambiarPasswordObligatorio from './CambiarPasswordObligatorio'
 import { SessionContext } from './session'
 
 export default function RequireSession() {
+  const location = useLocation()
   const [session, setSession] = useState({ loading: true })
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
@@ -22,5 +23,6 @@ export default function RequireSession() {
   if (!session.data) return <Navigate to="/login_principal" replace />
   // Contraseña temporal: nada del sistema hasta cambiarla (el backend también lo exige).
   if (session.data.debe_cambiar_password) return <CambiarPasswordObligatorio usuario={session.data.usuario} onCambiada={data => setSession({ data })} />
+  if (location.pathname === '/' && session.data.permisos.includes('solicitudes.propias') && !session.data.permisos.includes('legajo.ver')) return <Navigate to="/requerimientos?clase=actualizacion" replace />
   return <SessionContext.Provider value={session.data}><AdminLayout user={session.data.usuario} avisoServicio={session.data.aviso_servicio} /></SessionContext.Provider>
 }

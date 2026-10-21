@@ -15,6 +15,7 @@ return [
 
     // Catálogo cerrado: un permiso que no esté aquí no existe.
     'catalogo' => [
+        'solicitudes.propias' => 'Presentar y consultar exclusivamente las solicitudes del propio legajo.',
         'personal.ver' => 'Ver la lista del personal.',
         'usuarios.gestionar' => 'Crear, editar y desactivar personal y cuentas.',
         'legajo.ver' => 'Ver el legajo de una persona.',
@@ -57,6 +58,7 @@ return [
     // Código de rol (roles.codigo) => permisos. '*' = todo el catálogo menos
     // los derivados, los pendientes y los explícitos; un explícito se suma nombrándolo junto a '*'.
     'roles' => [
+        'autoservicio_legajo' => ['solicitudes.propias'],
         // El administrador de cada institución (jefe de la ORH) también configura sus funcionalidades
         // (decisión del 17/10/2026). Cada cambio exige motivo y queda auditado.
         'ADMIN' => ['*', 'configuracion.modulos', 'equipo.gestionar'],
@@ -69,6 +71,7 @@ return [
 
         // Perfiles fijos del equipo institucional; se crean al otorgar su primer acceso.
         'asistente_legajo' => [
+            'solicitudes.propias',
             'personal.ver',
             'legajo.ver',
             'legajo.editar',
@@ -77,6 +80,7 @@ return [
             'seccion07.ver',
         ],
         'suplente_legajo' => [
+            'solicitudes.propias',
             'personal.ver', 'legajo.ver', 'legajo.editar', 'legajo.abrir',
             'documento.subir', 'documento.recepcionar', 'documento.revisar',
             'seccion07.ver', 'seccion07.registrar',

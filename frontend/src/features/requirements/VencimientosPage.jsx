@@ -16,6 +16,9 @@ function Campo({ label, children }) {
 
 function Resultados() {
   const [params, setParams] = useSearchParams()
+  const formKey = new URLSearchParams(params)
+  formKey.delete('q')
+  formKey.delete('page')
   const admin = usePuede('sistema.administrar')
   const request = useLiveQuery(`/vencimientos?${params.toString()}`)
   const result = request.data
@@ -36,8 +39,13 @@ function Resultados() {
     <header className="mb-7"><p className="text-xs font-semibold uppercase tracking-widest text-teal-700">Seguimiento del personal</p><h1 className="mt-2 text-3xl font-bold text-slate-800">Vencimientos</h1><p className="mt-3 text-sm text-slate-600">Personas con documentos o contratos próximos a vencer, documentos vencidos o requerimientos documentales atrasados.</p></header>
     <section className={`${panel} mb-6 p-5`} aria-label="Criterios del panel"><p className="text-sm leading-relaxed text-slate-700">Se revisan legajos activos. «Por vencer» incluye hoy y los próximos {result?.dias ?? params.get('dias') ?? 30} días. «Desactualizado» indica documentos vencidos o requerimientos pendientes fuera de plazo; no significa que todo el legajo haya caducado.</p><p className="mt-2 text-xs text-slate-600">Rojo: vencido o menos de 7 días. Amarillo: desde 7 días hasta el límite elegido. Los registros sin fecha no generan alertas.{!admin && ' Los requerimientos administrativos y los documentos sensibles se muestran según tus permisos.'}</p></section>
     {result && <section aria-label="Resumen según los filtros" className="mb-6 grid gap-4 sm:grid-cols-3">{[['Personal con alertas', result.resumen.personas, 'text-slate-800'], ['Desactualizados', result.resumen.desactualizados, 'text-rose-800'], ['Por vencer', result.resumen.por_vencer, 'text-amber-900']].map(([label, count, color]) => <div key={label} className={`${panel} p-5`}><h2 className="text-sm text-slate-600">{label}</h2><p className={`mt-2 text-3xl font-bold ${color}`}>{count}</p></div>)}</section>}
-    <section className={`${panel} mb-6 p-5`} aria-label="Filtros de vencimientos"><form key={params.toString()} onSubmit={filtrar} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      <Campo label="Nombre o documento de identidad"><input name="q" maxLength={120} defaultValue={params.get('q') || ''} className={control} /></Campo>
+    <section className={`${panel} mb-6 p-5`} aria-label="Filtros de vencimientos"><form key={formKey.toString()} onSubmit={filtrar} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <Campo label="Nombre o documento de identidad"><input name="q" maxLength={120} value={params.get('q') || ''} onChange={e => {
+        const next = new URLSearchParams(params)
+        e.target.value ? next.set('q', e.target.value) : next.delete('q')
+        next.delete('page')
+        setParams(next, { replace: true })
+      }} className={control} /></Campo>
       <Campo label="Próximos días (incluye hoy)"><input name="dias" required type="number" min={1} max={365} defaultValue={params.get('dias') || 30} className={control} /></Campo>
       <Campo label="Estado del seguimiento"><select name="estado" defaultValue={params.get('estado') || ''} className={control}><option value="">Todos los estados</option><option value="desactualizado">Desactualizado</option><option value="por_vencer">Por vencer</option></select></Campo>
       <Campo label="Motivo de la alerta"><select name="origen" defaultValue={params.get('origen') || ''} className={control}><option value="">Todos los motivos</option>{Object.entries(fuentes).filter(([key]) => admin || key !== 'requerimiento').map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></Campo>

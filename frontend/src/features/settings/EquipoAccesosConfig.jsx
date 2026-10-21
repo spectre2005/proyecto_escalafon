@@ -20,31 +20,28 @@ function DialogoEquipo({ seleccion, datos, cerrar, completado }) {
   const [busy, setBusy] = useState(false)
   const [buscando, setBuscando] = useState(false)
   const [error, setError] = useState('')
-  const busqueda = useRef(null)
   const accion = seleccion.accion
   const requiereHasta = nuevo ? perfil === 'suplente_legajo' : seleccion.registro.perfil === 'suplente_legajo'
   const nombreAccion = { agregar: 'Agregar integrante', renovar: 'Renovar acceso', revocar: 'Revocar acceso', restablecer: 'Restablecer contraseña' }[accion]
   useEffect(() => {
     ref.current.showModal()
-    return () => busqueda.current?.abort()
   }, [])
 
-  async function buscar() {
-    busqueda.current?.abort()
+  useEffect(() => {
+    if (modo !== 'existente' || !consulta.trim()) return
     const controller = new AbortController()
-    busqueda.current = controller
-    setError('')
-    setBuscando(true)
-    setResultados(null)
-    try {
-      const lista = await buscarPersonasEquipo(consulta.trim(), controller.signal)
-      if (!controller.signal.aborted) setResultados(lista)
-    } catch (failure) {
-      if (!controller.signal.aborted) setError(apiErrorMessage(failure))
-    } finally {
-      if (!controller.signal.aborted) setBuscando(false)
-    }
-  }
+    const timer = setTimeout(() => {
+      setBuscando(true)
+      buscarPersonasEquipo(consulta.trim(), controller.signal).then(lista => {
+        if (!controller.signal.aborted) setResultados(lista)
+      }).catch(failure => {
+        if (!controller.signal.aborted) setError(apiErrorMessage(failure))
+      }).finally(() => {
+        if (!controller.signal.aborted) setBuscando(false)
+      })
+    }, 150)
+    return () => { clearTimeout(timer); controller.abort() }
+  }, [consulta, modo])
 
   async function guardar(event) {
     event.preventDefault()
@@ -87,8 +84,8 @@ function DialogoEquipo({ seleccion, datos, cerrar, completado }) {
         {nuevo && <>
           <label className="grid gap-2 text-sm">Persona<select className={campo} value={modo} onChange={event => { setModo(event.target.value); setPersona(null) }}><option value="existente">Seleccionar persona existente</option><option value="nueva">Registrar una cuenta nueva</option></select></label>
           {modo === 'existente' ? <div className="space-y-3">
-            <label className="grid gap-2 text-sm">Buscar por DNI, nombre o correo<input className={campo} value={consulta} onChange={event => { setConsulta(event.target.value); setPersona(null); setResultados(null) }} maxLength={100} /></label>
-            <button className={boton} type="button" onClick={buscar} disabled={buscando || consulta.trim().length < 3}>{buscando ? 'Buscando…' : 'Buscar persona'}</button>
+            <label className="grid gap-2 text-sm">Buscar por DNI, nombre o correo<input className={campo} value={consulta} onChange={event => { setConsulta(event.target.value); setPersona(null); setResultados(null); setBuscando(false); setError('') }} maxLength={100} /></label>
+            {buscando && <p role="status" className="text-sm text-slate-500">Buscando personas…</p>}
             {resultados?.length === 0 && <p role="status" className="text-sm">No se encontraron personas activas.</p>}
             {resultados && <div className="max-h-48 space-y-2 overflow-auto">{resultados.map(item => <label key={item.id} className="flex items-start gap-3 rounded-xl border border-slate-200 p-3 text-sm"><input type="radio" name="persona" checked={persona?.id === item.id} onChange={() => setPersona(item)} /><span>{item.nombre}<span className="block text-xs text-slate-500">{item.documento} · {item.email}</span></span></label>)}</div>}
             <p className="text-xs text-slate-500">Se conservará su contraseña actual. Las cuentas con otros roles se gestionan por separado.</p>
@@ -144,12 +141,12 @@ export default function EquipoAccesosConfig() {
   }
 
   return <section aria-label="Equipo de trabajo" className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8">
-    <div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="font-semibold text-slate-800">Equipo de trabajo</h2><p className="mt-2 max-w-2xl text-sm text-slate-500">Agrega asistentes o delega tareas a un suplente por un periodo definido. Cada persona ingresa con su propia cuenta.</p></div><button type="button" className={principal} disabled={!datos || !!seleccion} onClick={() => abrir('agregar')}>Agregar integrante</button></div>
+    <div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="font-semibold text-slate-800">Equipo y accesos del personal</h2><p className="mt-2 max-w-2xl text-sm text-slate-500">Otorga acceso a asistentes, suplentes o al autoservicio de solicitudes del propio legajo. Cada persona ingresa con su propia cuenta.</p></div><button type="button" className={principal} disabled={!datos || !!seleccion} onClick={() => abrir('agregar')}>Agregar integrante</button></div>
     {error && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error} <button type="button" onClick={() => setRevision(valor => valor + 1)} className="underline">Reintentar</button></p>}
     {aviso && <p role="status" className="mt-4 rounded-xl bg-teal-50 p-3 text-sm text-teal-800">{aviso}</p>}
     {credenciales && <div className="mt-4 space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm"><p className="font-semibold">Contraseña temporal</p><p>Correo: {credenciales.email}</p><p>Contraseña: <code className="select-all font-mono">{credenciales.password_temporal}</code></p><p>Entrégala a la persona. Deberá cambiarla al ingresar. Al cerrar este aviso no podrás volver a consultarla.</p><button type="button" className={boton} onClick={() => setCredenciales(null)}>Ya la guardé, cerrar</button></div>}
     {!datos && !error && <p role="status" className="mt-4 text-sm text-slate-500">Cargando equipo…</p>}
-    {datos && <ul className="mt-5 divide-y divide-slate-100">{datos.asignaciones.length === 0 && <li className="py-4 text-sm text-slate-500">Todavía no hay asistentes ni suplentes asignados.</li>}{datos.asignaciones.map(registro => <li key={registro.id} className="flex flex-wrap items-start justify-between gap-4 py-5">
+    {datos && <ul className="mt-5 divide-y divide-slate-100">{datos.asignaciones.length === 0 && <li className="py-4 text-sm text-slate-500">Todavía no hay accesos asignados.</li>}{datos.asignaciones.map(registro => <li key={registro.id} className="flex flex-wrap items-start justify-between gap-4 py-5">
       <div><p className="text-sm font-semibold text-slate-800">{registro.persona.nombre} <span className="ml-2 rounded-full bg-slate-100 px-2 py-1 text-xs font-normal">{etiquetas[registro.estado]}</span></p><p className="mt-2 text-xs text-slate-500">{registro.persona.email} · {registro.nombre_perfil}</p><p className="mt-1 text-xs text-slate-500">Desde {registro.vigente_desde} · {registro.vigente_hasta ? `Hasta ${registro.vigente_hasta}` : 'Sin fecha de término'}</p><p className="mt-2 max-w-xl break-words text-xs text-slate-600">{registro.motivo}</p>{registro.debe_cambiar_password && <p className="mt-1 text-xs text-amber-700">Debe cambiar su contraseña al ingresar.</p>}</div>
       {registro.estado !== 'revocado' && registro.estado !== 'inactivo' && <div className="flex flex-wrap gap-2"><button className={boton} type="button" disabled={!!seleccion} onClick={() => abrir('renovar', registro)}>Renovar</button>{registro.estado !== 'vencido' && <button className={boton} type="button" disabled={!!seleccion} onClick={() => abrir('restablecer', registro)}>Restablecer contraseña</button>}<button className={`${boton} text-rose-700`} type="button" disabled={!!seleccion} onClick={() => abrir('revocar', registro)}>Revocar</button></div>}
     </li>)}</ul>}
