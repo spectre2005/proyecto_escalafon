@@ -90,6 +90,7 @@ class UsoInstitucionTest extends TestCase
 
     public function test_counts_and_last_login_come_from_each_institution_database(): void
     {
+        $this->travelTo('2026-10-21 12:00:00');
         $uno = $this->con('uno');
         $ana = $this->persona('40000001', acceso: '2026-10-10 15:00:00', admin: true);
         $beto = $this->persona('40000002', acceso: '2026-10-15 09:30:00');
@@ -104,14 +105,40 @@ class UsoInstitucionTest extends TestCase
         $this->assertSame(['total' => 3, 'con_acceso' => 2], $u['personas']);
         $this->assertSame(['total' => 3, 'activos' => 1, 'pasivos' => 2], $u['legajos'], 'El «cerrado» antiguo cuenta con los pasivos.');
         // El último inicio de sesión de cualquiera (Beto) y el de quien tiene el rol ADMIN (Ana).
-        $this->assertSame(['cualquiera' => '2026-10-15T09:30:00+00:00', 'administrador' => '2026-10-10T15:00:00+00:00'], $u['ultimo_ingreso']);
+        // Además, cuántas cuentas iniciaron sesión en los últimos 30 días (Ana y Beto).
+        $this->assertSame(['cualquiera' => '2026-10-15T09:30:00+00:00', 'administrador' => '2026-10-10T15:00:00+00:00', 'cuentas_recientes' => 2], $u['ultimo_ingreso']);
         $this->assertSame(['correcto', 'correcto'], [$this->estado($u, 'base_datos'), $this->estado($u, 'esquema')]);
 
         // Otra institución, con su propia base: ni sus personas ni su último ingreso se mezclan.
         $d = $this->uso($dos);
         $this->assertSame(['total' => 1, 'con_acceso' => 1], $d['personas']);
         $this->assertSame(['total' => 0, 'activos' => 0, 'pasivos' => 0], $d['legajos']);
-        $this->assertSame(['cualquiera' => null, 'administrador' => null], $d['ultimo_ingreso'], 'Sin inicios de sesión, no se inventa una fecha.');
+        $this->assertSame(['cualquiera' => null, 'administrador' => null, 'cuentas_recientes' => 0], $d['ultimo_ingreso'], 'Sin inicios de sesión, no se inventa una fecha.');
+    }
+
+    public function test_documents_are_counted_in_total_and_by_month_in_the_platform_time_zone(): void
+    {
+        $this->travelTo('2026-10-21 12:00:00');
+        $uno = $this->con('uno');
+        $ana = $this->persona('40000001');
+        $this->legajo($ana, 'activo');
+        $legajo = DB::connection('preparar')->table('legajos')->value('id');
+        // Solo cuenta filas: las claves de tipo y sección no importan aquí.
+        DB::connection('preparar')->statement('PRAGMA foreign_keys = OFF');
+        $documento = fn (string $creado) => DB::connection('preparar')->table('documentos_usuario')->insert(['id' => (string) Str::uuid(), 'usuario_id' => $ana,
+            'legajo_id' => $legajo, 'tipo_documento_id' => (string) Str::uuid(), 'seccion_legajo_id' => 1, 'created_by' => $ana, 'created_at' => $creado, 'updated_at' => $creado]);
+        $documento('2026-10-02 10:00:00');
+        $documento('2026-10-20 10:00:00');
+        $documento('2026-09-15 10:00:00');
+        // 1 de octubre a las 03:00 UTC es aún 30 de setiembre en Lima: cuenta en setiembre.
+        $documento('2026-10-01 03:00:00');
+        $documento('2026-03-10 10:00:00');                                                 // fuera de los últimos 6 meses
+
+        $d = $this->uso($uno)['documentos'];
+        $this->assertSame(5, $d['total']);
+        $this->assertSame(2, $d['este_mes']);
+        $this->assertSame(['2026-05' => 0, '2026-06' => 0, '2026-07' => 0, '2026-08' => 0, '2026-09' => 2, '2026-10' => 2],
+            array_column($d['por_mes'], 'total', 'mes'));
     }
 
     public function test_storage_counts_only_the_institution_files_once_and_skips_links_outside(): void

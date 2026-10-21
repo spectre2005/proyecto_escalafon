@@ -6,7 +6,7 @@ export const PESTANAS = [
   { clave: 'servicio', titulo: 'Servicio y pagos' },
   { clave: 'administradores', titulo: 'Administradores' },
   { clave: 'datos', titulo: 'Datos y contrato' },
-  { clave: 'tecnico', titulo: 'Técnico y respaldos' },
+  { clave: 'tecnico', titulo: 'Uso y respaldos' },
   { clave: 'auditoria', titulo: 'Auditoría' },
 ]
 

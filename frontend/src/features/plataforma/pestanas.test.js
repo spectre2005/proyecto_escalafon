@@ -4,7 +4,7 @@ import { PARAMETRO, PESTANAS, PREDETERMINADA, conSeccion, idPanel, idPestana, pe
 
 test('the five tabs, in order, with the service tab as default', () => {
   assert.deepEqual(PESTANAS.map(p => p.clave), ['servicio', 'administradores', 'datos', 'tecnico', 'auditoria'])
-  assert.deepEqual(PESTANAS.map(p => p.titulo), ['Servicio y pagos', 'Administradores', 'Datos y contrato', 'Técnico y respaldos', 'Auditoría'])
+  assert.deepEqual(PESTANAS.map(p => p.titulo), ['Servicio y pagos', 'Administradores', 'Datos y contrato', 'Uso y respaldos', 'Auditoría'])
   assert.equal(PREDETERMINADA, 'servicio')
   assert.equal(PARAMETRO, 'seccion')
 })
@@ -19,7 +19,7 @@ test('stable and unique ids for each tab and its panel', () => {
   assert.equal(new Set(ids).size, 10)
   assert.equal(idPestana('datos'), 'institucion-pestana-datos')
   assert.equal(idPanel('datos'), 'institucion-panel-datos')
-  assert.equal(tituloPestana('tecnico'), 'Técnico y respaldos')
+  assert.equal(tituloPestana('tecnico'), 'Uso y respaldos')
   assert.equal(tituloPestana('otra'), '')
 })
 

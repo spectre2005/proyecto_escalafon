@@ -16,7 +16,10 @@ use Throwable;
  * - Personas: todas las filas de usuarios, como el inicio institucional y «Personal»; con acceso = activo.
  * - Legajos: por estado_legajo (activo; pasivo, que incluye el «cerrado» antiguo). No se borran.
  * - Último ingreso: usuarios.ultimo_acceso, que solo escribe el inicio de sesión institucional (AuthController::login):
- *   es el último inicio de sesión, no la última actividad. Aparte, el de quien tiene el rol ADMIN.
+ *   es el último inicio de sesión, no la última actividad. Aparte, el de quien tiene el rol ADMIN, y cuántas cuentas
+ *   iniciaron sesión en los últimos DIAS_ACTIVIDAD días.
+ * - Documentos: filas de documentos_usuario (un documento no se borra: se subsana con otro, y ambos cuentan como
+ *   cargas). Por mes de created_at en la zona horaria de la plataforma, los últimos MESES meses (el actual incluido).
  * - Espacio: storage/app/private/{almacenamiento}, donde ConexionInstitucion pone todos sus discos privados. No sigue
  *   enlaces simbólicos (apuntan fuera de la institución: se informan y no se cuentan), no cuenta dos veces un archivo
  *   (dispositivo e inodo) y no lee contenidos. Con más de MAX_ARCHIVOS se detiene y la cifra queda como parcial.
@@ -28,13 +31,17 @@ final class UsoInstitucion
 {
     public const MAX_ARCHIVOS = 200000;
 
+    public const DIAS_ACTIVIDAD = 30;
+
+    public const MESES = 6;
+
     private const CONEXION = 'uso_institucion';
 
     /** @return array<string, mixed> */
     public static function medir(Institucion $institucion): array
     {
         $resultado = ['institucion' => $institucion->only(['id', 'nombre', 'slug', 'estado']), 'medido_en' => now()->toIso8601String(),
-            'personas' => null, 'legajos' => null, 'ultimo_ingreso' => null, 'almacenamiento' => null, 'comprobaciones' => []];
+            'personas' => null, 'legajos' => null, 'documentos' => null, 'ultimo_ingreso' => null, 'almacenamiento' => null, 'comprobaciones' => []];
         if (! $institucion->aprovisionada()) {
             $resultado['comprobaciones'][] = self::comprobacion('instalacion', 'no_disponible', 'Sin aprovisionar: todavía no tiene base de datos ni carpeta.');
 
@@ -77,7 +84,9 @@ final class UsoInstitucion
                     'personas' => ['total' => (int) $personas->total, 'con_acceso' => (int) $personas->con_acceso],
                     'legajos' => ['total' => (int) $estados->sum(), 'activos' => (int) ($estados['activo'] ?? 0),
                         'pasivos' => (int) (($estados['pasivo'] ?? 0) + ($estados['cerrado'] ?? 0))],
-                    'ultimo_ingreso' => ['cualquiera' => self::fecha($db->table('usuarios')->max('ultimo_acceso')), 'administrador' => self::fecha($admin)],
+                    'documentos' => self::documentos($db),
+                    'ultimo_ingreso' => ['cualquiera' => self::fecha($db->table('usuarios')->max('ultimo_acceso')), 'administrador' => self::fecha($admin),
+                        'cuentas_recientes' => $db->table('usuarios')->where('ultimo_acceso', '>=', now()->subDays(self::DIAS_ACTIVIDAD))->count()],
                 ];
                 $comprobaciones = [self::comprobacion('base_datos', 'correcto', 'Responde.')];
             } catch (Throwable) {
@@ -89,6 +98,25 @@ final class UsoInstitucion
         } finally {
             DB::purge(self::CONEXION);
         }
+    }
+
+    /**
+     * Documentos cargados: total y por mes (los últimos MESES, del más antiguo al actual). Un mes es el de la zona horaria
+     * de la plataforma; sus límites se pasan a la de la aplicación, que es la de created_at.
+     */
+    private static function documentos($db): array
+    {
+        $zona = (string) config('plataforma.zona_horaria');
+        $actual = now($zona)->startOfMonth();
+        $porMes = [];
+        for ($atras = self::MESES - 1; $atras >= 0; $atras--) {
+            $inicio = $actual->copy()->subMonthsNoOverflow($atras);
+            $porMes[] = ['mes' => $inicio->format('Y-m'), 'total' => $db->table('documentos_usuario')
+                ->where('created_at', '>=', $inicio->copy()->setTimezone(config('app.timezone')))
+                ->where('created_at', '<', $inicio->copy()->addMonthNoOverflow()->setTimezone(config('app.timezone')))->count()];
+        }
+
+        return ['total' => $db->table('documentos_usuario')->count(), 'este_mes' => end($porMes)['total'], 'por_mes' => $porMes];
     }
 
     /** Migraciones del código que la base aún no tiene (tabla migrations frente a database/migrations). */
