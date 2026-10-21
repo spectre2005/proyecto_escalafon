@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Plataforma\AuditoriaPlataforma;
 use App\Models\Plataforma\Institucion;
-use Database\Seeders\AdministradorSeeder;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Connection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Tests\Concerns\UsaPlataforma;
+use Tests\Fixtures\AdministradorPruebaSeeder as AdministradorSeeder;
 use Tests\TestCase;
 
 /**
@@ -36,7 +37,7 @@ class AdministradoresInstitucionTest extends TestCase
     {
         parent::setUp();
         $this->base = tempnam(sys_get_temp_dir(), 'inst_');
-        config(['auth.administrador_inicial' => ['email' => self::ADMIN, 'password' => 'Clave-inicial-1'],
+        config(['pruebas.administrador' => ['email' => self::ADMIN, 'password' => 'Clave-inicial-1'],
             'database.connections.institucion_prueba' => ['driver' => 'sqlite', 'database' => $this->base, 'prefix' => '', 'foreign_key_constraints' => true]]);
         $this->artisan('migrate', ['--database' => 'institucion_prueba', '--force' => true])->assertSuccessful();
         $this->artisan('db:seed', ['--class' => AdministradorSeeder::class, '--database' => 'institucion_prueba', '--force' => true])->assertSuccessful();
@@ -89,7 +90,7 @@ class AdministradoresInstitucionTest extends TestCase
         $lista = $this->getJson($this->url())->assertOk()->json('data');
 
         $this->assertSame([self::ADMIN], array_column($lista, 'email_institucional'));
-        $this->assertSame(['id', 'nombres', 'apellido_paterno', 'email_institucional', 'activo', 'debe_cambiar_password', 'ultimo_acceso'], array_keys($lista[0]));
+        $this->assertSame(['password_temporal_vence_en', 'password_temporal_vencida', 'id', 'nombres', 'apellido_paterno', 'apellido_materno', 'email_institucional', 'dni', 'activo', 'debe_cambiar_password', 'ultimo_acceso'], array_keys($lista[0]));
     }
 
     public function test_a_new_administrator_gets_a_temporary_password_that_is_not_audited(): void
@@ -120,6 +121,36 @@ class AdministradoresInstitucionTest extends TestCase
         $this->assertSame(1, AuditoriaPlataforma::query()->where('accion', 'administrador_institucion.clave_restablecida')->count());
         // Una persona sin rol de administración no se gestiona desde el panel.
         $this->postJson($this->url("/{$this->persona}/restablecer"))->assertNotFound();
+    }
+
+    public function test_dni_and_both_surnames_are_saved_without_duplicating_or_promoting_existing_people(): void
+    {
+        $datos = ['dni' => '01234567', 'nombres' => 'Ana María', 'apellido_paterno' => 'Quispe', 'apellido_materno' => 'Flores', 'email' => 'ana@uno.test'];
+        $this->agregar($datos)->assertCreated();
+        $fila = $this->enBase()->table('usuarios')->where('numero_doc_identidad', '01234567')->sole();
+        $this->assertSame('dni', $fila->tipo_doc_identidad);
+        $this->assertSame('Flores', $fila->apellido_materno);
+
+        $this->postJson($this->url(), [...$datos, 'email' => 'otra@uno.test'])->assertUnprocessable()->assertJsonValidationErrors('dni');
+        $this->postJson($this->url(), [...$datos, 'dni' => '45678912', 'email' => 'nueva@uno.test'])->assertUnprocessable()->assertJsonValidationErrors('dni');
+        $this->assertSame(1, $this->enBase()->table('usuarios')->where('numero_doc_identidad', '45678912')->count());
+        $this->assertSame(0, $this->enBase()->table('usuario_roles')->where('usuario_id', $this->persona)->count());
+    }
+
+    public function test_an_expired_administrator_remains_listed_and_can_receive_a_new_deadline(): void
+    {
+        $id = $this->getJson($this->url())->assertOk()->json('data.0.id');
+        $this->enBase()->table('usuarios')->where('id', $id)->update([
+            'debe_cambiar_password' => true, 'password_temporal_vence_en' => now()->subMinute(),
+        ]);
+        $this->getJson($this->url())->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.password_temporal_vencida', true);
+        $this->postJson($this->url("/{$id}/restablecer"), ['vigencia_horas' => 2])->assertUnprocessable();
+        $respuesta = $this->postJson($this->url("/{$id}/restablecer"), ['vigencia_horas' => 72])
+            ->assertOk()->assertJsonPath('data.password_temporal_vencida', false);
+        $this->assertSame(now()->addHours(72)->toIso8601String(), $respuesta->json('data.password_temporal_vence_en'));
+        $fechaElegida = now('America/Lima')->addDays(2)->endOfDay()->format('Y-m-d\TH:i:sP');
+        $calendario = $this->postJson($this->url("/{$id}/restablecer"), ['vence_en' => $fechaElegida])->assertOk();
+        $this->assertSame(CarbonImmutable::parse($fechaElegida)->utc()->toIso8601String(), $calendario->json('data.password_temporal_vence_en'));
     }
 
     public function test_the_institution_never_runs_out_of_active_administrators(): void

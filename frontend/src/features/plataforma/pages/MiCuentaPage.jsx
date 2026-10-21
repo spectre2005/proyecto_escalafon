@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { cambiarMiPassword, mensajeError, sesionTerminada } from '../api'
-import { Aviso } from '../componentes'
+import { Aviso, LimitePassword } from '../componentes'
 import { ENTRADA, TARJETA, boton } from '../estilos'
 import { useSesionPlataforma } from '../sesion'
 import { Campo } from '../ui'
@@ -11,7 +11,7 @@ const vacio = { password_actual: '', password: '', password_confirmation: '' }
  * (obligatorio). El backend valida las reglas; esta sesión sigue abierta y las demás de la cuenta se cierran.
  */
 export default function MiCuentaPage({ obligatorio = false }) {
-  const { administrador, terminada, actualizar } = useSesionPlataforma()
+  const { administrador, terminada, actualizar, passwordTemporalVenceEn } = useSesionPlataforma()
   const [datos, setDatos] = useState(vacio)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -42,6 +42,7 @@ export default function MiCuentaPage({ obligatorio = false }) {
     <h1 id="titulo-cuenta" className="text-2xl font-bold text-slate-900">Mi cuenta</h1>
     <p className="mt-1 text-sm text-slate-500">{administrador.nombre} · {administrador.email}</p>
     {obligatorio && <div className="mt-5"><Aviso tipo="info">Tu contraseña es temporal. Cámbiala para usar el panel.</Aviso></div>}
+    {obligatorio && <LimitePassword cuenta={{ debe_cambiar_password: true, password_temporal_vence_en: passwordTemporalVenceEn }} />}
     <form onSubmit={enviar} aria-busy={busy} className={`${TARJETA} mt-6 max-w-lg space-y-4`}>
       <h2 className="font-semibold text-slate-800">Cambiar contraseña</h2>
       <Aviso>{error}</Aviso>

@@ -3,8 +3,10 @@
 namespace App\Http\Middleware;
 
 use App\Models\Usuario;
+use App\Support\PasswordTemporal;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -17,6 +19,15 @@ class ExigeCambioPassword
     public function handle(Request $request, Closure $next): Response
     {
         $usuario = $request->user();
+        if ($usuario instanceof Usuario && PasswordTemporal::vencida($usuario)) {
+            Auth::guard('web')->logout();
+            if ($request->hasSession()) {
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+            }
+
+            return response()->json(['message' => PasswordTemporal::MENSAJE, 'codigo' => 'password_temporal_vencida'], 401);
+        }
         if ($usuario instanceof Usuario && $usuario->debe_cambiar_password) {
             return response()->json(['message' => 'Debes cambiar tu contraseña temporal antes de continuar.', 'codigo' => 'cambio_password_requerido'], 403);
         }

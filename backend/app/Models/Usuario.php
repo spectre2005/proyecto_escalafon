@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\PasswordTemporal;
 use Database\Factories\UsuarioFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -17,6 +18,11 @@ class Usuario extends Authenticatable
 {
     // Solo para Sanctum en modo SPA (cookie). No hay tabla de tokens: no usar createToken().
     use HasApiTokens;
+
+    protected static function booted(): void
+    {
+        static::saving(fn (self $cuenta) => PasswordTemporal::preparar($cuenta));
+    }
 
     /** @use HasFactory<UsuarioFactory> */
     use HasFactory;
@@ -65,7 +71,7 @@ class Usuario extends Authenticatable
     {
         return [
             'fecha_nacimiento' => 'date',
-            'password' => 'hashed',
+            'password_temporal_vence_en' => 'immutable_datetime', 'password' => 'hashed',
             'obligado_djbr' => 'boolean',
             'exige_colegiatura' => 'boolean',
             'exige_estudios_basicos' => 'boolean',
@@ -110,7 +116,7 @@ class Usuario extends Authenticatable
         if ($this->permisosCalculados !== null) {
             return $this->permisosCalculados;
         }
-        if (! $this->activo) {
+        if (! $this->activo || PasswordTemporal::vencida($this)) {
             return $this->permisosCalculados = [];
         }
         $catalogo = array_keys(config('permisos.catalogo'));

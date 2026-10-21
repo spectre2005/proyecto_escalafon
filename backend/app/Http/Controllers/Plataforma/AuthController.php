@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Plataforma;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\SesionPlataformaValida;
 use App\Models\Plataforma\AdministradorPlataforma;
+use App\Support\PasswordTemporal;
 use App\Support\Plataforma\AuditoriaOperaciones;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -44,6 +45,11 @@ class AuthController extends Controller
             RateLimiter::hit($clave, self::BLOQUEO_SEGUNDOS);
             throw ValidationException::withMessages(['email' => 'Correo o contraseña incorrectos.']);
         }
+        if (PasswordTemporal::vencida(Auth::guard('plataforma')->user())) {
+            Auth::guard('plataforma')->logout();
+            RateLimiter::hit($clave, self::BLOQUEO_SEGUNDOS);
+            throw ValidationException::withMessages(['email' => PasswordTemporal::MENSAJE]);
+        }
         RateLimiter::clear($clave);
         $request->session()->regenerate();
         /** @var AdministradorPlataforma $administrador */
@@ -73,6 +79,10 @@ class AuthController extends Controller
      */
     public function cambiarPassword(Request $request): JsonResponse
     {
+        if (PasswordTemporal::vencida(Auth::guard('plataforma')->user())) {
+            $this->cerrar($request);
+            abort(401, PasswordTemporal::MENSAJE);
+        }
         $data = $request->validate([
             'password_actual' => 'required|string|max:255',
             'password' => [...AdministradorPlataforma::reglasPassword(), 'confirmed'],
@@ -104,7 +114,7 @@ class AuthController extends Controller
     private function sesion(AdministradorPlataforma $administrador): JsonResponse
     {
         return response()->json(['data' => ['administrador' => $administrador->only(['id', 'nombre', 'email']),
-            'debe_cambiar_password' => (bool) $administrador->debe_cambiar_password]]);
+            ...PasswordTemporal::datos($administrador), 'debe_cambiar_password' => (bool) $administrador->debe_cambiar_password]]);
     }
 
     private function cerrar(Request $request): void

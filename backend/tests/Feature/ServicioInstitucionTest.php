@@ -4,12 +4,12 @@ namespace Tests\Feature;
 
 use App\Models\Plataforma\AuditoriaPlataforma;
 use App\Models\Plataforma\Institucion;
-use Database\Seeders\AdministradorSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Tests\Concerns\UsaPlataforma;
+use Tests\Fixtures\AdministradorPruebaSeeder as AdministradorSeeder;
 use Tests\TestCase;
 
 /**
@@ -121,7 +121,7 @@ class ServicioInstitucionTest extends TestCase
     {
         $this->temporales[] = $base = tempnam(sys_get_temp_dir(), 'inst_');
         config(['plataforma.modo' => 'subdominio', 'sanctum.stateful' => ['*.localhost:5173'],
-            'auth.administrador_inicial' => ['email' => self::ADMIN, 'password' => self::CLAVE],
+            'pruebas.administrador' => ['email' => self::ADMIN, 'password' => self::CLAVE],
             'database.connections.preparar' => ['driver' => 'sqlite', 'database' => $base, 'prefix' => '', 'foreign_key_constraints' => true]]);
         $this->artisan('migrate', ['--database' => 'preparar', '--force' => true])->assertSuccessful();
         $this->artisan('db:seed', ['--class' => AdministradorSeeder::class, '--database' => 'preparar', '--force' => true])->assertSuccessful();

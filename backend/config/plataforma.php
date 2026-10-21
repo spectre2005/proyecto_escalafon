@@ -27,11 +27,7 @@ return [
     'zona_horaria' => env('PLATAFORMA_ZONA_HORARIA', 'America/Lima'),
     'aviso_vencimiento_dias' => (int) env('PLATAFORMA_AVISO_VENCIMIENTO_DIAS', 15),
 
-    /* Cuenta e institución principal de prueba (SuperadministradorSeeder e InstitucionesPruebaSeeder, solo local/testing). */
-    'administrador_prueba' => [
-        'email' => env('PLATAFORMA_ADMIN_EMAIL'),
-        'password' => env('PLATAFORMA_ADMIN_PASSWORD'),
-    ],
+    /* Identidad de la institución local de demostración; no contiene cuentas de acceso. */
     'institucion_prueba' => [
         'slug' => env('PLATAFORMA_PRUEBA_SLUG'),
         'nombre' => env('PLATAFORMA_PRUEBA_NOMBRE'),

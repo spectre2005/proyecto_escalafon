@@ -4,13 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\Plataforma\Institucion;
 use App\Support\Plataforma\ConexionInstitucion;
-use Database\Seeders\AdministradorSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 use Tests\Concerns\UsaPlataforma;
+use Tests\Fixtures\AdministradorPruebaSeeder as AdministradorSeeder;
 use Tests\TestCase;
 
 /**
@@ -37,7 +37,7 @@ class ResolverInstitucionTest extends TestCase
         parent::setUp();
         $this->guardInicial = (string) config('auth.defaults.guard');
         config(['plataforma.modo' => 'subdominio', 'plataforma.dominio' => 'localhost', 'sanctum.stateful' => ['*.localhost:5173'],
-            'auth.administrador_inicial' => ['email' => self::EMAIL, 'password' => self::CLAVE]]);
+            'pruebas.administrador' => ['email' => self::EMAIL, 'password' => self::CLAVE]]);
     }
 
     protected function tearDown(): void

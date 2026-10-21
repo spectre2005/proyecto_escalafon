@@ -12,8 +12,7 @@ use Tests\Concerns\UsaPlataforma;
 use Tests\TestCase;
 
 /**
- * Superadministrador e instituciones de prueba: iguales en todos los equipos, nunca en producción. Las instituciones
- * adicionales se aprovisionan en PostgreSQL y aquí (SQLite) se omiten; se prueba la principal.
+ * Los seeders de compatibilidad no gestionan cuentas. La identidad institucional local se conserva sin duplicados.
  */
 class CuentasPruebaSeederTest extends TestCase
 {
@@ -31,13 +30,16 @@ class CuentasPruebaSeederTest extends TestCase
             'plataforma.institucion_prueba' => ['slug' => 'principal', 'nombre' => 'Universidad Principal de Prueba']]);
     }
 
-    public function test_creates_the_account_once_and_it_can_log_in(): void
+    public function test_seeding_never_creates_or_changes_a_superadministrator(): void
     {
         $this->seed(SuperadministradorSeeder::class);
+        $this->assertSame(0, AdministradorPlataforma::query()->count());
+        $cuenta = AdministradorPlataforma::query()->create(['nombre' => 'Cuenta existente', 'email' => self::EMAIL,
+            'password' => 'Clave-personal-2026', 'activo' => true]);
+        $hash = $cuenta->password;
         $this->seed(SuperadministradorSeeder::class);
-
-        $this->assertSame(1, AdministradorPlataforma::query()->where('email', self::EMAIL)->count());
-        $this->postJson('/api/plataforma/auth/login', ['email' => self::EMAIL, 'password' => self::CLAVE])->assertOk();
+        $this->assertSame($hash, $cuenta->fresh()->password);
+        $this->postJson('/api/plataforma/auth/login', ['email' => self::EMAIL, 'password' => 'Clave-personal-2026'])->assertOk();
     }
 
     public function test_does_nothing_without_credentials(): void

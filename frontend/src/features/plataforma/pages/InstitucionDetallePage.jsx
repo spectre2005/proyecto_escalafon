@@ -1,8 +1,9 @@
+import { limiteInicial } from '../plazoPassword'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import ModulosSistemaConfig from '../../settings/ModulosSistemaConfig'
 import { consultarModulosInstitucion, guardarModuloInstitucion, activarInstitucion, aprovisionarInstitucion, mensajeError, sesionTerminada, suspenderInstitucion, verInstitucion } from '../api'
-import { Aviso, Credenciales, EstadoInstitucion, EstadoServicio, SinAprovisionar } from '../componentes'
+import { Aviso, Credenciales, EstadoInstitucion, EstadoServicio, SinAprovisionar, PlazoPassword } from '../componentes'
 import AdministradoresInstitucion from './AdministradoresInstitucion'
 import AuditoriaInstitucion from './AuditoriaInstitucion'
 import ServicioInstitucion from './ServicioInstitucion'
@@ -18,6 +19,8 @@ import { useSesionPlataforma } from '../sesion'
 import { Campo, Dialogo, PanelPestana, Pestanas } from '../ui'
 import { useEdicionIdentificacion } from '../useEdicionIdentificacion'
 import { useUso } from '../useUso'
+import CampoDni from '../CampoDni'
+import { useIdentidadDni } from '../useIdentidadDni'
 
 /** Confirmación de suspender o activar. Suspender exige motivo; los datos y archivos de la institución se conservan. */
 function ConfirmarEstado({ accion, institucion, onConfirmar, onCerrar }) {
@@ -51,12 +54,13 @@ function ConfirmarEstado({ accion, institucion, onConfirmar, onCerrar }) {
  * segundos; mientras tanto no se puede cerrar. Un 500 trae un mensaje propio (se retiró lo creado).
  */
 function Aprovisionar({ institucion, onAprovisionada, onSesionTerminada, onCerrar }) {
-  const [datos, setDatos] = useState({ nombres: '', apellido_paterno: '', email: '' })
+  const [datos, setDatos] = useState({ dni: '', nombres: '', apellido_paterno: '', apellido_materno: '', email: '', vence_en: limiteInicial() })
+  const consulta = useIdentidadDni(datos.dni, setDatos)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   async function confirmar(event) {
     event.preventDefault()
-    if (busy) return
+    if (busy || consulta.consultando) return
     setBusy(true)
     setError('')
     try {
@@ -67,14 +71,17 @@ function Aprovisionar({ institucion, onAprovisionada, onSesionTerminada, onCerra
       if (sesionTerminada(failure)) onSesionTerminada()
     }
   }
-  const campo = (nombre, etiqueta, props = {}) => <Campo etiqueta={etiqueta}><input value={datos[nombre]} onChange={event => setDatos({ ...datos, [nombre]: event.target.value })} disabled={busy} required className={ENTRADA} {...props} /></Campo>
+  const campo = (nombre, etiqueta, props = {}) => <Campo etiqueta={etiqueta}><input value={datos[nombre]} onChange={event => setDatos({ ...datos, [nombre]: event.target.value })} disabled={busy || (consulta.consultando && nombre !== 'email')} required className={ENTRADA} {...props} /></Campo>
   return <Dialogo titulo={`Aprovisionar «${institucion.nombre}»`} onCerrar={onCerrar} onEnviar={confirmar} busy={busy} bloquearCierre
-    textoBoton="Aprovisionar" textoOcupado="Creando base y catálogos…">
+    textoBoton="Aprovisionar" textoOcupado="Creando base y catálogos…" bloquearEnvio={consulta.consultando}>
     <p className="text-sm text-slate-600">Se crea la base <strong>{institucion.base_datos}</strong> con los catálogos (sin datos de ejemplo), la carpeta <strong>{institucion.almacenamiento}</strong> y su primer administrador. La institución no se activa todavía.</p>
     <Aviso>{error}</Aviso>
-    {campo('nombres', 'Nombres del primer administrador *', { minLength: 2, maxLength: 100, autoComplete: 'off' })}
-    {campo('apellido_paterno', 'Apellido paterno *', { minLength: 2, maxLength: 100, autoComplete: 'off' })}
+    <CampoDni value={datos.dni} consulta={consulta} disabled={busy} />
+    {campo('nombres', 'Nombres del primer administrador *', { minLength: 2, maxLength: 120, autoComplete: 'off' })}
+    {campo('apellido_paterno', 'Apellido paterno *', { minLength: 2, maxLength: 80, autoComplete: 'off' })}
+    {campo('apellido_materno', 'Apellido materno', { required: false, maxLength: 80, autoComplete: 'off' })}
     {campo('email', 'Correo de acceso *', { type: 'email', maxLength: 255, autoComplete: 'off' })}
+    <PlazoPassword value={datos.vence_en} onChange={valor => setDatos({ ...datos, vence_en: valor })} disabled={busy} />
   </Dialogo>
 }
 

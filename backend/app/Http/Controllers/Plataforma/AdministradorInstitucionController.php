@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Plataforma;
 use App\Http\Controllers\Controller;
 use App\Models\Plataforma\Institucion;
 use App\Models\Usuario;
+use App\Support\PasswordTemporal;
 use App\Support\Plataforma\AdministradoresInstitucion;
 use App\Support\Plataforma\AuditoriaOperaciones;
 use Illuminate\Database\QueryException;
@@ -30,7 +31,10 @@ class AdministradorInstitucionController extends Controller
     public function store(Request $request, string $institucion): JsonResponse
     {
         $datos = $this->validar($request, [
-            'nombres' => 'required|string|min:2|max:100', 'apellido_paterno' => 'required|string|min:2|max:100', 'email' => 'required|email|max:255',
+            ...PasswordTemporal::reglasPlazo(),
+            'dni' => ['nullable', 'string', 'regex:/\A[0-9]{8}\z/'],
+            'apellido_materno' => 'nullable|string|max:80',
+            'nombres' => 'required|string|min:2|max:120', 'apellido_paterno' => 'required|string|min:2|max:80', 'email' => 'required|email|max:255',
         ]);
         $registro = $this->institucion($institucion);
         [$admin, $clave] = $this->enBase($registro, fn (): array => AdministradoresInstitucion::crear($datos));
@@ -41,9 +45,9 @@ class AdministradorInstitucionController extends Controller
 
     public function restablecer(Request $request, string $institucion, string $administrador): JsonResponse
     {
-        $this->validar($request, []);
+        $datos = $this->validar($request, PasswordTemporal::reglasPlazo());
         $registro = $this->institucion($institucion);
-        [$admin, $clave] = $this->enBase($registro, fn (): array => AdministradoresInstitucion::restablecer($administrador));
+        [$admin, $clave] = $this->enBase($registro, fn (): array => AdministradoresInstitucion::restablecer($administrador, 48, PasswordTemporal::limite($datos)));
         $this->auditar('administrador_institucion.clave_restablecida', $request, $registro, $admin);
 
         return $this->conClave($admin, $clave);
@@ -102,7 +106,7 @@ class AdministradorInstitucionController extends Controller
     private function auditar(string $accion, Request $request, Institucion $institucion, Usuario $admin): void
     {
         AuditoriaOperaciones::registrar($accion, $request, Auth::guard('plataforma')->id(), $institucion->id, null,
-            ['usuario_id' => $admin->id, 'email' => $admin->email_institucional]);
+            ['usuario_id' => $admin->id, 'email' => $admin->email_institucional, ...PasswordTemporal::datos($admin)]);
     }
 
     private function conClave(Usuario $admin, string $clave, int $estado = 200): JsonResponse

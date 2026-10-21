@@ -7,6 +7,7 @@ use App\Models\Plataforma\AuditoriaPlataforma;
 use App\Models\Plataforma\Institucion;
 use App\Models\Plataforma\Respaldo;
 use App\Rules\Ruc;
+use App\Support\PasswordTemporal;
 use App\Support\Plataforma\Aprovisionamiento;
 use App\Support\Plataforma\AprovisionamientoRechazado;
 use App\Support\Plataforma\AuditoriaOperaciones;
@@ -165,10 +166,14 @@ class InstitucionController extends Controller
      */
     public function aprovisionar(Request $request, string $institucion): JsonResponse
     {
-        $this->sinCamposAjenos($request, ['nombres', 'apellido_paterno', 'email']);
+        $this->sinCamposAjenos($request, ['dni', 'nombres', 'apellido_paterno', 'apellido_materno', 'email', 'vigencia_horas', 'vence_en']);
         $administrador = $request->validate([
-            'nombres' => 'required|string|min:2|max:100', 'apellido_paterno' => 'required|string|min:2|max:100', 'email' => 'required|email|max:255',
+            ...PasswordTemporal::reglasPlazo(),
+            'dni' => ['nullable', 'string', 'regex:/\A[0-9]{8}\z/'],
+            'apellido_materno' => 'nullable|string|max:80',
+            'nombres' => 'required|string|min:2|max:120', 'apellido_paterno' => 'required|string|min:2|max:80', 'email' => 'required|email|max:255',
         ]);
+        $administrador['password_temporal_vence_en'] = PasswordTemporal::limite($administrador);
         $registro = Institucion::query()->findOrFail($institucion);
         // Migrar y cargar catálogos toma unos segundos.
         set_time_limit(300);
@@ -182,7 +187,7 @@ class InstitucionController extends Controller
         }
 
         return response()->json(['data' => [...$registro->refresh()->datos(),
-            'administrador_inicial' => ['email' => mb_strtolower(trim($administrador['email'])), 'clave_temporal' => $clave]]])
+            'administrador_inicial' => ['email' => mb_strtolower(trim($administrador['email'])), 'clave_temporal' => $clave, 'password_temporal_vence_en' => $administrador['password_temporal_vence_en']->toIso8601String()]]])
             ->header('Cache-Control', 'no-store');
     }
 

@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\V1\FeriadoController;
 use App\Http\Controllers\Api\V1\FormacionAcademicaController;
 use App\Http\Controllers\Api\V1\GoceVacacionalController;
 use App\Http\Controllers\Api\V1\HistorialEstadoDocumentoController;
+use App\Http\Controllers\Api\V1\IdentidadDniController;
 use App\Http\Controllers\Api\V1\InduccionController;
 use App\Http\Controllers\Api\V1\InstitutionSettingsController;
 use App\Http\Controllers\Api\V1\LegajoController;
@@ -171,6 +172,7 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
         ->middleware(['can:legajo.ver', 'can:datos_sensibles.ver'])->whereUuid(['usuario', 'certificado']);
 
     Route::middleware(['can:legajo.editar', 'can:datos_sensibles.ver'])->group(function (): void {
+        Route::post('expedientes/{usuario}/consulta-dni', [IdentidadDniController::class, 'paraEdicion'])->whereUuid('usuario')->middleware('throttle:20,1');
         Route::patch('expedientes/{usuario}', [ExpedienteController::class, 'update'])->whereUuid('usuario');
         Route::post('expedientes/{usuario}/familiares', [FamiliarPersonalController::class, 'storeForPerson'])->whereUuid('usuario');
         Route::patch('expedientes/{usuario}/familiares/{familiar}', [FamiliarPersonalController::class, 'updateForPerson'])->whereUuid(['usuario', 'familiar']);
@@ -288,6 +290,7 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
     });
 
     Route::middleware('can:usuarios.gestionar')->group(function (): void {
+        Route::post('usuarios/consulta-dni', IdentidadDniController::class)->middleware('throttle:20,1');
         Route::post('usuarios', [UsuarioController::class, 'store'])->name('api.v1.usuarios.store');
         // Registro manual: persona con su primer vínculo (además exige legajo.abrir y legajo.editar, en el controlador).
         Route::post('usuarios/con-vinculo', [UsuarioController::class, 'storeConVinculo'])->name('api.v1.usuarios.store-con-vinculo');

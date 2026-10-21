@@ -21,6 +21,6 @@ export default function RequireSession() {
   if (session.error) return <div role="alert" className="p-8">No se pudo comprobar la sesión. <button onClick={() => { setSession({ loading: true }); setAttempt(attempt + 1) }}>Reintentar</button></div>
   if (!session.data) return <Navigate to="/login_principal" replace />
   // Contraseña temporal: nada del sistema hasta cambiarla (el backend también lo exige).
-  if (session.data.debe_cambiar_password) return <CambiarPasswordObligatorio usuario={session.data.usuario} onCambiada={data => setSession({ data })} />
+  if (session.data.debe_cambiar_password) return <CambiarPasswordObligatorio venceEn={session.data.password_temporal_vence_en} usuario={session.data.usuario} onCambiada={data => setSession({ data })} />
   return <SessionContext.Provider value={session.data}><AdminLayout user={session.data.usuario} avisoServicio={session.data.aviso_servicio} /></SessionContext.Provider>
 }

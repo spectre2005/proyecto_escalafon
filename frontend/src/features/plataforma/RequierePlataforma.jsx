@@ -68,7 +68,7 @@ export default function RequierePlataforma() {
   const { administrador, debe_cambiar_password: obligatorio } = sesion.data
   // actualizar: vuelve a leer la sesión (p. ej. tras cambiar una contraseña temporal).
   const actualizar = () => setIntento(valor => valor + 1)
-  return <SesionPlataforma.Provider value={{ administrador, terminada, actualizar }}>
+  return <SesionPlataforma.Provider value={{ administrador, terminada, actualizar, passwordTemporalVenceEn: sesion.data.password_temporal_vence_en }}>
     <div className="min-h-dvh bg-[#f6f8fa] font-['DM_Sans',sans-serif] text-slate-700 antialiased [&_button]:cursor-pointer [&_button:disabled]:cursor-not-allowed [&_button:disabled]:opacity-50 [&_:focus-visible]:outline-2 [&_:focus-visible]:outline-offset-4 [&_:focus-visible]:outline-teal-600 [&_h1]:font-['Manrope',sans-serif] [&_h2]:font-['Manrope',sans-serif]">
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 overflow-y-auto bg-slate-900 lg:block"><Lateral administrador={administrador} salir={salir} saliendo={saliendo} errorSalida={errorSalida} obligatorio={obligatorio} /></aside>
       <dialog ref={drawerRef} aria-label="Menú de la plataforma" className="fixed inset-y-0 left-0 m-0 h-dvh max-h-none w-80 max-w-[90vw] border-0 bg-slate-900 p-0 backdrop:bg-slate-900/40"><button type="button" onClick={() => drawerRef.current.close()} className="absolute top-2 right-2 rounded-lg p-2 text-slate-200 hover:bg-white/10" aria-label="Cerrar menú"><Icon name="close" /></button><Lateral administrador={administrador} salir={salir} saliendo={saliendo} errorSalida={errorSalida} obligatorio={obligatorio} onNavigate={() => drawerRef.current.close()} /></dialog>

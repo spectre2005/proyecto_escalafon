@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Plataforma;
 
 use App\Http\Controllers\Controller;
 use App\Models\Plataforma\AdministradorPlataforma;
+use App\Support\PasswordTemporal;
 use App\Support\Plataforma\AuditoriaOperaciones;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,14 +34,18 @@ class SuperadministradorController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $this->sinCamposAjenos($request, ['nombre', 'email']);
+        $this->sinCamposAjenos($request, ['dni', 'nombre', 'email', 'vigencia_horas', 'vence_en']);
         $request->merge(['nombre' => trim((string) $request->input('nombre')), 'email' => mb_strtolower(trim((string) $request->input('email')))]);
         $datos = $request->validate([
+            ...PasswordTemporal::reglasPlazo(),
+            'dni' => ['nullable', 'string', 'regex:/\A[0-9]{8}\z/', Rule::unique('plataforma.administradores_plataforma', 'dni')],
             'nombre' => 'required|string|min:3|max:150',
             'email' => ['required', 'email:rfc', 'max:255', Rule::unique('plataforma.administradores_plataforma', 'email')],
         ], ['email.unique' => 'Ya existe una cuenta con ese correo.']);
         $clave = self::claveTemporal();
-        $cuenta = AdministradorPlataforma::query()->create([...$datos, 'password' => $clave, 'activo' => true, 'debe_cambiar_password' => true]);
+        $limite = PasswordTemporal::limite($datos);
+        unset($datos['vigencia_horas'], $datos['vence_en']);
+        $cuenta = AdministradorPlataforma::query()->create([...$datos, 'password_temporal_vence_en' => $limite, 'password' => $clave, 'activo' => true, 'debe_cambiar_password' => true]);
         AuditoriaOperaciones::registrar('administrador.creado', $request, Auth::guard('plataforma')->id(), null, null, $cuenta->only(['id', 'nombre', 'email']), 'Creado desde el panel.');
 
         return $this->conClave($cuenta, $clave, 201);
@@ -48,11 +53,12 @@ class SuperadministradorController extends Controller
 
     public function restablecer(Request $request, string $cuenta): JsonResponse
     {
-        $this->sinCamposAjenos($request, []);
+        $this->sinCamposAjenos($request, ['vigencia_horas', 'vence_en']);
+        $datos = $request->validate(PasswordTemporal::reglasPlazo());
         $registro = $this->otra($cuenta, 'Tu propia contraseña se cambia en «Mi cuenta».');
         abort_unless($registro->activo, 409, 'La cuenta está desactivada: reactívala para darle una contraseña temporal.');
         $clave = self::claveTemporal();
-        $registro->forceFill(['password' => $clave, 'debe_cambiar_password' => true])->save();
+        $registro->forceFill(['password' => $clave, 'debe_cambiar_password' => true, 'password_temporal_vence_en' => PasswordTemporal::limite($datos)])->save();
         AuditoriaOperaciones::registrar('administrador.clave_restablecida', $request, Auth::guard('plataforma')->id(), null, null, $registro->only(['id', 'email']));
 
         return $this->conClave($registro, $clave);
@@ -80,11 +86,12 @@ class SuperadministradorController extends Controller
 
     public function reactivar(Request $request, string $cuenta): JsonResponse
     {
-        $this->sinCamposAjenos($request, []);
+        $this->sinCamposAjenos($request, ['vigencia_horas', 'vence_en']);
+        $datos = $request->validate(PasswordTemporal::reglasPlazo());
         $registro = $this->otra($cuenta, 'Tu cuenta ya está activa.');
         abort_if($registro->activo, 409, 'La cuenta ya está activa.');
         $clave = self::claveTemporal();
-        $registro->forceFill(['activo' => true, 'password' => $clave, 'debe_cambiar_password' => true])->save();
+        $registro->forceFill(['activo' => true, 'password' => $clave, 'debe_cambiar_password' => true, 'password_temporal_vence_en' => PasswordTemporal::limite($datos)])->save();
         AuditoriaOperaciones::registrar('administrador.reactivado', $request, Auth::guard('plataforma')->id(), null, ['activo' => false], $registro->only(['id', 'email', 'activo']));
 
         return $this->conClave($registro, $clave);

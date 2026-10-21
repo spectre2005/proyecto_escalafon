@@ -8,7 +8,7 @@ const entrada = 'rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-sla
  * Cuenta con contraseña temporal (debe_cambiar_password): antes de usar el sistema debe cambiarla. El backend bloquea
  * el resto de la API hasta entonces (ExigeCambioPassword). onCambiada(sesion) recibe la sesión ya liberada.
  */
-export default function CambiarPasswordObligatorio({ usuario, onCambiada }) {
+export default function CambiarPasswordObligatorio({ usuario, venceEn, onCambiada }) {
   const navigate = useNavigate()
   const [datos, setDatos] = useState({ password_actual: '', password: '', password_confirmation: '' })
   const [busy, setBusy] = useState(false)
@@ -35,6 +35,7 @@ export default function CambiarPasswordObligatorio({ usuario, onCambiada }) {
       <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-slate-400">Primer ingreso</p>
       <h1 className="mt-2 text-2xl font-bold text-slate-900">Cambia tu contraseña</h1>
       <p className="mt-2 text-xs text-slate-500">{usuario?.nombres ? `${usuario.nombres}, tu` : 'Tu'} contraseña es temporal. Elige una nueva, con letras y números, para continuar.</p>
+      {venceEn && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs text-amber-900">Cámbiala antes del {new Date(venceEn).toLocaleString('es-PE', { timeZone: 'America/Lima' })} (hora de Lima). Después necesitarás una nueva contraseña temporal.</p>}
       {error && <p role="alert" className="mt-5 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
       <label className="mt-6 grid gap-2 text-xs font-medium text-slate-600">Contraseña temporal
         <input type="password" required autoComplete="current-password" value={datos.password_actual} onChange={set('password_actual')} disabled={busy} className={entrada} />

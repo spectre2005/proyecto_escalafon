@@ -18,3 +18,5 @@ export async function saveUserWithLink(payload) {
   const { data } = await api.post('/usuarios/con-vinculo', payload)
   return data.data
 }
+
+export const consultarDniPersonal = (dni, signal) => api.post('/usuarios/consulta-dni', { dni }, { signal, notificarCambios: false }).then(respuesta => respuesta.data.data)

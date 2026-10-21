@@ -3,10 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Usuario;
-use Database\Seeders\AdministradorSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Tests\Fixtures\AdministradorPruebaSeeder as AdministradorSeeder;
 use Tests\TestCase;
 
 /**
@@ -26,7 +26,7 @@ class CambioPasswordTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['auth.administrador_inicial' => ['email' => self::EMAIL, 'password' => self::TEMPORAL],
+        config(['pruebas.administrador' => ['email' => self::EMAIL, 'password' => self::TEMPORAL],
             'sanctum.stateful' => ['localhost:5173'], 'cache.limiter' => 'array']);
         $this->withHeader('Origin', 'http://localhost:5173');
         $this->seed(AdministradorSeeder::class);

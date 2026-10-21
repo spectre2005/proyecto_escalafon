@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Plataforma\Institucion;
 use App\Models\Usuario;
+use App\Support\PasswordTemporal;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -34,7 +35,13 @@ class AuthController extends Controller
 
         // Cualquier rechazo (clave mala, cuenta inactiva o sin permisos) responde igual,
         // para no confirmar si la contraseña era correcta.
-        if (! Auth::guard('web')->attempt(['email_institucional' => $email, 'password' => $data['password'], 'activo' => true])
+        $valida = Auth::guard('web')->attempt(['email_institucional' => $email, 'password' => $data['password'], 'activo' => true]);
+        if ($valida && PasswordTemporal::vencida($request->user())) {
+            Auth::guard('web')->logout();
+            RateLimiter::hit($clave, self::BLOQUEO_SEGUNDOS);
+            throw ValidationException::withMessages(['email' => PasswordTemporal::MENSAJE]);
+        }
+        if (! $valida
             || $request->user()->permisos() === []) {
             Auth::guard('web')->logout();
             RateLimiter::hit($clave, self::BLOQUEO_SEGUNDOS);
@@ -56,7 +63,7 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
-        if ($request->user()->permisos() === []) {
+        if (PasswordTemporal::vencida($request->user()) || $request->user()->permisos() === []) {
             $this->cerrar($request);
             abort(401, 'La sesión ya no es válida.');
         }
@@ -77,6 +84,10 @@ class AuthController extends Controller
      */
     public function cambiarPassword(Request $request): JsonResponse
     {
+        if (PasswordTemporal::vencida($request->user())) {
+            $this->cerrar($request);
+            abort(401, PasswordTemporal::MENSAJE);
+        }
         $data = $request->validate([
             'password_actual' => 'required|string|max:255',
             'password' => ['required', 'string', 'max:255', 'confirmed', Password::defaults()],
@@ -109,7 +120,7 @@ class AuthController extends Controller
             'usuario' => $usuario->only(['id', 'nombres', 'apellido_paterno', 'apellido_materno', 'email_institucional']),
             'permisos' => $usuario->permisos(),
             've_datos_sensibles' => $usuario->veDatosSensibles(),
-            'debe_cambiar_password' => (bool) $usuario->debe_cambiar_password,
+            ...PasswordTemporal::datos($usuario), 'debe_cambiar_password' => (bool) $usuario->debe_cambiar_password,
             'aviso_servicio' => $this->avisoServicio($usuario),
         ]]);
     }

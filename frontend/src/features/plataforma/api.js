@@ -52,7 +52,7 @@ export const registrarPeriodo = (id, datos) => plataforma.post(`/instituciones/$
 export const anularPeriodo = (id, periodo, motivo) => plataforma.post(`/instituciones/${id}/periodos/${periodo}/anular`, { motivo }).then(r => r.data.data)
 export const listarAdministradores = (id, signal) => plataforma.get(`/instituciones/${id}/administradores`, { signal }).then(r => r.data.data)
 export const agregarAdministrador = (id, datos) => plataforma.post(`/instituciones/${id}/administradores`, datos).then(r => r.data.data)
-export const restablecerAdministrador = (id, admin) => plataforma.post(`/instituciones/${id}/administradores/${admin}/restablecer`).then(r => r.data.data)
+export const restablecerAdministrador = (id, admin, vence_en) => plataforma.post(`/instituciones/${id}/administradores/${admin}/restablecer`, vence_en ? { vence_en } : {}).then(r => r.data.data)
 export const cambiarActivoAdministrador = (id, admin, activo) => plataforma.post(`/instituciones/${id}/administradores/${admin}/${activo ? 'reactivar' : 'desactivar'}`).then(r => r.data.data)
 
 /** Mensaje legible de un error de la API de plataforma. */
@@ -73,7 +73,8 @@ export const sesionTerminada = error => [401, 419].includes(error?.response?.sta
 // Cuentas de superadministrador (no se borran: se desactivan) y cambio de la propia contraseña.
 export const listarSuperadmins = signal => plataforma.get('/superadministradores', { signal }).then(r => r.data.data)
 export const crearSuperadmin = datos => plataforma.post('/superadministradores', datos).then(r => r.data.data)
-export const accionSuperadmin = (id, accion) => plataforma.post(`/superadministradores/${id}/${accion}`).then(r => r.data.data)
+export const consultarIdentidadDni = (dni, signal) => plataforma.post('/identidad/dni', { dni }, { signal }).then(r => r.data.data)
+export const accionSuperadmin = (id, accion, vence_en) => plataforma.post(`/superadministradores/${id}/${accion}`, accion === 'desactivar' || !vence_en ? {} : { vence_en }).then(r => r.data.data)
 export const cambiarMiPassword = datos => plataforma.put('/auth/password', datos).then(r => r.data.data)
 // Uso y estado técnico de una institución (se guarda unos minutos; actualizar lo vuelve a medir).
 export const verUso = (id, actualizar = false, signal) => plataforma.get(`/instituciones/${id}/uso`, { params: actualizar ? { actualizar: 1 } : {}, signal }).then(r => r.data.data)

@@ -11,6 +11,9 @@ import UbigeoFields from '../../../components/ui/UbigeoFields'
 import TresEstados from '../../../components/ui/TresEstados'
 import { valorBandera } from '../../../shared/banderas'
 import { usePuede } from '../../auth/session'
+import { useDniEdicion } from './useDniEdicion'
+import ComparacionIdentidad from './ComparacionIdentidad'
+import { aplicarSeleccionIdentidad, cambiarDocumentoEdicion, claveDocumento, ubicacionDeEdicion } from '../config/identidadEdicion'
 
 const inputClass = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-teal-600 disabled:bg-slate-50 disabled:text-slate-400'
 const fields = [
@@ -60,13 +63,21 @@ export default function GeneralDataEditor({ usuario, data, onSaved, onCancel, on
     : options.data?.data[catalog] || []
   // Al cambiar el tipo de personal, la ley se conserva si también le corresponde; si no, queda Sin definir.
   const leyDelTipo = (id, tipo) => (leyes || []).some(ley => ley.id === id && ley.aplica_a === tipo) ? id : ''
-  const [location, setLocation] = useState(() => Object.fromEntries(['region', 'provincia', 'distrito'].map(key => [key, data.usuario.values[key] ?? ''])))
+  const [ubicacionManual, setUbicacionManual] = useState(null)
+  const consultaDni = useDniEdicion(usuario, draft.tipo_doc_identidad, draft.numero_doc_identidad)
+  const location = ubicacionDeEdicion(original, draft, ubicacionManual)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
+  function aplicarConsulta(seleccion) {
+    const resultado = aplicarSeleccionIdentidad(draft, location, consultaDni.estado.persona, seleccion)
+    setDraft(resultado.draft)
+    if (resultado.ubicacion) setUbicacionManual({ documento: claveDocumento(draft), value: resultado.ubicacion })
+    consultaDni.cerrarComparacion()
+  }
   async function save(event) {
     event.preventDefault()
-    if (saving) return
+    if (saving || consultaDni.consultando) return
     // Una bandera sin responder se compara con null (no con ''), para no enviarla si no cambió.
     const inicial = key => flags.some(([flag]) => flag === key) ? valorBandera(original[key]) : original[key] ?? ''
     const changes = Object.fromEntries(Object.entries(draft).filter(([key, value]) => key !== 'nacionalidad' && value !== inicial(key)).map(([key, value]) => [key, typeof value === 'string' ? value.trim() || null : value]))
@@ -92,27 +103,67 @@ export default function GeneralDataEditor({ usuario, data, onSaved, onCancel, on
       setSaving(false)
     }
   }
-  return <DocumentoModal titulo="Editar información personal" busy={saving} onCancel={onCancel}><form onSubmit={save} onKeyDown={advanceOnEnter} aria-busy={saving}>
-    <div className="mb-6 flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-lg font-semibold text-slate-800">Editar información personal</h2><p className="mt-2 text-xs text-slate-500">Los cambios se mostrarán al guardar.</p></div><div className="flex flex-wrap items-center gap-3">{onUploadFicha && <button type="button" disabled={saving} onClick={onUploadFicha} className="inline-flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-100"><Icon name="upload" size={17} />Subir ficha personal</button>}<button type="button" disabled={saving} onClick={onCancel} className="text-sm text-slate-500 hover:text-slate-800">Cancelar</button></div></div>
+  function campo(key) {
+    const [, title, type, maxLength, required] = fields.find(([nombre]) => nombre === key)
+    const isDni = key === 'numero_doc_identidad' && draft.tipo_doc_identidad === 'dni'
+    const digits = isDni ? 8 : key === 'telefono' ? 9 : null
+    const props = { name: key, className: inputClass, required, value: draft[key], inputMode: digits ? 'numeric' : undefined, pattern: digits ? `[0-9]{${digits}}` : undefined, title: digits ? `Debe contener ${digits} dígitos.` : undefined,
+      disabled: consultaDni.consultando && ['nombres', 'apellido_paterno', 'apellido_materno'].includes(key),
+      onChange: event => {
+        const valor = digits ? event.target.value.replace(/\D/g, '').slice(0, digits) : event.target.value
+        if (draft[key] === valor) return
+        if (['tipo_doc_identidad', 'numero_doc_identidad'].includes(key)) {
+          const siguiente = { ...draft, [key]: valor }
+          setDraft(actual => cambiarDocumentoEdicion(actual, key, valor))
+          setUbicacionManual({ documento: claveDocumento(siguiente), value: location })
+          consultaDni.cambiarDocumento(siguiente.tipo_doc_identidad, siguiente.numero_doc_identidad)
+        } else setDraft(previous => ({ ...previous, [key]: valor }))
+      }, 'aria-invalid': !!fieldErrors[key] }
+    const lista = listas[key]
+    return <div key={key} className="flex flex-col gap-2 text-xs font-medium text-slate-600">
+      <label htmlFor={`personal-${key}`}>{isDni ? 'DNI' : title}{required ? ' *' : ''}</label>
+      <div className="flex items-center gap-2">
+        {lista ? <select {...props} id={`personal-${key}`}><Opciones lista={lista} actual={draft[key]} vacio={required ? undefined : 'No registrado'} /></select> : <input {...props} id={`personal-${key}`} type={type} maxLength={digits || maxLength} readOnly={key === 'nacionalidad'} aria-readonly={key === 'nacionalidad' ? true : undefined} />}
+        {key === 'numero_doc_identidad' && onUploadDni && <span className="group relative shrink-0">
+          <button type="button" onClick={onUploadDni} aria-label={isDni ? 'Subir copia de DNI' : 'Subir copia de documento de identidad'} aria-describedby="identity-upload-tooltip" className="grid size-11 place-items-center rounded-xl border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100 focus-visible:outline-2 focus-visible:outline-teal-600"><Icon name="upload" size={19} /></button>
+          <span id="identity-upload-tooltip" role="tooltip" className="pointer-events-none absolute right-0 bottom-full z-10 mb-2 hidden whitespace-nowrap rounded-lg bg-slate-800 px-3 py-2 text-[11px] text-white group-hover:block group-focus-within:block">{isDni ? 'Subir copia de DNI' : 'Subir archivo de identidad'}</span>
+        </span>}
+      </div>
+      {fieldErrors[key] && <span className="text-rose-700">{fieldErrors[key].join(' ')}</span>}
+    </div>
+  }
+  return <DocumentoModal titulo="Editar información personal" busy={saving} onCancel={onCancel}><form onSubmit={save} onKeyDown={advanceOnEnter} aria-busy={saving || consultaDni.consultando}>
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-4"><p className="text-xs text-slate-500">Revisa los datos sugeridos. Los cambios se aplicarán al guardar.</p><div className="flex flex-wrap items-center gap-3">{onUploadFicha && <button type="button" disabled={saving} onClick={onUploadFicha} className="inline-flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-100"><Icon name="upload" size={17} />Subir ficha personal</button>}<button type="button" disabled={saving} onClick={onCancel} className="text-sm text-slate-500 hover:text-slate-800">Cancelar</button></div></div>
     {error && <p role="alert" className="mb-5 rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{error}</p>}
     <fieldset disabled={saving} className="grid gap-5 sm:grid-cols-2">
-      {fields.map(([key, title, type, maxLength, required]) => {
-        const isDni = key === 'numero_doc_identidad' && draft.tipo_doc_identidad === 'dni'
-        const digits = isDni ? 8 : key === 'telefono' ? 9 : null
-        const props = { name: key, className: inputClass, required, value: draft[key], inputMode: digits ? 'numeric' : undefined, pattern: digits ? `[0-9]{${digits}}` : undefined, title: digits ? `Debe contener ${digits} dígitos.` : undefined, onChange: event => setDraft(previous => ({ ...previous, [key]: digits ? event.target.value.replace(/\D/g, '').slice(0, digits) : event.target.value })), 'aria-invalid': !!fieldErrors[key] }
-        const lista = listas[key]
-        return <div key={key} className="flex flex-col gap-2 text-xs font-medium text-slate-600">
-          <label htmlFor={`personal-${key}`}>{isDni ? 'DNI' : title}{required ? ' *' : ''}</label>
-          <div className="flex items-center gap-2">
-            {lista ? <select {...props} id={`personal-${key}`}><Opciones lista={lista} actual={draft[key]} vacio={required ? undefined : 'No registrado'} /></select> : <input {...props} id={`personal-${key}`} type={type} maxLength={digits || maxLength} readOnly={key === 'nacionalidad'} aria-readonly={key === 'nacionalidad' ? true : undefined} />}
-            {key === 'numero_doc_identidad' && onUploadDni && <span className="group relative shrink-0">
-              <button type="button" onClick={onUploadDni} aria-label={isDni ? 'Subir copia de DNI' : 'Subir copia de documento de identidad'} aria-describedby="identity-upload-tooltip" className="grid size-11 place-items-center rounded-xl border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100 focus-visible:outline-2 focus-visible:outline-teal-600"><Icon name="upload" size={19} /></button>
-              <span id="identity-upload-tooltip" role="tooltip" className="pointer-events-none absolute right-0 bottom-full z-10 mb-2 hidden whitespace-nowrap rounded-lg bg-slate-800 px-3 py-2 text-[11px] text-white group-hover:block group-focus-within:block">{isDni ? 'Subir copia de DNI' : 'Subir archivo de identidad'}</span>
-            </span>}
+      <section aria-labelledby="identidad-personal-titulo" className="col-span-full rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+        <h3 id="identidad-personal-titulo" className="mb-4 text-sm font-semibold text-slate-800">Identificación y ubicación</h3>
+        <div className="grid min-w-0 gap-4 sm:grid-cols-3">
+          {campo('tipo_doc_identidad')}
+          {campo('numero_doc_identidad')}
+          <button type="button" disabled={!consultaDni.valido || consultaDni.consultando} onClick={consultaDni.consultar}
+            className="self-end rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5 text-sm font-semibold text-teal-800 hover:bg-teal-100 disabled:cursor-not-allowed disabled:opacity-50">{consultaDni.consultando ? 'Consultando…' : 'Consultar datos del DNI'}</button>
+          <div className="col-span-full flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3">
+            <p className="max-w-lg text-xs leading-relaxed text-slate-600">La consulta usa los datos guardados si existen. Para obtener una respuesta nueva, actualiza desde Factiliza. Cada actualización realiza una consulta externa de tu plan.</p>
+            <button type="button" disabled={!consultaDni.valido || consultaDni.consultando} onClick={consultaDni.actualizar} className="shrink-0 rounded-lg border border-teal-200 bg-white px-3 py-2 text-xs font-semibold text-teal-800 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50">Actualizar desde Factiliza</button>
           </div>
-          {fieldErrors[key] && <span className="text-rose-700">{fieldErrors[key].join(' ')}</span>}
+          <p role="status" aria-live="polite" className={`col-span-full rounded-lg px-3 py-2 text-xs ${consultaDni.estado.tipo === 'error' ? 'bg-amber-50 text-amber-900' : 'bg-teal-50 text-teal-900'}`}>
+            {consultaDni.consultando ? 'Buscando nombres, apellidos y ubicación…'
+              : consultaDni.estado.tipo === 'completado' ? `Compara los datos y selecciona cuáles aplicar.${consultaDni.estado.persona.ubicacion ? '' : ' No se obtuvo una ubicación del catálogo; puedes seleccionarla manualmente.'}`
+                : consultaDni.estado.tipo === 'revisado' ? 'Comparación cerrada. Revisa el formulario y guarda cuando termines.'
+                  : consultaDni.estado.tipo === 'error' ? consultaDni.estado.mensaje : 'Usa «Consultar datos del DNI» para revisar el documento actual. Al cambiar el DNI, la búsqueda comienza al completar sus 8 dígitos. Si no hay datos guardados, se consultará Factiliza.'}
+          </p>
+          {consultaDni.estado.tipo === 'completado' && !consultaDni.consultando && <ComparacionIdentidad key={consultaDni.estado.solicitud} original={original} draft={draft} ubicacion={location} persona={consultaDni.estado.persona} origen={consultaDni.estado.origen} onApply={aplicarConsulta} onDismiss={consultaDni.cerrarComparacion} />}
+          {['nombres', 'apellido_paterno', 'apellido_materno'].map(campo)}
+          <UbigeoFields value={location} onChange={value => setUbicacionManual({ documento: claveDocumento(draft), value })} disabled={saving} />
         </div>
-      })}
+      </section>
+      <section aria-labelledby="contacto-personal-titulo" className="col-span-full rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+        <h3 id="contacto-personal-titulo" className="mb-4 text-sm font-semibold text-slate-800">Información personal y contacto</h3>
+        <div className="grid gap-5 sm:grid-cols-2">{['fecha_nacimiento', 'nacionalidad', 'estado_civil', 'domicilio', 'telefono', 'email_institucional'].map(campo)}</div>
+      </section>
+      <div className="col-span-full"><h3 className="text-sm font-semibold text-slate-700">Clasificación y datos registrados</h3><p className="mt-2 text-xs text-slate-500">El puesto y la unidad actuales se toman del vínculo vigente, en la sección 02.</p></div>
+      {campo('nombre_puesto')}
       <label className="flex flex-col gap-2 text-xs font-medium text-slate-600">Tipo de personal *<select name="tipo_personal" className={inputClass} value={draft.tipo_personal} onChange={event => setDraft(previous => ({ ...previous, tipo_personal: event.target.value, regimen_normativo_id: leyDelTipo(previous.regimen_normativo_id, event.target.value) }))}><option value="docente">Docente</option><option value="administrativo">Administrativo</option></select></label>
       {[['unidad_organica_id', 'Unidad orgánica registrada en la persona', 'unidades', 'Sin asignar'], ['regimen_normativo_id', 'Ley / régimen normativo', 'regimenes', 'Sin definir']].map(([key, title, catalog, vacio]) => <label key={key} className="flex flex-col gap-2 text-xs font-medium text-slate-600">{title}<select name={key} className={inputClass} value={draft[key]} disabled={!options.data} onChange={event => setDraft(previous => ({ ...previous, [key]: event.target.value }))}><option value="">{vacio}</option>{!options.data && draft[key] && <option value={draft[key]}>{data.usuario.values[key]}</option>}{opcionesDe(catalog, draft[key]).map(item => <option key={item.id} value={item.id}>{item.nombre}{item.activo ? '' : ' (inactivo)'}</option>)}</select>{key === 'regimen_normativo_id' && <span className="font-normal text-slate-500">Leyes del personal {draft.tipo_personal}. El tipo de vínculo (carrera, plazo determinado o designado) se registra en el vínculo laboral, en 2.2.</span>}{fieldErrors[key] && <span className="text-rose-700">{fieldErrors[key].join(' ')}</span>}</label>)}
       {options.error && <p role="alert" className="col-span-full text-xs text-rose-700">No se pudieron cargar las unidades y regímenes. <button type="button" className="underline" onClick={options.retry}>Reintentar</button></p>}
@@ -121,8 +172,7 @@ export default function GeneralDataEditor({ usuario, data, onSaved, onCancel, on
         return <TresEstados key={key} name={key} label={title} ayuda={bloqueada ? `${ayuda} Solo administración de la ORH puede registrarlo.` : ayuda} value={draft[key]} disabled={bloqueada} error={fieldErrors[key]}
           onChange={valor => setDraft(previous => ({ ...previous, [key]: valor }))} />
       })}</div><p className="mt-4 text-xs text-slate-500">Las condiciones del puesto (declaración jurada de bienes y rentas, colegiatura, estudios básicos y período de prueba) se registran en el vínculo laboral, en la sección 02.</p></div>
-      <div className="col-span-full border-t border-slate-100 pt-5"><h3 className="mb-4 text-sm font-semibold text-slate-700">Ubicación</h3><UbigeoFields value={location} onChange={setLocation} disabled={saving} /><p className="mt-3 text-xs text-slate-500">Selecciona región, provincia y distrito del catálogo.</p></div>
-      <div className="col-span-full flex justify-end gap-3 border-t border-slate-100 pt-5"><button type="button" onClick={onCancel} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm">Cancelar</button><button type="submit" className="rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50">{saving ? 'Guardando…' : 'Guardar cambios'}</button></div>
+      <div className="col-span-full flex justify-end gap-3 border-t border-slate-100 pt-5"><button type="button" onClick={onCancel} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm">Cancelar</button><button type="submit" disabled={consultaDni.consultando} className="rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50">{saving ? 'Guardando…' : 'Guardar cambios'}</button></div>
     </fieldset>
   </form></DocumentoModal>
 }

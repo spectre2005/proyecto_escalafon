@@ -5,10 +5,9 @@ namespace Tests\Feature;
 use App\Models\Rol;
 use App\Models\Usuario;
 use App\Models\UsuarioRol;
-use Database\Seeders\AdministradorSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
+use Tests\Fixtures\AdministradorPruebaSeeder as AdministradorSeeder;
 use Tests\TestCase;
 
 class AuthenticationTest extends TestCase
@@ -23,7 +22,7 @@ class AuthenticationTest extends TestCase
     {
         parent::setUp();
         config([
-            'auth.administrador_inicial' => ['email' => self::EMAIL, 'password' => self::CLAVE],
+            'pruebas.administrador' => ['email' => self::EMAIL, 'password' => self::CLAVE],
             'sanctum.stateful' => ['localhost:5173'],
             // El contenedor fija CACHE_STORE=file y phpunit.xml no lo impone: sin esto, los intentos de
             // login (por correo e IP y el throttle de la ruta) se acumulan entre pruebas y entre ejecuciones.
@@ -44,46 +43,22 @@ class AuthenticationTest extends TestCase
         $response->assertUnprocessable()->assertJsonPath('errors.email.0', 'Correo o contraseña incorrectos.');
     }
 
-    public function test_admin_seeder_reads_credentials_from_config_and_is_repeatable(): void
+    public function test_legacy_seeders_do_not_create_access_accounts(): void
+    {
+        $this->seed(\Database\Seeders\AdministradorSeeder::class);
+        $this->assertDatabaseCount('usuarios', 0);
+    }
+
+    public function test_reseeding_does_not_change_existing_database_credentials(): void
     {
         $this->seed(AdministradorSeeder::class);
         $admin = Usuario::where('email_institucional', self::EMAIL)->firstOrFail();
-        $this->assertTrue(Hash::check(self::CLAVE, $admin->password));
-        $this->assertTrue($admin->isAdministrator());
-        $admin->update(['password' => 'changed-password']);
-        $this->seed(AdministradorSeeder::class);
-        $this->assertDatabaseCount('usuarios', 1);
-        $this->assertDatabaseCount('roles', 1);
-        $this->assertDatabaseCount('usuario_roles', 1);
-        $this->assertTrue(Hash::check('changed-password', $admin->fresh()->password));
-    }
-
-    public function test_admin_seeder_does_nothing_without_credentials_or_outside_local(): void
-    {
-        config(['auth.administrador_inicial' => ['email' => null, 'password' => null]]);
-        $this->seed(AdministradorSeeder::class);
-        $this->assertDatabaseCount('usuarios', 0);
-
-        config(['auth.administrador_inicial' => ['email' => self::EMAIL, 'password' => self::CLAVE]]);
-        $this->app->instance('env', 'production');
-        // Directo y no con seed(): db:seed pide confirmación en producción.
-        $this->app->make(AdministradorSeeder::class)->run();
-        $this->assertDatabaseCount('usuarios', 0);
-    }
-
-    public function test_admin_seeder_reuses_system_administrator_when_email_changes(): void
-    {
-        $this->seed(AdministradorSeeder::class);
-        $admin = Usuario::firstOrFail();
-        config(['auth.administrador_inicial' => ['email' => 'nuevo@example.test', 'password' => 'da123']]);
-
-        $this->seed(AdministradorSeeder::class);
-
-        $this->assertDatabaseCount('usuarios', 1);
-        $this->assertDatabaseCount('usuario_roles', 1);
-        $this->assertSame('nuevo@example.test', $admin->fresh()->email_institucional);
-        $this->assertTrue(Hash::check('da123', $admin->fresh()->password));
-        $this->login('nuevo@example.test', 'da123')->assertOk();
+        $hash = $admin->password;
+        config(['auth.administrador_inicial' => ['email' => 'otro@example.test', 'password' => 'Otra-clave-2026']]);
+        $this->seed(\Database\Seeders\AdministradorSeeder::class);
+        $this->assertSame($hash, $admin->fresh()->password);
+        $this->assertSame(self::EMAIL, $admin->fresh()->email_institucional);
+        $this->login()->assertOk();
     }
 
     public function test_successful_login_returns_user_permissions_and_sensitive_flag(): void

@@ -2,6 +2,10 @@
 
 return [
 
+    'factiliza' => [
+        'token' => env('FACTILIZA_TOKEN'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Third Party Services

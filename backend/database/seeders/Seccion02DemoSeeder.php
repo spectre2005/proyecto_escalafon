@@ -45,7 +45,7 @@ class Seccion02DemoSeeder extends Seeder
             ]);
             $conPrueba = $persona('99000201', 'Persona Demo Con Prueba', 'administrativo', true);
             $sinPrueba = $persona('99000202', 'Persona Demo Sin Prueba', 'docente', false);
-            $registrador = Usuario::query()->where('email_institucional', mb_strtolower((string) config('auth.administrador_inicial.email')))->value('id') ?? $conPrueba->id;
+            $registrador = Usuario::query()->whereHas('usuarioRolesPorUsuario.rol', fn ($query) => $query->where('codigo', 'ADMIN'))->value('id') ?? $conPrueba->id;
             $fecha = fn (int $dias) => $hoy->copy()->addDays($dias)->toDateString();
 
             Legajo::query()->create(['usuario_id' => $conPrueba->id, 'numero_legajo' => 'DEMO-S02-001', 'fecha_apertura' => $fecha(-200)]);

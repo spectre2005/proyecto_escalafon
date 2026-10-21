@@ -98,7 +98,7 @@ class SuperadministradoresTest extends TestCase
         $lista = $this->pedir('ana', 'GET', '/superadministradores')->assertOk();
         $this->assertEqualsCanonicalizing(['ana@example.test', 'beto@example.test'], array_column($lista->json('data'), 'email'));
         $this->assertSame([true, false], array_column(collect($lista->json('data'))->sortBy('email')->values()->all(), 'es_actual'));
-        $this->assertSame(['id', 'nombre', 'email', 'activo', 'debe_cambiar_password', 'ultimo_acceso', 'created_at', 'es_actual'], array_keys($lista->json('data.0')));
+        $this->assertSame(['id', 'dni', 'nombre', 'email', 'password_temporal_vence_en', 'password_temporal_vencida', 'activo', 'debe_cambiar_password', 'ultimo_acceso', 'created_at', 'es_actual'], array_keys($lista->json('data.0')));
         // Ni la API ni la auditoría guardan contraseñas, temporales ni hashes.
         $auditoria = AuditoriaPlataforma::query()->get();
         $this->assertSame(['administrador.creado', 'administrador.clave_restablecida', 'administrador.desactivado', 'administrador.reactivado'],

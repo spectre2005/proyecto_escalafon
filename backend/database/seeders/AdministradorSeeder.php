@@ -2,54 +2,13 @@
 
 namespace Database\Seeders;
 
-use App\Models\Rol;
-use App\Models\Usuario;
-use App\Models\UsuarioRol;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 
+/** Compatibilidad con instalaciones anteriores: sembrar datos nunca crea ni modifica cuentas de acceso. */
 class AdministradorSeeder extends Seeder
 {
     public function run(): void
     {
-        if (! app()->environment(['local', 'testing'])) {
-            return;
-        }
-
-        $email = mb_strtolower(trim((string) config('auth.administrador_inicial.email')));
-        $password = (string) config('auth.administrador_inicial.password');
-        if ($email === '' || $password === '') {
-            $this->command?->warn('AdministradorSeeder: define ADMIN_EMAIL y ADMIN_PASSWORD en backend/.env. No se creó el administrador.');
-
-            return;
-        }
-
-        DB::transaction(function () use ($email, $password): void {
-            $admin = Usuario::query()->where('email_institucional', $email)->first()
-                ?? Usuario::query()->where('numero_doc_identidad', 'ADMIN-SISTEMA')->first();
-
-            if ($admin && $admin->email_institucional !== $email) {
-                $admin->update(['email_institucional' => $email, 'password' => $password, 'activo' => true]);
-            }
-
-            $admin ??= Usuario::query()->create([
-                'email_institucional' => $email,
-                'tipo_doc_identidad' => 'sistema',
-                'numero_doc_identidad' => 'ADMIN-SISTEMA',
-                'nombres' => 'Administrador',
-                'apellido_paterno' => 'Sistema',
-                'tipo_personal' => 'administrativo',
-                'regimen_laboral' => 'No aplica',
-                'password' => $password,
-                'activo' => true,
-            ]);
-            $role = Rol::query()->firstOrCreate(['codigo' => 'ADMIN'], [
-                'nombre' => 'Administrador', 'descripcion' => 'Administracion del sistema',
-                've_datos_sensibles' => true, 'activo' => true,
-            ]);
-            UsuarioRol::query()->firstOrCreate(['usuario_id' => $admin->id, 'rol_id' => $role->id], [
-                'ambito_tipo_personal' => 'ambos', 'vigente_desde' => '2020-01-01', 'asignado_por' => $admin->id,
-            ]);
-        });
+        $this->command?->warn('Los administradores se crean desde el panel de plataforma: institución → Administradores → Agregar administrador.');
     }
 }

@@ -2,16 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Models\Plataforma\AdministradorPlataforma;
 use App\Models\Plataforma\AuditoriaPlataforma;
 use App\Models\Plataforma\Institucion;
 use App\Models\Usuario;
-use Database\Seeders\AdministradorSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
 use Tests\Concerns\UsaPlataforma;
+use Tests\Fixtures\AdministradorPruebaSeeder as AdministradorSeeder;
 use Tests\TestCase;
 use Throwable;
 
@@ -73,7 +74,7 @@ class PlataformaPanelTest extends TestCase
         mkdir($carpeta, 0755, true);
         try {
             config(['session.driver' => 'file', 'session.files' => $carpeta,
-                'auth.administrador_inicial' => ['email' => 'admin@example.test', 'password' => 'clave-de-prueba-1']]);
+                'pruebas.administrador' => ['email' => 'admin@example.test', 'password' => 'clave-de-prueba-1']]);
             $this->seed(AdministradorSeeder::class);
             $this->administrador();
             $institucional = config('session.cookie');
@@ -249,6 +250,13 @@ class PlataformaPanelTest extends TestCase
             ->expectsQuestion('Repite la contraseña', 'Clave-larga-2026')->assertSuccessful();
         $this->postJson('/api/plataforma/auth/login', ['email' => 'primera@example.test', 'password' => 'Clave-larga-2026'])->assertOk();
         $this->assertSame('administrador.creado', AuditoriaPlataforma::query()->where('accion', 'administrador.creado')->value('accion'));
+    }
+
+    public function test_setup_never_creates_a_default_account_without_interactively_entered_credentials(): void
+    {
+        $this->artisan('plataforma:crear-administrador', ['--no-interaction' => true])
+            ->expectsOutputToContain('requiere una terminal interactiva')->assertFailed();
+        $this->assertSame(0, AdministradorPlataforma::query()->count());
     }
 
     /**

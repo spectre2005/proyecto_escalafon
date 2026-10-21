@@ -77,7 +77,7 @@ class EquipoAccesoController extends Controller
                     'email_institucional' => $email, 'password' => $clave,
                     'tipo_personal' => 'administrativo', 'regimen_laboral' => 'No aplica', 'activo' => true,
                 ]);
-                $usuario->forceFill(['debe_cambiar_password' => true])->save();
+                $usuario->forceFill(['debe_cambiar_password' => true, 'password_temporal_vence_en' => now()->addHours(48)])->save();
             }
             $this->comprobarPersona($usuario, $request);
             abort_if($this->asignaciones()->where('usuario_id', $usuario->id)->whereNull('revocado_en')
@@ -144,7 +144,7 @@ class EquipoAccesoController extends Controller
             $registro = $this->bloquear($asignacion, $request);
             abort_if($registro->revocado_en || ($registro->vigente_hasta && $registro->vigente_hasta->lt(today())), 409, 'Renueva el acceso antes de restablecer la contraseña.');
             $clave = Str::password(16, symbols: false);
-            $registro->usuario->forceFill(['password' => $clave, 'debe_cambiar_password' => true])->save();
+            $registro->usuario->forceFill(['password' => $clave, 'debe_cambiar_password' => true, 'password_temporal_vence_en' => now()->addHours(48)])->save();
             $this->auditar($registro, $request, 'equipo.clave_restablecida', null, $data['motivo']);
 
             return response()->json(['data' => ['email' => $registro->usuario->email_institucional, 'password_temporal' => $clave]]);

@@ -122,7 +122,7 @@ class Seccion07DemoSeeder extends Seeder
             $carrera = $persona('99000701', 'Persona Demo Carrera', 'administrativo', '276');
             $docente = $persona('99000702', 'Persona Demo Docente', 'docente', '30220');
             $plazo = $persona('99000703', 'Persona Demo Plazo', 'administrativo', 'CAS');
-            $registrador = Usuario::query()->where('email_institucional', mb_strtolower((string) config('auth.administrador_inicial.email')))->value('id') ?? $carrera->id;
+            $registrador = Usuario::query()->whereHas('usuarioRolesPorUsuario.rol', fn ($query) => $query->where('codigo', 'ADMIN'))->value('id') ?? $carrera->id;
             foreach ([[$carrera, '001'], [$docente, '002'], [$plazo, '003']] as [$p, $n]) {
                 Legajo::query()->create(['usuario_id' => $p->id, 'numero_legajo' => 'DEMO-S07-'.$n, 'fecha_apertura' => $fecha(-900)]);
             }

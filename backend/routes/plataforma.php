@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\ModuloSistemaController;
 use App\Http\Controllers\Plataforma\AdministradorInstitucionController;
 use App\Http\Controllers\Plataforma\AuthController;
+use App\Http\Controllers\Plataforma\IdentidadDniController;
 use App\Http\Controllers\Plataforma\InstitucionController;
 use App\Http\Controllers\Plataforma\PeriodoServicioController;
 use App\Http\Controllers\Plataforma\SuperadministradorController;
@@ -26,6 +27,7 @@ Route::middleware(ApiHabilitada::class)->group(function (): void {
         Route::get('auth/me', [AuthController::class, 'me']);
         Route::post('auth/logout', [AuthController::class, 'logout']);
         Route::put('auth/password', [AuthController::class, 'cambiarPassword'])->middleware('throttle:10,1');
+        Route::post('identidad/dni', IdentidadDniController::class)->middleware('throttle:20,1');
         // Cuentas de superadministrador: no se borran; se desactivan.
         Route::get('superadministradores', [SuperadministradorController::class, 'index']);
         Route::post('superadministradores', [SuperadministradorController::class, 'store']);

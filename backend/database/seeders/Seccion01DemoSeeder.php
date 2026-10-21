@@ -39,7 +39,7 @@ class Seccion01DemoSeeder extends Seeder
                 'nombre_puesto' => 'Especialista administrativo', 'estado_civil' => 'conviviente',
                 'obligado_djbr' => false, 'con_discapacidad' => false, 'tiene_derechohabientes' => true,
             ]);
-            $registrador = Usuario::query()->where('email_institucional', mb_strtolower((string) config('auth.administrador_inicial.email')))->value('id') ?? $persona->id;
+            $registrador = Usuario::query()->whereHas('usuarioRolesPorUsuario.rol', fn ($query) => $query->where('codigo', 'ADMIN'))->value('id') ?? $persona->id;
             Legajo::query()->create(['usuario_id' => $persona->id, 'numero_legajo' => 'DEMO-S01-001', 'fecha_apertura' => $hoy->copy()->subDays(30)]);
 
             $familiar = fn (string $parentesco, string $nombre, ?int $anios, string $dni) => Familiar::query()->create([

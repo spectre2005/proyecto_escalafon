@@ -6,6 +6,8 @@ use App\Models\Plataforma\Institucion;
 use App\Models\Rol;
 use App\Models\Usuario;
 use App\Models\UsuarioRol;
+use App\Support\PasswordTemporal;
+use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -46,7 +48,7 @@ final class AdministradoresInstitucion
     /**
      * Nuevo administrador en la base actual, con rol ADMIN y contraseña temporal.
      *
-     * @param  array{nombres: string, apellido_paterno: string, email: string}  $datos
+     * @param  array{nombres: string, apellido_paterno: string, email: string, dni?: ?string, apellido_materno?: ?string}  $datos
      * @return array{0: Usuario, 1: string} el usuario y su contraseña temporal
      */
     public static function crear(array $datos): array
@@ -55,14 +57,18 @@ final class AdministradoresInstitucion
         if (Usuario::query()->where('email_institucional', $email)->exists()) {
             throw ValidationException::withMessages(['email' => 'Ya existe una cuenta con ese correo en la institución.']);
         }
+        $dni = $datos['dni'] ?? null;
+        if ($dni && Usuario::query()->where('numero_doc_identidad', $dni)->exists()) {
+            throw ValidationException::withMessages(['dni' => 'Ya existe una persona con ese DNI en la institución. Gestiona su cuenta existente para evitar duplicarla.']);
+        }
         $clave = self::claveTemporal();
         $admin = Usuario::query()->create([
-            'email_institucional' => $email, 'tipo_doc_identidad' => 'sistema', 'numero_doc_identidad' => 'ADMIN-'.strtoupper(Str::random(8)),
-            'nombres' => trim($datos['nombres']), 'apellido_paterno' => trim($datos['apellido_paterno']), 'tipo_personal' => 'administrativo',
+            'email_institucional' => $email, 'tipo_doc_identidad' => $dni ? 'dni' : 'sistema', 'numero_doc_identidad' => $dni ?: 'ADMIN-'.strtoupper(Str::random(8)),
+            'nombres' => trim($datos['nombres']), 'apellido_paterno' => trim($datos['apellido_paterno']), 'apellido_materno' => trim($datos['apellido_materno'] ?? '') ?: null, 'tipo_personal' => 'administrativo',
             'regimen_laboral' => 'No aplica', 'password' => $clave, 'activo' => true,
         ]);
         // Contraseña temporal: hasta cambiarla no puede usar el sistema (ExigeCambioPassword).
-        $admin->forceFill(['debe_cambiar_password' => true])->save();
+        $admin->forceFill(['debe_cambiar_password' => true, 'password_temporal_vence_en' => $datos['password_temporal_vence_en'] ?? PasswordTemporal::limite($datos)])->save();
         $rol = Rol::query()->firstOrCreate(['codigo' => 'ADMIN'], [
             'nombre' => 'Administrador', 'descripcion' => 'Administracion del sistema', 've_datos_sensibles' => true, 'activo' => true,
         ]);
@@ -73,11 +79,11 @@ final class AdministradoresInstitucion
     }
 
     /** Contraseña temporal nueva para un administrador (olvido o entrega a otra persona). @return array{0: Usuario, 1: string} */
-    public static function restablecer(string $usuarioId): array
+    public static function restablecer(string $usuarioId, int $horas = 48, ?CarbonImmutable $limite = null): array
     {
         $admin = self::administrador($usuarioId);
         $clave = self::claveTemporal();
-        $admin->forceFill(['password' => $clave, 'debe_cambiar_password' => true])->save();
+        $admin->forceFill(['password' => $clave, 'debe_cambiar_password' => true, 'password_temporal_vence_en' => $limite ?? now()->addHours($horas)])->save();
 
         return [$admin, $clave];
     }
@@ -101,7 +107,8 @@ final class AdministradoresInstitucion
     /** @return array<string, mixed> */
     public static function datos(Usuario $usuario): array
     {
-        return [...$usuario->only(['id', 'nombres', 'apellido_paterno', 'email_institucional']),
+        return [...PasswordTemporal::datos($usuario), ...$usuario->only(['id', 'nombres', 'apellido_paterno', 'apellido_materno', 'email_institucional']),
+            'dni' => mb_strtolower($usuario->tipo_doc_identidad) === 'dni' ? $usuario->numero_doc_identidad : null,
             'activo' => (bool) $usuario->activo, 'debe_cambiar_password' => (bool) $usuario->debe_cambiar_password,
             'ultimo_acceso' => $usuario->ultimo_acceso?->toIso8601String()];
     }
@@ -121,7 +128,8 @@ final class AdministradoresInstitucion
      */
     private static function esAdministrador(Usuario $usuario): bool
     {
-        return (new Usuario)->newFromBuilder([...$usuario->getAttributes(), 'activo' => true])->isAdministrator();
+        return (new Usuario)->newFromBuilder([...$usuario->getAttributes(), 'activo' => true,
+            'debe_cambiar_password' => false, 'password_temporal_vence_en' => null])->isAdministrator();
     }
 
     private static function claveTemporal(): string

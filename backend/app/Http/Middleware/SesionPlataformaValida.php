@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Plataforma\AdministradorPlataforma;
+use App\Support\PasswordTemporal;
 use Closure;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Http\Request;
@@ -31,12 +32,12 @@ class SesionPlataformaValida
         if (! $administrador instanceof AdministradorPlataforma) {
             return $next($request);
         }
-        if (! $administrador->activo || ! hash_equals(self::huella($administrador), (string) $request->session()->get(self::CLAVE_HUELLA))) {
+        if (PasswordTemporal::vencida($administrador) || ! $administrador->activo || ! hash_equals(self::huella($administrador), (string) $request->session()->get(self::CLAVE_HUELLA))) {
             $guard->logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
-            return response()->json(['message' => 'La sesión ya no es válida. Inicia sesión de nuevo.'], 401);
+            return response()->json(['message' => PasswordTemporal::vencida($administrador) ? PasswordTemporal::MENSAJE : 'La sesión ya no es válida. Inicia sesión de nuevo.'], 401);
         }
         if ($administrador->debe_cambiar_password && ! $request->is(...self::SOLO_CON_TEMPORAL)) {
             return response()->json(['message' => 'Debes cambiar tu contraseña temporal antes de continuar.', 'codigo' => 'cambio_password_requerido'], 403);

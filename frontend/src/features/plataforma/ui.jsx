@@ -25,7 +25,7 @@ export function Seccion({ titulo, descripcion, detalle, acciones, children, clas
  * el botón de confirmar. Se abre al montarse; al cerrarse (Cancelar, Escape) llama a onCerrar. Con bloquearCierre,
  * Escape no lo cierra mientras está ocupado (busy).
  */
-export function Dialogo({ titulo, onCerrar, onEnviar, busy = false, textoBoton, textoOcupado = 'Guardando…', peligro = false, bloquearCierre = false, children }) {
+export function Dialogo({ titulo, onCerrar, onEnviar, busy = false, bloquearEnvio = false, textoBoton, textoOcupado = 'Guardando…', peligro = false, bloquearCierre = false, children }) {
   const ref = useRef(null)
   const id = useId()
   useEffect(() => { ref.current?.showModal() }, [])
@@ -35,7 +35,7 @@ export function Dialogo({ titulo, onCerrar, onEnviar, busy = false, textoBoton, 
       {children}
       <div className="flex justify-end gap-3">
         <button type="button" onClick={() => ref.current.close()} disabled={busy} className={boton('secundario')}>Cancelar</button>
-        <button type="submit" disabled={busy} className={boton(peligro ? 'peligro' : 'principal')}>{busy ? textoOcupado : textoBoton}</button>
+        <button type="submit" disabled={busy || bloquearEnvio} className={boton(peligro ? 'peligro' : 'principal')}>{busy ? textoOcupado : textoBoton}</button>
       </div>
     </form>
   </dialog>

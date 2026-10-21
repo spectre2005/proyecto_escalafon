@@ -130,7 +130,7 @@ final class Aprovisionamiento
     }
 
     /**
-     * Primer administrador (rol ADMIN, como AdministradorSeeder) y nombre de la institución, en la base nueva. La
+     * Primer administrador institucional (rol ADMIN y contraseña temporal) y nombre de la institución, en la base nueva. La
      * conexión por defecto apunta a ella mientras tanto, para que los modelos y sus eventos escriban ahí.
      */
     private static function administrador(Institucion $institucion, array $datos): string

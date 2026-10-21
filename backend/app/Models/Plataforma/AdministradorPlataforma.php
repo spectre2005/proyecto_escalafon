@@ -2,6 +2,7 @@
 
 namespace App\Models\Plataforma;
 
+use App\Support\PasswordTemporal;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
@@ -17,9 +18,14 @@ class AdministradorPlataforma extends Authenticatable
 
     protected $table = 'administradores_plataforma';
 
-    protected $fillable = ['nombre', 'email', 'password', 'activo', 'ultimo_acceso', 'debe_cambiar_password'];
+    protected $fillable = ['dni', 'nombre', 'email', 'password', 'activo', 'ultimo_acceso', 'debe_cambiar_password', 'password_temporal_vence_en'];
 
     protected $hidden = ['password'];
+
+    protected static function booted(): void
+    {
+        static::saving(fn (self $cuenta) => PasswordTemporal::preparar($cuenta));
+    }
 
     /** Sin «recordarme»: la tabla no guarda remember_token. */
     protected $rememberTokenName = '';
@@ -27,7 +33,7 @@ class AdministradorPlataforma extends Authenticatable
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['password' => 'hashed', 'activo' => 'boolean', 'ultimo_acceso' => 'datetime', 'debe_cambiar_password' => 'boolean'];
+        return ['password_temporal_vence_en' => 'immutable_datetime', 'password' => 'hashed', 'activo' => 'boolean', 'ultimo_acceso' => 'datetime', 'debe_cambiar_password' => 'boolean'];
     }
 
     /** Reglas de contraseña de un superadministrador (comando, panel y cambio de la propia). */
@@ -46,7 +52,7 @@ class AdministradorPlataforma extends Authenticatable
     /** Datos administrativos de la cuenta: nunca la contraseña ni su hash. @return array<string, mixed> */
     public function datos(): array
     {
-        return [...$this->only(['id', 'nombre', 'email']), 'activo' => (bool) $this->activo, 'debe_cambiar_password' => (bool) $this->debe_cambiar_password,
+        return [...$this->only(['id', 'dni', 'nombre', 'email']), ...PasswordTemporal::datos($this), 'activo' => (bool) $this->activo, 'debe_cambiar_password' => (bool) $this->debe_cambiar_password,
             'ultimo_acceso' => $this->ultimo_acceso?->toIso8601String(), 'created_at' => $this->created_at?->toIso8601String()];
     }
 }

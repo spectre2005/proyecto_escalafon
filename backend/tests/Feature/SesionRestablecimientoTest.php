@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Plataforma\Institucion;
-use Database\Seeders\AdministradorSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -11,6 +10,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Tests\Concerns\UsaPlataforma;
+use Tests\Fixtures\AdministradorPruebaSeeder as AdministradorSeeder;
 use Tests\TestCase;
 
 /**
@@ -55,7 +55,7 @@ class SesionRestablecimientoTest extends TestCase
         config([
             'session.driver' => 'file', 'session.files' => $this->storage.'/framework/sessions', 'session.encrypt' => true,
             'plataforma.modo' => 'subdominio', 'plataforma.dominio' => 'localhost', 'sanctum.stateful' => ['uno.localhost:5173', 'localhost:5173'],
-            'auth.administrador_inicial' => ['email' => self::ADMIN, 'password' => self::CLAVE],
+            'pruebas.administrador' => ['email' => self::ADMIN, 'password' => self::CLAVE],
             'database.connections.institucion_prueba' => ['driver' => 'sqlite', 'database' => $this->base, 'prefix' => '', 'foreign_key_constraints' => true],
         ]);
         $this->artisan('migrate', ['--database' => 'institucion_prueba', '--force' => true])->assertSuccessful();

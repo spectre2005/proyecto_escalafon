@@ -5,11 +5,12 @@ namespace App\Console\Commands;
 use App\Models\Plataforma\AdministradorPlataforma;
 use App\Support\Plataforma\AuditoriaOperaciones;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 /**
- * Crea una cuenta de superadministrador de la plataforma. Es la única forma de crearla (no hay registro público ni
- * credenciales predeterminadas): la contraseña se escribe dos veces sin mostrarse y no se acepta por parámetro.
+ * Alta de instalación y recuperación operativa: la contraseña se introduce oculta y nunca por parámetro ni archivo.
+ * Las altas posteriores también están disponibles desde el panel autenticado.
  */
 class CrearAdministradorPlataforma extends Command
 {
@@ -19,6 +20,11 @@ class CrearAdministradorPlataforma extends Command
 
     public function handle(): int
     {
+        if (! $this->input->isInteractive()) {
+            $this->error('Este comando requiere una terminal interactiva para introducir la contraseña de forma oculta. Ejecútalo sin --no-interaction.');
+
+            return self::FAILURE;
+        }
         $nombre = trim((string) ($this->option('nombre') ?: $this->ask('Nombre')));
         $email = mb_strtolower(trim((string) ($this->option('email') ?: $this->ask('Correo de acceso'))));
         $password = (string) $this->secret('Contraseña (mínimo 12 caracteres, con letras y números)');
@@ -37,8 +43,10 @@ class CrearAdministradorPlataforma extends Command
             return self::FAILURE;
         }
 
-        $administrador = AdministradorPlataforma::query()->create(['nombre' => $nombre, 'email' => $email, 'password' => $password, 'activo' => true]);
-        AuditoriaOperaciones::registrar('administrador.creado', null, null, null, null, $administrador->only(['id', 'nombre', 'email']), 'Creado con plataforma:crear-administrador.');
+        DB::connection('plataforma')->transaction(function () use ($nombre, $email, $password): void {
+            $administrador = AdministradorPlataforma::query()->create(['nombre' => $nombre, 'email' => $email, 'password' => $password, 'activo' => true]);
+            AuditoriaOperaciones::registrar('administrador.creado', null, null, null, null, $administrador->only(['id', 'nombre', 'email']), 'Creado con plataforma:crear-administrador.');
+        });
         $this->info("Superadministrador creado: {$email}.");
 
         return self::SUCCESS;

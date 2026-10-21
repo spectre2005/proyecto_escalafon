@@ -14,8 +14,6 @@ class DatabaseSeeder extends Seeder
         $this->call([
             UnidadOrganicaSeeder::class,
             CatalogosInstitucionSeeder::class,
-            AdministradorSeeder::class,
-            SuperadministradorSeeder::class,
             InstitucionesPruebaSeeder::class,
             UsuarioSeeder::class,
             EvaluacionDesempenoSeeder::class,

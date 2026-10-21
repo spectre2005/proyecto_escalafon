@@ -40,12 +40,8 @@ class VerificarProduccion extends Command
             $this->exigir(! in_array(Str::lower($valor), self::CLAVES_DEBILES, true) && Str::length($valor) >= 16,
                 "{$variable} debe tener al menos 16 caracteres y no ser una clave conocida.");
         }
-        // Las cuentas e instituciones de prueba (db:seed en local) se configuran con estas variables. En producción los
-        // seeders no hacen nada, pero si están puestas es que se copió .env.example: su contraseña es pública.
-        foreach (['auth.administrador_inicial.email' => 'ADMIN_EMAIL', 'auth.administrador_inicial.password' => 'ADMIN_PASSWORD',
-            'plataforma.administrador_prueba.email' => 'PLATAFORMA_ADMIN_EMAIL', 'plataforma.administrador_prueba.password' => 'PLATAFORMA_ADMIN_PASSWORD',
-            'plataforma.institucion_prueba.slug' => 'PLATAFORMA_PRUEBA_SLUG', 'plataforma.institucion_prueba.nombre' => 'PLATAFORMA_PRUEBA_NOMBRE'] as $clave => $variable) {
-            $this->exigir(trim((string) config($clave)) === '', "{$variable} debe quedar vacía: solo sirve para las cuentas de prueba en local y su contraseña es pública.");
+        foreach (['plataforma.institucion_prueba.slug' => 'PLATAFORMA_PRUEBA_SLUG', 'plataforma.institucion_prueba.nombre' => 'PLATAFORMA_PRUEBA_NOMBRE'] as $clave => $variable) {
+            $this->exigir(trim((string) config($clave)) === '', "{$variable} debe quedar vacía: solo sirve para la institución de demostración local.");
         }
         if (config('plataforma.modo') === 'subdominio') {
             $dominio = (string) config('plataforma.dominio');

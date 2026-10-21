@@ -87,7 +87,7 @@ Desde la raíz del proyecto:
 .\iniciar.ps1
 ```
 
-El script construye e inicia los servicios, instala las dependencias del backend, genera la clave si falta, aplica las migraciones, crea la base de plataforma y carga los catálogos, instituciones y cuentas de demostración. Finalmente inicia el frontend. La primera ejecución puede tardar varios minutos.
+El script construye e inicia los servicios, instala las dependencias del backend, genera la clave si falta, aplica las migraciones, crea la base de plataforma y carga los catálogos y la identidad de la institución local. Las cuentas de acceso se crean por separado. Finalmente inicia el frontend. La primera ejecución puede tardar varios minutos.
 
 Si el script termina con un error, resuélvelo antes de continuar; consulta las soluciones de esta sección. No borres la base de datos para reintentarlo.
 
@@ -225,7 +225,7 @@ docker compose exec app php artisan plataforma:migrar-instituciones --crear-base
 docker compose exec app php artisan db:seed --no-interaction
 ```
 
-Primero se prepara la base institucional, después la de plataforma y finalmente los catálogos y cuentas demo. El seeder crea también las instituciones `uno` y `dos` con sus propias bases.
+Primero se prepara la base institucional, después la de plataforma y finalmente los catálogos y datos locales. Las cuentas de acceso y las instituciones adicionales se crean desde el flujo de instalación y los paneles.
 
 ### Paso 6. Iniciar el frontend y entrar
 
@@ -278,7 +278,7 @@ Sustituye `/ruta/real/proyecto_escalafon` por tu carpeta. Una terminal normal no
 | Archivo | Para qué sirve | Qué revisar |
 | --- | --- | --- |
 | `.env` de la raíz | Variables que lee Docker Compose | Usuario de los contenedores y credenciales de PostgreSQL |
-| `backend/.env` | Configuración de Laravel | Conexión a PostgreSQL, clave de aplicación, cuentas de prueba, instituciones y sesiones |
+| `backend/.env` | Configuración de Laravel | Conexión a PostgreSQL, clave de aplicación, identidad institucional y sesiones |
 
 Las variables `DB_DATABASE`, `DB_USERNAME` y `DB_PASSWORD` deben coincidir en ambos archivos. Los valores de ejemplo son para desarrollo local.
 
@@ -303,8 +303,6 @@ Configura también:
 | `APP_DEBUG=true` | Muestra errores durante el desarrollo |
 | `APP_URL=http://localhost:8000` | Dirección del backend |
 | `APP_KEY` | Se genera en el primer arranque; conservarla después |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Administrador de prueba de la institución principal (solo local) |
-| `PLATAFORMA_ADMIN_EMAIL`, `PLATAFORMA_ADMIN_PASSWORD` | Superadministrador de prueba del panel de plataforma (solo local) |
 | `PLATAFORMA_PRUEBA_SLUG`, `PLATAFORMA_PRUEBA_NOMBRE` | Subdominio y nombre de la institución principal de prueba (solo local) |
 | `PLATAFORMA_MODO=subdominio`, `PLATAFORMA_DOMINIO=localhost` | Cada institución en su subdominio; el panel en `localhost` |
 | `PLATAFORMA_DB_DATABASE` | Base de la plataforma (instituciones y superadministradores), separada de las institucionales |
@@ -313,33 +311,40 @@ Configura también:
 | `SESSION_DRIVER=file`, `CACHE_STORE=file` | Sesiones y caché en archivos; Compose también impone estos valores al servicio `app` |
 | `MAIL_MAILER=log` | Escribe correos en el log; no envía correo real |
 
-`backend/.env.example` trae **cuentas de demostración con una contraseña compartida y pública** (ver [Cuentas e instituciones de demostración](#4-direcciones-y-cuentas-de-acceso)), para que todos los equipos que clonan el proyecto entren igual. Los seeders solo las crean con `APP_ENV=local` o `testing`. Si dejas esas variables vacías, el seeder muestra una advertencia y no crea la cuenta.
+Las cuentas de acceso se almacenan en la base de datos y sus contraseñas se guardan mediante hash. Los archivos `.env` contienen configuración técnica, no correos ni contraseñas de administradores. Los seeders cargan catálogos y datos locales; no crean ni cambian cuentas de acceso.
 
-> **Producción:** nunca copies `backend/.env.example` a producción. Allí no hay cuentas ni contraseñas predeterminadas: se parte de `.env.produccion.example`, el primer superadministrador se crea con `php artisan plataforma:crear-administrador` y cada institución se aprovisiona desde el panel con una contraseña temporal. `php artisan produccion:verificar` (lo ejecuta el contenedor de producción antes de arrancar) rechaza la configuración si `ADMIN_*`, `PLATAFORMA_ADMIN_*` o `PLATAFORMA_PRUEBA_*` tienen valor. Ver [docs/PRODUCCION.md](docs/PRODUCCION.md).
+> **Producción:** parte de `.env.produccion.example`. El primer superadministrador se crea con `php artisan plataforma:crear-administrador`; las demás cuentas se gestionan desde el panel. `produccion:verificar` comprueba la configuración técnica y rechaza la identidad de demostración `PLATAFORMA_PRUEBA_*` en producción. Ver [docs/PRODUCCION.md](docs/PRODUCCION.md).
 
 El frontend utiliza `/api/v1` y el proxy de Vite de forma predeterminada. No necesita un `.env` propio para esta instalación. `VITE_API_URL` permite cambiar la URL, pero una configuración externa requiere revisar cookies, dominios y acceso al backend.
 
 ## 4. Direcciones y cuentas de acceso
 
-`db:seed` crea las mismas cuentas en todos los equipos, con los valores de `backend/.env.example`. **Son ficticias y su contraseña es pública: solo sirven en local.**
+Cada instalación mantiene sus propias cuentas en la base de datos. No hay una contraseña compartida de demostración.
 
-Contraseña de todas: `Demo-Escalafon-2026`
+### Primera instalación
 
-| Para entrar a | Dirección | Correo | Base de datos |
-| --- | --- | --- | --- |
-| Panel de plataforma (superadministrador) | http://localhost:5173/plataforma/login | superadmin@demo.test | `escalafon_plataforma` |
-| UNIQ (institución principal, con 10 personas demo) | http://uniq.localhost:5173 | admin.uniq@demo.test | `escalafon` (la de `DB_DATABASE`) |
-| Universidad de Prueba Uno | http://uno.localhost:5173 | admin.uno@demo.test | `escalafon_uno` |
-| Universidad de Prueba Dos | http://dos.localhost:5173 | admin.dos@demo.test | `escalafon_dos` |
+Después de migrar y sembrar los catálogos, crea el primer superadministrador desde una terminal interactiva:
 
-Cada institución usa su propia base: la cuenta de una no existe en las otras. Desde el panel se pueden suspender y reactivar instituciones, o crear y aprovisionar otras nuevas, que se abren en su propio subdominio.
+```sh
+docker compose exec app php artisan plataforma:crear-administrador
+```
 
-Los datos de demostración no incluyen documentos ni fotos: los legajos, PDF y fotos que cargue cada persona quedan solo en su computadora.
+El comando pide nombre, correo y contraseña con confirmación. La contraseña se introduce de forma oculta; no la pases por argumentos ni la escribas en `.env`. Se guarda su hash y se registra la creación en la auditoría.
 
-**Si ya tenías el proyecto instalado**, copia de `backend/.env.example` a tu `backend/.env` las líneas `ADMIN_*`, `PLATAFORMA_ADMIN_*`, `PLATAFORMA_PRUEBA_*`, `PLATAFORMA_MODO`, `PLATAFORMA_DOMINIO` y `SANCTUM_STATEFUL_DOMAINS`, y vuelve a ejecutar `iniciar.ps1` en Windows o los pasos 5 y 6 de la instalación en Linux. Ten en cuenta:
+1. Entra a http://localhost:5173/plataforma/login con esa cuenta.
+2. Abre la institución principal y su pestaña **Administradores → Agregar administrador**. Para una institución nueva, usa **Aprovisionar**.
+3. Entrega la contraseña temporal al administrador. Deberá cambiarla en su primer ingreso.
+4. Las cuentas adicionales de superadministrador se crean desde **Superadministradores → Nueva cuenta**.
 
-- Las instituciones que ya tengas registradas en tu panel no se tocan, aunque usen el mismo subdominio.
-- `AdministradorSeeder` usa el correo de `ADMIN_EMAIL`: si tu base ya tenía el administrador del sistema con otro correo, lo cambia a `admin.uniq@demo.test` con la contraseña de demostración. Tus legajos no cambian.
+La institución principal local se configura con `PLATAFORMA_PRUEBA_SLUG` y `PLATAFORMA_PRUEBA_NOMBRE`. Con el identificador `uniq`, su dirección es http://uniq.localhost:5173. Las instituciones adicionales se crean desde el panel; no se aprovisionan automáticamente al ejecutar los seeders.
+
+### Instalaciones existentes
+
+Las cuentas y contraseñas actuales se conservan. No necesitas crear otra cuenta ni volver a registrar tus instituciones. Las variables antiguas `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `PLATAFORMA_ADMIN_EMAIL` y `PLATAFORMA_ADMIN_PASSWORD` ya no se utilizan y pueden retirarse del `.env`. Cambia tu contraseña desde **Mi cuenta** si todavía usabas una contraseña de demostración compartida.
+
+Al crear o restablecer una cuenta desde la plataforma, elige en el calendario «Contraseña temporal válida hasta el» una fecha dentro de los próximos 7 días calendario. Vence a las 23:59:59 del día seleccionado, hora de Lima. La fecha exacta se guarda en la base de datos. Las operaciones sin fecha explícita mantienen un plazo inicial de 48 horas. Al vencer, la contraseña temporal deja de permitir el acceso y el cambio de contraseña; otro administrador debe emitir una nueva desde el panel. Cambiarla a tiempo elimina ese límite de la contraseña definitiva. Las contraseñas temporales que ya estaban pendientes al aplicar la migración reciben 48 horas desde la actualización.
+
+Los cambios de contraseña, altas, restablecimientos y desactivaciones se realizan desde los paneles. Repetir `db:seed` no modifica los accesos, los correos ni las contraseñas existentes.
 
 ## 5. Trabajo diario y actualizaciones
 
@@ -373,7 +378,7 @@ El arranque del frontend ejecuta `pnpm install`. Usa `composer install` para res
 
 ### Migraciones y seeders
 
-Las migraciones crean y actualizan el esquema. Algunas también cargan o corrigen catálogos, incluida la sección 04. `DatabaseSeeder` carga catálogos, ubigeos, unidades, regímenes, las cuentas e instituciones de demostración y datos de demostración de usuarios, evaluaciones y requerimientos.
+Las migraciones crean y actualizan el esquema. Algunas también cargan o corrigen catálogos, incluida la sección 04. `DatabaseSeeder` carga catálogos, ubigeos, unidades, regímenes, la identidad de la institución local y datos de demostración de usuarios, evaluaciones y requerimientos.
 
 `migrate` solo migra la base de `DB_DATABASE`. La base de la plataforma y las de cada institución se migran con `plataforma:migrar-instituciones`. Para una instalación existente:
 
@@ -383,7 +388,7 @@ docker compose exec app php artisan plataforma:migrar-instituciones --no-interac
 docker compose exec app php artisan migrate:status --no-interaction
 ```
 
-Para volver a ejecutar los seeders registrados, o crear las cuentas después de completar sus variables:
+Para volver a ejecutar los catálogos y datos locales registrados:
 
 ```sh
 docker compose exec app php artisan config:clear --no-interaction
@@ -393,10 +398,10 @@ docker compose exec app php artisan db:seed --no-interaction
 Para ejecutar una clase específica:
 
 ```sh
-docker compose exec app php artisan db:seed --class=AdministradorSeeder --no-interaction
+docker compose exec app php artisan db:seed --class=CatalogosInstitucionSeeder --no-interaction
 ```
 
-Cambiar `ADMIN_PASSWORD` o `PLATAFORMA_ADMIN_PASSWORD` y repetir el seeder **no restablece automáticamente la contraseña de una cuenta existente con el mismo correo**. Las plantillas `.env.example` tampoco modifican por sí solas los archivos `.env` locales.
+Los antiguos seeders `AdministradorSeeder` y `SuperadministradorSeeder` solo muestran una indicación del flujo actual; nunca crean ni modifican cuentas.
 
 No todos los archivos de `database/seeders/` se ejecutan con `db:seed`: la lista está en `DatabaseSeeder.php`. Algunos son ejemplos o crean datos con factories; revisa su contenido antes de ejecutarlos individualmente. Las personas demo no reemplazan a la cuenta administradora.
 
@@ -497,7 +502,6 @@ Verificación realizada el **19 de octubre de 2026**, en Linux con Docker Engine
 | --- | --- |
 | Configuración de Compose (`docker compose config --quiet`) | Correcta. |
 | Requisitos PHP (`composer check-platform-reqs`) | Cumplidos; PDO dispone de PostgreSQL y SQLite. |
-| Instalación sobre PostgreSQL 16 vacío y temporal | Migraciones y seeders correctos; se crearon las cuatro bases y las instituciones `uniq`, `uno` y `dos`, con sus cuentas demo. |
 | Backend (`php artisan test --compact`) | 792 pruebas aprobadas, 9062 aserciones. |
 | Frontend (`pnpm test`) | 141 pruebas aprobadas. |
 | Frontend (`pnpm lint` y `pnpm build`) | Correctos; Vite advierte de chunks mayores de 500 kB, sin impedir la compilación. |
@@ -544,13 +548,13 @@ PostgreSQL usa las variables de inicialización cuando crea el volumen por prime
 
 ### No puedo iniciar sesión, aparece 419 o la API devuelve 403
 
-- Si no existen las cuentas de demostración, revisa sus variables en `backend/.env`, limpia la configuración (`config:clear`) y vuelve a ejecutar `db:seed`.
+- Si aún no hay cuentas, crea el primer superadministrador con `plataforma:crear-administrador` y los administradores institucionales desde el panel. Si la cuenta existe, restablece su contraseña desde el panel correspondiente; los seeders no cambian accesos.
 - Para problemas de sesión, usa la misma dirección durante todo el flujo (por ejemplo, siempre `http://uniq.localhost:5173`). Comprueba que `SANCTUM_STATEFUL_DOMAINS` incluya `*.localhost:5173`, `SESSION_SECURE_COOKIE=false`, `SESSION_DOMAIN=null` y `APP_KEY`; borra las cookies locales después de corregir la configuración.
 - Un 403 con "El acceso de esta institución está suspendido" significa que se suspendió desde el panel: reactívala ahí. Otro 403 puede indicar falta de permisos o acceso bloqueado a una sección. Revisa la respuesta de la API antes de cambiar permisos.
 
 ### "No existe una institución activa en esta dirección"
 
-- En `http://localhost:5173` sin subdominio es lo esperado: entra por `uniq.localhost`, `uno.localhost` o `dos.localhost`.
+- En `http://localhost:5173` sin subdominio es lo esperado: entra por el subdominio registrado de tu institución (por ejemplo, `uniq.localhost`).
 - En un subdominio, la institución no está registrada, aún no está aprovisionada o no se ha activado. Revísala en el panel de plataforma, o vuelve a ejecutar `db:seed` si faltan las de demostración.
 - Si el navegador no abre `uniq.localhost`, prueba con Chrome, Edge o Firefox.
 

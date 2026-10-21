@@ -14,7 +14,7 @@ function notifyUpdate() {
 }
 if (updates) updates.onmessage = notifyUpdate
 api.interceptors.response.use(response => {
-  if (['post', 'put', 'patch', 'delete'].includes(response.config.method)) {
+  if (response.config.notificarCambios !== false && ['post', 'put', 'patch', 'delete'].includes(response.config.method)) {
     notifyUpdate()
     updates?.postMessage('updated')
   }
