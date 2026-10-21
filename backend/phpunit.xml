@@ -37,6 +37,10 @@
         <env name="PLATAFORMA_MODO" value="unica"/>
         <!-- Carpetas comunes aunque el .env tenga carpeta propia; AlmacenamientoUnicaTest prueba la variable. -->
         <env name="PLATAFORMA_ALMACENAMIENTO_UNICA" value="" force="true"/>
+        <!-- Sin proveedor de identidad salvo que la prueba lo elija (ConsultaIdentidadTest), aunque el .env local use el simulado. -->
+        <env name="IDENTIDAD_PROVEEDOR" value="ninguno" force="true"/>
+        <!-- Nunca el token real en pruebas: cada prueba de Factiliza pone uno ficticio y responde con Http::fake. -->
+        <env name="FACTILIZA_TOKEN" value="" force="true"/>
         <env name="MAIL_MAILER" value="array" force="true"/>
         <env name="QUEUE_CONNECTION" value="sync" force="true"/>
         <env name="SESSION_DRIVER" value="array" force="true"/>

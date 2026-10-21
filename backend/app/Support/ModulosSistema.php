@@ -18,6 +18,9 @@ final class ModulosSistema
     public const CATALOGO = ['evaluaciones' => [
         'nombre' => 'Evaluaciones del menú principal',
         'descripcion' => 'Consulta general de evaluaciones, progresiones, ratificaciones y desplazamientos. La sección 07 del legajo y los reportes conservan su configuración independiente.',
+    ], 'consulta_dni' => [
+        'nombre' => 'Consulta de identidad por DNI',
+        'descripcion' => 'En el registro manual de personal, completa nombres y apellidos a partir del DNI con el proveedor de identidad configurado en el servidor. Activarla no conecta con RENIEC: si no hay un proveedor autorizado, la consulta figura como no disponible y el registro sigue siendo manual.',
     ]];
 
     public static function institucionActual(): ?Institucion

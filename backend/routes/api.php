@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\CompensacionBeneficioController;
 use App\Http\Controllers\Api\V1\CompromisoDocumentoController;
 use App\Http\Controllers\Api\V1\CompromisoEntregaOriginalController;
 use App\Http\Controllers\Api\V1\ConfiguracionFuncionalidadController;
+use App\Http\Controllers\Api\V1\ConsultaIdentidadController;
 use App\Http\Controllers\Api\V1\ControversiaController;
 use App\Http\Controllers\Api\V1\DeclaracionVerificacionController;
 use App\Http\Controllers\Api\V1\DesplazamientoController;
@@ -291,6 +292,11 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
         Route::post('usuarios', [UsuarioController::class, 'store'])->name('api.v1.usuarios.store');
         // Registro manual: persona con su primer vínculo (además exige legajo.abrir y legajo.editar, en el controlador).
         Route::post('usuarios/con-vinculo', [UsuarioController::class, 'storeConVinculo'])->name('api.v1.usuarios.store-con-vinculo');
+        // Consulta de identidad por DNI para completar el registro manual (no crea personas; además exige legajo.abrir y
+        // legajo.editar, en el controlador). El DNI va en el cuerpo, nunca en la URL.
+        Route::get('identidad/consulta-dni', [ConsultaIdentidadController::class, 'estado'])->name('api.v1.identidad.estado');
+        Route::post('identidad/consulta-dni', [ConsultaIdentidadController::class, 'consultar'])
+            ->middleware(ModuloSistemaActivo::class.':'.ConsultaIdentidadController::MODULO)->name('api.v1.identidad.consultar');
         Route::match(['put', 'patch'], 'usuarios/{record}', [UsuarioController::class, 'update'])->whereUuid('record')->name('api.v1.usuarios.update');
         Route::delete('usuarios/{record}', [UsuarioController::class, 'destroy'])->whereUuid('record')->name('api.v1.usuarios.destroy');
     });

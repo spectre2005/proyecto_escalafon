@@ -57,6 +57,13 @@ class VerificarProduccion extends Command
         } else {
             $this->avisar('PLATAFORMA_MODO=unica: una sola institución, sin panel de plataforma operativo.');
         }
+        $this->exigir(trim((string) config('identidad.proveedor')) !== 'simulado',
+            'IDENTIDAD_PROVEEDOR no puede ser simulado: sus datos son ficticios (en producción se bloquea igual). Usa ninguno hasta tener un proveedor oficial.');
+        $this->exigir(trim((string) config('identidad.proveedor')) !== 'factiliza' || trim((string) config('identidad.factiliza.token')) !== '',
+            'IDENTIDAD_PROVEEDOR=factiliza exige FACTILIZA_TOKEN: sin él la consulta por DNI no funciona. Usa ninguno o define el token.');
+        if (trim((string) config('identidad.proveedor')) === 'factiliza') {
+            $this->avisar('IDENTIDAD_PROVEEDOR=factiliza: el DNI consultado se envía a un servicio externo de pago, no oficial (no es RENIEC).');
+        }
         $this->almacenamientoUnica();
         if (config('app.crud_generico_escritura')) {
             $this->avisar('API_CRUD_GENERICO_ESCRITURA=true: el CRUD genérico permite borrar y editar sin las reglas de cada sección (auditoría, historial, folios).');
