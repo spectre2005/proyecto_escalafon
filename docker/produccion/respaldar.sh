@@ -7,14 +7,19 @@
 #
 # Copia externa (opcional): si RESPALDO_REMOTO está definido, sube la carpeta con rclone (imagen Docker, sin
 # instalarlo) y la comprueba con «rclone cryptcheck». Solo a un remoto de tipo crypt: Google Drive u otro servicio
-# guarda los archivos cifrados y con nombres ilegibles. Si el remoto no es crypt, no se sube nada y queda como fallo.
+# guarda los archivos cifrados y con nombres ilegibles. No se sube nada, y queda como fallo, si el remoto no es crypt,
+# si rclone.conf no está cifrado con su clave (conectar-drive.sh lo prepara) o si la aplicación no está en
+# APP_ENV=production: un entorno local conectado a datos reales nunca sube copias.
 #
 # Cada resultado se registra en la base de la plataforma (plataforma:registrar-respaldo) y el panel lo muestra.
 # Programarlo con cron (docs/PRODUCCION.md). Termina con error si algo falló.
 #
-# Variables (entorno o líneas RESPALDO_* de .env.produccion):
+# Variables (entorno o líneas RESPALDO_* de .env.produccion). Una variable del entorno manda aunque esté vacía:
+# «RESPALDO_REMOTO= sh respaldar.sh» no sube nada aunque .env.produccion tenga un remoto.
 #   RESPALDO_REMOTO        remoto:ruta de rclone, de tipo crypt (vacío: sin copia externa)
-#   RESPALDO_RCLONE_CONF   archivo de configuración de rclone (por defecto ~/.config/rclone/rclone.conf)
+#   RESPALDO_RCLONE_CONF   archivo de configuración de rclone, cifrado (por defecto ~/.config/rclone/rclone.conf)
+#   RESPALDO_RCLONE_CLAVE  archivo con la clave de rclone.conf, permisos 600 o 400 (por defecto
+#                          ~/.config/escalafon/rclone.clave); se monta solo para rclone y nunca se imprime
 #   RESPALDO_DIR           carpeta de los respaldos (por defecto «respaldos», en la raíz del repositorio)
 #   RESPALDO_DIAS          días que se conservan en el servidor (14); nunca se borra uno protegido
 #   RESPALDO_CONSERVAR     motivo para proteger ESTE respaldo (p. ej. antes de normalizar una institución): queda con
@@ -23,16 +28,19 @@
 #                          RESPALDO_DIR fuera de todo repositorio git (.gitignore no basta: git add -f lo incluiría).
 #   RESPALDO_REMOTO_DIAS   días que se conservan en la copia externa (30)
 #   RESPALDO_DC            orden de docker compose (por defecto, la de producción; las pruebas usan otra)
+#   RESPALDO_ENTORNO       archivo del que se leen las líneas RESPALDO_* (por defecto .env.produccion; las pruebas)
 set -eu
 umask 077
 cd "$(dirname "$0")/../.."
 
-if [ -f .env.produccion ]; then
-	# Solo las líneas RESPALDO_* sin espacios, sin ejecutarlas; las del entorno mandan.
-	for linea in $(grep -E '^RESPALDO_[A-Z_]+=[^ ]*$' .env.produccion || true); do
+RESPALDO_ENTORNO=${RESPALDO_ENTORNO:-.env.produccion}
+if [ -f "$RESPALDO_ENTORNO" ]; then
+	# Solo las líneas RESPALDO_* sin espacios, sin ejecutarlas. Las del entorno mandan, también si están vacías: una
+	# variable presente pero vacía no se reemplaza en silencio por la del archivo.
+	for linea in $(grep -E '^RESPALDO_[A-Z_]+=[^ ]*$' "$RESPALDO_ENTORNO" || true); do
 		nombre=${linea%%=*}
-		eval "actual=\${$nombre:-}"
-		[ -n "$actual" ] || export "$linea"
+		eval "definida=\${$nombre+si}"
+		[ "$definida" = si ] || export "$linea"
 	done
 fi
 RESPALDO_DC=${RESPALDO_DC:-docker compose --env-file .env.produccion -f docker-compose.produccion.yml}
@@ -40,10 +48,25 @@ RESPALDO_REMOTO=${RESPALDO_REMOTO:-}
 RESPALDO_DIR=${RESPALDO_DIR:-respaldos}
 RESPALDO_CONSERVAR=${RESPALDO_CONSERVAR:-}
 RESPALDO_RCLONE_CONF=${RESPALDO_RCLONE_CONF:-$HOME/.config/rclone/rclone.conf}
+RESPALDO_RCLONE_CLAVE=${RESPALDO_RCLONE_CLAVE:-$HOME/.config/escalafon/rclone.clave}
 RCLONE_IMAGEN=rclone/rclone:1.68.2
 # Sin entrada estándar: docker compose exec la leería y, dentro de un «while read», se comería las líneas siguientes.
 dc() { $RESPALDO_DC "$@" < /dev/null; }
-rclone_docker() { docker run --rm -v "$RESPALDO_RCLONE_CONF:/config/rclone/rclone.conf" -v "$RESPALDO_DIR:/respaldos:ro" ${RESPALDO_RCLONE_DOCKER_ARGS:-} "$RCLONE_IMAGEN" "$@"; }
+# rclone con el usuario actual y la carpeta de rclone.conf montada (al renovar el token de Google reescribe el archivo,
+# cifrado). La clave llega por --password-command desde un archivo de solo lectura: ni en argumentos ni en el entorno.
+rclone_docker() {
+	docker run --rm --user "$(id -u):$(id -g)" -v "$(dirname "$RESPALDO_RCLONE_CONF"):/config/rclone" \
+		-v "$RESPALDO_RCLONE_CLAVE:/run/clave:ro" -v "$RESPALDO_DIR:/respaldos:ro" ${RESPALDO_RCLONE_DOCKER_ARGS:-} "$RCLONE_IMAGEN" \
+		--config "/config/rclone/$(basename "$RESPALDO_RCLONE_CONF")" --password-command "cat /run/clave" --cache-dir /tmp "$@" < /dev/null
+}
+# Motivo legible de un fallo de rclone (su salida de error, en $1): autenticación de Google o un fallo general.
+motivo_rclone() { # $1 archivo con la salida de error, $2 qué falló
+	if grep -Eqi 'invalid_grant|unauthorized|oauth2|token (has been )?(expired|revoked)|couldn.t fetch token|Error 40[13]' "$1"; then
+		echo "$2: Google Drive rechazó la autorización (vuelve a ejecutar docker/produccion/conectar-drive.sh)"
+	else
+		echo "$2"
+	fi
+}
 
 # Un respaldo protegido se comprueba antes de crear nada.
 if [ -n "$RESPALDO_CONSERVAR" ]; then
@@ -136,27 +159,40 @@ for base in $bases_servidor; do
 done
 [ ! -d "$destino/otras" ] || (cd "$destino/otras" && sha256sum ./* > SHA256SUMS)
 
-# Copia externa cifrada.
+# Copia externa cifrada. Primero el respaldo local (arriba); después la subida y su comprobación.
 externa=no_configurada
 detalle_externa=""
 if [ -n "$RESPALDO_REMOTO" ]; then
 	remoto=${RESPALDO_REMOTO%%:*}
 	ruta=${RESPALDO_REMOTO#*:}
+	errores_rclone=$(mktemp)
 	if [ "$ruta" = "$RESPALDO_REMOTO" ] || [ -z "$ruta" ] || [ "$ruta" = "/" ]; then
 		# Se borran las copias antiguas de esta ruta: nunca la raíz del remoto, donde puede haber otros archivos.
 		externa=fallida detalle_externa="RESPALDO_REMOTO debe ser remoto:carpeta (una carpeta solo para respaldos)"
+	elif ! dc exec -T app php artisan env 2>/dev/null | grep -q '\[production\]'; then
+		externa=fallida detalle_externa="la copia externa solo se hace con APP_ENV=production: este entorno no sube copias"
 	elif [ ! -f "$RESPALDO_RCLONE_CONF" ]; then
 		externa=fallida detalle_externa="no existe $RESPALDO_RCLONE_CONF"
-	elif ! rclone_docker config show "$remoto" 2>/dev/null | grep -qx 'type = crypt'; then
-		externa=fallida detalle_externa="el remoto $remoto no es de tipo crypt: no se sube sin cifrar"
-	elif rclone_docker copy "/respaldos/$carpeta" "$RESPALDO_REMOTO/$carpeta" --exclude .resultados \
-		&& rclone_docker cryptcheck "/respaldos/$carpeta" "$RESPALDO_REMOTO/$carpeta" --exclude .resultados; then
+	elif ! grep -q '^RCLONE_ENCRYPT_V0:' "$RESPALDO_RCLONE_CONF"; then
+		externa=fallida detalle_externa="rclone.conf no está cifrado: prepáralo con docker/produccion/conectar-drive.sh"
+	elif [ ! -f "$RESPALDO_RCLONE_CLAVE" ]; then
+		externa=fallida detalle_externa="no existe la clave de rclone.conf ($RESPALDO_RCLONE_CLAVE)"
+	elif ! case "$(stat -c %a "$RESPALDO_RCLONE_CLAVE")" in 600 | 400) true ;; *) false ;; esac; then
+		externa=fallida detalle_externa="la clave de rclone.conf debe tener permisos 600 o 400"
+	elif ! rclone_docker config show "$remoto" 2>"$errores_rclone" | grep -qx 'type = crypt'; then
+		externa=fallida detalle_externa="el remoto $remoto no es de tipo crypt, no existe o rclone.conf no se pudo abrir con su clave: no se sube nada"
+	elif ! rclone_docker copy "/respaldos/$carpeta" "$RESPALDO_REMOTO/$carpeta" --exclude .resultados 2>"$errores_rclone"; then
+		externa=fallida detalle_externa=$(motivo_rclone "$errores_rclone" "falló la subida (rclone copy)")
+	elif ! rclone_docker cryptcheck "/respaldos/$carpeta" "$RESPALDO_REMOTO/$carpeta" --exclude .resultados 2>"$errores_rclone"; then
+		externa=fallida detalle_externa=$(motivo_rclone "$errores_rclone" "la comprobación de la copia subida no coincide o falló (rclone cryptcheck)")
+	else
 		externa=correcta
 		rclone_docker delete --min-age "${RESPALDO_REMOTO_DIAS:-30}d" "$RESPALDO_REMOTO" || echo "Aviso: no se pudieron borrar copias externas antiguas." >&2
 		rclone_docker rmdirs --leave-root "$RESPALDO_REMOTO" || true
-	else
-		externa=fallida detalle_externa="rclone copy o cryptcheck falló"
 	fi
+	# Las últimas líneas de error de rclone, para diagnosticar (rclone no escribe ahí el token ni la clave).
+	[ "$externa" != fallida ] || [ ! -s "$errores_rclone" ] || tail -n 3 "$errores_rclone" | sed 's/^/rclone: /' >&2
+	rm -f "$errores_rclone"
 	echo "Copia externa: $externa${detalle_externa:+ ($detalle_externa)}"
 fi
 

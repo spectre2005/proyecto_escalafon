@@ -107,6 +107,7 @@ shift
 case "$1" in
 plataforma:respaldo-plan) printf 'plataforma\tescalafon_plataforma\t-\nuniq\tescalafon\tinstituciones/uniq\n' ;;
 plataforma:registrar-respaldo) shift; echo "$*" >> "$FALSO/registros" ;;
+env) echo "INFO  The application environment is [${FALSO_APP_ENV:-production}]." ;;
 *) exit 1 ;;
 esac
 EOF
@@ -116,7 +117,42 @@ cat > "$T/hostbin/docker" <<'EOF'
 echo "$*" >> "$FALSO/docker"
 exit 1
 EOF
-chmod +x "$FALSO/bin/"* "$T/hostbin/docker"
+# docker falso con rclone simulado para la copia externa: nunca sale a la red. Exige la clave por --password-command
+# y simula, según FALSO_*, un remoto de otro tipo, una autorización rechazada, una subida o una comprobación fallidas.
+mkdir -p "$T/rclonebin"
+cat > "$T/rclonebin/docker" <<'FIN_RCLONE'
+#!/bin/sh
+echo "$*" >> "$FALSO/rclone.log"
+clave=""
+while [ "$#" -gt 0 ] && [ "$1" != rclone/rclone:1.68.2 ]; do
+	[ "$1" != -v ] || case "$2" in *:/run/clave:ro) clave=${2%:/run/clave:ro} ;; esac
+	shift
+done
+[ "$#" -gt 0 ] || exit 99
+shift
+pc=""
+while [ "$#" -gt 0 ]; do
+	case "$1" in
+	--password-command) pc=$2; shift 2 ;;
+	--config | --cache-dir | --contimeout | --timeout | --retries) shift 2 ;;
+	*) break ;;
+	esac
+done
+[ "$pc" = "cat /run/clave" ] && [ -r "$clave" ] || { echo "falso: rclone sin su clave" >&2; exit 98; }
+[ "$(cat "$clave")" = clave-de-prueba ] || { echo "CRITICAL: Failed to load config file: password incorrect" >&2; exit 1; }
+case "$1" in
+config) [ "$2" = show ] || exit 97; printf '[%s]\ntype = %s\npassword = SECRETO-FALSO\n' "$3" "${FALSO_TIPO:-crypt}" ;;
+copy)
+	case "${FALSO_COPIA:-}" in
+	auth) echo 'ERROR : couldn'"'"'t fetch token: oauth2: "invalid_grant" "Token has been expired or revoked."' >&2; exit 1 ;;
+	falla) echo 'ERROR : Failed to copy: googleapi: Error 500: backendError' >&2; exit 1 ;;
+	esac ;;
+cryptcheck) [ -z "${FALSO_CHECK:-}" ] || { echo 'ERROR : 1 differences found' >&2; exit 1; } ;;
+delete | rmdirs) ;;
+*) exit 97 ;;
+esac
+FIN_RCLONE
+chmod +x "$FALSO/bin/"* "$T/hostbin/docker" "$T/rclonebin/docker"
 
 export RESPALDO_DC="sh $FALSO/dc.sh"
 export PATH="$T/hostbin:$PATH"
@@ -250,6 +286,76 @@ comprobar "el protegido de hace 60 días sigue" test -f "$RESPALDO_DIR/$protegid
 comprobar "lo informa" salida_tiene "Se conserva $protegido (protegido con .conservar)."
 comprobar "el normal de hace 60 días se borró" test ! -e "$RESPALDO_DIR/$viejo"
 comprobar "el protegido sigue verificable" restaurar verificar "$protegido" uniq
+
+echo "respaldar.sh: copia externa (rclone simulado, sin red)"
+mkdir -p "$T/rclone" "$T/claves"
+printf '# Encrypted rclone\nRCLONE_ENCRYPT_V0:\nCONTENIDO-CIFRADO-FALSO\n' > "$T/rclone/rclone.conf"
+printf 'clave-de-prueba' > "$T/claves/rclone.clave"
+chmod 600 "$T/rclone/rclone.conf" "$T/claves/rclone.clave"
+printf 'RESPALDO_REMOTO=cifrado:copias\nRESPALDO_RCLONE_CONF=%s\nRESPALDO_RCLONE_CLAVE=%s\n' \
+	"$T/rclone/rclone.conf" "$T/claves/rclone.clave" > "$T/entorno"
+export RESPALDO_DIR="$T/externas"
+: > "$FALSO/rclone.log"
+# Respaldo con el rclone simulado y el entorno de prueba, sin RESPALDO_REMOTO en el entorno (lo da el archivo).
+remota() { env -u RESPALDO_REMOTO RESPALDO_ENTORNO="$T/entorno" PATH="$T/rclonebin:$PATH" "$@" sh "$REPO/docker/produccion/respaldar.sh" > "$T/salida" 2>&1; }
+ultimo_uniq() { grep '^uniq ' "$FALSO/registros" | tail -n 1; }
+sin_secretos() { ! grep -Eq 'clave-de-prueba|SECRETO-FALSO' "$T/salida"; }
+
+# RESPALDO_REMOTO sigue exportado y vacío (arriba): manda sobre el remoto del archivo.
+if env RESPALDO_ENTORNO="$T/entorno" PATH="$T/rclonebin:$PATH" sh "$REPO/docker/produccion/respaldar.sh" > "$T/salida" 2>&1; then
+	ok "variable presente y vacía: termina bien"
+else falla "variable presente y vacía: debía terminar bien"; fi
+comprobar "la variable vacía manda sobre el archivo: sin copia externa" sh -c "grep '^uniq ' '$FALSO/registros' | tail -n 1 | grep -q -- '--copia-externa=no_configurada'"
+comprobar "y no llama a rclone" test ! -s "$FALSO/rclone.log"
+
+sleep 1
+comprobar "destino bien configurado: termina bien" remota
+comprobar "registra la copia externa correcta" sh -c "grep '^uniq ' '$FALSO/registros' | tail -n 1 | grep -q -- '--estado=correcto --copia-externa=correcta'"
+comprobar "sube y después comprueba con cryptcheck" sh -c "grep -n ' copy /respaldos/' '$FALSO/rclone.log' | head -n 1 | cut -d: -f1 > '$T/n1' && grep -n ' cryptcheck /respaldos/' '$FALSO/rclone.log' | head -n 1 | cut -d: -f1 > '$T/n2' && [ \"\$(cat '$T/n1')\" -lt \"\$(cat '$T/n2')\" ]"
+comprobar "la clave llega por --password-command desde un montaje de solo lectura" sh -c "grep -q -- '--password-command cat /run/clave' '$FALSO/rclone.log' && grep -q ':/run/clave:ro' '$FALSO/rclone.log'"
+comprobar "la clave nunca va en los argumentos" sh -c "! grep -q clave-de-prueba '$FALSO/rclone.log'"
+comprobar "sin secretos en la salida" sin_secretos
+comprobar "respaldar.sh no conoce RESPALDO_MODO" sh -c "! grep -q RESPALDO_MODO '$REPO/docker/produccion/respaldar.sh'"
+
+fallida_externa() { # $1 descripción $2 texto esperado en el detalle; resto: variables del caso
+	descripcion=$1 texto=$2
+	shift 2
+	sleep 1
+	: > "$FALSO/rclone.log"
+	if remota "$@"; then falla "$descripcion: debía terminar con error"; else ok "$descripcion: termina con error"; fi
+	registro=$(ultimo_uniq)
+	if printf '%s' "$registro" | grep -q -- '--estado=correcto --copia-externa=fallida'; then
+		ok "$descripcion: respaldo local correcto y copia externa fallida"
+	else falla "$descripcion: respaldo local correcto y copia externa fallida ($registro)"; fi
+	if printf '%s' "$registro" | grep -qF -- "$texto"; then ok "$descripcion: el detalle lo explica"; else falla "$descripcion: el detalle lo explica ($registro)"; fi
+	comprobar "$descripcion: el respaldo local existe" test -f "$RESPALDO_DIR/$(ultima_carpeta "$RESPALDO_DIR")/uniq/base.dump"
+	comprobar "$descripcion: sin secretos en la salida" sin_secretos
+}
+fallida_externa "fuera de producción" "solo se hace con APP_ENV=production" FALSO_APP_ENV=local
+comprobar "fuera de producción: no llama a rclone" test ! -s "$FALSO/rclone.log"
+fallida_externa "RESPALDO_MODO=local no habilita nada" "solo se hace con APP_ENV=production" FALSO_APP_ENV=local RESPALDO_MODO=local
+comprobar "RESPALDO_MODO=local: no llama a rclone" test ! -s "$FALSO/rclone.log"
+fallida_externa "sin rclone.conf" "no existe $T/no-existe.conf" RESPALDO_RCLONE_CONF="$T/no-existe.conf"
+comprobar "sin rclone.conf: no llama a rclone" test ! -s "$FALSO/rclone.log"
+printf '[cifrado]\ntype = crypt\n' > "$T/rclone/plano.conf"
+fallida_externa "rclone.conf sin cifrar" "rclone.conf no está cifrado" RESPALDO_RCLONE_CONF="$T/rclone/plano.conf"
+comprobar "rclone.conf sin cifrar: no llama a rclone" test ! -s "$FALSO/rclone.log"
+fallida_externa "sin la clave" "no existe la clave" RESPALDO_RCLONE_CLAVE="$T/claves/no-existe"
+cp "$T/claves/rclone.clave" "$T/claves/abierta"
+chmod 644 "$T/claves/abierta"
+fallida_externa "clave con permisos abiertos" "permisos 600 o 400" RESPALDO_RCLONE_CLAVE="$T/claves/abierta"
+comprobar "clave con permisos abiertos: no llama a rclone" test ! -s "$FALSO/rclone.log"
+printf 'otra-clave' > "$T/claves/equivocada"
+chmod 600 "$T/claves/equivocada"
+fallida_externa "clave equivocada (configuración incorrecta)" "no se pudo abrir con su clave" RESPALDO_RCLONE_CLAVE="$T/claves/equivocada"
+fallida_externa "remoto que no es crypt" "no es de tipo crypt" FALSO_TIPO=drive
+comprobar "remoto que no es crypt: no sube nada" sh -c "! grep -q ' copy ' '$FALSO/rclone.log'"
+fallida_externa "remoto sin carpeta" "debe ser remoto:carpeta" RESPALDO_REMOTO=cifrado:
+fallida_externa "autorización rechazada" "Google Drive rechazó la autorización" FALSO_COPIA=auth
+fallida_externa "subida fallida" "falló la subida (rclone copy)" FALSO_COPIA=falla
+comprobar "subida fallida: no la da por comprobada" sh -c "! grep -q ' cryptcheck ' '$FALSO/rclone.log'"
+fallida_externa "comprobación fallida" "la comprobación de la copia subida no coincide" FALSO_CHECK=1
+comprobar "comprobación fallida: no toca las copias remotas anteriores" sh -c "! grep -Eq ' (delete|rmdirs) ' '$FALSO/rclone.log'"
 
 echo "Al terminar"
 comprobar "las bases reales falsas siguen intactas" bases_reales_intactas

@@ -101,46 +101,82 @@ repositorio git (`.gitignore` no basta: `git add -f` lo incluiría). Por ejemplo
         sh docker/produccion/respaldar.sh
     RESPALDO_DIR="$HOME/respaldos-escalafon" sh docker/produccion/restaurar.sh verificar AAAAMMDD-HHMMSS uniq
 
-Pruebas aisladas de los dos scripts (en el host, sin Docker ni bases reales): `sh docker/produccion/pruebas/respaldos.sh`.
+Pruebas aisladas (sin Docker real, sin red ni bases reales): `sh docker/produccion/pruebas/respaldos.sh` (respaldo,
+verificación y copia externa con un rclone simulado) y `sh docker/produccion/pruebas/conectar-drive.sh` (el asistente
+de Google Drive).
+
+Las variables `RESPALDO_*` se leen del entorno o de `.env.produccion`. **Una variable del entorno manda aunque esté
+vacía**: `RESPALDO_REMOTO= sh docker/produccion/respaldar.sh` no sube nada aunque `.env.produccion` tenga un remoto.
 
 Programarlo cada noche con `crontab -e`:
 
     0 2 * * * cd /ruta/del/proyecto && sh docker/produccion/respaldar.sh >> respaldos/respaldo.log 2>&1
 
-### Copia externa cifrada (Google Drive u otro servicio)
+### Copia externa cifrada (Google Drive)
 
-Un respaldo en el mismo servidor no protege si se pierde el servidor. Con `RESPALDO_REMOTO`, el script sube cada
-respaldo con [rclone](https://rclone.org), usando su imagen Docker, sin instalarlo, y lo comprueba con
-`rclone cryptcheck`. Solo sube a un remoto de tipo **crypt**: el servicio externo guarda los archivos cifrados y con
-nombres ilegibles, porque llevan datos personales y de salud. Si el remoto no es crypt, no sube nada y lo registra
-como fallo.
+Un respaldo en el mismo servidor no protege si se pierde el servidor. Con `RESPALDO_REMOTO`, `respaldar.sh` sube cada
+respaldo **después** de crearlo en el servidor, con [rclone](https://rclone.org) en su imagen Docker (sin instalarlo),
+y lo comprueba con `rclone cryptcheck`. El resultado queda en el panel como copia externa `correcta` (subida y
+comprobada), `fallida` (con el motivo) o `no_configurada`. Si la copia externa falla, el respaldo local sigue
+registrado como correcto y el script termina con error.
+
+No se sube nada, y queda como `fallida`, si:
+
+- la aplicación no está en `APP_ENV=production` (un entorno local, aunque esté conectado a datos reales, nunca sube);
+- `RESPALDO_REMOTO` no es `remoto:carpeta`, o el remoto no es de tipo **crypt** (Google ve los archivos cifrados y
+  con nombres ilegibles, porque llevan datos personales y de salud);
+- `rclone.conf` no existe, **no está cifrado**, o su clave falta, tiene permisos distintos de 600/400 o no lo abre.
+
+El motivo distingue una autorización de Google rechazada o revocada (hay que volver a ejecutar el asistente), una
+subida fallida y una comprobación que no coincide.
 
 **Pendiente del cliente:** de quién es la cuenta de destino (del proveedor o de cada universidad), y que la
 universidad autorice que sus datos, aunque vayan cifrados, se guarden en un servicio externo.
 
-1. Crear la configuración en el servidor, con un remoto de Drive y un remoto crypt encima de una carpeta solo para
-   respaldos:
+#### Credenciales: rclone.conf cifrado y su clave
 
-       mkdir -p ~/.config/rclone
-       docker run --rm -it -v ~/.config/rclone:/config/rclone rclone/rclone:1.68.2 config
+`rclone.conf` guarda el token de Google y las contraseñas del cifrado de los respaldos. Sin cifrar, rclone solo las
+**ofusca** (cualquiera que lea el archivo las recupera). Por eso se exige `rclone.conf` cifrado con la clave de
+`RESPALDO_RCLONE_CLAVE` (por defecto `~/.config/escalafon/rclone.clave`, en otra carpeta que `rclone.conf`):
 
-   - `n` (nuevo) → nombre `drive` → tipo `drive` → seguir el asistente (cuenta de Google).
-   - `n` (nuevo) → nombre `cifrado` → tipo `crypt` → remote `drive:escalafon-respaldos` → cifrar nombres →
-     **contraseña y sal generadas**.
-2. **Guardar la contraseña y la sal del remoto crypt fuera del servidor** (gestor de contraseñas del equipo).
-   Sin ellas, los respaldos de la copia externa no se pueden descifrar.
-3. En `.env.produccion`:
+- La clave llega a rclone con `--password-command`, desde un archivo montado de solo lectura: nunca en los argumentos,
+  en el entorno, en `.env.produccion` ni en los logs. Al renovar el token, rclone reescribe `rclone.conf` cifrado.
+- `rclone.conf` y la clave van fuera del repositorio, con permisos 600. **Guarda una copia de cada uno, por separado y
+  fuera del servidor** (p. ej. el gestor de contraseñas del equipo): sin los dos no se pueden leer las copias de Drive.
+- Limitación: el usuario que ejecuta los respaldos lee ambos archivos; el cifrado protege `rclone.conf` si se copia,
+  se filtra o se respalda por separado, no frente a quien ya controla esa cuenta del servidor.
 
-       RESPALDO_REMOTO=cifrado:escalafon
+#### Conectar Google Drive (una vez, en el servidor de producción)
 
-   Opcional: `RESPALDO_RCLONE_CONF`, por defecto `~/.config/rclone/rclone.conf`, y `RESPALDO_REMOTO_DIAS`, que
-   son los días que se conservan en la copia externa (30). `RESPALDO_REMOTO` debe ser `remoto:carpeta`: las copias de
-   más de `RESPALDO_REMOTO_DIAS` días de esa carpeta se borran, así que nunca debe apuntar a una carpeta con otros
-   archivos.
+    sh docker/produccion/conectar-drive.sh                 # con navegador en este equipo
+    sh docker/produccion/conectar-drive.sh --sin-navegador # servidor sin navegador («rclone authorize» en otro equipo)
+    sh docker/produccion/conectar-drive.sh --verificar     # solo comprueba la conexión, sin cambiar nada
 
-Para recuperar un respaldo de la copia externa en otro servidor, con la misma configuración de rclone:
+Exige `.env.produccion` con `APP_ENV=production` y una terminal. El asistente:
 
-    docker run --rm -v ~/.config/rclone:/config/rclone -v "$PWD/respaldos:/respaldos" rclone/rclone:1.68.2 copy cifrado:escalafon/AAAAMMDD-HHMMSS /respaldos/AAAAMMDD-HHMMSS
+1. Crea la clave (si falta) y cifra `rclone.conf` con ella. La clave no se muestra.
+2. Autoriza Google Drive con OAuth (alcance `drive.file`: rclone solo ve los archivos que él mismo crea) en el remoto
+   `escalafon_drive`.
+3. Crea el remoto crypt de `RESPALDO_REMOTO` (por defecto `escalafon_cifrado:copias`) sobre
+   `escalafon_drive:escalafon-respaldos`, con nombres de archivos y carpetas cifrados. Cuando rclone pida sus
+   contraseñas, elegir `g` (generar).
+4. Sube un archivo de prueba, lo lee, comprueba que coincide y lo borra (solo ese archivo).
+5. Solo si todo salió bien, guarda en `.env.produccion` `RESPALDO_REMOTO`, `RESPALDO_RCLONE_CONF` y
+   `RESPALDO_RCLONE_CLAVE`, sin tocar las demás líneas ni sus permisos.
+
+rclone muestra la configuración al crear cada remoto: el asistente oculta tokens y contraseñas en pantalla. No sube
+respaldos, no borra copias y no programa nada.
+
+Opcional: `RESPALDO_REMOTO_DIAS` (30), los días que se conservan en la copia externa. Tras una copia correcta y
+comprobada, `respaldar.sh` borra de la carpeta de `RESPALDO_REMOTO` las copias más antiguas: esa carpeta debe ser
+solo para respaldos. (Comportamiento anterior a esta integración, sin cambios; pendiente de confirmar.)
+
+Recuperar desde Drive (restaurar desde la copia externa queda para una fase posterior; hoy es manual), con
+`rclone.conf` y su clave:
+
+    docker run --rm -v ~/.config/rclone:/config/rclone -v ~/.config/escalafon/rclone.clave:/run/clave:ro \
+        -v "$PWD/respaldos:/respaldos" rclone/rclone:1.68.2 --password-command "cat /run/clave" \
+        copy escalafon_cifrado:copias/AAAAMMDD-HHMMSS /respaldos/AAAAMMDD-HHMMSS
 
 ### Verificar y restaurar
 
