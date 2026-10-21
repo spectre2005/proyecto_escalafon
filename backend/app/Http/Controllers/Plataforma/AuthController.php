@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Plataforma;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\SesionPlataformaValida;
 use App\Models\Plataforma\AdministradorPlataforma;
+use App\Models\Plataforma\AuditoriaPlataforma;
 use App\Support\Plataforma\AuditoriaOperaciones;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -91,6 +92,63 @@ class AuthController extends Controller
         AuditoriaOperaciones::registrar('administrador.clave_cambiada', $request, $administrador->id, null, null, $administrador->only(['id', 'email']));
 
         return $this->sesion($administrador);
+    }
+
+    /**
+     * Datos de la propia cuenta. El acceso anterior (fecha, IP y navegador) es el inicio de sesión previo al de esta
+     * sesión: sirve para notar uno que no se reconoce.
+     */
+    public function cuenta(): JsonResponse
+    {
+        /** @var AdministradorPlataforma $administrador */
+        $administrador = Auth::guard('plataforma')->user();
+        $propias = fn () => AuditoriaPlataforma::query()->where('administrador_id', $administrador->id);
+        $anterior = $propias()->where('accion', 'sesion.inicio')->latest('created_at')->skip(1)->first();
+
+        return response()->json(['data' => [
+            'cuenta' => [...$administrador->only(['id', 'nombre', 'email']), 'creada_en' => $administrador->created_at?->toIso8601String(),
+                'ultimo_acceso' => $administrador->ultimo_acceso?->toIso8601String(),
+                'clave_cambiada_en' => $propias()->where('accion', 'administrador.clave_cambiada')->latest('created_at')->value('created_at')?->toIso8601String()],
+            'acceso_anterior' => $anterior ? [...$anterior->only(['id', 'ip_origen', 'user_agent']), 'created_at' => $anterior->created_at?->toIso8601String()] : null,
+        ]]);
+    }
+
+    /** Cambio del propio nombre (el correo es el usuario de acceso: no se cambia aquí). */
+    public function actualizarCuenta(Request $request): JsonResponse
+    {
+        $nombre = trim((string) $request->validate(['nombre' => 'required|string|max:150'], ['nombre.required' => 'Escribe tu nombre.'])['nombre']);
+        if ($nombre === '') {
+            throw ValidationException::withMessages(['nombre' => 'Escribe tu nombre.']);
+        }
+        /** @var AdministradorPlataforma $administrador */
+        $administrador = Auth::guard('plataforma')->user();
+        if ($nombre !== $administrador->nombre) {
+            $antes = $administrador->only(['nombre']);
+            $administrador->forceFill(['nombre' => $nombre])->save();
+            AuditoriaOperaciones::registrar('administrador.nombre_cambiado', $request, $administrador->id, null, $antes, $administrador->only(['id', 'nombre']));
+        }
+
+        return $this->sesion($administrador);
+    }
+
+    /**
+     * Cierra las demás sesiones de la cuenta sin cambiar la contraseña: la vuelve a cifrar (misma contraseña, cifrado
+     * nuevo), así cambia su huella y SesionPlataformaValida cierra las otras en su siguiente petición. Esta sigue válida.
+     */
+    public function cerrarOtrasSesiones(Request $request): JsonResponse
+    {
+        $data = $request->validate(['password_actual' => 'required|string|max:255'], ['password_actual.required' => 'Escribe tu contraseña actual.']);
+        /** @var AdministradorPlataforma $administrador */
+        $administrador = Auth::guard('plataforma')->user();
+        if (! Hash::check($data['password_actual'], $administrador->password)) {
+            throw ValidationException::withMessages(['password_actual' => 'La contraseña actual no es correcta.']);
+        }
+        $administrador->forceFill(['password' => $data['password_actual']])->save();
+        $request->session()->regenerate();
+        SesionPlataformaValida::recordar($request, $administrador);
+        AuditoriaOperaciones::registrar('sesion.otras_cerradas', $request, $administrador->id);
+
+        return response()->json(['message' => 'Se cerraron tus otras sesiones.']);
     }
 
     public function logout(Request $request): JsonResponse

@@ -75,6 +75,10 @@ export const listarSuperadmins = signal => plataforma.get('/superadministradores
 export const crearSuperadmin = datos => plataforma.post('/superadministradores', datos).then(r => r.data.data)
 export const accionSuperadmin = (id, accion) => plataforma.post(`/superadministradores/${id}/${accion}`).then(r => r.data.data)
 export const cambiarMiPassword = datos => plataforma.put('/auth/password', datos).then(r => r.data.data)
+// Mi cuenta: datos y actividad propia, nombre y cierre de las demás sesiones.
+export const verMiCuenta = signal => plataforma.get('/auth/cuenta', { signal }).then(r => r.data.data)
+export const cambiarMiNombre = nombre => plataforma.patch('/auth/cuenta', { nombre }).then(r => r.data.data)
+export const cerrarOtrasSesiones = passwordActual => plataforma.post('/auth/cerrar-otras-sesiones', { password_actual: passwordActual }).then(r => r.data)
 // Uso y estado técnico de una institución (se guarda unos minutos; actualizar lo vuelve a medir).
 export const verUso = (id, actualizar = false, signal) => plataforma.get(`/instituciones/${id}/uso`, { params: actualizar ? { actualizar: 1 } : {}, signal }).then(r => r.data.data)
 

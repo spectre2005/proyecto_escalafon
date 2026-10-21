@@ -213,11 +213,13 @@ const ACCIONES = {
   'periodo.anulado': 'Anuló un periodo de uso',
   'sesion.inicio': 'Inició sesión',
   'sesion.cierre': 'Cerró sesión',
+  'sesion.otras_cerradas': 'Cerró sus otras sesiones',
   'administrador.creado': 'Se creó una cuenta de superadministrador',
   'administrador.clave_restablecida': 'Dio una contraseña temporal a un superadministrador',
   'administrador.desactivado': 'Desactivó a un superadministrador',
   'administrador.reactivado': 'Reactivó a un superadministrador',
   'administrador.clave_cambiada': 'Cambió su propia contraseña',
+  'administrador.nombre_cambiado': 'Cambió su nombre',
   'almacenamiento.normalizacion_preparar': 'Preparó la copia para normalizar su almacenamiento',
   'almacenamiento.normalizacion_verificar': 'Verificó la copia de normalización',
   'almacenamiento.normalizacion_cambiar': 'Normalizó su almacenamiento (carpetas propias en lugar de enlaces)',
@@ -225,6 +227,20 @@ const ACCIONES = {
   'almacenamiento.normalizacion_fallida': 'Falló una etapa de la normalización de su almacenamiento',
 }
 export const etiquetaAccion = accion => ACCIONES[accion] || accion
+
+/**
+ * Navegador y sistema de un user agent, en pocas palabras («Chrome en Windows»), para reconocer un acceso. Orden: Edge y
+ * Opera antes que Chrome, y Chrome antes que Safari, porque sus textos los incluyen.
+ */
+export function navegador(userAgent) {
+  if (!userAgent) return 'Navegador desconocido'
+  const programa = [[/Edg\//, 'Edge'], [/OPR\/|Opera/, 'Opera'], [/Firefox\//, 'Firefox'], [/Chrome\/|CriOS\//, 'Chrome'], [/Safari\//, 'Safari']]
+    .find(([patron]) => patron.test(userAgent))?.[1]
+  const sistema = [[/Android/, 'Android'], [/iPhone|iPad/, 'iOS'], [/Windows/, 'Windows'], [/Mac OS X|Macintosh/, 'macOS'], [/Linux/, 'Linux']]
+    .find(([patron]) => patron.test(userAgent))?.[1]
+  if (!programa) return sistema ? `Otro programa en ${sistema}` : 'Otro programa'
+  return sistema ? `${programa} en ${sistema}` : programa
+}
 
 export function fecha(iso) {
   if (!iso) return '—'

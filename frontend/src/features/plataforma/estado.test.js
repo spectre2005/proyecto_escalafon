@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, COPIA_EXTERNA, VERIFICACION, ACCION_SUPERADMIN, ESTADO_TECNICO, cifra, siguienteFiltro, resumenTecnico, textoEspacio, accionesDisponibles, accionesSuperadmin, cambiosCliente, importe, textoVencimiento, etiquetaAccion, tamano, cambios, etiquetaEstado, fechaCorta, proponerPeriodo, proponerSlug, proponerUbicacion, textoServicio } from './estado.js'
+import { AVISO_SUSPENSION, AVISO_SUSPENSION_BLOQUEA, COPIA_EXTERNA, VERIFICACION, ACCION_SUPERADMIN, ESTADO_TECNICO, cifra, siguienteFiltro, resumenTecnico, textoEspacio, accionesDisponibles, accionesSuperadmin, cambiosCliente, importe, textoVencimiento, etiquetaAccion, navegador, tamano, cambios, etiquetaEstado, fechaCorta, proponerPeriodo, proponerSlug, proponerUbicacion, textoServicio } from './estado.js'
 import { esEscritura, mensajeError } from './api.js'
 
 test('state actions follow what the backend allows', () => {
@@ -155,4 +155,15 @@ test('searching again without changes is detected so the list reloads instead of
   assert.deepEqual(siguienteFiltro(new URLSearchParams('q=uno&page=2'), { q: 'uno', page: '' }), { siguiente: { q: 'uno' }, igual: false })
   assert.deepEqual(siguienteFiltro(new URLSearchParams('q=uno'), { estado: 'activa', page: '' }), { siguiente: { q: 'uno', estado: 'activa' }, igual: false })
   assert.deepEqual(siguienteFiltro(new URLSearchParams('q=uno'), { q: '', page: '' }), { siguiente: {}, igual: false })
+})
+
+test('the browser of an access is described in a few words', () => {
+  assert.equal(navegador('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36'), 'Chrome en Windows')
+  assert.equal(navegador('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36 Edg/130.0'), 'Edge en Windows')
+  assert.equal(navegador('Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0'), 'Firefox en Linux')
+  assert.equal(navegador('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'), 'Safari en iOS')
+  assert.equal(navegador('Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36'), 'Chrome en Android')
+  assert.equal(navegador('curl/8.0'), 'Otro programa')
+  assert.equal(navegador(null), 'Navegador desconocido')
+  assert.equal(etiquetaAccion('sesion.otras_cerradas'), 'Cerró sus otras sesiones')
 })

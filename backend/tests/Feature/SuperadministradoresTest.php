@@ -189,6 +189,61 @@ class SuperadministradoresTest extends TestCase
         $this->pedir('beto', 'GET', '/dashboard')->assertOk();
     }
 
+    public function test_my_account_shows_its_data_and_previous_access(): void
+    {
+        $this->cuenta('ana@example.test');
+        $this->cuenta('beto@example.test');
+        $this->entrar('ana_ayer', 'ana@example.test')->assertOk();
+        $this->entrar('ana', 'ana@example.test')->assertOk();
+        $this->entrar('beto', 'beto@example.test')->assertOk();
+        // Los dos inicios caen en el mismo segundo: uno pasa a ayer para que el acceso anterior sea ese.
+        $anterior = AuditoriaPlataforma::query()->where('administrador_id', $this->idDe('ana@example.test'))->where('accion', 'sesion.inicio')->firstOrFail();
+        $anterior->forceFill(['created_at' => now()->subDay()])->save();
+
+        $this->pedir('ana', 'GET', '/auth/cuenta')->assertOk()
+            ->assertJsonPath('data.cuenta.email', 'ana@example.test')
+            ->assertJsonPath('data.cuenta.clave_cambiada_en', null)
+            ->assertJsonPath('data.acceso_anterior.id', $anterior->id)
+            ->assertJsonMissingPath('data.cuenta.password');
+        // Beto solo ve su propio acceso: no tiene uno anterior.
+        $this->pedir('beto', 'GET', '/auth/cuenta')->assertOk()->assertJsonPath('data.acceso_anterior', null);
+    }
+
+    public function test_my_name_can_be_changed_and_it_is_audited(): void
+    {
+        $this->cuenta('ana@example.test');
+        $this->entrar('ana', 'ana@example.test')->assertOk();
+
+        $this->pedir('ana', 'PATCH', '/auth/cuenta', ['nombre' => '   '])->assertUnprocessable()->assertJsonValidationErrors('nombre');
+        $this->pedir('ana', 'PATCH', '/auth/cuenta', ['nombre' => '  Ana Torres  '])->assertOk()->assertJsonPath('data.administrador.nombre', 'Ana Torres');
+        // Sin cambios no se audita de nuevo; el correo no se cambia por aquí.
+        $this->pedir('ana', 'PATCH', '/auth/cuenta', ['nombre' => 'Ana Torres', 'email' => 'otra@example.test'])->assertOk();
+
+        $this->assertSame('ana@example.test', AdministradorPlataforma::query()->whereKey($this->idDe('ana@example.test'))->value('email'));
+        $this->assertSame(1, AuditoriaPlataforma::query()->where('accion', 'administrador.nombre_cambiado')->count());
+        $this->pedir('ana', 'GET', '/auth/cuenta')->assertJsonPath('data.cuenta.nombre', 'Ana Torres');
+    }
+
+    public function test_closing_my_other_sessions_keeps_this_one_and_the_password(): void
+    {
+        $this->cuenta('ana@example.test');
+        $this->cuenta('beto@example.test');
+        $this->entrar('ana_portatil', 'ana@example.test')->assertOk();
+        $this->entrar('ana_oficina', 'ana@example.test')->assertOk();
+        $this->entrar('beto', 'beto@example.test')->assertOk();
+
+        $this->pedir('ana_portatil', 'POST', '/auth/cerrar-otras-sesiones', ['password_actual' => 'otra-cosa-1'])->assertUnprocessable()->assertJsonValidationErrors('password_actual');
+        $this->pedir('ana_oficina', 'GET', '/dashboard')->assertOk();
+
+        $this->pedir('ana_portatil', 'POST', '/auth/cerrar-otras-sesiones', ['password_actual' => self::CLAVE])->assertOk();
+        $this->pedir('ana_portatil', 'GET', '/dashboard')->assertOk();
+        $this->pedir('ana_oficina', 'GET', '/dashboard')->assertUnauthorized();
+        $this->pedir('beto', 'GET', '/dashboard')->assertOk();
+        // La contraseña es la misma: se vuelve a entrar con ella.
+        $this->entrar('ana_oficina', 'ana@example.test')->assertOk();
+        $this->assertSame(1, AuditoriaPlataforma::query()->where('accion', 'sesion.otras_cerradas')->count());
+    }
+
     public function test_the_platform_never_runs_out_of_active_superadministrators(): void
     {
         $this->cuenta('ana@example.test');
@@ -212,7 +267,8 @@ class SuperadministradoresTest extends TestCase
     {
         $ana = $this->cuenta('ana@example.test');
         $rutas = [['GET', '/superadministradores'], ['POST', '/superadministradores'], ['POST', "/superadministradores/{$ana->id}/restablecer"],
-            ['POST', "/superadministradores/{$ana->id}/desactivar"], ['POST', "/superadministradores/{$ana->id}/reactivar"], ['PUT', '/auth/password']];
+            ['POST', "/superadministradores/{$ana->id}/desactivar"], ['POST', "/superadministradores/{$ana->id}/reactivar"], ['PUT', '/auth/password'],
+            ['GET', '/auth/cuenta'], ['PATCH', '/auth/cuenta'], ['POST', '/auth/cerrar-otras-sesiones']];
         foreach ($rutas as [$metodo, $url]) {
             $this->pedir('anonimo', $metodo, $url)->assertUnauthorized();
         }

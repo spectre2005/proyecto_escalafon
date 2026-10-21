@@ -26,6 +26,10 @@ Route::middleware(ApiHabilitada::class)->group(function (): void {
         Route::get('auth/me', [AuthController::class, 'me']);
         Route::post('auth/logout', [AuthController::class, 'logout']);
         Route::put('auth/password', [AuthController::class, 'cambiarPassword'])->middleware('throttle:10,1');
+        // Mi cuenta: datos y actividad propia, cambio de nombre y cierre de las demás sesiones (con la contraseña actual).
+        Route::get('auth/cuenta', [AuthController::class, 'cuenta']);
+        Route::patch('auth/cuenta', [AuthController::class, 'actualizarCuenta']);
+        Route::post('auth/cerrar-otras-sesiones', [AuthController::class, 'cerrarOtrasSesiones'])->middleware('throttle:10,1');
         // Cuentas de superadministrador: no se borran; se desactivan.
         Route::get('superadministradores', [SuperadministradorController::class, 'index']);
         Route::post('superadministradores', [SuperadministradorController::class, 'store']);
