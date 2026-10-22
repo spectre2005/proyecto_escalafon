@@ -22,7 +22,11 @@ services:
       db:
         condition: service_healthy
 
+  # Tareas programadas (legajo:recibir-respuestas cada minuto: lee el Gmail conectado en cada institución). En desarrollo
+  # no arranca con «docker compose up -d»: solo con su perfil, p. ej. «docker compose --profile programador up -d scheduler»
+  # (README, «Trabajo diario»). Producción lo arranca siempre desde docker-compose.produccion.yml.
   scheduler:
+    profiles: ["programador"]
     build: ./docker/php
     user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     environment:

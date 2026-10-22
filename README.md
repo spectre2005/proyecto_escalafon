@@ -369,6 +369,15 @@ docker compose up -d --build --force-recreate frontend
 
 El arranque del frontend ejecuta `pnpm install`. Usa `composer install` para respetar el archivo de bloqueo; `composer update` y `pnpm update` son cambios de dependencias que deben revisarse con el equipo.
 
+**Tareas programadas (recepción de correos de requerimientos).** El servicio `scheduler` ejecuta cada minuto `legajo:recibir-respuestas`, que lee el Gmail conectado en Configuración. En desarrollo no arranca con `docker compose up -d`; para probarlo, a propósito y con datos de prueba:
+
+```sh
+docker compose --profile programador up -d scheduler   # iniciarlo
+docker compose --profile programador stop scheduler    # detenerlo
+```
+
+En producción arranca siempre (`docker-compose.produccion.yml`).
+
 **Cada computadora tiene su propia base de datos y sus propios archivos.** Hacer `git pull` no descarga los registros, documentos ni fotos de otra instalación.
 
 ### Migraciones y seeders

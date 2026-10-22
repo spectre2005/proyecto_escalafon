@@ -11,6 +11,7 @@ idéntico a producción. El `docker-compose.yml` de la raíz es solo para desarr
 | `caddy` | Único con puertos públicos (80 y 443). HTTPS automático por subdominio, frontend compilado y paso a PHP de `/api`, `/sanctum` y `/up`. |
 | `app` | Laravel (php-fpm) con el código dentro de la imagen. No arranca si `php artisan produccion:verificar` falla. |
 | `worker` | Trabajos en cola (`queue:work`), cada uno con la base y los archivos de su institución. |
+| `scheduler` | Tareas programadas (`schedule:work`): cada minuto `legajo:recibir-respuestas` revisa el Gmail conectado de cada institución activa. Sin Gmail conectado no hace nada. |
 | `db` | PostgreSQL 16, sin puerto público. Una base por institución, más la de la plataforma. |
 
 Volúmenes persistentes: `postgres` (bases), `storage` (PDF, fotos, sesiones, caché) y `caddy_datos` (certificados).
