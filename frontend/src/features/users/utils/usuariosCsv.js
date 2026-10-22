@@ -4,7 +4,25 @@ import { errorLey } from './leyes.js'
 export const columns = ['numero_doc_identidad', 'nombres', 'apellido_paterno', 'apellido_materno', 'email_institucional', 'tipo_personal', 'ley', 'telefono']
 const columnasAnteriores = { regimen_laboral: 'ley' }
 
-export function validateUser(user, catalogo) {
+/** Fecha de hoy en Lima (AAAA-MM-DD), para no aceptar fechas de nacimiento futuras. */
+export const hoyLima = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' })
+
+/**
+ * Fecha de la importación en AAAA-MM-DD: acepta una fecha de Excel (Date), dd/mm/aaaa o aaaa-mm-dd. Si no es una fecha
+ * real del calendario, devuelve el texto tal cual para que la validación lo informe (nunca se corrige ni se aproxima).
+ */
+export function fechaIso(valor) {
+  if (valor instanceof Date) return Number.isNaN(valor.getTime()) ? '' : valor.toISOString().slice(0, 10)
+  const texto = String(valor ?? '').trim()
+  const partes = texto.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+  const iso = partes ? `${partes[3]}-${partes[2]}-${partes[1]}` : texto
+  return fechaValida(iso) ? iso : texto
+}
+
+const fechaValida = iso => /^\d{4}-\d{2}-\d{2}$/.test(iso) && new Date(`${iso}T00:00:00Z`).toISOString().slice(0, 10) === iso
+
+// puedeSensibles: fecha de nacimiento y domicilio son datos sensibles; sin el permiso no se registran (el backend lo exige).
+export function validateUser(user, catalogo, { puedeSensibles = true } = {}) {
   const errors = []
   if (!/^\d{8}$/.test(user.numero_doc_identidad)) errors.push('El DNI debe contener 8 dígitos.')
   if (!user.nombres || user.nombres.length > 120) errors.push('Los nombres son obligatorios (máximo 120 caracteres).')
@@ -15,6 +33,10 @@ export function validateUser(user, catalogo) {
   const ley = errorLey(catalogo, user)
   if (ley) errors.push(ley)
   if (user.telefono && !/^[0-9]{9}$/.test(user.telefono)) errors.push('El teléfono debe contener 9 dígitos.')
+  if (user.fecha_nacimiento && !fechaValida(user.fecha_nacimiento)) errors.push('Fecha de nacimiento: usa una fecha válida (dd/mm/aaaa).')
+  else if (user.fecha_nacimiento && user.fecha_nacimiento > hoyLima()) errors.push('Fecha de nacimiento: no puede ser posterior a hoy.')
+  if (user.domicilio && user.domicilio.length > 250) errors.push('Domicilio: admite hasta 250 caracteres.')
+  if (!puedeSensibles && (user.fecha_nacimiento || user.domicilio)) errors.push('Fecha de nacimiento y domicilio requieren el permiso de datos sensibles.')
   return errors
 }
 

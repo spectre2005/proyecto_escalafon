@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\ConsultaIdentidadController;
 use App\Models\AuditoriaEvento;
 use App\Models\Legajo;
 use App\Models\Plataforma\Institucion;
+use App\Models\Ubigeo;
 use App\Models\Usuario;
 use App\Support\Identidad\ConsultaDni;
 use App\Support\Identidad\ConsultaDniSimulada;
@@ -47,19 +48,23 @@ class ConsultaIdentidadTest extends TestCase
         return AuditoriaEvento::query()->where('accion', 'identidad.consultar_dni');
     }
 
-    public function test_a_simulated_match_fills_only_names_marked_as_simulated_and_creates_nothing(): void
+    public function test_a_simulated_match_fills_names_and_catalog_location_marked_as_simulated_and_creates_nothing(): void
     {
         $actor = $this->actuarComo();
         Http::fake();
         $usuarios = Usuario::query()->count();
+        $lugar = Ubigeo::factory()->create(['region' => 'Cusco', 'provincia' => 'La Convención', 'distrito' => 'Santa Ana']);
 
         $this->getJson(self::URL)->assertOk()->assertExactJson(['data' => ['habilitada' => true, 'disponible' => true, 'simulada' => true]]);
         $this->postJson(self::URL, ['dni' => '00000001'])->assertOk()->assertExactJson(['data' => [
             'encontrado' => true, 'simulada' => true, 'nombres' => 'Ana Lucía', 'apellido_paterno' => 'Demostración', 'apellido_materno' => 'Ficticia',
+            'ubicacion' => ['id' => $lugar->id, 'region' => 'Cusco', 'provincia' => 'La Convención', 'distrito' => 'Santa Ana'], 'ubicacion_estado' => 'asignada',
         ]]);
-        $this->postJson(self::URL, ['dni' => '00000003'])->assertOk()->assertJsonPath('data.apellido_materno', null);
+        $this->postJson(self::URL, ['dni' => '00000003'])->assertOk()->assertJsonPath('data.apellido_materno', null)
+            ->assertJsonPath('data.ubicacion', null)->assertJsonPath('data.ubicacion_estado', 'sin_dato');
         $this->postJson(self::URL, ['dni' => '00000004'])->assertOk()->assertExactJson(['data' => [
             'encontrado' => true, 'simulada' => true, 'nombres' => 'Lucía Fernanda', 'apellido_paterno' => 'Muestra', 'apellido_materno' => 'Simulada',
+            'ubicacion' => null, 'ubicacion_estado' => 'sin_coincidencia',
         ]]);
 
         Http::assertNothingSent();
@@ -83,10 +88,12 @@ class ConsultaIdentidadTest extends TestCase
     {
         // Catálogo cerrado: cambiar o añadir un caso exige actualizar esta prueba y docs/CONSULTA_IDENTIDAD.md.
         $this->assertSame([
-            '00000001' => ['nombres' => 'Ana Lucía', 'apellido_paterno' => 'Demostración', 'apellido_materno' => 'Ficticia'],
+            '00000001' => ['nombres' => 'Ana Lucía', 'apellido_paterno' => 'Demostración', 'apellido_materno' => 'Ficticia',
+                'ubicacion' => ['departamento' => 'CUSCO', 'provincia' => 'LA CONVENCION', 'distrito' => 'SANTA ANA']],
             '00000002' => ['nombres' => 'Carlos Alberto', 'apellido_paterno' => 'Prueba', 'apellido_materno' => 'Simulado'],
             '00000003' => ['nombres' => 'María', 'apellido_paterno' => 'Ejemplo', 'apellido_materno' => null],
-            '00000004' => ['nombres' => 'Lucía Fernanda', 'apellido_paterno' => 'Muestra', 'apellido_materno' => 'Simulada'],
+            '00000004' => ['nombres' => 'Lucía Fernanda', 'apellido_paterno' => 'Muestra', 'apellido_materno' => 'Simulada',
+                'ubicacion' => ['departamento' => 'REGION FICTICIA', 'provincia' => 'PROVINCIA FICTICIA', 'distrito' => 'DISTRITO FICTICIO']],
         ], ConsultaDniSimulada::CASOS);
         $this->assertSame('00000009', ConsultaDniSimulada::DNI_NO_DISPONIBLE);
     }

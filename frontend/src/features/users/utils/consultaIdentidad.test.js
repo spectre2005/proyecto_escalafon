@@ -3,7 +3,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
 import { datosPuestoInicial, vinculoInicial } from '../../legajos/components/seccion02/borradoresVinculo.js'
-import { AVISO_SIMULACION, aplicarIdentidad, camposPorReemplazar, consultarAlCompletar, crearConsultaIdentidad, ESPERA_CONSULTA_MS, mensajeErrorConsulta, modoConsulta, NO_DISPONIBLE, valoresIdentidad } from './consultaIdentidad.js'
+import { AVISO_SIMULACION, aplicarIdentidad, camposPorReemplazar, consultarAlCompletar, crearConsultaIdentidad, ESPERA_CONSULTA_MS, mensajeErrorConsulta, mensajeUbicacion, modoConsulta, NO_DISPONIBLE, UBICACION_VACIA, ubicacionManual, ubicacionTrasCambioDni, ubicacionTrasConsulta, valoresIdentidad } from './consultaIdentidad.js'
 import { armarRegistro, erroresPersona, personaExistente } from './registroPasos.js'
 import { updateUserDraft } from './usuariosEmail.js'
 
@@ -194,4 +194,58 @@ test('only the manual registration uses the identity query (not legajo editing n
   recorrer(raiz)
   const usan = archivos.filter(ruta => /consulta-dni|consultarIdentidad|consultaIdentidad/.test(readFileSync(ruta, 'utf8'))).map(ruta => ruta.slice(raiz.length)).sort()
   assert.deepEqual(usan, ['features/users/api/usuariosApi.js', 'features/users/components/RegistroManual.jsx', 'features/users/utils/consultaIdentidad.js'])
+})
+
+const lugar = { id: 'ubigeo-santa-ana', region: 'Cusco', provincia: 'La Convención', distrito: 'Santa Ana' }
+const conLugar = { encontrado: true, nombres: 'ROSA', apellido_paterno: 'FICTICIA', ubicacion: lugar, ubicacion_estado: 'asignada' }
+
+test('a unique catalog match fills the location and marks it as coming from that DNI', () => {
+  const estado = ubicacionTrasConsulta(UBICACION_VACIA, '71000001', conLugar)
+  assert.deepEqual(estado, { value: { region: 'Cusco', provincia: 'La Convención', distrito: 'Santa Ana' }, id: 'ubigeo-santa-ana', origen: { dni: '71000001' } })
+  assert.match(mensajeUbicacion(UBICACION_VACIA, conLugar), /Se completó la ubicación/)
+})
+
+test('without a match, with an ambiguous one or without location the selection is left as it is', () => {
+  for (const ubicacion_estado of ['sin_coincidencia', 'ambigua']) {
+    const datos = { encontrado: true, ubicacion: null, ubicacion_estado }
+    assert.equal(ubicacionTrasConsulta(UBICACION_VACIA, '71000001', datos), UBICACION_VACIA)
+    assert.match(mensajeUbicacion(UBICACION_VACIA, datos), /selecciónala manualmente/)
+  }
+  // Solo nombres (sin_dato) o un usuario sin datos sensibles (sin las claves): ni ubicación ni aviso.
+  assert.equal(ubicacionTrasConsulta(UBICACION_VACIA, '71000001', { encontrado: true, ubicacion: null, ubicacion_estado: 'sin_dato' }), UBICACION_VACIA)
+  assert.equal(mensajeUbicacion(UBICACION_VACIA, { encontrado: true, ubicacion_estado: 'sin_dato' }), null)
+  assert.equal(ubicacionTrasConsulta(UBICACION_VACIA, '71000001', { encontrado: true, nombres: 'ROSA' }), UBICACION_VACIA)
+  assert.equal(mensajeUbicacion(UBICACION_VACIA, { encontrado: true, nombres: 'ROSA' }), null)
+})
+
+test('a location chosen by hand before the lookup is kept', () => {
+  const manual = ubicacionManual({ region: 'Lima', provincia: 'Lima', distrito: 'Miraflores' }, 'ubigeo-miraflores')
+  assert.equal(manual.origen, 'manual')
+  assert.equal(ubicacionTrasConsulta(manual, '71000001', conLugar), manual)
+  assert.equal(mensajeUbicacion(manual, conLugar), 'Se conservó la ubicación que elegiste.')
+  // Vaciar la selección la deja libre para la próxima consulta.
+  assert.equal(ubicacionManual({ region: '', provincia: '', distrito: '' }, '').origen, null)
+})
+
+test('changing the DNI drops the location of the previous lookup but keeps a manual one', () => {
+  const deConsulta = ubicacionTrasConsulta(UBICACION_VACIA, '71000001', conLugar)
+  assert.equal(ubicacionTrasCambioDni(deConsulta, '71000002'), UBICACION_VACIA)
+  assert.equal(ubicacionTrasCambioDni(deConsulta, '71000001'), deConsulta)
+  const manual = ubicacionManual({ region: 'Lima', provincia: 'Lima', distrito: 'Miraflores' }, 'ubigeo-miraflores')
+  assert.equal(ubicacionTrasCambioDni(manual, '71000002'), manual)
+})
+
+test('a lookup still running when the DNI changes never brings its location to the new person', async () => {
+  let responder
+  const consultor = crearConsultaIdentidad(() => new Promise(resolve => { responder = resolve }))
+  let ubicacion = UBICACION_VACIA
+  const enCurso = consultor.consultar('71000001')
+  // El usuario cambia el DNI: el formulario cancela la consulta y descarta lo que trajo la anterior.
+  consultor.cancelar()
+  ubicacion = ubicacionTrasCambioDni(ubicacion, '71000002')
+  responder(conLugar)
+  const resultado = await enCurso
+  assert.equal(resultado.estado, 'obsoleta')
+  if (resultado.estado === 'ok') ubicacion = ubicacionTrasConsulta(ubicacion, '71000001', resultado.datos)
+  assert.equal(ubicacion, UBICACION_VACIA)
 })

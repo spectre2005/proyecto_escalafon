@@ -2,7 +2,8 @@
 
 Estado (21/10/2026): proveedores **simulado** (datos ficticios, solo local y pruebas) y **Factiliza** (servicio
 externo de pago, NO oficial; aceptado por el equipo el 21/10/2026). No hay conexión con RENIEC ni con PIDE. La consulta
-completa nombres y apellidos en el paso 1 del registro manual, y **solo ahí**: ni la edición del legajo ni los
+completa nombres y apellidos y, para quien ve datos sensibles, la ubicación del catálogo (22/10/2026), en el paso 1 del
+registro manual, y **solo ahí**: ni la edición del legajo ni los
 formularios de plataforma la usan. Es opcional: el registro manual funciona igual sin ella. La importación masiva no la
 usa.
 
@@ -11,7 +12,8 @@ usa.
 | Pieza | Archivo | Responsabilidad |
 |---|---|---|
 | Contrato | `backend/app/Support/Identidad/ConsultaDni.php` | `nombre()`, `esOficial()`, `esSimulado()`, `consultar($dni)` → `ResultadoIdentidad`; lanza `ProveedorNoDisponible` si falla |
-| Resultado | `ResultadoIdentidad.php` | Solo `nombres`, `apellidoPaterno` y `apellidoMaterno` (o «sin coincidencia») |
+| Resultado | `ResultadoIdentidad.php` | `nombres`, `apellidoPaterno`, `apellidoMaterno` y, opcional, `ubicacion` (departamento, provincia y distrito tal como los informa el proveedor), o «sin coincidencia» |
+| Ubicación | `UbicacionCatalogo.php` | Empareja esa ubicación con la tabla `ubigeo` de la institución (ver «Ubicación») |
 | Selección | `ProveedorIdentidad.php` | Lee `config('identidad.proveedor')`. Devuelve `null` (no disponible) si el valor es `ninguno`, desconocido, el simulado fuera de local/testing o Factiliza sin token |
 | Simulado | `ConsultaDniSimulada.php` | Casos ficticios fijos, sin red; se niega a responder fuera de `local`/`testing` |
 | Factiliza | `ConsultaDniFactiliza.php` | `GET https://api.factiliza.com/v1/dni/info/{dni}` con el token del servidor; solo toma nombres y apellidos |
@@ -30,7 +32,7 @@ permisos del registro manual.
 
 | Caso | Respuesta |
 |---|---|
-| Coincidencia | 200 `{ encontrado: true, simulada, nombres, apellido_paterno, apellido_materno }` |
+| Coincidencia | 200 `{ encontrado: true, simulada, nombres, apellido_paterno, apellido_materno }` y, solo con `datos_sensibles.ver`, `ubicacion` (`{ id, region, provincia, distrito }` o `null`) y `ubicacion_estado` |
 | Sin coincidencia | 200 `{ encontrado: false, simulada }` |
 | DNI inválido o campo extra | 422 (errores de validación) |
 | Sin permiso | 401 sin sesión / 403 |
@@ -76,7 +78,10 @@ Servicio externo **de pago y no oficial** (no es RENIEC). Se activa con `IDENTID
 - Petición: `GET https://api.factiliza.com/v1/dni/info/{dni}` con `Authorization: Bearer`, sin redirecciones, conexión
   de 3 s y espera total de `IDENTIDAD_TIEMPO_ESPERA` (8 s).
 - Respuesta válida: `success: true` y `data.numero` igual al DNI consultado, con `nombres` y `apellido_paterno` no vacíos
-  (máx. 120 y 80 caracteres). `apellido_materno` es opcional. Todo lo demás (ubicación, dirección…) se descarta.
+  (máx. 120 y 80 caracteres). `apellido_materno` es opcional. `departamento`, `provincia` y `distrito` (máx. 100) se
+  toman solo si vienen los tres. Todo lo demás se descarta: `direccion`, `fecha_nacimiento`, `sexo`, ubigeos… Su
+  documentación lista dirección y fecha de nacimiento, pero en su propio ejemplo la fecha viene vacía y no está
+  confirmado que el plan contratado las devuelva: esos dos datos se ingresan a mano.
 - 404 = sin coincidencia. Conexión fallida, tiempo agotado, 401/403 (token inválido o revocado), 429 (límite del plan),
   5xx o respuesta con otra forma o de otro DNI = `ProveedorNoDisponible` (503 `proveedor_no_disponible`). El log solo
   lleva el código HTTP, nunca el DNI, la URL, el cuerpo ni el token.
@@ -84,6 +89,19 @@ Servicio externo **de pago y no oficial** (no es RENIEC). Se activa con `IDENTID
 - Las respuestas llevan `simulada: false`; la auditoría registra `proveedor: factiliza`, `oficial: false`.
 - **Por verificar con el proveedor:** si responde 404 o `success: false` con 200 cuando no encuentra el DNI (hoy el
   segundo caso cuenta como respuesta inesperada), cuotas y costo del plan, y el tratamiento de datos (Ley 29733).
+
+## Ubicación
+
+- La propone el proveedor (departamento, provincia y distrito) y `UbicacionCatalogo` la busca en la tabla `ubigeo` de la
+  institución, comparando sin mayúsculas, tildes ni espacios repetidos. Solo se usa una **coincidencia única de los
+  tres niveles**; sin coincidencia (`sin_coincidencia`), con varias (`ambigua`) o sin el dato (`sin_dato`), el formulario
+  pide elegirla a mano. No se aproxima ni se inventan códigos.
+- Es un dato sensible: sin `datos_sensibles.ver` la respuesta no trae `ubicacion` ni `ubicacion_estado` y el catálogo ni
+  se consulta.
+- En el formulario, la ubicación elegida a mano prevalece; la que trajo una consulta se descarta al cambiar el DNI, y
+  una respuesta tardía de otro DNI no se aplica. Nada se guarda hasta pulsar «Registrar personal».
+- La lógica de emparejamiento se tomó de `origin/feature/accesos-dni`, sin su tabla `identidades_dni`: no se guarda
+  ninguna identidad consultada.
 
 ## Modo simulado
 
@@ -93,10 +111,10 @@ con datos reales. Casos de demostración (personas ficticias):
 
 | DNI | Resultado |
 |---|---|
-| `00000001` | Ana Lucía Demostración Ficticia |
+| `00000001` | Ana Lucía Demostración Ficticia (ubicación CUSCO / LA CONVENCION / SANTA ANA, del catálogo nacional) |
 | `00000002` | Carlos Alberto Prueba Simulado |
 | `00000003` | María Ejemplo (sin apellido materno) |
-| `00000004` | Lucía Fernanda Muestra Simulada (los tres campos) |
+| `00000004` | Lucía Fernanda Muestra Simulada (los tres campos; ubicación ficticia que no está en ningún catálogo) |
 | `00000009` | Simula un servicio caído (503) |
 | cualquier otro | Sin coincidencia: no se inventan nombres |
 

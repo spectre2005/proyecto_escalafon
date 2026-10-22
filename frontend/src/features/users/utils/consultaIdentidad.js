@@ -1,8 +1,9 @@
 import { updateUserDraft } from './usuariosEmail.js'
 
-// Consulta de identidad por DNI del paso 1 del registro manual (POST /identidad/consulta-dni). Solo propone nombres y
-// apellidos: los campos siguen editables, lo escrito no se reemplaza sin confirmación y el registro nunca depende de
-// ella. El backend decide el proveedor, los permisos, el módulo de la institución y el límite de consultas.
+// Consulta de identidad por DNI del paso 1 del registro manual (POST /identidad/consulta-dni). Propone nombres y
+// apellidos y, para quien ve datos sensibles, la ubicación del catálogo: los campos siguen editables, lo escrito no se
+// reemplaza sin confirmación y el registro nunca depende de ella. El backend decide el proveedor, los permisos, el módulo
+// de la institución, el límite de consultas y el emparejamiento de la ubicación con el catálogo.
 
 export const CAMPOS_IDENTIDAD = ['nombres', 'apellido_paterno', 'apellido_materno']
 export const AVISO_SIMULACION = 'Simulación: datos ficticios, no consultados a RENIEC'
@@ -90,4 +91,36 @@ export function crearConsultaIdentidad(pedir) {
       }
     },
   }
+}
+
+// Ubicación del registro: { value: { region, provincia, distrito }, id, origen }. origen es null (vacía), 'manual'
+// (elegida por el usuario) o { dni } (completada por la consulta de ese DNI).
+export const UBICACION_VACIA = Object.freeze({ value: { region: '', provincia: '', distrito: '' }, id: '', origen: null })
+
+/** Selección en los campos de ubicación: es manual si eligió algo; vaciarla la deja libre para una consulta. */
+export function ubicacionManual(value, id) {
+  return { value, id: id || '', origen: Object.values(value).some(Boolean) ? 'manual' : null }
+}
+
+/**
+ * Ubicación tras una respuesta del DNI dni: la elegida a mano se conserva; si el backend encontró un único lugar del
+ * catálogo (ubicacion.id), se completa con él. Sin coincidencia, ambigua o sin dato, no cambia nada.
+ */
+export function ubicacionTrasConsulta(actual, dni, datos) {
+  const encontrada = datos?.ubicacion
+  if (actual.origen === 'manual' || !encontrada?.id) return actual
+  return { value: { region: encontrada.region, provincia: encontrada.provincia, distrito: encontrada.distrito }, id: encontrada.id, origen: { dni } }
+}
+
+/** Al cambiar el DNI, la ubicación que trajo la consulta de otra persona se descarta; la elegida a mano se conserva. */
+export function ubicacionTrasCambioDni(actual, dni) {
+  return actual.origen && actual.origen !== 'manual' && actual.origen.dni !== dni ? UBICACION_VACIA : actual
+}
+
+/** Aviso sobre la ubicación de la respuesta (null si no hay nada que decir o el usuario no ve ubicaciones). */
+export function mensajeUbicacion(actual, datos) {
+  const estado = datos?.ubicacion_estado
+  if (estado === 'asignada') return actual.origen === 'manual' ? 'Se conservó la ubicación que elegiste.' : 'Se completó la ubicación con el catálogo. Revísala antes de continuar.'
+  if (estado === 'sin_coincidencia' || estado === 'ambigua') return 'La ubicación del DNI no coincide con un único lugar del catálogo: selecciónala manualmente.'
+  return null
 }

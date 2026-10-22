@@ -1,4 +1,4 @@
-import { columns, parseUsersCsv } from './usuariosCsv.js'
+import { columns, fechaIso, parseUsersCsv } from './usuariosCsv.js'
 import { codigoVisible, leyesDelTipo } from './leyes.js'
 import { aMayusculas } from '../../../shared/forms/mayusculas.js'
 
@@ -8,7 +8,10 @@ export const excelFields = [
   ['email_institucional', 'Correo electrónico *', 38], ['telefono', 'Teléfono', 16],
   ['tipo_personal', 'Tipo de personal *', 24], ['ley', 'Ley (código) *', 24],
   ['region', 'Región', 24], ['provincia', 'Provincia', 24], ['distrito', 'Distrito', 24],
+  // Al final, para no mover las columnas anteriores. Opcionales: las plantillas sin ellas se siguen importando.
+  ['fecha_nacimiento', 'Fecha de nacimiento (dd/mm/aaaa)', 22], ['domicilio', 'Domicilio', 40],
 ]
+const opcionales = new Set(['fecha_nacimiento', 'domicilio'])
 
 // Plantillas anteriores: la ley venía como «Régimen laboral».
 const encabezadosAnteriores = { 'Régimen laboral *': 'ley', 'Correo institucional *': 'email_institucional' }
@@ -31,7 +34,7 @@ export async function createUsersTemplate(catalogo) {
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F766E' } }
     cell.alignment = { vertical: 'middle', wrapText: true }
   })
-  sheet.autoFilter = 'A1:K1001'
+  sheet.autoFilter = 'A1:M1001'
   excelFields.forEach(([, label], index) => { sheet.getCell(1, index + 1).note = label.includes('*') ? 'Campo obligatorio.' : 'Campo opcional.' })
   for (let row = 2; row <= 1001; row++) {
     sheet.getCell(row, 7).dataValidation = { type: 'list', allowBlank: false, formulae: ['"docente,administrativo"'], showErrorMessage: true, errorTitle: 'Tipo inválido', error: 'Selecciona docente o administrativo.' }
@@ -49,6 +52,8 @@ export async function createUsersTemplate(catalogo) {
     ['Administrativos', `Tipo: administrativo. Ley: ${administrativos.replaceAll(',', ', ') || 'sin leyes activas en el catálogo'}. CAS es el D.L. 1057.`],
     ['Tipo de vínculo', 'No se indica aquí: carrera, plazo determinado o designado se registra con el vínculo laboral, en la sección 02.'],
     ['Ubicación', 'Opcional. Completa región, provincia y distrito juntos, con los nombres del catálogo del formulario manual.'],
+    ['Fecha de nacimiento', 'Opcional. Formato dd/mm/aaaa, no posterior a hoy. Solo la registra quien tiene permiso de datos sensibles.'],
+    ['Domicilio', 'Opcional. Hasta 250 caracteres. Solo lo registra quien tiene permiso de datos sensibles.'],
     ['Validación', 'No repitas DNI ni correo. Revisa la vista previa y corrige los errores antes de guardar.'],
     ['Ejemplo ficticio', 'DNI: 99000001 | Nombres: Ana | Apellido paterno: Ejemplo | Correo: ana.ejemplo@example.test | Tipo: docente | Ley: 30220'],
   ]
@@ -68,6 +73,13 @@ export async function downloadUsersTemplate(catalogo) {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
+// Fecha de Excel: una celda de fecha (Date) o, en una celda con formato de texto, su número de serie (días desde el
+// 30/12/1899). Cualquier otro valor se lee como texto (dd/mm/aaaa).
+function fechaDeCelda(valor) {
+  if (valor instanceof Date) return valor
+  return Number.isInteger(valor) && valor > 0 ? new Date(Date.UTC(1899, 11, 30) + valor * 86400000) : null
+}
+
 export async function parseUsersExcel(buffer) {
   const book = await workbook()
   await book.xlsx.load(buffer)
@@ -75,7 +87,9 @@ export async function parseUsersExcel(buffer) {
   if (!sheet) throw new Error('No se encontró la hoja Personal. Utiliza la plantilla de Excel.')
   const headers = sheet.getRow(1).values.slice(1)
   const keys = headers.map(label => excelFields.find(field => field[1] === label)?.[0] || encabezadosAnteriores[label])
-  if (keys.length !== excelFields.length || keys.some(key => !key) || new Set(keys).size !== keys.length) throw new Error('Los encabezados no coinciden con la plantilla de Excel.')
+  // Todas las columnas obligatorias de la plantilla, ninguna desconocida ni repetida; las opcionales pueden faltar.
+  const obligatorias = excelFields.map(([key]) => key).filter(key => !opcionales.has(key))
+  if (keys.some(key => !key) || new Set(keys).size !== keys.length || obligatorias.some(key => !keys.includes(key))) throw new Error('Los encabezados no coinciden con la plantilla de Excel.')
   const records = []
   sheet.eachRow((row, number) => {
     if (number === 1) return
@@ -83,7 +97,7 @@ export async function parseUsersExcel(buffer) {
     keys.forEach((key, index) => {
       const cell = row.getCell(index + 1)
       if (cell.type === 6 || cell.type === 10) throw new Error(`Fila ${number}: utiliza valores de texto, sin fórmulas ni errores.`)
-      record[key] = cell.text.trim()
+      record[key] = key === 'fecha_nacimiento' ? fechaIso(fechaDeCelda(cell.value) ?? cell.text) : cell.text.trim()
     })
     if (!Object.values(record).some(Boolean)) return
     records.push(record)
@@ -107,6 +121,9 @@ export function resolveUsersLocations(records, locations) {
     user.ley = user.ley.toUpperCase()
     // Como en el formulario: nombres y apellidos en mayúsculas.
     for (const key of ['nombres', 'apellido_paterno', 'apellido_materno']) user[key] = aMayusculas(user[key])
+    // Opcionales: solo si el archivo los trae (una plantilla anterior no tiene esas columnas).
+    if (record.fecha_nacimiento) user.fecha_nacimiento = record.fecha_nacimiento
+    if (record.domicilio) user.domicilio = aMayusculas(record.domicilio)
     const fields = ['region', 'provincia', 'distrito']
     if (!fields.some(key => record[key])) return user
     if (fields.some(key => !record[key])) throw new Error(`Registro ${index + 1}: completa región, provincia y distrito juntos.`)

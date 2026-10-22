@@ -28,7 +28,7 @@ class StoreUsuariosRequest extends FormRequest
     {
         return [
             'usuarios' => ['required', 'array', 'list', 'min:1', 'max:1000'],
-            'usuarios.*' => ['required', 'array:numero_doc_identidad,nombres,apellido_paterno,apellido_materno,email_institucional,tipo_personal,regimen_normativo_id,regimen_laboral,telefono,ubigeo_id,tiene_derechohabientes,con_discapacidad'],
+            'usuarios.*' => ['required', 'array:numero_doc_identidad,nombres,apellido_paterno,apellido_materno,email_institucional,tipo_personal,regimen_normativo_id,regimen_laboral,telefono,ubigeo_id,tiene_derechohabientes,con_discapacidad,fecha_nacimiento,domicilio'],
             'usuarios.*.ubigeo_id' => ['nullable', 'uuid', Rule::exists('ubigeo', 'id')],
             'usuarios.*.numero_doc_identidad' => ['bail', 'required', 'string', 'regex:/^[0-9]{8}$/', 'distinct:strict', Rule::unique('usuarios', 'numero_doc_identidad')],
             'usuarios.*.nombres' => ['required', 'string', 'max:120'],
@@ -45,6 +45,10 @@ class StoreUsuariosRequest extends FormRequest
             // además discapacidad.editar (CambioDiscapacidad, en el controlador).
             'usuarios.*.tiene_derechohabientes' => ['nullable', 'boolean'],
             'usuarios.*.con_discapacidad' => ['nullable', 'boolean'],
+            // Datos personales opcionales, con las mismas reglas que la edición de datos generales (UpdateExpedienteRequest).
+            // Son datos sensibles: solo los registra quien tiene datos_sensibles.ver (withValidator).
+            'usuarios.*.fecha_nacimiento' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'usuarios.*.domicilio' => ['nullable', 'string', 'max:250'],
         ];
     }
 
@@ -63,13 +67,22 @@ class StoreUsuariosRequest extends FormRequest
         }
     }
 
-    /** Toda fila trae la ley, por id o por código. */
+    /** Datos personales sensibles del alta: sin datos_sensibles.ver no se registran (tampoco por la importación). */
+    public const DATOS_SENSIBLES = ['fecha_nacimiento' => 'la fecha de nacimiento', 'domicilio' => 'el domicilio'];
+
+    /** Toda fila trae la ley, por id o por código; los datos sensibles exigen su permiso. */
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
+            $veSensibles = (bool) $this->user()?->veDatosSensibles();
             foreach ((array) $this->input('usuarios', []) as $indice => $fila) {
                 if (is_array($fila) && empty($fila['regimen_normativo_id']) && empty($fila['regimen_laboral'])) {
                     $validator->errors()->add("usuarios.$indice.regimen_normativo_id", RegimenesLaborales::error(null, $fila['tipo_personal'] ?? null));
+                }
+                foreach (self::DATOS_SENSIBLES as $campo => $nombre) {
+                    if (! $veSensibles && is_array($fila) && filled($fila[$campo] ?? null)) {
+                        $validator->errors()->add("usuarios.$indice.$campo", 'Registro '.($indice + 1).': registrar '.$nombre.' requiere el permiso de datos sensibles.');
+                    }
                 }
             }
         });
@@ -91,6 +104,9 @@ class StoreUsuariosRequest extends FormRequest
             'unique' => 'El campo :attribute ya está registrado.',
             'email' => 'El correo de :attribute no es válido.',
             'in' => 'El tipo de personal debe ser docente o administrativo.',
+            'usuarios.*.fecha_nacimiento.date_format' => 'La fecha de nacimiento debe ser una fecha válida.',
+            'usuarios.*.fecha_nacimiento.before_or_equal' => 'La fecha de nacimiento no puede ser posterior a hoy.',
+            'usuarios.*.domicilio.max' => 'El domicilio admite hasta 250 caracteres.',
         ];
     }
 }

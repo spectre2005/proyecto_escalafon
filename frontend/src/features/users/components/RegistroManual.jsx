@@ -9,10 +9,11 @@ import { datosPuestoInicial, vinculoInicial } from '../../legajos/components/sec
 import { completarDesdePuesto, equivalenciaPuesto } from '../../legajos/config/puestosSugeridos'
 import { categoriasDocente, condicionesDocente } from '../../legajos/config/seccion02'
 import { leyesDelTipo, leyInicial } from '../utils/leyes'
-import { columns } from '../utils/usuariosCsv'
+import { columns, hoyLima } from '../utils/usuariosCsv'
 import { updateUserDraft } from '../utils/usuariosEmail'
 import { consultarIdentidad, estadoConsultaIdentidad } from '../api/usuariosApi'
-import { AVISO_SIMULACION, aplicarIdentidad, camposPorReemplazar, consultarAlCompletar, crearConsultaIdentidad, ESPERA_CONSULTA_MS, mensajeErrorConsulta, modoConsulta, NO_DISPONIBLE, valoresIdentidad } from '../utils/consultaIdentidad'
+import { usePuede } from '../../auth/session'
+import { AVISO_SIMULACION, aplicarIdentidad, camposPorReemplazar, consultarAlCompletar, crearConsultaIdentidad, ESPERA_CONSULTA_MS, mensajeErrorConsulta, modoConsulta, mensajeUbicacion, NO_DISPONIBLE, UBICACION_VACIA, ubicacionManual, ubicacionTrasCambioDni, ubicacionTrasConsulta, valoresIdentidad } from '../utils/consultaIdentidad'
 import { armarRegistro, erroresDe, erroresPersona, PASOS, personaDelPaso, personaExistente, primerPasoConError, rutaFicha, sugerenciaTipoVinculo } from '../utils/registroPasos'
 
 // Registro manual en tres pasos dentro de la ventana «Agregar personal»: persona, primer vínculo laboral y datos del
@@ -20,18 +21,21 @@ import { armarRegistro, erroresDe, erroresPersona, PASOS, personaDelPaso, person
 // sola operación al final (onGuardar → POST /usuarios/con-vinculo, transaccional).
 
 // Sin selección inicial: el tipo de personal lo elige el usuario. La ley se toma sola solo si su tipo tiene una única ley.
-const personaVacia = { ...Object.fromEntries(columns.map(key => [key, ''])), tipo_personal: '', regimen_normativo_id: '' }
+// Fecha de nacimiento y domicilio: opcionales y solo para quien ve datos sensibles (el backend lo exige igual).
+const personaVacia = { ...Object.fromEntries(columns.map(key => [key, ''])), tipo_personal: '', regimen_normativo_id: '', fecha_nacimiento: '', domicilio: '' }
 const condicionesVacias = { tiene_derechohabientes: null, con_discapacidad: null }
 // Datos del puesto de cada tipo por separado: cambiar el tipo de personal no borra lo ya escrito para el otro.
 const puestosVacios = () => ({ docente: datosPuestoInicial(true), administrativo: datosPuestoInicial(false) })
 const camposPersona = [
   ['numero_doc_identidad', 'DNI', true], ['nombres', 'Nombres', true], ['apellido_paterno', 'Apellido paterno', true],
   ['apellido_materno', 'Apellido materno', false], ['email_institucional', 'Correo electrónico', true], ['telefono', 'Teléfono', false],
+  ['fecha_nacimiento', 'Fecha de nacimiento', false],
 ]
-const largo = { numero_doc_identidad: 8, telefono: 9, nombres: 120, email_institucional: 255 }
+const camposSensibles = ['fecha_nacimiento', 'domicilio']
+const largo = { numero_doc_identidad: 8, telefono: 9, nombres: 120, email_institucional: 255, domicilio: 250 }
 const tiposPersonal = { docente: 'Docente', administrativo: 'Administrativo' }
 const etiquetas = Object.fromEntries(camposPersona.map(([key, label]) => [key, label.toLowerCase()]))
-const identidadInicial = { cargando: false, mensaje: null, origen: null, pendiente: null }
+const identidadInicial = { cargando: false, mensaje: null, origen: null, pendiente: null, ubicacion: null }
 const estilosMensaje = { ok: 'bg-[#eaf4ee] text-[#2c7650]', info: 'border border-[#f1d9a6] bg-[#fff8e8] text-[#7a5a17]', error: 'bg-[#fff0ed] text-[#ac4d3a]' }
 const botonSecundario = 'rounded-lg border border-[#dbe6e1] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#4f6d63] hover:bg-[#edf6f2]'
 
@@ -75,8 +79,12 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   const [paso, setPaso] = useState(1)
   const [draft, setDraft] = useState(personaVacia)
   const [condiciones, setCondiciones] = useState(condicionesVacias)
-  const [ubicacion, setUbicacion] = useState({ region: '', provincia: '', distrito: '' })
-  const [ubigeoId, setUbigeoId] = useState('')
+  // Ubicación con su origen (manual o consulta de un DNI): la elegida a mano prevalece sobre la consulta.
+  const [ubicacionEstado, setUbicacionEstado] = useState(UBICACION_VACIA)
+  const ubicacion = ubicacionEstado.value
+  const ubigeoId = ubicacionEstado.id
+  const ubicacionRef = useRef(ubicacionEstado)
+  const puedeSensibles = usePuede('datos_sensibles.ver')
   const [vinculo, setVinculo] = useState(vinculoInicial)
   const [puestos, setPuestos] = useState(puestosVacios)
   const [avisos, setAvisos] = useState([])
@@ -100,6 +108,7 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   const modoIdentidad = modoConsulta({ dni: draft.numero_doc_identidad, existente, estado: estadoIdentidad, puedeRegistrar })
 
   useEffect(() => { draftRef.current = draft }, [draft])
+  useEffect(() => { ubicacionRef.current = ubicacionEstado }, [ubicacionEstado])
   // Sin permiso no se pregunta; si el estado no llega, no hay botón y el registro sigue manual.
   useEffect(() => {
     if (!puedeRegistrar) return undefined
@@ -124,16 +133,17 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
     return () => clearTimeout(espera)
   })
 
-  // Un DNI nuevo descarta la consulta en curso y lo que esperaba confirmación (era de otro DNI).
-  function reiniciarIdentidad() {
+  // Un DNI nuevo descarta la consulta en curso, lo que esperaba confirmación y la ubicación que trajo otra consulta.
+  function reiniciarIdentidad(dni) {
     consultor.cancelar()
     consultadoRef.current = ''
     setIdentidad(identidadInicial)
+    setUbicacionEstado(actual => ubicacionTrasCambioDni(actual, String(dni || '').trim()))
   }
 
-  function aplicarConsulta(dni, datos) {
+  function aplicarConsulta(dni, datos, avisoUbicacion = null) {
     setDraft(previo => previo.numero_doc_identidad.trim() === dni ? aplicarIdentidad(previo, datos, dominioCorreo) : previo)
-    setIdentidad({ cargando: false, pendiente: null, origen: { simulada: datos.simulada, valores: valoresIdentidad(datos) },
+    setIdentidad({ cargando: false, pendiente: null, origen: { simulada: datos.simulada, valores: valoresIdentidad(datos) }, ubicacion: avisoUbicacion,
       mensaje: { tipo: 'ok', texto: 'Se completaron nombres y apellidos. Revísalos antes de continuar; puedes corregirlos.' } })
   }
 
@@ -154,11 +164,14 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
         : 'No se encontraron datos para este DNI. Completa los datos manualmente.' } }))
       return
     }
+    // La ubicación no espera la confirmación de los nombres: solo se completa si no hay una elegida a mano.
+    const avisoUbicacion = mensajeUbicacion(ubicacionRef.current, datos)
+    setUbicacionEstado(actual => ubicacionTrasConsulta(actual, dni, datos))
     if (camposPorReemplazar(draftRef.current, datos).length) {
-      setIdentidad(previo => ({ ...previo, cargando: false, pendiente: { dni, datos } }))
+      setIdentidad(previo => ({ ...previo, cargando: false, pendiente: { dni, datos }, ubicacion: avisoUbicacion }))
       return
     }
-    aplicarConsulta(dni, datos)
+    aplicarConsulta(dni, datos, avisoUbicacion)
   }
 
   const sugerencia = tipo ? sugerenciaTipoVinculo({ tipoPersonal: tipo, datosPuesto: puestos[tipo], codigoLey: (catalogo || []).find(ley => ley.id === leyElegida)?.codigo }) : null
@@ -221,14 +234,14 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
     const numerico = ['numero_doc_identidad', 'telefono'].includes(key)
     return <label key={key} className={key === 'email_institucional' ? 'sm:col-span-2 lg:col-span-1' : undefined}>
       {label}{requerido && ' *'}
-      <input name={key} value={draft[key]} type={key === 'email_institucional' ? 'email' : 'text'} inputMode={numerico ? 'numeric' : undefined}
+      <input name={key} value={draft[key]} type={key === 'email_institucional' ? 'email' : key === 'fecha_nacimiento' ? 'date' : 'text'} max={key === 'fecha_nacimiento' ? hoyLima() : undefined} inputMode={numerico ? 'numeric' : undefined}
         placeholder={key === 'email_institucional' ? (dominioCorreo ? `nombre-apellido@${dominioCorreo}` : 'correo@dominio') : undefined} maxLength={largo[key] || 80} required={requerido}
         pattern={key === 'numero_doc_identidad' ? '[0-9]{8}' : key === 'telefono' ? '[0-9]{9}' : undefined}
         title={key === 'numero_doc_identidad' ? 'El DNI debe contener 8 dígitos.' : key === 'telefono' ? 'El teléfono debe contener 9 dígitos.' : undefined}
         aria-invalid={erroresPersonaCampo[key] ? true : undefined}
         onChange={event => {
           const valor = numerico ? event.target.value.replace(/\D/g, '').slice(0, largo[key]) : event.target.value
-          if (key === 'numero_doc_identidad' && valor !== draft.numero_doc_identidad) reiniciarIdentidad()
+          if (key === 'numero_doc_identidad' && valor !== draft.numero_doc_identidad) reiniciarIdentidad(valor)
           setDraft(updateUserDraft(draft, key, valor, dominioCorreo))
         }} />
       {key === 'email_institucional' && <small className="text-[10px] text-[#8b9c91]">{dominioCorreo ? 'Se sugiere con el nombre y el apellido; puedes cambiarlo. ' : ''}Se utiliza para enviar requerimientos y notificaciones. Si la persona tiene una cuenta habilitada en el sistema, también puede utilizarse para iniciar sesión.</small>}
@@ -255,8 +268,8 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
       {identidad.pendiente.datos.simulada && <strong className="block">{AVISO_SIMULACION}.</strong>}
       La consulta trae otros datos para {camposPorReemplazar(draft, identidad.pendiente.datos).map(campoNombre => etiquetas[campoNombre]).join(', ') || 'los nombres'}. ¿Reemplazar lo que escribiste?
       <span className="mt-2 flex flex-wrap gap-2">
-        <button type="button" className={botonSecundario} onClick={() => aplicarConsulta(identidad.pendiente.dni, identidad.pendiente.datos)}>Reemplazar</button>
-        <button type="button" className={botonSecundario} onClick={() => setIdentidad(identidadInicial)}>Conservar lo escrito</button>
+        <button type="button" className={botonSecundario} onClick={() => aplicarConsulta(identidad.pendiente.dni, identidad.pendiente.datos, identidad.ubicacion)}>Reemplazar</button>
+        <button type="button" className={botonSecundario} onClick={() => setIdentidad({ ...identidadInicial, ubicacion: identidad.ubicacion })}>Conservar lo escrito</button>
       </span>
     </div>}
     {/* Mientras se pide confirmación, el aviso de simulación va dentro de esa pregunta: uno solo a la vista. */}
@@ -280,7 +293,7 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
       <fieldset disabled={saving || bloqueado} className="grid min-w-0 gap-5">
         {paso === 1 && <>
           <Grupo titulo="Identificación y contacto">
-            {camposPersona.map(([key, label, requerido]) => key === 'numero_doc_identidad' ? campoDni() : campo(key, label, requerido))}
+            {camposPersona.filter(([key]) => puedeSensibles || !camposSensibles.includes(key)).map(([key, label, requerido]) => key === 'numero_doc_identidad' ? campoDni() : campo(key, label, requerido))}
             {avisoIdentidad}
           </Grupo>
           <Grupo titulo="Clasificación" ayuda="El tipo de vínculo (carrera, plazo determinado o designado) se indica en el paso 3, con una sugerencia.">
@@ -303,7 +316,10 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
             </label>
           </Grupo>
           <Grupo titulo="Ubicación" ayuda="Opcional; si la indicas, completa región, provincia y distrito.">
-            <UbigeoFields value={ubicacion} onChange={(siguiente, id) => { setUbicacion(siguiente); setUbigeoId(id) }} disabled={saving} />
+            <UbigeoFields value={ubicacion} onChange={(siguiente, id) => setUbicacionEstado(ubicacionManual(siguiente, id))} disabled={saving} />
+            {ubicacionEstado.origen && ubicacionEstado.origen !== 'manual' && <small className="col-span-full text-[10px] font-semibold text-[#7a5a17]">{identidad.origen?.simulada ? 'Ubicación simulada (ficticia)' : 'Ubicación de la consulta de identidad'}</small>}
+            {identidad.ubicacion && <p role="status" className={`col-span-full rounded-lg px-3 py-2 text-[11px] ${estilosMensaje.info}`}>{identidad.ubicacion}</p>}
+            {puedeSensibles && <div className="col-span-full">{campo('domicilio', 'Domicilio', false)}</div>}
           </Grupo>
           <Grupo titulo="Condiciones de la persona" ayuda="Si no lo sabes, deja «Sin responder».">
             <TresEstados name="alta-tiene_derechohabientes" label="¿Tiene derechohabientes?" ayuda="Cónyuge, concubino/a o hijos." error={erroresPersonaCampo.tiene_derechohabientes}

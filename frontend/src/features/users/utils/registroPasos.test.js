@@ -94,3 +94,22 @@ test('the final call carries every step and only the job data of the person type
   assert.equal(puestos.administrativo.cargo_estructural, 'Escrito antes de cambiar de tipo')
   assert.equal('cargo_estructural' in registro.datos_puesto, false)
 })
+
+test('birth date and address travel only when they were filled in', () => {
+  const vinculo = { ...vinculoInicial(), regimen_laboral: 'carrera', nombre_puesto: 'Docente', fecha_inicio: '2026-03-01' }
+  const puestos = { docente: datosPuestoInicial(true), administrativo: datosPuestoInicial(false) }
+  const armar = datos => armarRegistro({ persona: personaDelPaso({ ...persona, ...datos }, 'ley-30220'), catalogo, ubigeoId: '', condiciones: { tiene_derechohabientes: null, con_discapacidad: null }, puedeDiscapacidad: false, vinculo, puestos }).usuarios[0]
+  const conDatos = armar({ fecha_nacimiento: '1980-03-15', domicilio: ' JR. FICTICIO 123 ' })
+  assert.equal(conDatos.fecha_nacimiento, '1980-03-15')
+  assert.equal(conDatos.domicilio, 'JR. FICTICIO 123')
+  const sinDatos = armar({ fecha_nacimiento: '', domicilio: '  ' })
+  assert.equal('fecha_nacimiento' in sinDatos, false)
+  assert.equal('domicilio' in sinDatos, false)
+})
+
+test('the birth date cannot be in the future or impossible', () => {
+  const base = { ...persona, regimen_normativo_id: 'ley-30220' }
+  assert.deepEqual(erroresPersona({ ...base, fecha_nacimiento: '1980-03-15' }, { catalogo }), [])
+  assert.match(erroresPersona({ ...base, fecha_nacimiento: '2999-01-01' }, { catalogo }).join(' '), /posterior a hoy/)
+  assert.match(erroresPersona({ ...base, fecha_nacimiento: '1980-02-30' }, { catalogo }).join(' '), /fecha válida/)
+})

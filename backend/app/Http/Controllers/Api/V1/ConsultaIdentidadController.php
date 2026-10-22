@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Support\Auditoria;
 use App\Support\Identidad\ConsultaDni;
 use App\Support\Identidad\ProveedorIdentidad;
+use App\Support\Identidad\UbicacionCatalogo;
 use App\Support\ModulosSistema;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,7 +16,8 @@ use Illuminate\Validation\ValidationException;
 use Throwable;
 
 /**
- * Consulta de identidad por DNI para completar nombres y apellidos en el registro manual. No crea ni guarda personas:
+ * Consulta de identidad por DNI para completar nombres, apellidos y, para quien ve datos sensibles, la ubicación del
+ * catálogo (UbicacionCatalogo) en el registro manual. No crea ni guarda personas:
  * solo devuelve datos para el formulario. Exige los mismos permisos que el registro manual (usuarios.gestionar en la
  * ruta, legajo.abrir y legajo.editar aquí) y el módulo «consulta_dni» activo en la institución de la sesión (la del
  * subdominio; el cliente no puede elegir otra). Cada consulta que llega al proveedor queda en auditoria_eventos sin el
@@ -66,11 +68,15 @@ class ConsultaIdentidadController extends Controller
         }
         $this->auditar($request, $proveedor, $dni, $resultado->encontrado ? 'coincidencia' : 'sin_coincidencia');
         $simulada = $proveedor->esSimulado();
+        $datos = ['encontrado' => true, 'simulada' => $simulada, 'nombres' => $resultado->nombres, 'apellido_paterno' => $resultado->apellidoPaterno, 'apellido_materno' => $resultado->apellidoMaterno];
+        // La ubicación es un dato sensible (región, provincia y distrito): sin datos_sensibles.ver no sale ni se busca.
+        if ($resultado->encontrado && $request->user()->veDatosSensibles()) {
+            ['estado' => $estado, 'ubicacion' => $ubicacion] = UbicacionCatalogo::emparejar($resultado->ubicacion);
+            $datos += ['ubicacion' => $ubicacion, 'ubicacion_estado' => $estado];
+        }
 
-        return response()->json(['data' => $resultado->encontrado
-            ? ['encontrado' => true, 'simulada' => $simulada, 'nombres' => $resultado->nombres, 'apellido_paterno' => $resultado->apellidoPaterno, 'apellido_materno' => $resultado->apellidoMaterno]
-            : ['encontrado' => false, 'simulada' => $simulada],
-        ])->header('Cache-Control', 'private, no-store');
+        return response()->json(['data' => $resultado->encontrado ? $datos : ['encontrado' => false, 'simulada' => $simulada]])
+            ->header('Cache-Control', 'private, no-store');
     }
 
     /** Mismos permisos que el registro manual (UsuarioController::storeConVinculo). */

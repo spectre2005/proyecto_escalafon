@@ -48,6 +48,10 @@ class UsuarioController extends Controller
                 continue;
             }
             $field = substr($field, strlen('usuarios.*.'));
+            // Fecha de nacimiento y domicilio se editan solo desde la ficha (ExpedienteController, con datos_sensibles.ver).
+            if (array_key_exists($field, StoreUsuariosRequest::DATOS_SENSIBLES)) {
+                continue;
+            }
             $rules[$field] = ['sometimes', ...array_filter($fieldRules, fn (mixed $rule): bool => ! $rule instanceof Unique
                 && ! (is_string($rule) && str_starts_with($rule, 'distinct:'))
             )];
@@ -217,6 +221,8 @@ class UsuarioController extends Controller
             'apellido_materno' => $row['apellido_materno'] ?? null,
             'telefono' => $row['telefono'] ?? null,
             'ubigeo_id' => $row['ubigeo_id'] ?? null,
+            'fecha_nacimiento' => $row['fecha_nacimiento'] ?? null,
+            'domicilio' => filled($row['domicilio'] ?? null) ? trim($row['domicilio']) : null,
             // Todas las filas con las mismas columnas (inserción por bloques); sin respuesta, Sin responder.
             'tiene_derechohabientes' => CambioDiscapacidad::valor($row['tiene_derechohabientes'] ?? null),
             'con_discapacidad' => CambioDiscapacidad::valor($row['con_discapacidad'] ?? null),

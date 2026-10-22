@@ -21,6 +21,8 @@ export default function UsersPage() {
   const [registrationOpen, setRegistrationOpen] = useState(false)
   const registrationDialog = useRef(null)
   const puedeDiscapacidad = usePuede('discapacidad.editar')
+  // Fecha de nacimiento y domicilio de la importación: datos sensibles (el backend también lo exige).
+  const puedeSensibles = usePuede('datos_sensibles.ver')
   // Dominio del correo del personal configurado por la institución (vacío: no se sugiere correo).
   const dominioCorreo = useOutletContext()?.institution?.emailDomain || ''
   const opciones = useLiveQuery('/expediente-opciones')
@@ -113,7 +115,7 @@ export default function UsersPage() {
   }
 
   const checked = batch.map((user, index) => {
-    const errors = validateUser(user, catalogo)
+    const errors = validateUser(user, catalogo, { puedeSensibles })
     const previous = [...users, ...batch.slice(0, index)]
     if (
       previous.some(

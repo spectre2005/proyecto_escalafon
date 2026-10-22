@@ -84,10 +84,13 @@ const recortar = datos => Object.fromEntries(Object.entries(datos).map(([clave, 
  * Cuerpo de la operación final: persona (con su ley por id), primer vínculo y datos del puesto del tipo de personal de
  * la persona. Los datos del otro tipo, si se llegaron a escribir, no se envían.
  */
+// Campos opcionales que no se envían vacíos (así quien no ve datos sensibles nunca los manda).
+const sinVacios = (objeto, claves) => Object.fromEntries(Object.entries(objeto).filter(([clave, valor]) => !claves.includes(clave) || String(valor ?? '').trim() !== ''))
+
 export function armarRegistro({ persona, catalogo, ubigeoId, condiciones, puedeDiscapacidad, vinculo, puestos }) {
   const docente = persona.tipo_personal === 'docente'
   return {
-    usuarios: [conLey(catalogo, { ...persona, ubigeo_id: ubigeoId || null, tiene_derechohabientes: condiciones.tiene_derechohabientes, con_discapacidad: puedeDiscapacidad ? condiciones.con_discapacidad : null })],
+    usuarios: [conLey(catalogo, { ...sinVacios(persona, ['fecha_nacimiento', 'domicilio']), ubigeo_id: ubigeoId || null, tiene_derechohabientes: condiciones.tiene_derechohabientes, con_discapacidad: puedeDiscapacidad ? condiciones.con_discapacidad : null })],
     vinculo: recortar(vinculo),
     datos_puesto: limpiarDatosPuesto(docente, recortar(puestos[persona.tipo_personal] || {})),
   }

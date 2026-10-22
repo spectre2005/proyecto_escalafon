@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Controllers\Api\V1\ConsultaIdentidadController;
 use App\Models\AuditoriaEvento;
 use App\Models\Legajo;
+use App\Models\Ubigeo;
 use App\Models\Usuario;
 use App\Support\Identidad\ConsultaDniFactiliza;
 use App\Support\Identidad\ProveedorIdentidad;
@@ -56,15 +57,18 @@ class ConsultaIdentidadFactilizaTest extends TestCase
         Http::fake([ConsultaDniFactiliza::URL.'*' => Http::response($respuesta, $estado)]);
     }
 
-    public function test_a_match_returns_only_names_not_simulated_and_stores_nothing(): void
+    public function test_a_match_returns_names_and_catalog_location_not_simulated_and_stores_nothing(): void
     {
         $actor = $this->actuarComo();
         $this->falsear($this->respuesta());
         $usuarios = Usuario::query()->count();
+        $lugar = Ubigeo::factory()->create(['region' => 'Cusco', 'provincia' => 'La Convención', 'distrito' => 'Santa Ana']);
 
         $this->getJson(self::URL)->assertOk()->assertExactJson(['data' => ['habilitada' => true, 'disponible' => true, 'simulada' => false]]);
+        // Del resto de la respuesta (dirección…) no sale nada: solo nombres y el lugar del catálogo.
         $this->postJson(self::URL, ['dni' => self::DNI])->assertOk()->assertExactJson(['data' => [
             'encontrado' => true, 'simulada' => false, 'nombres' => 'Rosa Elena', 'apellido_paterno' => 'Ficticia', 'apellido_materno' => 'De Prueba',
+            'ubicacion' => ['id' => $lugar->id, 'region' => 'Cusco', 'provincia' => 'La Convención', 'distrito' => 'Santa Ana'], 'ubicacion_estado' => 'asignada',
         ]]);
 
         // Una sola petición, al endpoint de referencia, con el token del servidor y el DNI en la ruta.
