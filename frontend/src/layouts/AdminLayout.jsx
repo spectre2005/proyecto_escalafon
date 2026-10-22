@@ -4,6 +4,7 @@ import { institutionPageTheme } from '../config/pageTheme'
 import { cacheInstitution, normalizeInstitution, readInstitution } from '../config/institution'
 import { fetchInstitution, saveInstitution } from '../features/settings/institutionApi'
 import { navigation } from '../config/navigation'
+import { activarMayusculas } from '../shared/forms/mayusculas'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 
@@ -19,6 +20,8 @@ function AvisoServicio({ aviso }) {
 }
 
 export default function AdminLayout({ user, avisoServicio = null }) {
+  // Campos cortos en mayúsculas en todo el sistema institucional (no en el panel de plataforma).
+  useEffect(() => activarMayusculas(), [])
   const [institution, setInstitution] = useState(readInstitution)
   const [institutionVersion, setInstitutionVersion] = useState('')
   const [institutionLoading, setInstitutionLoading] = useState(true)

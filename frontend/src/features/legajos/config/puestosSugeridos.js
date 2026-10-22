@@ -23,6 +23,10 @@ export function sugerenciasPuesto(tipoPersonal) {
   return puestosSugeridos[tipoPersonal] || []
 }
 
+// Los puestos se escriben en mayúsculas (shared/forms/mayusculas.js): la coincidencia no distingue mayúsculas.
+const mismoTexto = (a, b) => a.toLocaleUpperCase('es-PE') === b.toLocaleUpperCase('es-PE')
+const sugerenciaDe = (texto, tipoPersonal) => sugerenciasPuesto(tipoPersonal).find(puesto => mismoTexto(puesto, texto))
+
 /**
  * Opción del selector para un puesto guardado: la sugerencia si coincide; OTRO si se eligió «Otro» o si es una
  * denominación propia o anterior que no está en las sugerencias (se conserva y se muestra para editarla); '' si no hay.
@@ -31,7 +35,7 @@ export function seleccionPuesto(valor, tipoPersonal, otroElegido = false) {
   const texto = String(valor ?? '').trim()
   if (otroElegido) return OTRO
   if (!texto) return ''
-  return sugerenciasPuesto(tipoPersonal).includes(texto) ? texto : OTRO
+  return sugerenciaDe(texto, tipoPersonal) ?? OTRO
 }
 
 /** Valor del campo al elegir una opción: la sugerencia tal cual; con «Otro», el texto propio (nunca «Otro puesto…»). */
@@ -39,7 +43,7 @@ export function puestoElegido(opcion, valorActual, tipoPersonal) {
   if (opcion !== OTRO) return { nombre_puesto: opcion, otro: false }
   // Al pasar a «Otro» se conserva una denominación propia ya escrita; si venía de una sugerencia, se escribe de nuevo.
   const actual = String(valorActual ?? '').trim()
-  return { nombre_puesto: actual && !sugerenciasPuesto(tipoPersonal).includes(actual) ? actual : '', otro: true }
+  return { nombre_puesto: actual && !sugerenciaDe(actual, tipoPersonal) ? actual : '', otro: true }
 }
 
 // Equivalencias inequívocas puesto → datos del perfil docente (Ley 30220: condición y, en ordinarios, categoría). Los
@@ -53,7 +57,9 @@ const equivalencias = {
 }
 
 export function equivalenciaPuesto(tipoPersonal, nombrePuesto) {
-  return tipoPersonal === 'docente' ? equivalencias[String(nombrePuesto ?? '').trim()] || {} : {}
+  const texto = String(nombrePuesto ?? '').trim()
+  const clave = Object.keys(equivalencias).find(puesto => mismoTexto(puesto, texto))
+  return tipoPersonal === 'docente' && clave ? equivalencias[clave] : {}
 }
 
 /**

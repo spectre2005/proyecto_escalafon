@@ -34,6 +34,14 @@ test('old or custom positions are kept and shown as Otro with their text', () =>
   assert.equal(seleccionPuesto('Docente contratado', 'administrativo'), OTRO)
 })
 
+test('a position saved in uppercase still matches its suggestion', () => {
+  assert.equal(seleccionPuesto('PROFESOR ORDINARIO ASOCIADO', 'docente'), 'Profesor ordinario asociado')
+  assert.equal(seleccionPuesto('JEFE DE PRÁCTICA', 'docente'), 'Jefe de práctica')
+  assert.deepEqual(puestoElegido(OTRO, 'DOCENTE CONTRATADO', 'docente'), { nombre_puesto: '', otro: true })
+  assert.deepEqual(puestoElegido(OTRO, 'BARRENDERO', 'administrativo'), { nombre_puesto: 'BARRENDERO', otro: true })
+  assert.deepEqual(equivalenciaPuesto('docente', 'PROFESOR ORDINARIO PRINCIPAL'), { condicion_docente: 'ordinario', categoria: 'principal' })
+})
+
 test('only unequivocal positions fill teacher data, and never over the user choice', () => {
   assert.deepEqual(equivalenciaPuesto('docente', 'Profesor ordinario principal'), { condicion_docente: 'ordinario', categoria: 'principal' })
   assert.deepEqual(equivalenciaPuesto('docente', 'Docente contratado'), { condicion_docente: 'contratado' })

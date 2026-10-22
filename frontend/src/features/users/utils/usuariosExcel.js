@@ -1,5 +1,6 @@
 import { columns, parseUsersCsv } from './usuariosCsv.js'
 import { codigoVisible, leyesDelTipo } from './leyes.js'
+import { aMayusculas } from '../../../shared/forms/mayusculas.js'
 
 export const excelFields = [
   ['numero_doc_identidad', 'DNI *', 14], ['nombres', 'Nombres *', 25],
@@ -104,6 +105,8 @@ export function resolveUsersLocations(records, locations) {
     const user = Object.fromEntries(columns.map(key => [key, record[key] || '']))
     user.tipo_personal = user.tipo_personal.toLowerCase()
     user.ley = user.ley.toUpperCase()
+    // Como en el formulario: nombres y apellidos en mayúsculas.
+    for (const key of ['nombres', 'apellido_paterno', 'apellido_materno']) user[key] = aMayusculas(user[key])
     const fields = ['region', 'provincia', 'distrito']
     if (!fields.some(key => record[key])) return user
     if (fields.some(key => !record[key])) throw new Error(`Registro ${index + 1}: completa región, provincia y distrito juntos.`)

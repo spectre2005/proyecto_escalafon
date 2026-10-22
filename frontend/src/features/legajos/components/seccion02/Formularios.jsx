@@ -100,7 +100,7 @@ export function AdendaForm({ usuario, vinculos, documentoId, onSaved, onCancel }
     <NotaDocumento documentoId={documentoId} />
     <CampoVinculo vinculos={vinculos} draft={draft} set={set} errors={errors} />
     <Campo label="N.º de adenda" error={errors.numero}><input maxLength={40} value={draft.numero} onChange={set('numero')} /></Campo>
-    <Campo label="Motivo" error={errors.motivo}><input maxLength={200} value={draft.motivo} onChange={set('motivo')} /></Campo>
+    <Campo label="Motivo" error={errors.motivo}><input data-sin-mayusculas maxLength={200} value={draft.motivo} onChange={set('motivo')} /></Campo>
     <Campo label="Fecha de inicio" required error={errors.fecha_inicio}><input type="date" required value={draft.fecha_inicio} onChange={set('fecha_inicio')} /></Campo>
     <Campo label="Fecha de fin" required error={errors.fecha_fin}><input type="date" required min={draft.fecha_inicio || undefined} value={draft.fecha_fin} onChange={set('fecha_fin')} /></Campo>
   </Formulario>

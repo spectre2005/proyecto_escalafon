@@ -145,7 +145,7 @@ export default function SubirDocumentoForm({ usuario, seccion, tipo, titular, en
             <option value="">No, es un documento adicional</option>
             {vigentes.map(documento => <option key={documento.id} value={documento.id}>{resumen(documento)}</option>)}
           </select></Campo>}
-        <Campo label="Motivo de incorporación" error={errors.motivo_incorporacion} className="sm:col-span-2"><input maxLength={300} value={draft.motivo_incorporacion} onChange={set('motivo_incorporacion')} /></Campo>
+        <Campo label="Motivo de incorporación" error={errors.motivo_incorporacion} className="sm:col-span-2"><input data-sin-mayusculas maxLength={300} value={draft.motivo_incorporacion} onChange={set('motivo_incorporacion')} /></Campo>
       </div>
     </details>
     </FormSplit>
