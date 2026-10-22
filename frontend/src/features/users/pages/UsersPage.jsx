@@ -289,7 +289,7 @@ export default function UsersPage() {
                   <tr>
                     <th>Usuario</th>
                     <th>DNI</th>
-                    <th>Correo institucional</th>
+                    <th>Correo electrónico</th>
                     <th>Tipo de personal</th>
                     <th>Ley</th>
                     <th>Situación</th>
@@ -516,7 +516,7 @@ export default function UsersPage() {
                       <th>Registro</th>
                       <th>DNI</th>
                       <th>Usuario</th>
-                      <th>Correo institucional</th>
+                      <th>Correo electrónico</th>
                       <th>Tipo de personal</th>
                       <th>Ley</th>
                       <th>Teléfono</th>

@@ -24,7 +24,7 @@ const fields = [
   ['estado_civil', 'Estado civil', 'text', 15],
   ['domicilio', 'Domicilio', 'text', 250],
   ['telefono', 'Teléfono', 'tel', 9],
-  ['email_institucional', 'Correo institucional', 'email', 255, true],
+  ['email_institucional', 'Correo electrónico', 'email', 255, true],
   // Dato histórico de la persona: el puesto y la unidad actuales se toman del vínculo vigente (sección 02).
   ['nombre_puesto', 'Puesto registrado en la persona', 'text', 150],
 ]
@@ -110,6 +110,7 @@ export default function GeneralDataEditor({ usuario, data, onSaved, onCancel, on
               <span id="identity-upload-tooltip" role="tooltip" className="pointer-events-none absolute right-0 bottom-full z-10 mb-2 hidden whitespace-nowrap rounded-lg bg-slate-800 px-3 py-2 text-[11px] text-white group-hover:block group-focus-within:block">{isDni ? 'Subir copia de DNI' : 'Subir archivo de identidad'}</span>
             </span>}
           </div>
+          {key === 'email_institucional' && <span className="font-normal text-slate-500">Se utiliza para enviar requerimientos y notificaciones. Si la persona tiene una cuenta habilitada en el sistema, también puede utilizarse para iniciar sesión.</span>}
           {fieldErrors[key] && <span className="text-rose-700">{fieldErrors[key].join(' ')}</span>}
         </div>
       })}

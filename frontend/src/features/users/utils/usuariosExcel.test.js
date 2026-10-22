@@ -70,3 +70,15 @@ test('older CSV files with the regimen_laboral column still import the law', () 
   const [registro] = parseUsersCsv('numero_doc_identidad,nombres,apellido_paterno,apellido_materno,email_institucional,tipo_personal,regimen_laboral,telefono\n99000001,Ana,Ejemplo,,ana@example.test,administrativo,CAS,')
   assert.equal(registro.ley, 'CAS')
 })
+
+test('the email column is called "Correo electrónico" and templates with the previous header still import', async () => {
+  const book = new ExcelJS.Workbook()
+  await book.xlsx.load(await createUsersTemplate(catalogo))
+  const sheet = book.getWorksheet('Personal')
+  assert.equal(sheet.getCell('E1').value, 'Correo electrónico *')
+  // Plantilla descargada antes del cambio de nombre: mismo campo, encabezado anterior.
+  sheet.getCell('E1').value = 'Correo institucional *'
+  sheet.addRow(['00123456', 'Ana', 'Ejemplo', '', 'ana@example.test', '', 'docente', '30220', '', '', ''])
+  const [registro] = await parseUsersExcel(await book.xlsx.writeBuffer())
+  assert.equal(registro.email_institucional, 'ana@example.test')
+})

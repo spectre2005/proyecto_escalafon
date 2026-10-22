@@ -7,7 +7,7 @@ export const personalGroups = [
     ['fecha_nacimiento', 'Fecha de nacimiento'], ['nacionalidad', 'Nacionalidad'], ['estado_civil', 'Estado civil'],
   ]],
   ['Contacto y domicilio', [
-    ['email_institucional', 'Correo institucional'], ['telefono', 'Teléfono'], ['domicilio', 'Domicilio'],
+    ['email_institucional', 'Correo electrónico'], ['telefono', 'Teléfono'], ['domicilio', 'Domicilio'],
     ['region', 'Región'], ['provincia', 'Provincia'], ['distrito', 'Distrito'],
   ]],
   ['Información laboral', [

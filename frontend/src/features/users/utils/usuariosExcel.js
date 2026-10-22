@@ -5,13 +5,13 @@ import { aMayusculas } from '../../../shared/forms/mayusculas.js'
 export const excelFields = [
   ['numero_doc_identidad', 'DNI *', 14], ['nombres', 'Nombres *', 25],
   ['apellido_paterno', 'Apellido paterno *', 24], ['apellido_materno', 'Apellido materno', 24],
-  ['email_institucional', 'Correo institucional *', 38], ['telefono', 'Teléfono', 16],
+  ['email_institucional', 'Correo electrónico *', 38], ['telefono', 'Teléfono', 16],
   ['tipo_personal', 'Tipo de personal *', 24], ['ley', 'Ley (código) *', 24],
   ['region', 'Región', 24], ['provincia', 'Provincia', 24], ['distrito', 'Distrito', 24],
 ]
 
 // Plantillas anteriores: la ley venía como «Régimen laboral».
-const encabezadosAnteriores = { 'Régimen laboral *': 'ley' }
+const encabezadosAnteriores = { 'Régimen laboral *': 'ley', 'Correo institucional *': 'email_institucional' }
 
 async function workbook() {
   const { default: ExcelJS } = await import('exceljs')
@@ -42,7 +42,7 @@ export async function createUsersTemplate(catalogo) {
   const instructions = [
     ['Campo', 'Cómo completar la plantilla'],
     ['Registro', 'Completa la hoja Personal desde la fila 2. Una fila por usuario. Máximo 1,000 usuarios. No cambies los encabezados.'],
-    ['Obligatorios', 'DNI, nombres, apellido paterno, correo institucional, tipo de personal y ley.'],
+    ['Obligatorios', 'DNI, nombres, apellido paterno, correo electrónico, tipo de personal y ley.'],
     ['DNI', '8 dígitos. Las celdas están en formato texto para conservar ceros iniciales.'],
     ['Teléfono', 'Opcional. 9 dígitos, sin espacios ni prefijos.'],
     ['Docentes', `Tipo: docente. Ley: ${docentes.replaceAll(',', ', ') || 'sin leyes activas en el catálogo'}.`],

@@ -16,7 +16,7 @@ final class ReportesSecciones
 
     public const DEFINICIONES = [
         'ficha_personal' => ['titulo' => 'Información personal y contacto', 'seccion' => 1, 'relacion' => null, 'campo_fecha' => 'fecha_nacimiento',
-            'campos' => ['fecha_nacimiento' => 'Nacimiento', 'edad' => 'Edad', 'nacionalidad' => 'Nacionalidad', 'estado_civil' => 'Estado civil', 'domicilio' => 'Domicilio', 'telefono' => 'Teléfono', 'email_institucional' => 'Correo institucional']],
+            'campos' => ['fecha_nacimiento' => 'Nacimiento', 'edad' => 'Edad', 'nacionalidad' => 'Nacionalidad', 'estado_civil' => 'Estado civil', 'domicilio' => 'Domicilio', 'telefono' => 'Teléfono', 'email_institucional' => 'Correo electrónico']],
         'familiares' => ['titulo' => 'Familiares y derechohabientes', 'seccion' => 1, 'relacion' => 'familiaresPorUsuario', 'campo_fecha' => 'fecha_nacimiento',
             'campos' => ['parentesco' => 'Parentesco', 'apellidos_nombres' => 'Familiar', 'numero_doc_identidad' => 'Documento del familiar', 'fecha_nacimiento' => 'Nacimiento del familiar', 'es_derechohabiente' => 'Derechohabiente']],
         'antecedentes' => ['titulo' => 'Declaraciones, antecedentes e impedimentos', 'seccion' => 1, 'relacion' => 'declaracionesVerificacionesPorUsuario', 'campo_fecha' => 'fecha',

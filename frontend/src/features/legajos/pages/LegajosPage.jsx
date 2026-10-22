@@ -42,7 +42,7 @@ const titles = {
   usuario_id: 'Titular', documento_id: 'Documento de respaldo', archivo_id: 'Archivo asociado',
   legajo_id: 'Legajo', vinculo_laboral_id: 'Vínculo laboral', seccion_legajo_id: 'Sección',
   subseccion_legajo_id: 'Subsección', tipo_documento_id: 'Tipo de documento',
-  email_institucional: 'Correo institucional', regimen_laboral: 'Tipo de vínculo',
+  email_institucional: 'Correo electrónico', regimen_laboral: 'Tipo de vínculo',
   regimen_normativo_id: 'Ley / régimen normativo', unidad_organica_id: 'Unidad orgánica',
   ley: 'Ley / régimen normativo', tipo_vinculo: 'Tipo de vínculo vigente',
   puesto_actual: 'Puesto actual (vínculo vigente)', unidad_actual: 'Unidad orgánica actual (vínculo vigente)',

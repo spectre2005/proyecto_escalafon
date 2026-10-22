@@ -50,7 +50,7 @@ export default function PersonalHeader({ data, usuario, compacto = false, onVerF
           <SummaryField title="Unidad orgánica actual" value={actual.unidad} nota={actual.nota} />
           <SummaryField title="Ley / régimen normativo" value={regimen.ley} />
           <SummaryField title="Tipo de vínculo vigente" value={regimen.tipo} />
-          <SummaryField title="Correo institucional" value={person.email_institucional} />
+          <SummaryField title="Correo electrónico" value={person.email_institucional} />
         </dl>
         <section aria-label="Legajos registrados" className="mt-6 border-t border-slate-100 pt-5">
           <h2 className="text-xs font-semibold text-slate-600">Legajos registrados</h2>
