@@ -23,6 +23,9 @@ final class RegimenesLaborales
 
     public const SIN_DEFINIR = 'Sin definir: se define al registrar el vínculo en 2.2.';
 
+    /** Hay vínculos abiertos, pero ninguno vigente a la fecha: no se afirma un tipo de vínculo vigente. */
+    public const SIN_VIGENTE_DETERMINADO = 'No determinado: ningún vínculo abierto está vigente a la fecha (plazo vencido sin cese o inicio futuro). Revísalo en la sección 02.';
+
     /** Vínculo anterior a la migración cuyo valor era una ley (p. ej. «276»): se confirma al corregirlo. */
     public const SIN_DEFINIR_VINCULO = 'Sin definir: confírmalo en «Corregir vínculo» de la sección 02.';
 

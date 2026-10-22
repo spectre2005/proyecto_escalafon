@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\V1\DeclaracionVerificacionController;
 use App\Http\Controllers\Api\V1\DesplazamientoController;
 use App\Http\Controllers\Api\V1\DesvinculacionController;
 use App\Http\Controllers\Api\V1\DocumentoUsuarioController;
+use App\Http\Controllers\Api\V1\EmisionPersonalController;
 use App\Http\Controllers\Api\V1\EquipoAccesoController;
 use App\Http\Controllers\Api\V1\EvaluacionDesempenoController;
 use App\Http\Controllers\Api\V1\Evaluaciones\Seccion07Controller;
@@ -90,6 +91,7 @@ use App\Http\Middleware\FuncionalidadActiva;
 use App\Http\Middleware\LegajoSoloLectura;
 use App\Http\Middleware\ModuloSistemaActivo;
 use App\Support\ConsultaReportes;
+use App\Support\EmisionesPersonales;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1/auth')->middleware(ApiHabilitada::class)->group(function (): void {
@@ -108,6 +110,9 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
         Route::get('legajos', 'legajos');
         Route::get('{formato}', 'show')->whereIn('formato', array_keys(FormatosDirectivaController::FORMATOS));
     });
+    // Informe escalafonario y constancias de una persona: mismos permisos que los formatos de la directiva.
+    Route::get('reportes/personales/{usuario}/{documento}', [EmisionPersonalController::class, 'show'])->middleware(['can:sistema.administrar', 'can:legajo.ver'])
+        ->whereUuid('usuario')->whereIn('documento', array_keys(EmisionesPersonales::DOCUMENTOS));
     Route::get('reportes/{tipo}', [ReporteController::class, 'show'])->whereIn('tipo', array_keys(ConsultaReportes::catalogo()));
     Route::get('vencimientos', VencimientosController::class)->middleware('can:legajo.ver');
     Route::get('institucion', [InstitutionSettingsController::class, 'show']);

@@ -35,6 +35,25 @@ final class VigenciaLaboral
         return $adenda?->fecha_fin ?? $vinculo->fecha_fin_prevista;
     }
 
+    /**
+     * Situación de un vínculo a la fecha, solo cuando los datos la permiten afirmar. Un plazo vencido sin cese registrado
+     * queda «no determinada»: no se afirma que siga ni que haya terminado. La comparten la ficha y las constancias.
+     *
+     * @return array{codigo: string, texto: string}
+     */
+    public static function situacion(VinculoLaboral $vinculo, ?string $fecha = null): array
+    {
+        $fecha ??= self::hoy();
+        $fin = self::fin($vinculo);
+
+        return match (true) {
+            $vinculo->fecha_inicio->format('Y-m-d') > $fecha => ['codigo' => 'programado', 'texto' => 'Inicio previsto el '.$vinculo->fecha_inicio->format('d/m/Y')],
+            $vinculo->fecha_cese !== null && $vinculo->fecha_cese->format('Y-m-d') < $fecha => ['codigo' => 'concluido', 'texto' => 'Concluido el '.$vinculo->fecha_cese->format('d/m/Y').' (cese registrado)'],
+            self::vigente($vinculo, $fecha) => ['codigo' => 'vigente', 'texto' => 'Vigente a la fecha'],
+            default => ['codigo' => 'no_determinada', 'texto' => 'No determinada: el plazo terminó el '.$fin?->format('d/m/Y').($vinculo->fecha_cese ? '' : ' y no hay cese registrado')],
+        };
+    }
+
     public static function vigente(VinculoLaboral $vinculo, ?string $fecha = null): bool
     {
         $fecha ??= self::hoy();

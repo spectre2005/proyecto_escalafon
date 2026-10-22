@@ -15,11 +15,13 @@ export const regimenesLaborales = { carrera: 'Carrera', plazo_determinado: 'Plaz
 // null = Sin definir: vínculo anterior cuyo valor era una ley; se confirma en «Corregir vínculo». Nunca es un tipo.
 export const tipoVinculo = valor => regimenesLaborales[valor] || 'Tipo de vínculo sin definir'
 
-// Puesto y unidad actuales (GET /expedientes, campo puesto_actual): del vínculo vigente; sin él, los registrados antes en
-// la persona, que se conservan como dato histórico.
+// Puesto y unidad actuales (GET /expedientes, campo puesto_actual): del vínculo vigente; sin él, del vínculo abierto más
+// reciente con su situación (plazo vencido sin cese o inicio futuro: backend VigenciaLaboral::situacion, la misma de la
+// constancia), o los registrados antes en la persona, que se conservan como dato histórico.
 export function puestoActual(actual) {
   const nota = actual?.origen === 'persona' ? 'Sin vínculo vigente: dato registrado antes en la persona.'
-    : actual?.vinculos_vigentes > 1 ? `${actual.vinculos_vigentes} vínculos vigentes: se muestra el de inicio más reciente.` : null
+    : actual?.situacion && actual.situacion.codigo !== 'vigente' ? `${actual.situacion.texto}.`
+      : actual?.vinculos_vigentes > 1 ? `${actual.vinculos_vigentes} vínculos vigentes: se muestra el de inicio más reciente.` : null
   return { puesto: actual?.nombre_puesto || null, unidad: actual?.unidad_organica || null, nota }
 }
 

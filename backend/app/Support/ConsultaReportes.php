@@ -486,7 +486,7 @@ final class ConsultaReportes
             && (empty($filtros['tipo_personal']) || strtolower($base['tipo_personal']) === $filtros['tipo_personal']);
     }
 
-    private static function etiqueta(?string $valor): string
+    public static function etiqueta(?string $valor): string
     {
         return ['maestria' => 'Maestría', 'educacion_basica' => 'Educación básica', 'titulo_profesional' => 'Título profesional',
             'tecnico' => 'Técnico', 'programa_especializacion' => 'Programa de especialización'][$valor ?? ''] ?? ($valor ? ucfirst(str_replace('_', ' ', $valor)) : 'Sin definir');

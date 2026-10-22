@@ -201,7 +201,7 @@ class RegistroConVinculoTest extends TestCase
         $persona = Usuario::factory()->create(['tipo_personal' => 'administrativo', 'nombre_puesto' => 'Puesto anterior', 'unidad_organica_id' => $unidad->id]);
         Legajo::factory()->create(['usuario_id' => $persona->id, 'estado_legajo' => 'activo']);
         $url = '/api/v1/expedientes/'.$persona->id;
-        $this->getJson($url)->assertOk()->assertJsonPath('data.puesto_actual', ['nombre_puesto' => 'Puesto anterior', 'unidad_organica' => 'Unidad anterior', 'origen' => 'persona', 'vinculos_vigentes' => 0]);
+        $this->getJson($url)->assertOk()->assertJsonPath('data.puesto_actual', ['nombre_puesto' => 'Puesto anterior', 'unidad_organica' => 'Unidad anterior', 'origen' => 'persona', 'vinculos_vigentes' => 0, 'situacion' => null]);
 
         VinculoLaboral::factory()->create(['usuario_id' => $persona->id, 'nombre_puesto' => 'Puesto vigente', 'unidad_organica_id' => null, 'fecha_inicio' => '2026-01-01', 'fecha_cese' => null, 'anulado' => false]);
         $this->getJson($url)->assertOk()->assertJsonPath('data.puesto_actual.origen', 'vinculo')->assertJsonPath('data.puesto_actual.nombre_puesto', 'Puesto vigente')

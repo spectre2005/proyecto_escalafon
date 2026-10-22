@@ -2,6 +2,7 @@ import AbrirLegajo from './AbrirLegajo'
 import CerrarLegajo from './CerrarLegajo'
 import ReabrirLegajo from './ReabrirLegajo'
 import PersonalPhoto from './PersonalPhoto'
+import EmisionesPersonales from '../../reportes/components/EmisionesPersonales'
 import { puestoActual, textoRegimen } from '../config/seccion02'
 
 function SummaryField({ title, value, nota }) {
@@ -65,6 +66,7 @@ export default function PersonalHeader({ data, usuario, compacto = false, onVerF
           </ul> : <p className="mt-2 text-sm text-slate-500">No hay legajos registrados para esta persona.</p>}
           {!data.legajos.some(legajo => legajo.values.estado_legajo === 'activo') && <AbrirLegajo usuario={usuario} className="mt-3" />}
         </section>
+        {data.legajos.length > 0 && <EmisionesPersonales usuario={usuario} />}
       </div>
       <PersonalPhoto usuario={usuario} nombre={data.nombre} />
     </div>

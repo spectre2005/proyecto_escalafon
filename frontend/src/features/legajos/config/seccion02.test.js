@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { pruebaEnNoConDatos, pruebaNoAplica } from './seccion02.js'
+import { pruebaEnNoConDatos, pruebaNoAplica, puestoActual } from './seccion02.js'
 import { vinculoParaGuardar } from '../components/seccion02/borradoresVinculo.js'
 
 test('2.4 does not apply only with the flag in No and nothing registered', () => {
@@ -34,4 +34,14 @@ test('a historical registration explicitly preserves the real cese date', () => 
 test('correcting an open link can still register its cese and blank dates remain null', () => {
   assert.equal(vinculoParaGuardar({ fecha_cese: '2026-10-19' }, { correccion: true }).fecha_cese, '2026-10-19')
   assert.equal(vinculoParaGuardar({ fecha_cese: '' }, { correccion: true }).fecha_cese, null)
+})
+
+test('the header never presents a link as current when the backend situation says otherwise', () => {
+  const base = { nombre_puesto: 'PUESTO', unidad_organica: 'UNIDAD', origen: 'vinculo' }
+  const vencido = { codigo: 'no_determinada', texto: 'No determinada: el plazo terminó el 31/12/2025 y no hay cese registrado' }
+  assert.equal(puestoActual({ ...base, vinculos_vigentes: 0, situacion: vencido }).nota, `${vencido.texto}.`)
+  assert.equal(puestoActual({ ...base, vinculos_vigentes: 0, situacion: { codigo: 'programado', texto: 'Inicio previsto el 04/01/2027' } }).nota, 'Inicio previsto el 04/01/2027.')
+  assert.equal(puestoActual({ ...base, vinculos_vigentes: 1, situacion: { codigo: 'vigente', texto: 'Vigente a la fecha' } }).nota, null)
+  assert.equal(puestoActual({ ...base, vinculos_vigentes: 2, situacion: { codigo: 'vigente', texto: 'Vigente a la fecha' } }).nota, '2 vínculos vigentes: se muestra el de inicio más reciente.')
+  assert.equal(puestoActual({ nombre_puesto: 'ANTERIOR', origen: 'persona', vinculos_vigentes: 0, situacion: null }).nota, 'Sin vínculo vigente: dato registrado antes en la persona.')
 })

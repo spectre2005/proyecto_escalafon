@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import api, { apiErrorMessage } from '../../../axios'
-import { cacheInstitution, normalizeInstitution, readInstitution } from '../../../config/institution'
-import { fetchInstitution } from '../../settings/institutionApi'
+import { institucionParaPdf } from '../institucionPdf'
 import { puestoActual, textoRegimen } from '../../legajos/config/seccion02'
 
 export default function DownloadPersonalReport({ usuario, blank = false, className }) {
@@ -13,9 +12,7 @@ export default function DownloadPersonalReport({ usuario, blank = false, classNa
     setError('')
     try {
       const { createPersonalPdf } = await import('../pdf/fichaPersonalPdf')
-      const branding = await fetchInstitution()
-      const institution = branding.configured ? normalizeInstitution(branding.data) : readInstitution()
-      if (branding.configured) cacheInstitution(institution)
+      const institution = await institucionParaPdf()
       let values = {}
       const families = []
       if (!blank) {

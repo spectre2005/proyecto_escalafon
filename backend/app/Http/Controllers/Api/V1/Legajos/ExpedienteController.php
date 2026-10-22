@@ -63,6 +63,7 @@ use App\Support\PerfilPendiente;
 use App\Support\PuestoActual;
 use App\Support\RegimenesLaborales;
 use App\Support\Seccion05;
+use App\Support\VigenciaLaboral;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -336,7 +337,9 @@ class ExpedienteController extends Controller
      */
     private function regimen(Usuario $person): array
     {
-        $tipos = $person->vinculosLaborales()->where('anulado', false)->whereNull('fecha_cese')->pluck('regimen_laboral');
+        // Tipos de los vínculos vigentes con el mismo criterio que el puesto actual y las constancias (VigenciaLaboral).
+        $abiertos = PuestoActual::vigentes($person->vinculosLaborales())->get();
+        $tipos = $abiertos->filter(fn (VinculoLaboral $vinculo): bool => VigenciaLaboral::vigente($vinculo))->pluck('regimen_laboral');
         $ley = $person->regimenNormativo;
 
         return [
@@ -345,6 +348,7 @@ class ExpedienteController extends Controller
             'tipos_vinculo' => $tipos->filter()->unique()->values()->all(),
             'sin_definir' => $tipos->isEmpty() || $tipos->contains(null),
             'mensaje' => match (true) {
+                $tipos->isEmpty() && $abiertos->isNotEmpty() => RegimenesLaborales::SIN_VIGENTE_DETERMINADO,
                 $tipos->isEmpty() => RegimenesLaborales::SIN_DEFINIR,
                 $tipos->contains(null) => RegimenesLaborales::SIN_DEFINIR_VINCULO,
                 default => null,
