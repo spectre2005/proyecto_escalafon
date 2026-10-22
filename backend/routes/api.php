@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\V1\ExperienciaLaboralController;
 use App\Http\Controllers\Api\V1\FamiliarController;
 use App\Http\Controllers\Api\V1\FeriadoController;
 use App\Http\Controllers\Api\V1\FormacionAcademicaController;
+use App\Http\Controllers\Api\V1\FormatosDirectivaController;
 use App\Http\Controllers\Api\V1\GoceVacacionalController;
 use App\Http\Controllers\Api\V1\HistorialEstadoDocumentoController;
 use App\Http\Controllers\Api\V1\InduccionController;
@@ -101,6 +102,12 @@ Route::prefix('v1/auth')->middleware(ApiHabilitada::class)->group(function (): v
 // FuncionalidadActiva: con una funcionalidad desactivada, sus rutas de creación y modificación responden 409.
 Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCambioPassword::class, FuncionalidadActiva::class, LegajoSoloLectura::class])->group(function (): void {
     Route::get('reportes/opciones', [ReporteController::class, 'opciones']);
+    // Formatos de la directiva (anexos 06 a 09): solo quien administra el sistema y ve legajos.
+    Route::prefix('reportes/formatos')->middleware(['can:sistema.administrar', 'can:legajo.ver'])->controller(FormatosDirectivaController::class)->group(function (): void {
+        Route::get('/', 'catalogo');
+        Route::get('legajos', 'legajos');
+        Route::get('{formato}', 'show')->whereIn('formato', array_keys(FormatosDirectivaController::FORMATOS));
+    });
     Route::get('reportes/{tipo}', [ReporteController::class, 'show'])->whereIn('tipo', array_keys(ConsultaReportes::catalogo()));
     Route::get('vencimientos', VencimientosController::class)->middleware('can:legajo.ver');
     Route::get('institucion', [InstitutionSettingsController::class, 'show']);

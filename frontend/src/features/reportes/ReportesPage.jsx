@@ -132,8 +132,11 @@ function ContenidoReportes() {
   const reporte = reportes.find(item => item.id === params.get('tipo')) || reportes.find(item => item.id === 'personal') || reportes[0]
   const grupos = [...new Set(reportes.map(item => item.grupo))].sort((a, b) => a.localeCompare(b, 'es'))
   const abrir = tipo => setParams({ tipo })
+  const administra = usePuede('sistema.administrar')
+  const veLegajos = usePuede('legajo.ver')
+  const formatos = administra && veLegajos
   return <div className="mx-auto max-w-[1500px] space-y-6 pb-8">
-    <header><p className="text-[10px] font-semibold uppercase tracking-[.2em] text-teal-700">Personal con legajo</p><h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-800">Reportes del personal</h1><p className="mt-2 text-sm leading-relaxed text-slate-500">Consulta y exporta la información registrada en las once secciones del legajo.</p></header>
+    <header className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-[10px] font-semibold uppercase tracking-[.2em] text-teal-700">Personal con legajo</p><h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-800">Reportes del personal</h1><p className="mt-2 text-sm leading-relaxed text-slate-500">Consulta y exporta la información registrada en las once secciones del legajo.</p></div>{formatos && <Link to="/reportes/formatos" className="inline-flex items-center gap-2 rounded-xl border border-teal-200 bg-white px-4 py-2.5 text-sm font-semibold text-teal-800 hover:bg-teal-50"><Icon name="file" size={17} />Formatos de la directiva (anexos 06 a 09)</Link>}</header>
     {opciones.loading && <p role="status" className="text-sm text-slate-500">Cargando reportes disponibles…</p>}
     {opciones.error && <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{apiErrorMessage(opciones.error)}</p>}
     {reporte && <>
