@@ -24,6 +24,9 @@ class ResolverInstitucion
 {
     public function handle(Request $request, Closure $next): Response
     {
+        if (app()->environment(['local', 'testing']) && $request->getHost() === 'localhost' && $request->is('api/v1/correo/gmail/retorno-local')) {
+            return $next($request);
+        }
         // /up (salud) e /interno/tls (permiso de certificados de Caddy) no son de ninguna institución.
         if (config('plataforma.modo') !== 'subdominio' || $request->is('up', 'interno/tls')) {
             return $next($request);

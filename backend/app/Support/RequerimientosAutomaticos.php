@@ -3,7 +3,6 @@
 namespace App\Support;
 
 use App\Models\Legajo;
-use App\Models\NotificacionUsuario;
 use App\Models\RequerimientoDocumento;
 use App\Models\Usuario;
 use Illuminate\Support\Facades\DB;
@@ -39,8 +38,6 @@ final class RequerimientosAutomaticos
                     'seguimiento' => [['accion' => 'detección automática', 'mensaje' => $descripcion,
                         'motivo' => $fila['estado_codigo'], 'autor' => null, 'fecha' => now()->toIso8601String()]],
                 ]);
-                NotificacionUsuario::query()->create(['usuario_id' => $r->usuario_id, 'tipo' => 'solicitud_legajo',
-                    'titulo' => 'Nuevo requerimiento de documentación', 'mensaje' => $descripcion, 'requerimiento_id' => $r->id]);
 
                 return 1;
             });

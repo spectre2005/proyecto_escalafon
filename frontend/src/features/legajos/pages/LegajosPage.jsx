@@ -1,6 +1,6 @@
 import AvisosExpediente from '../components/documentos/AvisosExpediente'
 import { useEffect, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from '../../../shared/queries/useLiveQuery'
 import { conModulosOcultos, primeraCategoria, seccionesVisibles } from '../../../shared/funcionalidadesEstado'
 import { useFuncionalidades } from '../../../shared/useFuncionalidades'
@@ -162,6 +162,36 @@ const avisosModuloOculto = {
   's01-discapacidad': '«Discapacidad» no se muestra: la persona figura sin discapacidad (el servidor ni sus hijos) y no tiene certificados ni documentos registrados. Para verlo, cambia «Con discapacidad» en Información personal.',
 }
 
+function DestinoLegajo() {
+  const { hash, pathname, search } = useLocation()
+  useEffect(() => {
+    if (!hash) return
+    let id
+    try { id = decodeURIComponent(hash.slice(1)) } catch { return }
+    if (!/^(perfil-pendiente-|registro-|bloque-)[a-zA-Z0-9_-]+$/.test(id)) return
+    let frame
+    const observer = new MutationObserver(enfocar)
+    function enfocar() {
+      const destino = document.getElementById(id)
+      if (!destino) return
+      observer.disconnect()
+      frame = requestAnimationFrame(() => {
+        for (let padre = destino.parentElement; padre; padre = padre.parentElement) {
+          if (padre.tagName === 'DETAILS') padre.open = true
+        }
+        destino.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        destino.tabIndex = -1
+        destino.focus({ preventScroll: true })
+      })
+    }
+    observer.observe(document.body, { childList: true, subtree: true })
+    enfocar()
+    const timeout = setTimeout(() => observer.disconnect(), 10000)
+    return () => { observer.disconnect(); clearTimeout(timeout); cancelAnimationFrame(frame) }
+  }, [hash, pathname, search])
+  return null
+}
+
 function Detail({ usuario }) {
   const funcionalidades = useFuncionalidades()
   const veSensibles = usePuede('datos_sensibles.ver')
@@ -224,6 +254,7 @@ function Detail({ usuario }) {
     {data && <>
       {/* En una sección, la persona en una línea y el perfil plegado: la sección de trabajo queda en la primera pantalla. */}
       <PersonalHeader data={data} usuario={usuario} compacto={selected !== 'general'} onVerFicha={() => change('categoria', 'general')} />
+      <DestinoLegajo />
       {!readOnly && <CompletaPerfil usuario={usuario} pendientes={data.condiciones?.pendientes} legajoActivo={hasActiveLegajo} plegado={selected !== 'general'} />}
       {avisoOculto && <p role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{avisoOculto}</p>}
       {readOnly && <p role="status" className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">Legajo cerrado. Puedes consultar las secciones y visualizar o descargar sus documentos.</p>}

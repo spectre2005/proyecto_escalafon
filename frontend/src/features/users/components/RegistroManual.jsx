@@ -26,7 +26,7 @@ const condicionesVacias = { tiene_derechohabientes: null, con_discapacidad: null
 const puestosVacios = () => ({ docente: datosPuestoInicial(true), administrativo: datosPuestoInicial(false) })
 const camposPersona = [
   ['numero_doc_identidad', 'DNI', true], ['nombres', 'Nombres', true], ['apellido_paterno', 'Apellido paterno', true],
-  ['apellido_materno', 'Apellido materno', false], ['email_institucional', 'Correo institucional', true], ['telefono', 'Teléfono', false],
+  ['apellido_materno', 'Apellido materno', false], ['email_institucional', 'Correo del personal (Gmail u otro)', true], ['telefono', 'Teléfono', false],
 ]
 const largo = { numero_doc_identidad: 8, telefono: 9, nombres: 120, email_institucional: 255 }
 const tiposPersonal = { docente: 'Docente', administrativo: 'Administrativo' }
@@ -231,7 +231,7 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
           if (key === 'numero_doc_identidad' && valor !== draft.numero_doc_identidad) reiniciarIdentidad()
           setDraft(updateUserDraft(draft, key, valor, dominioCorreo))
         }} />
-      {key === 'email_institucional' && <small className="text-[10px] text-[#8b9c91]">{dominioCorreo ? 'Se completa con el primer nombre y el apellido paterno. Puedes editarlo.' : 'Escríbelo completo. Para sugerirlo, configura el dominio del correo del personal en Configuración.'}</small>}
+      {key === 'email_institucional' && <small className="text-[10px] text-[#8b9c91]">{dominioCorreo ? 'Se sugiere con el nombre y apellido, pero puedes poner su Gmail. Los requerimientos se enviarán a esta dirección; el docente no conecta su cuenta.' : 'A esta dirección se enviarán los requerimientos. El docente no necesita conectar su Gmail ni crear una cuenta.'}</small>}
       {identidad.origen && draft[key] && identidad.origen.valores[key] === draft[key] && <small className="text-[10px] font-semibold text-[#7a5a17]">{identidad.origen.simulada ? 'Dato simulado (ficticio)' : 'Dato de la consulta de identidad'}</small>}
       {erroresPersonaCampo[key] && <span className="text-rose-700">{[].concat(erroresPersonaCampo[key]).join(' ')}</span>}
     </label>

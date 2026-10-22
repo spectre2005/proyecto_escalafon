@@ -14,6 +14,8 @@ return [
     |
     */
 
+    'reply_to' => ['address' => env('REQUERIMIENTOS_CORREO_RESPUESTA', env('MAIL_FROM_ADDRESS')), 'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Escalafón'))],
+
     'default' => env('MAIL_MAILER', 'log'),
 
     /*
@@ -45,7 +47,7 @@ return [
             'port' => env('MAIL_PORT', 2525),
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
-            'timeout' => null,
+            'timeout' => 20,
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 

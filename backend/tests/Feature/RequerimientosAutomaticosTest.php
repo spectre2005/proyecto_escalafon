@@ -47,7 +47,7 @@ class RequerimientosAutomaticosTest extends TestCase
         $this->assertDatabaseHas('requerimientos_documentos', ['usuario_id' => $legajo->usuario_id, 'tipo_documento_id' => $exigido->id, 'origen' => 'automatico', 'estado' => 'abierto']);
         $this->assertDatabaseMissing('requerimientos_documentos', ['tipo_documento_id' => $incierto->id]);
         $this->postJson('/api/v1/solicitudes-legajo/sincronizar')->assertOk()->assertJsonPath('creados', 0);
-        $this->assertDatabaseCount('notificaciones_usuario', 1);
+        $this->assertDatabaseCount('notificaciones_usuario', 0);
         $this->getJson('/api/v1/solicitudes-legajo/sugerencias')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.estado_codigo', 'por_determinar');
     }
 
@@ -90,12 +90,12 @@ class RequerimientosAutomaticosTest extends TestCase
         $this->assertDatabaseCount('requerimientos_documentos', 1);
     }
 
-    public function test_daily_scheduler_generates_requirements_without_opening_the_panel_and_teacher_cannot_scan_others(): void
+    public function test_daily_command_does_not_generate_requirements_and_teacher_cannot_scan_others(): void
     {
         $this->legajo();
         $this->tipo();
         $this->artisan('legajo:recordar-solicitudes')->assertSuccessful();
-        $this->assertDatabaseCount('requerimientos_documentos', 1);
+        $this->assertDatabaseCount('requerimientos_documentos', 0);
         $docente = $this->actuarComo(codigo: 'autoservicio_legajo');
         Sanctum::actingAs($docente);
         $this->postJson('/api/v1/solicitudes-legajo/sincronizar')->assertForbidden();

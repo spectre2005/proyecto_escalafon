@@ -32,7 +32,7 @@ class EquipoAccesoTest extends TestCase
             $this->postJson(self::URL, [])->assertForbidden();
         }
         $this->actuarComo();
-        $this->getJson(self::URL)->assertOk()->assertJsonCount(3, 'data.perfiles');
+        $this->getJson(self::URL)->assertOk()->assertJsonCount(2, 'data.perfiles');
     }
 
     public function test_assigning_an_existing_person_preserves_their_account_and_uses_the_authenticated_actor(): void

@@ -257,6 +257,7 @@ final class ConsultaReportes
     {
         $perfil = PerfilDocumental::de($persona, $persona->vinculosLaborales);
         $familiares = $persona->familiaresPorUsuario;
+        $pendientesPerfil = PerfilPendiente::de($persona, $perfil->aplicacion, $actor->veDatosSensibles());
         $porFamiliar = $familiares->map(fn ($f) => ExigenciasSeccion01::documentoDeFamiliar($f, today()))->filter()->values()->all();
         foreach ($persona->legajos->where('estado_legajo', 'activo') as $legajo) {
             $todos = $persona->documentosUsuarioPorUsuario->where('legajo_id', $legajo->id);
@@ -270,12 +271,18 @@ final class ConsultaReportes
                 if (($exigencia['aplica'] ?? true) === false) {
                     continue;
                 }
+                if ($exigencia['exigido'] === null) {
+                    $exigencia['destino_revision'] = self::destinoPerfil($persona, $perfil, $tipo, $pendientesPerfil);
+                }
                 $propios = $actuales->where('tipo_documento_id', $tipo->id);
                 if (isset(Seccion01::PARENTESCOS[$tipo->codigo]) && $familiares->isNotEmpty()) {
                     foreach ($familiares as $familiar) {
                         $exigenciaFamiliar = ExigenciasSeccion01::documentoDeFamiliar($familiar, today());
                         if (! $exigenciaFamiliar || $exigenciaFamiliar['codigo'] !== $tipo->codigo) {
                             continue;
+                        }
+                        if ($exigenciaFamiliar['exigido'] === null) {
+                            $exigenciaFamiliar['destino_revision'] = '/legajos/'.$persona->id.'?categoria=s01-familia#registro-'.$familiar->id;
                         }
                         $documento = $todos->firstWhere('id', $familiar->documento_id);
                         $visitados = [];
@@ -296,6 +303,40 @@ final class ConsultaReportes
         }
     }
 
+    /** @param list<array<string, mixed>> $pendientes */
+    private static function destinoPerfil(Usuario $persona, PerfilDocumental $perfil, TipoDocumento $tipo, array $pendientes): string
+    {
+        $bandera = null;
+        foreach (AplicacionDocumental::REQUIERE as $columna => [$campo]) {
+            if ($tipo->{$columna} && ($perfil->banderas[$campo] ?? null) === null) {
+                $bandera = $campo;
+                break;
+            }
+        }
+        if (in_array($tipo->codigo, AplicacionDocumental::DE_DERECHOHABIENTES, true)) {
+            if ($perfil->banderas['tiene_derechohabientes'] === null) {
+                $bandera = 'tiene_derechohabientes';
+            } elseif ($perfil->banderas['tiene_derechohabientes'] === true) {
+                return '/legajos/'.$persona->id.'?categoria=s01-familia#bloque-registros';
+            }
+        }
+        foreach ($pendientes as $pendiente) {
+            if ($pendiente['bandera'] === $bandera) {
+                $categoria = match ($bandera) {
+                    'tiene_derechohabientes' => 's01-familia',
+                    'con_discapacidad' => 's01-discapacidad',
+                    default => 's02-vinculo',
+                };
+
+                return '/legajos/'.$persona->id.'?categoria='.$categoria.'#perfil-pendiente-'.$bandera.'-'.($pendiente['vinculo_id'] ?? 'persona');
+            }
+        }
+        $vinculo = $persona->vinculosLaborales->first(fn (VinculoLaboral $v): bool => ! $v->anulado && $v->fecha_cese === null
+            && ! in_array($v->regimen_laboral, array_keys(PerfilDocumental::APLICA), true));
+
+        return '/legajos/'.$persona->id.'?categoria=s02-vinculo#'.($vinculo ? 'registro-'.$vinculo->id : 'bloque-registros');
+    }
+
     private static function pendienteTipo(array $base, Legajo $legajo, TipoDocumento $tipo, array $exigencia, Collection $documentos, ?string $familiar = null): Generator
     {
         $comun = [...$base, 'legajo_id' => $legajo->id, 'tipo_documento_id' => $tipo->id, 'legajo' => $legajo->numero_legajo, 'seccion' => str_pad((string) $tipo->seccion_legajo_id, 2, '0', STR_PAD_LEFT),
@@ -304,7 +345,7 @@ final class ConsultaReportes
         if ($documentos->isEmpty() || $cargados->isEmpty() && ! $documentos->contains('estado', 'observado') && ! $documentos->contains('estado', 'falso')) {
             if ($exigencia['exigido'] !== false) {
                 $estado = $exigencia['exigido'] === null ? 'por_determinar' : 'faltante';
-                yield [...$comun, 'id' => $legajo->id.':'.$tipo->id.':'.$familiar, 'estado_codigo' => $estado, 'estado' => self::catalogo()['pendientes']['estados'][$estado], 'motivo' => $exigencia['motivo']];
+                yield [...$comun, 'id' => $legajo->id.':'.$tipo->id.':'.$familiar, 'estado_codigo' => $estado, 'estado' => self::catalogo()['pendientes']['estados'][$estado], 'motivo' => $exigencia['motivo'], 'destino_revision' => $exigencia['destino_revision'] ?? null];
             }
 
             return;

@@ -1,6 +1,7 @@
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { usePuede } from '../auth/session'
 import InstitucionConfig from './InstitucionConfig'
+import CorreoRequerimientosConfig from './CorreoRequerimientosConfig'
 
 export default function SettingsPage() {
   const [params] = useSearchParams()
@@ -12,6 +13,6 @@ export default function SettingsPage() {
   return <div>
     <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-teal-700">Administración</p>
     <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-800">Configuración</h1>
-    <div className="mt-6"><InstitucionConfig /></div>
+    <div className="mt-6"><InstitucionConfig /><CorreoRequerimientosConfig /></div>
   </div>
 }

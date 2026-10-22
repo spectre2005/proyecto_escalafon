@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'gmail' => ['client_id' => env('GMAIL_CLIENT_ID'), 'client_secret' => env('GMAIL_CLIENT_SECRET'), 'redirect_uri' => env('GMAIL_REDIRECT_URI'), 'reply_to' => env('REQUERIMIENTOS_CORREO_RESPUESTA')],
 
     /*
     |--------------------------------------------------------------------------
