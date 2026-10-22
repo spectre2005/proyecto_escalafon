@@ -20,6 +20,7 @@ class NotificacionUsuario extends Model
     public const UPDATED_AT = null;
 
     protected $fillable = [
+        'correo_id_proveedor', 'correo_estado', 'correo_destinatario', 'correo_intentos', 'correo_enviado_en', 'correo_reintentar_en', 'correo_error',
         'usuario_id',
         'tipo',
         'titulo',
@@ -35,6 +36,9 @@ class NotificacionUsuario extends Model
     protected function casts(): array
     {
         return [
+            'correo_intentos' => 'integer',
+            'correo_enviado_en' => 'datetime',
+            'correo_reintentar_en' => 'datetime',
             'leida' => 'boolean',
             'fecha_lectura' => 'datetime',
             'created_at' => 'datetime',

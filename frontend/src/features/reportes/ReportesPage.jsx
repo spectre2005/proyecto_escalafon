@@ -79,14 +79,24 @@ function Resultados({ url, reporte, opciones, onPagina, onReintentar, institucio
 function PanelReporte({ reporte, opciones, params, setParams, institucion }) {
   const [formulario, setFormulario] = useState(() => Object.fromEntries(['q', 'tipo_personal', 'unidad_id', 'estado', 'seccion', 'desde', 'hasta', 'dias', 'anio', 'regimen_id', 'nivel', 'modalidad', 'contenido'].map(clave => [clave, params.get(clave) || (clave === 'dias' ? '30' : clave === 'anio' && reporte.id === 'evaluaciones' ? String(new Date().getFullYear()) : '')])))
   const [revision, setRevision] = useState(0)
-  const cambiar = clave => event => setFormulario(anterior => ({ ...anterior, [clave]: event.target.value }))
+  const cambiar = clave => event => {
+    const valor = event.target.value
+    setFormulario(anterior => ({ ...anterior, [clave]: valor }))
+    if (clave === 'q' || clave === 'contenido') {
+      const siguiente = new URLSearchParams(params)
+      siguiente.set('tipo', reporte.id)
+      valor ? siguiente.set(clave, valor) : siguiente.delete(clave)
+      siguiente.delete('page')
+      setParams(siguiente, { replace: true })
+    }
+  }
   const enviados = new URLSearchParams(params)
   enviados.delete('tipo')
   const url = `/reportes/${reporte.id}?${enviados}`
   function aplicar(event) {
     event.preventDefault()
     const siguiente = new URLSearchParams({ tipo: reporte.id })
-    Object.entries(formulario).forEach(([clave, valor]) => { if (valor) siguiente.set(clave, valor) })
+    Object.entries({ ...formulario, q: params.get('q') || '', contenido: params.get('contenido') || '' }).forEach(([clave, valor]) => { if (valor) siguiente.set(clave, valor) })
     if (reporte.id !== 'vencimientos') siguiente.delete('dias')
     setParams(siguiente)
     setRevision(valor => valor + 1)
@@ -95,7 +105,7 @@ function PanelReporte({ reporte, opciones, params, setParams, institucion }) {
     <form onSubmit={aplicar} className="rounded-2xl border border-slate-200 bg-white p-5">
       <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-800"><Icon name="search" size={17} />Filtrar resultados</div>
       <div className="grid items-end gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Campo titulo="Nombre, DNI o número de legajo"><input type="search" value={formulario.q} onChange={cambiar('q')} placeholder="Buscar persona…" maxLength={120} className={control} /></Campo>
+        <Campo titulo="Nombre, DNI o número de legajo"><input type="search" value={params.get('q') || ''} onChange={cambiar('q')} placeholder="Buscar persona…" maxLength={120} className={control} /></Campo>
         <Campo titulo="Tipo de personal"><select value={formulario.tipo_personal} onChange={cambiar('tipo_personal')} className={control}><option value="">Todo el personal</option><option value="docente">Docentes</option><option value="administrativo">Administrativos</option></select></Campo>
         <Campo titulo={['contratos', 'movimientos', 'vacaciones'].includes(reporte.id) ? 'Unidad del vínculo' : 'Unidad orgánica actual'}><select value={formulario.unidad_id} onChange={cambiar('unidad_id')} className={control}><option value="">Todas las unidades</option>{opciones.unidades.map(unidad => <option key={unidad.id} value={unidad.id}>{unidad.nombre}</option>)}</select></Campo>
         {reporte.id !== 'dotacion' && Object.keys(reporte.estados).length > 1 && <Campo titulo="Estado"><select value={formulario.estado} onChange={cambiar('estado')} className={control}><option value="">Todos los estados</option>{Object.entries(reporte.estados).map(([clave, nombre]) => <option key={clave} value={clave}>{nombre}</option>)}</select></Campo>}
@@ -104,7 +114,7 @@ function PanelReporte({ reporte, opciones, params, setParams, institucion }) {
         {reporte.id === 'capacitaciones' && <Campo titulo="Tipo de capacitación"><select value={formulario.modalidad} onChange={cambiar('modalidad')} className={control}><option value="">Todos los tipos</option>{opciones.modalidades.map(item => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select></Campo>}
         {['inventario', 'pendientes'].includes(reporte.id) && <Campo titulo="Sección del legajo"><select value={formulario.seccion} onChange={cambiar('seccion')} className={control}><option value="">Todas las secciones permitidas</option>{opciones.secciones.map(seccion => <option key={seccion.id} value={seccion.id}>{String(seccion.id).padStart(2, '0')} · {seccion.nombre}</option>)}</select></Campo>}
         {['vacaciones', 'evaluaciones'].includes(reporte.id) && <Campo titulo={reporte.id === 'evaluaciones' ? 'Ciclo de evaluación' : 'Año del período'}><input type="number" min="1900" max="2200" value={formulario.anio} onChange={cambiar('anio')} placeholder="Todos los períodos" className={control} /></Campo>}
-        {reporte.seccion_origen && <Campo titulo="Buscar en los datos del reporte"><input type="search" value={formulario.contenido} onChange={cambiar('contenido')} placeholder="Entidad, cargo, resultado…" maxLength={120} className={control} /></Campo>}
+        {reporte.seccion_origen && <Campo titulo="Buscar en los datos del reporte"><input type="search" value={params.get('contenido') || ''} onChange={cambiar('contenido')} placeholder="Entidad, cargo, resultado…" maxLength={120} className={control} /></Campo>}
         {reporte.fecha && <><Campo titulo={`${reporte.fecha} · desde`}><input type="date" value={formulario.desde} max={formulario.hasta || undefined} onChange={cambiar('desde')} className={control} /></Campo><Campo titulo="Hasta"><input type="date" value={formulario.hasta} min={formulario.desde || undefined} onChange={cambiar('hasta')} className={control} /></Campo></>}
         {reporte.id === 'vencimientos' && <Campo titulo="Próximos vencimientos"><select value={formulario.dias} onChange={cambiar('dias')} className={control}>{[7, 15, 30, 60, 90, 180, 365].map(dias => <option key={dias} value={dias}>{dias} días</option>)}</select></Campo>}
       </div>
@@ -145,7 +155,7 @@ function ContenidoReportes() {
         <Campo titulo="Reporte"><select value={reporte.id} onChange={event => abrir(event.target.value)} className={control}>{reportes.filter(item => item.grupo === reporte.grupo).map(item => <option key={item.id} value={item.id}>{item.titulo}</option>)}</select></Campo>
       </section>
       <div><h2 className="text-xl font-semibold tracking-tight text-slate-800">{reporte.titulo}</h2><p className="mt-2 text-sm text-slate-500">{reporte.descripcion}</p></div>
-      <PanelReporte key={`${reporte.id}:${params.toString()}`} reporte={reporte} opciones={opciones.data.data} params={params} setParams={setParams} institucion={institucion} />
+      <PanelReporte key={`${reporte.id}:${new URLSearchParams([...params].filter(([clave]) => !['q', 'contenido', 'page'].includes(clave)))}`} reporte={reporte} opciones={opciones.data.data} params={params} setParams={setParams} institucion={institucion} />
     </>}
   </div>
 }

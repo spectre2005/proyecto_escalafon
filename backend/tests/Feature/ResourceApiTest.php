@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Afiliacion;
 use App\Models\ArchivoDocumento;
+use App\Models\ConexionCorreo;
 use App\Models\ConfiguracionFuncionalidad;
 use App\Models\Controversia;
 use App\Models\Desvinculacion;
@@ -67,7 +68,7 @@ class ResourceApiTest extends TestCase
      * en su lugar, test_models_without_generic_crud_have_no_endpoint verifica que no exista ningún endpoint genérico.
      * Siguen cubiertos por ModelPersistenceTest.
      */
-    private const SIN_CRUD_GENERICO = [RecursoImpugnatorio::class, ConfiguracionFuncionalidad::class];
+    private const SIN_CRUD_GENERICO = [RecursoImpugnatorio::class, ConfiguracionFuncionalidad::class, ConexionCorreo::class];
 
     /** Sección 10: igual, se registran desde Legajos\Seccion10Controller (el CRUD genérico exige además datos_sensibles.ver). */
     private const SECCION_10 = [RegistroSstBienestar::class];

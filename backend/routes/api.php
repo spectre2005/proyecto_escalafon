@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\V1\FamiliarController;
 use App\Http\Controllers\Api\V1\FeriadoController;
 use App\Http\Controllers\Api\V1\FormacionAcademicaController;
 use App\Http\Controllers\Api\V1\FormatosDirectivaController;
+use App\Http\Controllers\Api\V1\GmailCorreoController;
 use App\Http\Controllers\Api\V1\GoceVacacionalController;
 use App\Http\Controllers\Api\V1\HistorialEstadoDocumentoController;
 use App\Http\Controllers\Api\V1\InduccionController;
@@ -75,6 +76,7 @@ use App\Http\Controllers\Api\V1\SancionController;
 use App\Http\Controllers\Api\V1\SeccionLegajoController;
 use App\Http\Controllers\Api\V1\SolicitudAccesoLegajoController;
 use App\Http\Controllers\Api\V1\SolicitudFiscalizacionController;
+use App\Http\Controllers\Api\V1\SolicitudLegajoController;
 use App\Http\Controllers\Api\V1\SubseccionLegajoController;
 use App\Http\Controllers\Api\V1\TiempoServicioReconocidoController;
 use App\Http\Controllers\Api\V1\TipoDocumentoController;
@@ -103,6 +105,24 @@ Route::prefix('v1/auth')->middleware(ApiHabilitada::class)->group(function (): v
 
 // FuncionalidadActiva: con una funcionalidad desactivada, sus rutas de creación y modificación responden 409.
 Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCambioPassword::class, FuncionalidadActiva::class, LegajoSoloLectura::class])->group(function (): void {
+    Route::prefix('correo/gmail')->middleware('can:sistema.administrar')->controller(GmailCorreoController::class)->group(function (): void {
+        Route::get('/', 'estado');
+        Route::post('autorizar', 'autorizar')->middleware('throttle:10,1');
+        Route::delete('/', 'desconectar');
+    });
+    Route::prefix('solicitudes-legajo')->middleware('can:requerimientos.gestionar')->controller(SolicitudLegajoController::class)->group(function (): void {
+        Route::get('/', 'index');
+        Route::get('opciones', 'opciones');
+        Route::get('sugerencias', 'sugerencias');
+        Route::post('/', 'store');
+        Route::post('sincronizar', 'sincronizar')->middleware('throttle:10,1');
+        Route::post('{record}/registrar-entrega', 'registrarEntrega')->whereUuid('record');
+        Route::post('{record}/enviar', 'enviar')->whereUuid('record');
+        Route::post('{record}/gestionar', 'gestionar')->whereUuid('record');
+        Route::get('{record}/documentos', 'documentos')->whereUuid('record');
+        Route::get('{record}/archivos/{indice}/{adjunto}', 'archivo')->whereUuid('record')->whereNumber('indice')->whereNumber('adjunto');
+        Route::get('{record}/archivos/{indice}', 'archivo')->whereUuid('record')->whereNumber('indice');
+    });
     Route::get('reportes/opciones', [ReporteController::class, 'opciones']);
     // Formatos de la directiva (anexos 06 a 09): solo quien administra el sistema y ve legajos.
     Route::prefix('reportes/formatos')->middleware(['can:sistema.administrar', 'can:legajo.ver'])->controller(FormatosDirectivaController::class)->group(function (): void {

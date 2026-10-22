@@ -121,6 +121,9 @@ class Usuario extends Authenticatable
         $comodin = array_diff($asignables, config('permisos.explicitos', []));
         $permisos = [];
         foreach ($this->rolesVigentes() as $rol) {
+            if (in_array($rol->codigo, config('permisos.deshabilitados', []), true)) {
+                continue;
+            }
             $delRol = (array) config('permisos.roles.'.$rol->codigo, []);
             $permisos = [...$permisos, ...(in_array('*', $delRol, true) ? $comodin : []), ...array_intersect($delRol, $asignables)];
             foreach ($derivados as $permiso => $columna) {

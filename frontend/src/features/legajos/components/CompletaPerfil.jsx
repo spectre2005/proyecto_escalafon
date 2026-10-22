@@ -45,7 +45,7 @@ export default function CompletaPerfil({ usuario, pendientes, legajoActivo, pleg
         const clave = clavePendiente(pendiente)
         const motivo = motivoSinRespuesta(pendiente, permisos)
         const ocupado = guardando === clave
-        return <li key={clave} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+        return <li key={clave} id={`perfil-pendiente-${pendiente.bandera}-${pendiente.vinculo_id || 'persona'}`} tabIndex={-1} className="scroll-mt-6 focus:outline-2 focus:outline-teal-600 target:bg-teal-50 flex flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div className="min-w-0">
             <p className="text-sm text-slate-700">{preguntasPerfil[pendiente.bandera] || pendiente.bandera}</p>
             <p className="mt-0.5 text-[11px] text-slate-500">Se guarda en: {lugarPendiente(pendiente)}{motivo ? ` · ${motivo}` : ''}</p>

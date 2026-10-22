@@ -192,7 +192,9 @@ class EquipoAccesoTest extends TestCase
     {
         $admin = $this->actuarComo();
         $usuario = Usuario::factory()->create(['nombres' => 'Asistente Prueba']);
-        $this->getJson(self::URL.'/personas?q=As')->assertUnprocessable();
+        $this->getJson(self::URL.'/personas?q=A')->assertOk();
+        $this->getJson(self::URL.'/personas?q=As')->assertOk();
+        $this->getJson(self::URL.'/personas?q=')->assertUnprocessable();
         $this->getJson(self::URL.'/personas?q=Asistente')->assertOk()->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', $usuario->id)->assertJsonMissingPath('data.0.password')->assertJsonMissingPath('data.0.domicilio');
         $this->getJson(self::URL.'/personas?q='.urlencode($admin->email_institucional))->assertOk()->assertJsonCount(0, 'data');

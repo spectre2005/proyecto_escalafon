@@ -183,7 +183,7 @@ class AuthenticationTest extends TestCase
     {
         $asistente = $this->actuarComo(Usuario::factory()->create(), 'asistente_legajo');
         $this->assertSame(
-            ['personal.ver', 'legajo.ver', 'legajo.editar', 'documento.subir', 'documento.recepcionar', 'seccion07.ver'],
+            ['requerimientos.gestionar', 'personal.ver', 'legajo.ver', 'legajo.editar', 'documento.subir', 'documento.recepcionar', 'seccion07.ver'],
             $asistente->permisos(),
         );
         $this->getJson('/api/v1/expedientes')->assertOk();

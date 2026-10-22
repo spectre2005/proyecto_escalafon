@@ -93,7 +93,7 @@ final class ConsultaVencimientos
             ->selectRaw("v.usuario_id, v.id as alerta_id, 'contrato' as origen, COALESCE(({$adenda->toSql()}), v.fecha_fin_prevista) as fecha, v.nombre_puesto as detalle", $adenda->getBindings());
         $contratos = DB::query()->fromSub($vinculos, 'v')->whereDate('fecha', '>=', $hoy->toDateString())->whereDate('fecha', '<=', $hoy->addDays($dias)->toDateString());
         $requerimientos = DB::table('requerimientos_documentos as r')->whereNull('r.cerrado_en')
-            ->whereIn('r.estado', ['abierto', 'pendiente', 'vencido', 'prorrogado'])
+            ->whereIn('r.estado', ['abierto', 'pendiente', 'vencido', 'prorrogado', 'observado'])
             ->whereRaw('DATE(COALESCE(r.prorroga_hasta, r.fecha_limite)) < ?', [$hoy->toDateString()])
             ->whereExists(fn (Builder $q) => $q->selectRaw('1')->from('legajos as l')->whereColumn('l.usuario_id', 'r.usuario_id')->where('l.estado_legajo', 'activo'))
             ->selectRaw("r.usuario_id, r.id as alerta_id, 'requerimiento' as origen, COALESCE(r.prorroga_hasta, r.fecha_limite) as fecha, r.descripcion as detalle");

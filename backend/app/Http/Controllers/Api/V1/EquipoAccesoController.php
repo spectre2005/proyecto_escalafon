@@ -17,7 +17,7 @@ use Illuminate\Validation\ValidationException;
 
 class EquipoAccesoController extends Controller
 {
-    private const PERFILES = ['asistente_legajo' => 'Asistente de legajos', 'suplente_legajo' => 'Suplente de administración'];
+    private const PERFILES = ['autoservicio_legajo' => 'Acceso docente deshabilitado', 'asistente_legajo' => 'Asistente de legajos', 'suplente_legajo' => 'Suplente de administración'];
 
     public function index(): JsonResponse
     {
@@ -25,7 +25,7 @@ class EquipoAccesoController extends Controller
 
         return response()->json(['data' => [
             'asignaciones' => $registros->map(fn (UsuarioRol $registro): array => $this->datos($registro)),
-            'perfiles' => collect(self::PERFILES)->map(fn (string $nombre, string $codigo): array => [
+            'perfiles' => collect(self::PERFILES)->except('autoservicio_legajo')->map(fn (string $nombre, string $codigo): array => [
                 'codigo' => $codigo, 'nombre' => $nombre,
                 'permisos' => collect(config('permisos.roles.'.$codigo))->map(fn (string $permiso): string => config('permisos.catalogo')[$permiso])->values(),
             ])->values(),
@@ -35,7 +35,7 @@ class EquipoAccesoController extends Controller
 
     public function personas(Request $request): JsonResponse
     {
-        $data = $request->validate(['q' => 'required|string|min:3|max:100']);
+        $data = $request->validate(['q' => 'required|string|min:1|max:100']);
         $termino = mb_strtolower(trim($data['q']));
         $personas = Usuario::query()->where('activo', true)->whereKeyNot($request->user()->id)
             ->where(function (Builder $query) use ($termino): void {
@@ -55,7 +55,7 @@ class EquipoAccesoController extends Controller
             'apellido_paterno' => ['required_without:usuario_id', Rule::prohibitedIf($request->filled('usuario_id')), 'string', 'max:80'],
             'numero_doc_identidad' => ['required_without:usuario_id', Rule::prohibitedIf($request->filled('usuario_id')), 'digits:8', 'unique:usuarios,numero_doc_identidad'],
             'email' => ['required_without:usuario_id', Rule::prohibitedIf($request->filled('usuario_id')), 'email', 'max:255'],
-            'perfil' => ['required', Rule::in(array_keys(self::PERFILES))],
+            'perfil' => ['required', Rule::in(array_diff(array_keys(self::PERFILES), ['autoservicio_legajo']))],
             'vigente_desde' => 'required|date_format:Y-m-d|after_or_equal:today',
             'vigente_hasta' => 'nullable|required_if:perfil,suplente_legajo|date_format:Y-m-d|after_or_equal:vigente_desde',
             'motivo' => 'required|string|min:5|max:500',
@@ -194,6 +194,7 @@ class EquipoAccesoController extends Controller
     {
         $estado = match (true) {
             $registro->revocado_en !== null => 'revocado',
+            $registro->rol->codigo === 'autoservicio_legajo' => 'inactivo',
             ! $registro->usuario->activo || ! $registro->rol->activo => 'inactivo',
             $registro->vigente_desde->gt(today()) => 'programado',
             $registro->vigente_hasta !== null && $registro->vigente_hasta->lt(today()) => 'vencido',

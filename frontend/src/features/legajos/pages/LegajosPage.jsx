@@ -1,6 +1,6 @@
 import AvisosExpediente from '../components/documentos/AvisosExpediente'
 import { useEffect, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from '../../../shared/queries/useLiveQuery'
 import { conModulosOcultos, primeraCategoria, seccionesVisibles } from '../../../shared/funcionalidadesEstado'
 import { useFuncionalidades } from '../../../shared/useFuncionalidades'
@@ -107,18 +107,18 @@ function Pagination({ data, onPage }) {
 
 function Directory() {
   const [params, setParams] = useSearchParams()
-  const [search, setSearch] = useState(params.get('q') || '')
+  const search = params.get('q') || ''
   const request = useRead(`/expedientes?${params}`)
   function change(key, value) {
     const next = new URLSearchParams(params)
     if (value) next.set(key, value)
     else next.delete(key)
     if (key !== 'page') next.delete('page')
-    setParams(next)
+    setParams(next, { replace: true })
   }
   return <>
     <div className="mb-7 flex flex-wrap items-end justify-between gap-4"><div><p className="mb-2 text-[10px] font-semibold uppercase tracking-[.2em] text-teal-700">Archivo del personal</p><h1 className="text-3xl font-bold text-slate-800">Legajos</h1><p className="mt-3 text-sm text-slate-500">Documentos, antecedentes y trayectoria en una ficha por persona.</p></div></div>
-    <section className={`${panel} mb-6 p-5`} aria-label="Buscar expedientes"><form onSubmit={event => { event.preventDefault(); change('q', search.trim()) }} className="flex flex-wrap gap-3"><label className="flex min-w-60 flex-1 items-center gap-2 rounded-xl border border-slate-200 px-3"><Icon name="search" size={18} /><input className="w-full py-3 text-sm outline-none" aria-label="Buscar por nombre, documento o número de legajo" placeholder="Nombre, documento o número de legajo" value={search} onChange={event => setSearch(event.target.value)} /></label><select aria-label="Tipo de personal" className={control} value={params.get('tipo') || ''} onChange={event => change('tipo', event.target.value)}><option value="">Todo el personal</option><option value="docente">Docentes</option><option value="administrativo">Administrativos</option></select><select aria-label="Disponibilidad de legajo" className={control} value={params.get('legajo') || ''} onChange={event => change('legajo', event.target.value)}><option value="">Con y sin legajo</option><option value="con">Con legajo</option><option value="sin">Sin legajo</option></select><button className="rounded-xl bg-teal-700 px-5 py-3 text-sm font-medium text-white hover:bg-teal-800">Buscar</button></form></section>
+    <section className={`${panel} mb-6 p-5`} aria-label="Buscar expedientes"><form onSubmit={event => { event.preventDefault(); change('q', search.trim()) }} className="flex flex-wrap gap-3"><label className="flex min-w-60 flex-1 items-center gap-2 rounded-xl border border-slate-200 px-3"><Icon name="search" size={18} /><input className="w-full py-3 text-sm outline-none" aria-label="Buscar por nombre, documento o número de legajo" placeholder="Nombre, documento o número de legajo" value={search} onChange={event => change('q', event.target.value)} /></label><select aria-label="Tipo de personal" className={control} value={params.get('tipo') || ''} onChange={event => change('tipo', event.target.value)}><option value="">Todo el personal</option><option value="docente">Docentes</option><option value="administrativo">Administrativos</option></select><select aria-label="Disponibilidad de legajo" className={control} value={params.get('legajo') || ''} onChange={event => change('legajo', event.target.value)}><option value="">Con y sin legajo</option><option value="con">Con legajo</option><option value="sin">Sin legajo</option></select><button className="rounded-xl bg-teal-700 px-5 py-3 text-sm font-medium text-white hover:bg-teal-800">Buscar</button></form></section>
     <Feedback {...request} />
     {request.data && <section className={`${panel} overflow-hidden`}><div className="border-b border-slate-100 px-6 py-5"><h2 className="text-sm font-semibold text-slate-800">Directorio de expedientes <span className="ml-2 rounded-full bg-teal-50 px-2 py-1 text-xs text-teal-700">{request.data.total}</span></h2></div><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr>{['Personal', 'Unidad / puesto', 'Legajos', 'Documentos', ''].map((title, i) => <th className="px-6 py-4 font-medium" key={i}>{title}</th>)}</tr></thead><tbody>{request.data.data.map(user => <tr key={user.id} className="border-t border-slate-100 hover:bg-teal-50/30"><td className="px-6 py-5"><Link to={`/legajos/${user.id}`} className="font-semibold text-teal-800 hover:underline">{user.nombres} {user.apellido_paterno} {user.apellido_materno}</Link><p className="mt-1 text-xs text-slate-500">{user.tipo_doc_identidad?.toUpperCase() || 'Documento'}: {user.numero_doc_identidad || 'No registrado'} · {({ docente: 'Docente', administrativo: 'Administrativo' })[user.tipo_personal] || user.tipo_personal}</p></td><td className="px-6 py-5 text-slate-600">{puestoActual(user.puesto_actual).unidad || 'Sin unidad registrada'}<p className="mt-1 text-xs text-slate-400">{puestoActual(user.puesto_actual).puesto || 'Sin puesto registrado'}</p></td><td className="px-6 py-5">{user.legajos_count || <span className="text-xs text-amber-700">Sin legajo</span>}</td><td className="px-6 py-5">{user.documentos_usuario_por_usuario_count}</td><td className="px-6 py-5"><Link className="whitespace-nowrap text-xs font-semibold text-teal-700 hover:underline" to={`/legajos/${user.id}`}>Abrir ficha →</Link></td></tr>)}</tbody></table></div>{!request.data.data.length && <p className="p-10 text-center text-sm text-slate-500">No se encontraron personas con estos filtros.</p>}<div className="px-6 pb-5"><Pagination data={request.data} onPage={page => change('page', page)} /></div></section>}
   </>
@@ -160,6 +160,36 @@ const avisosModuloOculto = {
   's02-prueba': '«2.4 Período de prueba» no se muestra: «Tiene período de prueba» está en No en el vínculo laboral y no hay períodos ni documentos registrados. Para verlo, cámbialo a Sí en 2.2.',
   's01-familia': '«Familia y derechohabientes» no se muestra: la persona figura sin derechohabientes y no tiene familiares ni documentos registrados. Para verlo, cambia «Tiene derechohabientes» en Información personal.',
   's01-discapacidad': '«Discapacidad» no se muestra: la persona figura sin discapacidad (el servidor ni sus hijos) y no tiene certificados ni documentos registrados. Para verlo, cambia «Con discapacidad» en Información personal.',
+}
+
+function DestinoLegajo() {
+  const { hash, pathname, search } = useLocation()
+  useEffect(() => {
+    if (!hash) return
+    let id
+    try { id = decodeURIComponent(hash.slice(1)) } catch { return }
+    if (!/^(perfil-pendiente-|registro-|bloque-)[a-zA-Z0-9_-]+$/.test(id)) return
+    let frame
+    const observer = new MutationObserver(enfocar)
+    function enfocar() {
+      const destino = document.getElementById(id)
+      if (!destino) return
+      observer.disconnect()
+      frame = requestAnimationFrame(() => {
+        for (let padre = destino.parentElement; padre; padre = padre.parentElement) {
+          if (padre.tagName === 'DETAILS') padre.open = true
+        }
+        destino.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        destino.tabIndex = -1
+        destino.focus({ preventScroll: true })
+      })
+    }
+    observer.observe(document.body, { childList: true, subtree: true })
+    enfocar()
+    const timeout = setTimeout(() => observer.disconnect(), 10000)
+    return () => { observer.disconnect(); clearTimeout(timeout); cancelAnimationFrame(frame) }
+  }, [hash, pathname, search])
+  return null
 }
 
 function Detail({ usuario }) {
@@ -224,6 +254,7 @@ function Detail({ usuario }) {
     {data && <>
       {/* En una sección, la persona en una línea y el perfil plegado: la sección de trabajo queda en la primera pantalla. */}
       <PersonalHeader data={data} usuario={usuario} compacto={selected !== 'general'} onVerFicha={() => change('categoria', 'general')} />
+      <DestinoLegajo />
       {!readOnly && <CompletaPerfil usuario={usuario} pendientes={data.condiciones?.pendientes} legajoActivo={hasActiveLegajo} plegado={selected !== 'general'} />}
       {avisoOculto && <p role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{avisoOculto}</p>}
       {readOnly && <p role="status" className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">Legajo cerrado. Puedes consultar las secciones y visualizar o descargar sus documentos.</p>}
