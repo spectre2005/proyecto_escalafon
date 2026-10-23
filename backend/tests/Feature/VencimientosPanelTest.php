@@ -68,9 +68,11 @@ class VencimientosPanelTest extends TestCase
         $this->contrato($legajo, 4)->update(['fecha_cese' => '2026-10-16']);
         $this->contrato($legajo, 5)->update(['fecha_inicio' => '2026-10-18']);
         // Plazo vencido sin cese registrado: es una alerta vencida (antes no aparecía).
-        $this->contrato($legajo, -40);
+        $vencido = $this->contrato($legajo, -40);
         $this->contrato($legajo, 6)->update(['fecha_fin_prevista' => null]);
+        // Cada motivo trae el id de su registro de origen: el panel enlaza directo a él.
         $this->getJson('/api/v1/vencimientos?origen=contrato')->assertOk()->assertJsonPath('data.0.total_alertas', 2)
+            ->assertJsonPath('data.0.motivos.0.id', $vencido->id)->assertJsonPath('data.0.motivos.1.id', $vinculo->id)
             ->assertJsonPath('data.0.motivos.0.fecha', '2026-09-07')->assertJsonPath('data.0.motivos.0.estado', 'vencido')
             ->assertJsonPath('data.0.motivos.1.fecha', '2026-10-25')->assertJsonPath('data.0.motivos.1.estado', 'por_vencer')
             ->assertJsonPath('data.0.estado', 'vencido');

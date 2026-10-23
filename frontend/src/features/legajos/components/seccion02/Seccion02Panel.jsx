@@ -337,7 +337,7 @@ function VinculoCard({ vinculo, aviso, destacado, completar, adjuntar, adjuntarA
   const finEfectivo = vinculo.vencimiento.fin_efectivo ? `${fecha(vinculo.vencimiento.fin_efectivo)}${vinculo.vencimiento.por_adenda ? ' (por adenda)' : ''}` : 'sin fecha de fin'
   const ultima = vinculo.adendas.at(-1)
   const tienePuesto = vinculo.datos_puesto.length > 0
-  return <article className={`rounded-2xl border bg-white p-5 ${destacado ? 'border-teal-300 ring-1 ring-teal-100' : 'border-slate-200'}`}>
+  return <article id={`registro-${vinculo.id}`} tabIndex={-1} className={`rounded-2xl border bg-white p-5 ${destacado ? 'border-teal-300 ring-1 ring-teal-100' : 'border-slate-200'}`}>
     <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h4 className="font-semibold text-slate-800">{v.nombre_puesto}</h4>
       <p className="mt-1 text-xs text-slate-500">{etiqueta(tiposPersonal, v.tipo_personal)} · {tipoVinculo(v.regimen_laboral)} · {v.numero_documento_vinculo || 'sin N.º de resolución o contrato'}</p>
       <p className="mt-1 text-xs text-slate-600">{fecha(v.fecha_inicio)} – {finEfectivo} · {vinculo.unidad_organica || 'Unidad orgánica no registrada'}</p></div>

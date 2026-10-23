@@ -59,7 +59,8 @@ final class ConsultaVencimientos
             $detalle = ($motivos->get($persona->usuario_id) ?? collect())->map(function ($alerta) use ($hoy): array {
                 $dias = (int) $hoy->diffInDays(CarbonImmutable::parse($alerta->fecha, 'America/Lima'), false);
 
-                return ['origen' => $alerta->origen, 'detalle' => $alerta->detalle, 'fecha' => substr($alerta->fecha, 0, 10),
+                // id: el del registro de origen (vínculo, certificado…), para enlazar a él desde el panel.
+                return ['id' => $alerta->alerta_id, 'origen' => $alerta->origen, 'detalle' => $alerta->detalle, 'fecha' => substr($alerta->fecha, 0, 10),
                     'estado' => self::estado($alerta->origen, (string) $alerta->fecha, $hoy), 'dias_restantes' => $dias, 'criticidad' => $dias < 7 ? 'rojo' : 'amarillo'];
             })->all();
 

@@ -59,7 +59,7 @@ export default function Registros({ titulo, agregar, vacio, registros, bloqueo, 
     {error && <p role="alert" className="mb-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
     {editing && !(bloqueo && !editing.id) && <EnZona titulo={editing.id ? `Corregir: ${tituloRegistro(editing)}` : agregar}>{renderForm({ record: editing.id ? editing : null, onCancel: () => setEditing(null), onSaved: () => { setEditing(null); setNotice('Registro guardado.') } })}</EnZona>}
     {registros.length === 0 && <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">{vacio}</p>}
-    <div className="space-y-4">{registros.map(record => <article key={record.id} className="rounded-2xl border border-slate-200 bg-white p-5">
+    <div className="space-y-4">{registros.map(record => <article key={record.id} id={`registro-${record.id}`} tabIndex={-1} className="rounded-2xl border border-slate-200 bg-white p-5">
       <div className="min-w-0"><h4 className="font-semibold text-slate-800">{tituloRegistro(record)}</h4>{subtitulo && <p className="mt-1 text-xs text-slate-500">{subtitulo(record)}</p>}</div>
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
         <button type="button" onClick={() => setViendo(record)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50">Ver detalles</button>

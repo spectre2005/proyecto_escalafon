@@ -200,7 +200,7 @@ class Seccion10Controller extends Controller
             : ($registro?->fecha_inicio?->format('Y-m-d') > $hoy || ! $disponible ? 'pendiente' : 'activo'));
 
         return [...$doc->only(['id', 'nombre', 'emisor', 'tipo_documento_id', 'folio_inicio', 'folio_fin', 'modalidad_presentacion', 'subsana_a_documento_id', 'fedateado', 'fiscalizado', 'created_by']),
-            'codigo_tipo' => $doc->tipoDocumento->codigo, 'subseccion' => $doc->tipoDocumento->subseccionLegajo?->codigo,
+            'codigo_tipo' => $doc->tipoDocumento->codigo, 'subseccion' => $doc->tipoDocumento->subseccionLegajo?->codigo, 'registro_id' => $registro?->id,
             ...($registro?->only(['descripcion', 'numero_documento', 'entidad', 'estado_tramite', 'motivo_anulacion']) ?? []),
             'estado_original' => $doc->estado, 'anulado' => $anulado, 'subsanado' => $subsanado, 'archivo_disponible' => (bool) $disponible,
             'archivo' => $doc->archivo?->only(['id', 'nombre_original', 'mime_type', 'tamano_bytes', 'num_paginas', 'estado_antivirus']),

@@ -35,7 +35,7 @@ export default function PersonalDocuments({ usuario, uploadCode, onClose }) {
       {documents.map(([code, label]) => {
         const item = data?.tipos.find(document => document.codigo === code)
         return <details key={code} className="min-w-0 rounded-xl border border-slate-200 p-3 sm:open:col-span-2">
-          <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 text-xs"><span className="font-semibold text-slate-700">{label}</span><span className="text-teal-700">{item?.lista?.length ? `Ver archivos (${item.lista.length})` : request.loading ? 'Consultando…' : 'Sin archivo'}</span></summary>
+          <summary id={`bloque-${code}`} className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 text-xs"><span className="font-semibold text-slate-700">{label}</span><span className="text-teal-700">{item?.lista?.length ? `Ver archivos (${item.lista.length})` : request.loading ? 'Consultando…' : 'Sin archivo'}</span></summary>
           {item && <ListaDocumentos usuario={usuario} tipo={item} />}
         </details>
       })}

@@ -12,7 +12,7 @@ function Tabla({ titulo, columnas, filas, celdas }) {
     <div className="overflow-x-auto rounded-xl border border-slate-100">
       <table className="tabla-documental w-full text-left text-sm">
         <thead className="bg-slate-50 text-xs text-slate-500"><tr>{[...columnas, 'Detalle'].map(columna => <th key={columna} scope="col" className="px-4 py-3 font-medium">{columna}</th>)}</tr></thead>
-        <tbody>{filas.map(fila => <tr key={fila.id} className="border-t border-slate-100">
+        <tbody>{filas.map(fila => <tr key={fila.id} id={`registro-${fila.id}`} tabIndex={-1} className="border-t border-slate-100">
           {celdas(fila).map((valor, indice) => indice === 0
             ? <th key={columnas[indice]} scope="row" className="min-w-48 px-4 py-3 font-medium text-slate-800">{valor}</th>
             : <td key={columnas[indice]} data-label={columnas[indice]} className="px-4 py-3 text-slate-600">{valor}</td>)}

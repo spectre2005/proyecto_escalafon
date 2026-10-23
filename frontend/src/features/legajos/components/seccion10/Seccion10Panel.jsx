@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { apiErrorMessage } from '../../../../axios'
 import Icon from '../../../../components/ui/Icon'
@@ -65,7 +66,7 @@ function Documentos({ item, permisos, abrir, ver, mostrarTitulo = true }) {
   return <section aria-label={`Documentos de ${item.nombre}`} className="rounded-2xl border border-slate-200 bg-white p-5">
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">{mostrarTitulo && <h3 className="font-semibold text-slate-800">{item.nombre}</h3>}<label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" className="accent-teal-700" checked={incluirHistorial} onChange={event => setIncluirHistorial(event.target.checked)} />Incluir anulados y versiones anteriores</label></div>
     {!documentos.length && <p className="text-sm text-slate-500">No hay documentos para esta consulta.</p>}
-    <div className="space-y-4">{documentos.map(doc => <article key={doc.id} className="rounded-xl border border-slate-200 p-4">
+    <div className="space-y-4">{documentos.map(doc => <article key={doc.id} id={doc.registro_id ? `registro-${doc.registro_id}` : undefined} tabIndex={-1} className="rounded-xl border border-slate-200 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3"><h4 className="break-words font-semibold text-slate-800">{doc.nombre || doc.archivo?.nombre_original || 'Trámite sin nombre'}</h4><span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">{doc.anulado ? 'Anulado' : doc.subsanado ? 'Versión anterior' : !doc.archivo ? 'Pendiente de archivo' : doc.estado_original}</span></div>
       <details className="mt-3 rounded-lg bg-slate-50 p-3"><summary className="cursor-pointer text-xs font-semibold text-teal-700">Ver datos y folios del documento</summary><dl className="mt-3 grid gap-3 text-xs sm:grid-cols-2 xl:grid-cols-3">
         {[
@@ -110,6 +111,11 @@ export default function Seccion10Panel({ usuario, subseccion = '10.1' }) {
   const [modal, setModal] = useState(null)
   const [visor, setVisor] = useState(null)
   const [aviso, setAviso] = useState('')
+  const { hash } = useLocation()
+  // Enlace a un registro (#registro-{id}, p. ej. desde Vencimientos): sus documentos se ven en la ventana de su tipo, así
+  // que esa ventana se muestra abierta hasta que se cierra; DestinoLegajo resalta el registro cuando aparece.
+  const idEnlace = hash.startsWith('#registro-') ? hash.slice('#registro-'.length) : ''
+  const [enlaceAtendido, setEnlaceAtendido] = useState('')
   const abrir = (modo, item, documento = null) => setModal({ modo, item, documento })
   function guardado() {
     setModal(null)
@@ -117,7 +123,8 @@ export default function Seccion10Panel({ usuario, subseccion = '10.1' }) {
     consulta.retry()
   }
   if (!data) return consulta.error ? <p role="alert" className="rounded-xl bg-rose-50 p-5 text-sm text-rose-800">{apiErrorMessage(consulta.error)} <button className="underline" onClick={consulta.retry}>Reintentar</button></p> : <p role="status" className="p-6 text-sm text-slate-500">Cargando {titulo}…</p>
-  const itemSeleccionado = data.items.find(item => item.id === seleccion)
+  const itemDelEnlace = idEnlace && idEnlace !== enlaceAtendido ? data.items.find(item => item.documentos.some(doc => doc.registro_id === idEnlace)) : null
+  const itemSeleccionado = data.items.find(item => item.id === seleccion) || itemDelEnlace
   const itemsSeccion = data.items.filter(item => item.subseccion === subseccion)
   return <EspacioSeccion clasica seccion={tituloSeccion('10')} subseccion={titulo} etiquetaResumen="Ver folios"
     cifras={`Folios ${subseccion === '10.1' ? 'SST' : 'Bienestar Social'}: ${subseccion === '10.1' ? data.folios.sst : data.folios.bienestar} · total de la sección 10: ${data.folios.total}.`}
@@ -136,7 +143,7 @@ export default function Seccion10Panel({ usuario, subseccion = '10.1' }) {
     </section>}
     {data.folios.sin_clasificar > 0 && <p className="rounded-xl bg-slate-50 p-4 text-xs text-slate-700">El total incluye {data.folios.sin_clasificar} folio(s) de documentos anteriores sin clasificación. Se conservan en el historial.</p>}
     {data.documentos_anteriores?.length > 0 && <details className="rounded-2xl border border-slate-200 bg-white p-4"><summary className="cursor-pointer text-sm font-medium text-slate-700">Documentos archivados de tipos anteriores</summary><div className="mt-4"><Documentos item={{ nombre: 'Documentos archivados', activo: false, documentos: data.documentos_anteriores }} permisos={{ anular }} abrir={abrir} ver={setVisor} /></div></details>}
-    {itemSeleccionado && <Modal titulo={`Documentos de ${itemSeleccionado.nombre}`} onClose={() => setSeleccion(null)}>
+    {itemSeleccionado && <Modal titulo={`Documentos de ${itemSeleccionado.nombre}`} onClose={() => { setSeleccion(null); setEnlaceAtendido(idEnlace) }}>
       <Documentos key={itemSeleccionado.id} item={itemSeleccionado} permisos={{ subir, editar, revisar, anular }} abrir={abrir} ver={setVisor} mostrarTitulo={false} />
     </Modal>}
     {visor && <Modal titulo={`Documento de ${titulo}`} onClose={() => setVisor(null)}><VisorPdf usuario={usuario} documento={visor} titulo={visor.nombre} onClose={() => setVisor(null)} /></Modal>}
