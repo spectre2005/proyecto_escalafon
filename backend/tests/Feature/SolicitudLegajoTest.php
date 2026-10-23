@@ -120,7 +120,7 @@ class SolicitudLegajoTest extends TestCase
     {
         $admin = $this->actuarComo();
         $u = $this->titular();
-        $tipo = TipoDocumento::factory()->create();
+        $tipo = TipoDocumento::factory()->create(['seccion_legajo_id' => 4, 'codigo' => 'EXP_CERTIFICADO_TRABAJO']);
         $id = $this->postJson('/api/v1/solicitudes-legajo', ['clase' => 'documentos', 'usuario_id' => $u->id,
             'descripcion' => 'Presentar constancia', 'tipo_documento_id' => $tipo->id,
             'fecha_limite' => today()->addWeek()->toDateString()])->assertCreated()->json('data.id');
@@ -150,6 +150,48 @@ class SolicitudLegajoTest extends TestCase
         $id = $this->crear($u);
         $this->post('/api/v1/solicitudes-legajo/'.$id.'/registrar-entrega', ['remitente' => $u->email_institucional, 'referencia_correo' => 'Correo recibido de prueba', 'mensaje' => 'Adjunto', 'pdf' => UploadedFile::fake()->createWithContent('falso.pdf', 'No es PDF')], ['Accept' => 'application/json'])->assertUnprocessable();
         $this->assertDatabaseHas('requerimientos_documentos', ['id' => $id, 'estado' => 'abierto']);
+    }
+
+    public function test_received_delivery_is_not_overdue_while_awaiting_review(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-23 12:00:00', 'America/Lima'));
+        $this->actuarComo();
+        $u = $this->titular();
+        $id = $this->crear($u);
+        RequerimientoDocumento::whereKey($id)->update(['fecha_limite' => '2026-10-22']);
+        $this->getJson('/api/v1/solicitudes-legajo')->assertOk()->assertJsonPath('data.0.atrasado', true);
+
+        $this->postJson('/api/v1/solicitudes-legajo/'.$id.'/registrar-entrega', [
+            'remitente' => $u->email_institucional,
+            'referencia_correo' => 'Respuesta al requerimiento',
+            'mensaje' => 'Datos actualizados',
+        ])->assertOk()->assertJsonPath('data.estado', 'en_revision');
+        $this->getJson('/api/v1/solicitudes-legajo')->assertOk()
+            ->assertJsonPath('data.0.estado', 'en_revision')->assertJsonPath('data.0.atrasado', false);
+
+        $this->postJson('/api/v1/solicitudes-legajo/'.$id.'/gestionar', [
+            'accion' => 'observar', 'mensaje' => 'Falta precisar la dirección',
+        ])->assertOk();
+        $this->getJson('/api/v1/solicitudes-legajo')->assertOk()->assertJsonPath('data.0.atrasado', true);
+
+        $this->postJson('/api/v1/solicitudes-legajo/'.$id.'/gestionar', [
+            'accion' => 'prorrogar', 'mensaje' => 'Nuevo plazo para corregir', 'prorroga_hasta' => '2026-10-24',
+        ])->assertOk();
+        $this->getJson('/api/v1/solicitudes-legajo')->assertOk()->assertJsonPath('data.0.atrasado', false);
+    }
+
+    public function test_request_catalog_excludes_types_not_available_in_the_sections(): void
+    {
+        $this->actuarComo();
+        $valido = TipoDocumento::factory()->create(['seccion_legajo_id' => 4, 'codigo' => 'EXP_CERTIFICADO_TRABAJO', 'activo' => true, 'es_dato_sensible' => false, 'es_dato_salud' => false]);
+        $ajeno = TipoDocumento::factory()->create(['seccion_legajo_id' => 4, 'codigo' => 'TIPO_AJENO', 'activo' => true]);
+        $ids = array_column($this->getJson('/api/v1/solicitudes-legajo/opciones')->assertOk()->json('tipos'), 'id');
+        $this->assertContains($valido->id, $ids);
+        $this->assertNotContains($ajeno->id, $ids);
+        $this->postJson('/api/v1/solicitudes-legajo', [
+            'clase' => 'documentos', 'usuario_id' => $this->titular()->id, 'descripcion' => 'Documento no admitido',
+            'tipo_documento_ids' => [$ajeno->id], 'fecha_limite' => today()->addWeek()->toDateString(),
+        ])->assertUnprocessable()->assertJsonValidationErrors('tipo_documento_ids');
     }
 
     public function test_deadlines_use_peruvian_date_even_after_midnight_utc(): void

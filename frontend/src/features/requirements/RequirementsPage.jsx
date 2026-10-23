@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import api, { apiErrorMessage } from '../../axios'
 import { useLiveQuery } from '../../shared/queries/useLiveQuery'
 import { usePuede, useSesion } from '../auth/session'
+import { destinoDocumentoRequerido } from './destinoDocumentoRequerido'
 import { separarHistorialCorreo } from './historialCorreo'
 import DocumentoModal from '../legajos/components/documentos/DocumentoModal'
 
@@ -22,6 +23,7 @@ function NuevoRequerimiento({ opciones, busy, error, progreso, onSubmit, onCance
   const [abierto, setAbierto] = useState(false)
   const [activo, setActivo] = useState(0)
   const [tipos, setTipos] = useState([])
+  const [otroAsunto, setOtroAsunto] = useState(false)
   const [filtroTipo, setFiltroTipo] = useState('')
   const palabras = normalizar(busqueda).trim().split(/\s+/).filter(Boolean)
   const coincidencias = (opciones?.personas || []).filter(p => palabras.every(palabra => normalizar(`${nombre(p)} ${p.numero_doc_identidad}`).includes(palabra)))
@@ -45,13 +47,14 @@ function NuevoRequerimiento({ opciones, busy, error, progreso, onSubmit, onCance
       {abierto && <ul id="personas-requerimiento" role="listbox" aria-label="Personas con legajo activo" className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg">{resultados.map((p, i) => <li key={p.id} id={`persona-${p.id}`} role="option" aria-selected={activo === i}><button type="button" className={`w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-teal-50 ${activo === i ? 'bg-teal-50' : ''}`} onMouseDown={e => e.preventDefault()} onClick={() => elegir(p)}><span className="block font-medium">{nombre(p)}</span><span className="text-xs text-slate-500">DNI / documento: {p.numero_doc_identidad} · {p.email_institucional || 'Sin correo registrado'}</span></button></li>)}{!resultados.length && <li className="p-3 text-sm text-slate-500">No se encontraron personas con legajo activo.</li>}{coincidencias.length > 15 && <li className="p-3 text-xs text-slate-500">Escribe más letras o el DNI para precisar la búsqueda.</li>}</ul>}
     </div>
     {persona && <p className="rounded-xl bg-teal-50 p-3 text-sm text-teal-900">Destinatario: {persona.email_institucional || 'Sin correo: complétalo en Personal antes de enviar.'}</p>}
-    <fieldset className="space-y-2"><legend className="text-sm font-medium text-slate-700">Tipos de documento ({tipos.length} seleccionados)</legend><input aria-label="Filtrar tipos de documento" placeholder="Buscar tipo de documento" className={control} value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)} /><div className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-slate-200 p-2">{opciones?.tipos.filter(t => normalizar(t.nombre).includes(normalizar(filtroTipo))).map(t => <label key={t.id} className="flex cursor-pointer items-start gap-2 rounded-lg p-2 text-sm hover:bg-slate-50"><input type="checkbox" checked={tipos.includes(t.id)} onChange={e => setTipos(current => e.target.checked ? [...current, t.id] : current.filter(id => id !== t.id))} className="mt-0.5 accent-teal-700" /><span>{t.nombre}</span></label>)}</div><p className="text-xs text-slate-500">Selecciona hasta 20 documentos. Cada uno tendrá su propio requerimiento y correo. Si no seleccionas ninguno, se registrará una corrección de datos u otro pedido.</p></fieldset>
+    <Campo label="Tipo de solicitud"><select value={otroAsunto ? 'otro' : 'documentos'} onChange={e => { setOtroAsunto(e.target.value === 'otro'); setTipos([]) }} className={control}><option value="documentos">Documento de las 11 secciones del legajo</option><option value="otro">Otro asunto (sin documento del legajo)</option></select></Campo>
+    {!otroAsunto && <fieldset className="space-y-2"><legend className="text-sm font-medium text-slate-700">Tipos de documento ({tipos.length} seleccionados)</legend><input aria-label="Filtrar tipos de documento" placeholder="Buscar tipo de documento" className={control} value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)} /><div className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-slate-200 p-2">{opciones?.tipos.filter(t => normalizar(t.nombre).includes(normalizar(filtroTipo))).map(t => <label key={t.id} className="flex cursor-pointer items-start gap-2 rounded-lg p-2 text-sm hover:bg-slate-50"><input type="checkbox" checked={tipos.includes(t.id)} onChange={e => setTipos(current => e.target.checked ? [...current, t.id] : current.filter(id => id !== t.id))} className="mt-0.5 accent-teal-700" /><span>{t.nombre}</span></label>)}</div><p className="text-xs text-slate-500">Selecciona hasta 20 documentos. Cada uno tendrá su propio requerimiento y correo. Para una solicitud sin documento del legajo, selecciona «Otro asunto».</p></fieldset>}
     <Campo label="Detalle de lo solicitado"><textarea required name="descripcion" maxLength={300} className={control} /></Campo>
     <Campo label="Fecha límite"><input required name="fecha_limite" type="date" className={control} /></Campo>
     <p className="text-xs text-slate-600">El envío se realiza solo al pulsar este botón. Registrar una persona o abrir este panel no envía correos.</p>
     {progreso && <p role="status" className="text-sm text-teal-800">{progreso}</p>}
     {error && <p role="alert" className="text-sm text-rose-800">{error}</p>}
-    <div className="flex flex-wrap gap-2"><button disabled={busy || !opciones || !persona || tipos.length > 20} className={button}>{busy ? 'Registrando y enviando…' : `Registrar y enviar ${tipos.length || 1} correo(s)`}</button><button type="button" className={button} disabled={busy} onClick={onCancel}>Cancelar</button></div>
+    <div className="flex flex-wrap gap-2"><button disabled={busy || !opciones || !persona || (!otroAsunto && !tipos.length) || tipos.length > 20} className={button}>{busy ? 'Registrando y enviando…' : `Registrar y enviar ${tipos.length || 1} correo(s)`}</button><button type="button" className={button} disabled={busy} onClick={onCancel}>Cancelar</button></div>
   </form>
 }
 
@@ -80,6 +83,9 @@ function Detalle({ record, admin, propio, onClose }) {
   const [success, setSuccess] = useState('')
   const [accion, setAccion] = useState(record.estado === 'en_revision' && !propio ? 'observar' : 'recordar')
   const [documentos, setDocumentos] = useState([])
+  const [cargandoDocumentos, setCargandoDocumentos] = useState(false)
+  const [errorDocumentos, setErrorDocumentos] = useState('')
+  const [documentoId, setDocumentoId] = useState('')
   const abierto = ['abierto', 'observado', 'en_revision'].includes(record.estado)
   async function enviar(event, path) {
     event.preventDefault()
@@ -105,7 +111,19 @@ function Detalle({ record, admin, propio, onClose }) {
   async function elegirAccion(value) {
     setAccion(value)
     if (value === 'aceptar' && record.tipo_documento_id) {
-      try { setDocumentos((await api.get(`/solicitudes-legajo/${record.id}/documentos`)).data.data) } catch (e) { setError(apiErrorMessage(e)) }
+      setCargandoDocumentos(true)
+      setErrorDocumentos('')
+      setDocumentos([])
+      setDocumentoId('')
+      try {
+        const disponibles = (await api.get(`/solicitudes-legajo/${record.id}/documentos`)).data.data
+        setDocumentos(disponibles)
+        if (disponibles.length === 1) setDocumentoId(disponibles[0].id)
+      } catch (e) {
+        setErrorDocumentos(apiErrorMessage(e))
+      } finally {
+        setCargandoDocumentos(false)
+      }
     }
   }
   return <DocumentoModal titulo="Seguimiento del requerimiento" busy={busy} onCancel={onClose} lateral cerrarAlClickFuera>
@@ -137,11 +155,26 @@ function Detalle({ record, admin, propio, onClose }) {
     })}</ol>
     {error && <p role="alert" className="my-3 text-sm text-rose-800">{error}</p>}{success && <p role="status">{success}</p>}
     {admin && ['abierto', 'observado'].includes(record.estado) && <form onSubmit={e => enviar(e, 'registrar-entrega')} className="space-y-3 border-t pt-4"><h3 className="font-semibold">Registrar respuesta recibida por correo</h3><p className="text-xs text-slate-600">Las respuestas identificadas por Gmail se incorporan automáticamente. Usa este formulario solo para entregas que debas registrar manualmente.</p><Campo label="Correo del remitente"><input required type="email" name="remitente" maxLength={255} className={control} /></Campo><Campo label="Referencia del correo (asunto y fecha)"><input required name="referencia_correo" maxLength={300} className={control} /></Campo><Campo label="Respuesta o explicación de por qué no corresponde"><textarea required maxLength={3000} name="mensaje" className={control} /></Campo><Campo label="Documento PDF (opcional)"><input type="file" name="pdf" accept="application/pdf" className={control} /></Campo><p className="text-xs text-slate-600">La entrega quedará pendiente de revisión. El legajo se actualizará después de la aprobación.</p><button disabled={busy} className={button}>Registrar entrega para revisión</button></form>}
-    {admin && abierto && <form onSubmit={e => enviar(e, 'gestionar')} className="mt-4 space-y-3 border-t pt-4"><h3 className="font-semibold">Gestión administrativa</h3><Campo label="Acción"><select name="accion" value={accion} onChange={e => elegirAccion(e.target.value)} className={control}><option value="observar" disabled={record.estado !== 'en_revision' || propio}>Observar entrega</option><option value="aceptar" disabled={record.estado !== 'en_revision' || propio}>Resolver requerimiento</option><option value="recordar">Enviar aviso por correo</option><option value="prorrogar">Ampliar plazo</option><option value="cancelar">Cancelar requerimiento</option></select></Campo>
+    {admin && abierto && <form onSubmit={e => enviar(e, 'gestionar')} className="mt-4 space-y-3 border-t pt-4"><h3 className="font-semibold">Gestión administrativa</h3><Campo label="Acción"><select name="accion" value={accion} onChange={e => elegirAccion(e.target.value)} className={control}><option value="observar" disabled={record.estado !== 'en_revision' || propio}>Observar entrega</option><option value="aceptar" disabled={record.estado !== 'en_revision' || propio}>Aprobar entrega y cerrar requerimiento</option><option value="recordar">Enviar aviso por correo</option><option value="prorrogar">Ampliar plazo</option><option value="cancelar">Cancelar requerimiento</option></select></Campo>
       <Campo label="Comentario y motivo de la decisión"><textarea required name="mensaje" maxLength={3000} className={control} /></Campo>
       {accion === 'prorrogar' && <Campo label="Nueva fecha límite"><input required type="date" name="prorroga_hasta" className={control} /></Campo>}
-      {accion === 'aceptar' && <><p className="text-sm text-slate-600">Revisa la entrega e incorpora el documento o corrige los datos desde la sección correspondiente del legajo. Después registra aquí la resolución.</p><Link to={`/legajos/${record.usuario_id}`} className="inline-block text-sm font-semibold text-teal-800 underline">Abrir legajo para actualizarlo</Link>{record.tipo_documento_id && <Campo label="Documento incorporado y aceptado"><select required name="documento_id" className={control}><option value="">Selecciona el documento del legajo</option>{documentos.map(d => <option key={d.id} value={d.id}>{d.nombre || d.num_resolucion || d.id} · {fecha(d.fecha_incorporacion)}</option>)}</select><button type="button" className={`${button} mt-2`} onClick={() => elegirAccion('aceptar')}>Actualizar documentos disponibles</button></Campo>}</>}
-      <button disabled={busy} className={button}>Registrar acción</button></form>}
+      {accion === 'aceptar' && record.tipo_documento_id && <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+        <p className="text-sm text-slate-600">Incorpora y acepta el documento recibido en la sección correspondiente del legajo. Luego vuelve aquí y pulsa «Actualizar documentos disponibles» para vincularlo y aprobar la entrega.</p>
+        <Link to={destinoDocumentoRequerido(record)} target="_blank" rel="noopener noreferrer" className="inline-block text-sm font-semibold text-teal-800 underline">Ir al documento solicitado en el legajo (nueva pestaña)</Link>
+        {record.tipo_documento_id && <>
+          {cargandoDocumentos ? <p role="status" className="text-sm text-slate-600">Consultando documentos del legajo…</p>
+            : errorDocumentos ? <p role="alert" className="text-sm text-rose-800">{errorDocumentos}</p>
+              : documentos.length ? <Campo label="Documento del legajo que corresponde a esta entrega">
+                <select required name="documento_id" value={documentoId} onChange={e => setDocumentoId(e.target.value)} className={control}>
+                  <option value="">Selecciona el documento</option>
+                  {documentos.map(d => <option key={d.id} value={d.id}>{d.nombre || d.num_resolucion || d.id} · {fecha(d.fecha_incorporacion)}</option>)}
+                </select>
+              </Campo>
+                : <p role="status" className="text-sm text-amber-900">Todavía no hay documentos de este tipo aceptados y disponibles en el legajo. El adjunto del correo se muestra en el historial, pero debes incorporarlo al legajo antes de cerrar el requerimiento.</p>}
+          <button type="button" disabled={busy || cargandoDocumentos} className={button} onClick={() => elegirAccion('aceptar')}>Actualizar documentos disponibles</button>
+        </>}
+      </div>}
+      <button disabled={busy || (accion === 'aceptar' && !!record.tipo_documento_id && (cargandoDocumentos || !!errorDocumentos || !documentoId))} className={button}>{accion === 'aceptar' ? (record.tipo_documento_id ? 'Aprobar entrega y cerrar requerimiento' : 'Confirmar aprobación') : 'Registrar acción'}</button></form>}
     </section>
   </DocumentoModal>
 }

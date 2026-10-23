@@ -168,7 +168,7 @@ function DestinoLegajo() {
     if (!hash) return
     let id
     try { id = decodeURIComponent(hash.slice(1)) } catch { return }
-    if (!/^(perfil-pendiente-|registro-|bloque-)[a-zA-Z0-9_-]+$/.test(id)) return
+    if (!/^(perfil-pendiente-|registro-|bloque-|item-)[a-zA-Z0-9_-]+$/.test(id)) return
     let frame
     const observer = new MutationObserver(enfocar)
     function enfocar() {

@@ -15,6 +15,17 @@ use App\Support\Documentos\ArchivoPdf;
 use App\Support\GmailCorreo;
 use App\Support\Parametros;
 use App\Support\RequerimientosAutomaticos;
+use App\Support\ResumenSeccion03;
+use App\Support\ResumenSeccion04;
+use App\Support\ResumenSeccion06;
+use App\Support\ResumenSeccion08;
+use App\Support\ResumenSeccion10;
+use App\Support\Seccion05;
+use App\Support\Seccion09;
+use App\Support\Seccion11;
+use Database\Seeders\Seccion01CatalogoSeeder;
+use Database\Seeders\Seccion02CatalogoSeeder;
+use Database\Seeders\Seccion07CatalogoSeeder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,7 +48,7 @@ class SolicitudLegajoController extends Controller
     public function index(Request $request): JsonResponse
     {
         $data = $request->validate(['clase' => 'nullable|in:documentos,actualizacion', 'estado' => 'nullable|in:abierto,observado,en_revision,aceptado,cancelado', 'q' => 'nullable|string|max:120', 'page' => 'sometimes|integer|min:1']);
-        $q = $this->consulta($request)->with(['usuario:id,nombres,apellido_paterno,apellido_materno', 'tipoDocumento:id,nombre', 'documento:id,nombre,estado', 'notificacionesUsuario' => fn ($q) => $q->whereNotNull('correo_estado')->orderByDesc('created_at')->limit(1)]);
+        $q = $this->consulta($request)->with(['usuario:id,nombres,apellido_paterno,apellido_materno', 'tipoDocumento:id,nombre,codigo,seccion_legajo_id,subseccion_legajo_id', 'tipoDocumento.subseccionLegajo:id,codigo', 'documento:id,nombre,estado', 'notificacionesUsuario' => fn ($q) => $q->whereNotNull('correo_estado')->orderByDesc('created_at')->limit(1)]);
         foreach (['clase', 'estado'] as $campo) {
             if (! empty($data[$campo])) {
                 $q->where($campo, $data[$campo]);
@@ -64,7 +75,7 @@ class SolicitudLegajoController extends Controller
             }, $r->seguimiento ?? []);
             $datos['correo'] = $r->notificacionesUsuario->first()?->only(['id', 'correo_estado', 'correo_destinatario', 'correo_enviado_en', 'correo_error']);
             unset($datos['notificaciones_usuario']);
-            $datos['atrasado'] = in_array($r->estado, self::ABIERTOS, true) && ($r->prorroga_hasta ?? $r->fecha_limite)->toDateString() < now('America/Lima')->toDateString();
+            $datos['atrasado'] = in_array($r->estado, ['abierto', 'observado'], true) && ($r->prorroga_hasta ?? $r->fecha_limite)->toDateString() < now('America/Lima')->toDateString();
 
             return $datos;
         });
@@ -83,12 +94,35 @@ class SolicitudLegajoController extends Controller
             'plazo_dias' => max(1, Parametros::entero('requerimiento_plazo_dias_calendario'))]);
     }
 
+    private function tiposDisponibles(): Builder
+    {
+        $catalogos = [
+            1 => array_column(Seccion01CatalogoSeeder::TIPOS, 0),
+            2 => array_column(Seccion02CatalogoSeeder::TIPOS, 1),
+            3 => array_keys(ResumenSeccion03::ITEMS),
+            4 => array_keys(ResumenSeccion04::ITEMS),
+            5 => array_keys(Seccion05::TIPOS_DOCUMENTO),
+            6 => array_keys(ResumenSeccion06::ITEMS),
+            7 => array_column(Seccion07CatalogoSeeder::TIPOS, 0),
+            8 => array_keys(ResumenSeccion08::ITEMS),
+            9 => array_keys(Seccion09::TIPOS_DOCUMENTO),
+            10 => array_keys(ResumenSeccion10::TIPOS),
+            11 => array_keys(Seccion11::TIPOS_DOCUMENTO),
+        ];
+
+        return TipoDocumento::query()->where('activo', true)->where(function (Builder $query) use ($catalogos): void {
+            foreach ($catalogos as $seccion => $codigos) {
+                $query->orWhere(fn (Builder $q) => $q->where('seccion_legajo_id', $seccion)->whereIn('codigo', $codigos));
+            }
+        });
+    }
+
     public function opciones(Request $request): JsonResponse
     {
         $admin = $request->user()->can('requerimientos.gestionar');
         $personas = Usuario::query()->whereHas('legajos', fn (Builder $q) => $q->where('estado_legajo', 'activo'))
             ->when(! $admin, fn (Builder $q) => $q->whereKey($request->user()->id))->orderBy('apellido_paterno')->get(['id', 'nombres', 'apellido_paterno', 'apellido_materno', 'numero_doc_identidad', 'email_institucional']);
-        $tipos = TipoDocumento::query()->where('activo', true)
+        $tipos = $this->tiposDisponibles()
             ->when(! $request->user()->veDatosSensibles(), fn (Builder $q) => $q->where('es_dato_sensible', false)->where('es_dato_salud', false)->whereNotIn('seccion_legajo_id', [1, 9, 10]))
             ->orderBy('nombre')->get(['id', 'nombre']);
 
@@ -300,7 +334,10 @@ class SolicitudLegajoController extends Controller
 
     private function tipoVisible(Request $request, string $id): void
     {
-        $t = TipoDocumento::query()->where('activo', true)->findOrFail($id);
+        $t = $this->tiposDisponibles()->find($id);
+        if (! $t) {
+            throw ValidationException::withMessages(['tipo_documento_ids' => 'Selecciona un documento disponible en las 11 secciones del legajo. Para otro asunto, no selecciones un tipo de documento.']);
+        }
         abort_if(! $request->user()->veDatosSensibles() && ($t->es_dato_sensible || $t->es_dato_salud || in_array($t->seccion_legajo_id, [1, 9, 10], true)), 403);
     }
 
