@@ -36,11 +36,13 @@ class VencimientosPanelTest extends TestCase
         $this->documento($legajo, 6);
         $this->contrato($legajo, 7);
         $this->requerimiento($legajo, -2);
+        // Un documento vencido manda sobre el requerimiento fuera de plazo; cada motivo lleva su propio estado.
         $this->getJson('/api/v1/vencimientos')->assertOk()->assertJsonPath('total', 1)
-            ->assertJsonPath('resumen.personas', 1)->assertJsonPath('resumen.desactualizados', 1)
+            ->assertJsonPath('resumen.personas', 1)->assertJsonPath('resumen.vencidos', 1)->assertJsonPath('resumen.fuera_de_plazo', 0)
             ->assertJsonPath('resumen.por_vencer', 0)->assertJsonPath('data.0.total_alertas', 4)
-            ->assertJsonPath('data.0.estado', 'desactualizado')->assertJsonPath('data.0.desactualizados', 2)
-            ->assertJsonPath('data.0.por_vencer', 2)->assertJsonPath('data.0.motivos.0.origen', 'requerimiento');
+            ->assertJsonPath('data.0.estado', 'vencido')->assertJsonPath('data.0.vencidos', 1)->assertJsonPath('data.0.fuera_de_plazo', 1)
+            ->assertJsonPath('data.0.por_vencer', 2)->assertJsonPath('data.0.motivos.0.origen', 'requerimiento')
+            ->assertJsonPath('data.0.motivos.0.estado', 'fuera_de_plazo')->assertJsonPath('data.0.motivos.1.estado', 'vencido');
     }
 
     public function test_includes_today_and_day_thirty_uses_lima_and_red_below_seven(): void
@@ -56,7 +58,7 @@ class VencimientosPanelTest extends TestCase
         $this->getJson('/api/v1/vencimientos?dias=6')->assertOk()->assertJsonPath('data.0.total_alertas', 2);
     }
 
-    public function test_contracts_use_latest_valid_adenda_and_exclude_ended_or_future_contracts(): void
+    public function test_contracts_use_latest_valid_adenda_include_expired_without_termination_and_exclude_ended_or_future(): void
     {
         $legajo = $this->legajo();
         $vinculo = $this->contrato($legajo, 2);
@@ -65,21 +67,31 @@ class VencimientosPanelTest extends TestCase
         $this->contrato($legajo, 3)->update(['anulado' => true]);
         $this->contrato($legajo, 4)->update(['fecha_cese' => '2026-10-16']);
         $this->contrato($legajo, 5)->update(['fecha_inicio' => '2026-10-18']);
-        $this->contrato($legajo, -1);
-        $this->getJson('/api/v1/vencimientos?origen=contrato')->assertOk()->assertJsonPath('data.0.total_alertas', 1)
-            ->assertJsonPath('data.0.motivos.0.fecha', '2026-10-25');
+        // Plazo vencido sin cese registrado: es una alerta vencida (antes no aparecía).
+        $this->contrato($legajo, -40);
+        $this->contrato($legajo, 6)->update(['fecha_fin_prevista' => null]);
+        $this->getJson('/api/v1/vencimientos?origen=contrato')->assertOk()->assertJsonPath('data.0.total_alertas', 2)
+            ->assertJsonPath('data.0.motivos.0.fecha', '2026-09-07')->assertJsonPath('data.0.motivos.0.estado', 'vencido')
+            ->assertJsonPath('data.0.motivos.1.fecha', '2026-10-25')->assertJsonPath('data.0.motivos.1.estado', 'por_vencer')
+            ->assertJsonPath('data.0.estado', 'vencido');
     }
 
-    public function test_requirements_respect_extensions_closed_states_and_effective_deadline(): void
+    public function test_requirements_show_upcoming_and_overdue_with_real_states_and_effective_deadline(): void
     {
         $legajo = $this->legajo();
         $this->requerimiento($legajo, -10)->update(['prorroga_hasta' => '2026-10-20']);
-        $this->requerimiento($legajo, -9)->update(['estado' => 'cumplido']);
+        // Cerrados o esperando a la ORH (en revisión): no son alertas de la persona.
+        foreach (['aceptado', 'cancelado', 'en_revision'] as $estado) {
+            $this->requerimiento($legajo, -9)->update(['estado' => $estado]);
+        }
         $this->requerimiento($legajo, -8)->update(['cerrado_en' => now()]);
         $this->requerimiento($legajo, 0);
-        $this->requerimiento($legajo, -7)->update(['prorroga_hasta' => '2026-10-16']);
-        $this->getJson('/api/v1/vencimientos?origen=requerimiento')->assertOk()->assertJsonPath('data.0.total_alertas', 1)
-            ->assertJsonPath('data.0.motivos.0.fecha', '2026-10-16')->assertJsonPath('data.0.estado', 'desactualizado');
+        $this->requerimiento($legajo, -7)->update(['prorroga_hasta' => '2026-10-16', 'estado' => 'observado']);
+        $this->requerimiento($legajo, 31);
+        $this->getJson('/api/v1/vencimientos?origen=requerimiento')->assertOk()->assertJsonPath('data.0.total_alertas', 3)
+            ->assertJsonPath('data.0.motivos.0.fecha', '2026-10-16')->assertJsonPath('data.0.motivos.0.estado', 'fuera_de_plazo')
+            ->assertJsonPath('data.0.motivos.1.estado', 'por_vencer')->assertJsonPath('data.0.motivos.2.fecha', '2026-10-20')
+            ->assertJsonPath('data.0.estado', 'fuera_de_plazo')->assertJsonPath('resumen.fuera_de_plazo', 1);
     }
 
     public function test_ignores_closed_legajos_invalid_documents_and_superseded_versions(): void
@@ -98,16 +110,22 @@ class VencimientosPanelTest extends TestCase
         $this->getJson('/api/v1/vencimientos')->assertOk()->assertJsonPath('total', 0);
     }
 
-    public function test_permissions_filter_sensitive_documents_and_administrative_requirements(): void
+    public function test_permissions_filter_sensitive_documents_and_requirements(): void
     {
         $legajo = $this->legajo();
         $this->documento($legajo, -1, 10);
         $this->documento($legajo, 3, 3);
         $this->requerimiento($legajo, -2);
-        $this->actuarComo(null, 'asistente_legajo');
-        $this->getJson('/api/v1/vencimientos')->assertOk()->assertJsonPath('incluye_requerimientos', false)
-            ->assertJsonPath('data.0.total_alertas', 1)->assertJsonPath('data.0.estado', 'por_vencer');
+        // Sin datos sensibles ni requerimientos.gestionar: solo el documento de la sección 03.
+        config(['permisos.roles.prueba_solo_legajo' => ['legajo.ver']]);
+        $this->actuarComo(null, 'prueba_solo_legajo');
+        $origenes = $this->getJson('/api/v1/vencimientos')->assertOk()->assertJsonPath('data.0.total_alertas', 1)
+            ->assertJsonPath('data.0.estado', 'por_vencer')->assertJsonPath('resumen.vencidos', 0)->json('origenes.*.id');
+        $this->assertNotContains('requerimiento', $origenes);
         $this->getJson('/api/v1/vencimientos?origen=requerimiento')->assertOk()->assertJsonPath('total', 0);
+        // El asistente gestiona requerimientos (requerimientos.gestionar): los ve, pero no el documento sensible.
+        $this->actuarComo(null, 'asistente_legajo');
+        $this->getJson('/api/v1/vencimientos')->assertOk()->assertJsonPath('data.0.total_alertas', 2)->assertJsonPath('data.0.estado', 'fuera_de_plazo');
         Sanctum::actingAs(Usuario::factory()->create());
         $this->getJson('/api/v1/vencimientos')->assertForbidden();
     }
@@ -119,9 +137,10 @@ class VencimientosPanelTest extends TestCase
         $legajo = $this->legajo($persona);
         $this->documento($legajo, -1);
         $this->documento($this->legajo(), 1);
-        $this->getJson('/api/v1/vencimientos?q=rosa&unidad_id='.$area->id.'&tipo_personal=docente&estado=desactualizado')->assertOk()
+        $this->getJson('/api/v1/vencimientos?q=rosa&unidad_id='.$area->id.'&tipo_personal=docente&estado=vencido')->assertOk()
             ->assertJsonPath('total', 1)->assertJsonPath('data.0.usuario_id', $persona->id)->assertJsonPath('data.0.area', $area->nombre);
-        $this->getJson('/api/v1/vencimientos?estado=por_vencer')->assertOk()->assertJsonPath('total', 1)->assertJsonPath('resumen.desactualizados', 0);
+        $this->getJson('/api/v1/vencimientos?estado=por_vencer')->assertOk()->assertJsonPath('total', 1)->assertJsonPath('resumen.vencidos', 0);
+        $this->getJson('/api/v1/vencimientos?estado=fuera_de_plazo')->assertOk()->assertJsonPath('total', 0);
     }
 
     public function test_paginates_people_without_duplicates_and_limits_detail_to_five_motives(): void
@@ -140,7 +159,7 @@ class VencimientosPanelTest extends TestCase
 
     public function test_rejects_invalid_filters(): void
     {
-        foreach (['dias=0', 'dias=366', 'dias=abc', 'estado=otro', 'origen=otro', 'unidad_id=invalid', 'page=0'] as $filtro) {
+        foreach (['dias=0', 'dias=366', 'dias=abc', 'estado=otro', 'estado=desactualizado', 'origen=otro', 'unidad_id=invalid', 'page=0'] as $filtro) {
             $this->getJson('/api/v1/vencimientos?'.$filtro)->assertUnprocessable();
         }
     }

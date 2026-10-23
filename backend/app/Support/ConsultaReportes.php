@@ -57,9 +57,9 @@ final class ConsultaReportes
         'inventario' => ['titulo' => 'Inventario de legajos', 'descripcion' => 'Expedientes, ubicación y documentos registrados.', 'icono' => 'folder',
             'fecha' => 'Fecha de apertura', 'estados' => ['activo' => 'Activo', 'pasivo' => 'Pasivo', 'transferido' => 'Transferido'],
             'ayuda' => 'Un resultado por legajo. Los documentos y folios incluyen su historial, excluyen anulados y se limitan a la información que puedes consultar.'],
-        'vencimientos' => ['titulo' => 'Vencimientos', 'descripcion' => 'Documentos, contratos y requerimientos que necesitan seguimiento.', 'icono' => 'clock',
-            'fecha' => 'Fecha de vencimiento', 'estados' => ['vencido' => 'Vencido', 'por_vencer' => 'Por vencer'],
-            'ayuda' => 'Se reutiliza la consulta de Vencimientos: documentos caducados o próximos, contratos próximos a vencer considerando adendas y requerimientos vencidos.'],
+        'vencimientos' => ['titulo' => 'Vencimientos', 'descripcion' => 'Documentos, contratos, requerimientos y otros datos con fecha que necesitan seguimiento.', 'icono' => 'clock',
+            'fecha' => 'Fecha de vencimiento', 'estados' => ['vencido' => 'Vencido', 'fuera_de_plazo' => 'Requerimiento fuera de plazo', 'por_vencer' => 'Por vencer'],
+            'ayuda' => 'Se reutiliza la consulta de Vencimientos: DNI, contratos y adendas (también vencidos sin cese), requerimientos, colegiatura, período de prueba y, según tus permisos, certificado de discapacidad, examen médico ocupacional, ratificación docente y encargos o destaques.'],
         'personal' => ['titulo' => 'Padrón del personal con legajo', 'descripcion' => 'Personal docente y administrativo, unidad, puesto y situación laboral.', 'icono' => 'users',
             'fecha' => null, 'estados' => ['con_vinculo' => 'Con vínculo abierto', 'sin_vinculo' => 'Sin vínculo abierto'],
             'ayuda' => 'Un resultado por persona. El puesto y la unidad proceden del vínculo abierto más reciente; sin vínculo, se identifica el dato histórico de la ficha. Solo incluye personas con al menos un legajo; excluye cuentas técnicas.'],
@@ -383,9 +383,11 @@ final class ConsultaReportes
                     continue;
                 }
                 $fecha = substr($alerta->fecha, 0, 10);
-                $estado = $fecha < $hoy->toDateString() ? 'vencido' : 'por_vencer';
+                $estado = ConsultaVencimientos::estado($alerta->origen, $fecha, $hoy);
+                // Las tres etiquetas de siempre se conservan (pendientesAutomaticos compara «Documento»); las nuevas, de ConsultaVencimientos.
+                $origen = ['documento' => 'Documento', 'contrato' => 'Contrato', 'requerimiento' => 'Requerimiento'][$alerta->origen] ?? ConsultaVencimientos::ORIGENES[$alerta->origen];
                 yield [...$base, 'id' => $alerta->alerta_id, 'fecha' => $fecha, 'estado_codigo' => $estado,
-                    'estado' => self::catalogo()['vencimientos']['estados'][$estado], 'origen' => ['documento' => 'Documento', 'contrato' => 'Contrato', 'requerimiento' => 'Requerimiento'][$alerta->origen], 'detalle' => $alerta->detalle,
+                    'estado' => self::catalogo()['vencimientos']['estados'][$estado], 'origen' => $origen, 'detalle' => $alerta->detalle,
                     'dias' => (int) $hoy->diffInDays(CarbonImmutable::parse($fecha, 'America/Lima'), false)];
             }
         } while ($alertas->count() === 100);
