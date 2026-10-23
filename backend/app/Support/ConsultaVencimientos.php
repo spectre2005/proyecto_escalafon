@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Usuario;
+use App\Models\VinculoLaboral;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
@@ -21,13 +22,23 @@ final class ConsultaVencimientos
             ->selectRaw("SUM(CASE WHEN DATE(fecha) < ? AND origen <> 'requerimiento' THEN 1 ELSE 0 END) as vencidos", [$hoyTexto])
             ->selectRaw("SUM(CASE WHEN DATE(fecha) < ? AND origen = 'requerimiento' THEN 1 ELSE 0 END) as fuera_de_plazo", [$hoyTexto])
             ->selectRaw('SUM(CASE WHEN DATE(fecha) >= ? THEN 1 ELSE 0 END) as por_vencer', [$hoyTexto])->groupBy('usuario_id');
-        $unidad = 'COALESCE((SELECT unidad_organica_id FROM vinculos_laborales WHERE usuario_id = u.id AND anulado = ? AND fecha_cese IS NULL ORDER BY fecha_inicio DESC, id DESC LIMIT 1), u.unidad_organica_id)';
+        // Área con el criterio de la ficha (PuestoActual): el vínculo vigente de inicio más reciente (VigenciaLaboral, con
+        // adendas); sin vigente, el abierto más reciente; sin vínculo abierto, la unidad registrada en la persona.
+        $vigente = VigenciaLaboral::consulta(VinculoLaboral::query()->whereColumn('vinculos_laborales.usuario_id', 'u.id'), $hoyTexto)
+            ->orderByDesc('vinculos_laborales.fecha_inicio')->orderByDesc('vinculos_laborales.id')->limit(1)->select('vinculos_laborales.id')->toBase();
+        $abierto = DB::table('vinculos_laborales as va')->select('va.id')->whereColumn('va.usuario_id', 'u.id')->where('va.anulado', false)
+            ->where(fn (Builder $q) => $q->whereNull('va.fecha_cese')->orWhereDate('va.fecha_cese', '>=', $hoyTexto))
+            ->orderByDesc('va.fecha_inicio')->orderByDesc('va.id')->limit(1);
         $personas = DB::query()->fromSub($agrupadas, 'a')->join('usuarios as u', 'u.id', '=', 'a.usuario_id')
-            ->select('a.*', 'u.numero_doc_identidad', 'u.tipo_personal')
+            ->select('a.*', 'u.numero_doc_identidad', 'u.tipo_personal', 'u.unidad_organica_id as unidad_persona')
             ->selectRaw("TRIM(u.nombres || ' ' || u.apellido_paterno || ' ' || COALESCE(u.apellido_materno, '')) as nombre")
-            ->selectRaw("$unidad as unidad_id", [false]);
-        $consulta = DB::query()->fromSub($personas, 'p')->leftJoin('unidades_organicas as area', 'area.id', '=', 'p.unidad_id')
-            ->select('p.*', 'area.nombre as area');
+            ->selectRaw("COALESCE(({$vigente->toSql()}), ({$abierto->toSql()})) as vinculo_actual", [...$vigente->getBindings(), ...$abierto->getBindings()]);
+        // Con vínculo, su unidad (aunque esté vacía, como en la ficha); sin vínculo, la de la persona.
+        $conArea = DB::query()->fromSub($personas, 'p')->leftJoin('vinculos_laborales as actual', 'actual.id', '=', 'p.vinculo_actual')
+            ->select('p.*')->selectRaw('CASE WHEN p.vinculo_actual IS NULL THEN p.unidad_persona ELSE actual.unidad_organica_id END as unidad_id');
+        $consulta = DB::query()->fromSub($conArea, 'p')->leftJoin('unidades_organicas as area', 'area.id', '=', 'p.unidad_id')
+            ->select('p.usuario_id', 'p.total_alertas', 'p.primera_fecha', 'p.vencidos', 'p.fuera_de_plazo', 'p.por_vencer', 'p.numero_doc_identidad',
+                'p.tipo_personal', 'p.nombre', 'p.unidad_id', 'area.nombre as area');
         if (! empty($filtros['q'])) {
             $busqueda = '%'.mb_strtolower(trim($filtros['q'])).'%';
             $consulta->where(fn (Builder $q) => $q->whereRaw('LOWER(p.nombre) LIKE ?', [$busqueda])->orWhere('p.numero_doc_identidad', 'like', $busqueda));
@@ -37,18 +48,20 @@ final class ConsultaVencimientos
                 $consulta->where('p.'.$campo, $filtros[$campo]);
             }
         }
-        // Estado de la persona: vencido si tiene algo vencido; si no, fuera de plazo si tiene requerimientos atrasados; si no, por vencer.
+        // Los contadores salen de las mismas alertas visibles (nunca cuentan lo que el actor no puede ver) y de todos los
+        // filtros salvo Estado: muestran el panorama aunque se elija un estado.
+        $resumen = ['personas' => (clone $consulta)->count(),
+            'vencidos' => (clone $consulta)->where('p.vencidos', '>', 0)->count(),
+            'fuera_de_plazo' => (clone $consulta)->where('p.vencidos', 0)->where('p.fuera_de_plazo', '>', 0)->count(),
+            'por_vencer' => (clone $consulta)->where('p.vencidos', 0)->where('p.fuera_de_plazo', 0)->count()];
+        // Estado de la persona: vencido si tiene algo vencido; si no, fuera de plazo si tiene requerimientos atrasados; si no,
+        // solo por vencer.
         match ($filtros['estado'] ?? null) {
             'vencido' => $consulta->where('p.vencidos', '>', 0),
             'fuera_de_plazo' => $consulta->where('p.vencidos', 0)->where('p.fuera_de_plazo', '>', 0),
             'por_vencer' => $consulta->where('p.vencidos', 0)->where('p.fuera_de_plazo', 0),
             default => null,
         };
-        // Los contadores salen de las mismas alertas visibles: nunca cuentan lo que el actor no puede ver.
-        $resumen = ['personas' => (clone $consulta)->count(),
-            'vencidos' => (clone $consulta)->where('p.vencidos', '>', 0)->count(),
-            'fuera_de_plazo' => (clone $consulta)->where('p.vencidos', 0)->where('p.fuera_de_plazo', '>', 0)->count(),
-            'por_vencer' => (clone $consulta)->where('p.vencidos', 0)->where('p.fuera_de_plazo', 0)->count()];
         $pagina = $consulta->orderBy('p.primera_fecha')->orderBy('p.usuario_id')->paginate(20)->withQueryString();
         $ids = $pagina->getCollection()->pluck('usuario_id');
         // Cinco motivos por persona mantienen acotada la respuesta aunque un legajo tenga muchos documentos antiguos.

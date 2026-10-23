@@ -11,6 +11,7 @@ use App\Models\UnidadOrganica;
 use App\Models\Usuario;
 use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
+use App\Support\PuestoActual;
 use Carbon\Carbon;
 use Database\Seeders\SeccionesLegajoCatalogoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -141,8 +142,60 @@ class VencimientosPanelTest extends TestCase
         $this->documento($this->legajo(), 1);
         $this->getJson('/api/v1/vencimientos?q=rosa&unidad_id='.$area->id.'&tipo_personal=docente&estado=vencido')->assertOk()
             ->assertJsonPath('total', 1)->assertJsonPath('data.0.usuario_id', $persona->id)->assertJsonPath('data.0.area', $area->nombre);
-        $this->getJson('/api/v1/vencimientos?estado=por_vencer')->assertOk()->assertJsonPath('total', 1)->assertJsonPath('resumen.vencidos', 0);
+        // El estado filtra las filas, no los contadores.
+        $this->getJson('/api/v1/vencimientos?estado=por_vencer')->assertOk()->assertJsonPath('total', 1)->assertJsonPath('resumen.vencidos', 1)->assertJsonPath('resumen.por_vencer', 1);
         $this->getJson('/api/v1/vencimientos?estado=fuera_de_plazo')->assertOk()->assertJsonPath('total', 0);
+    }
+
+    public function test_counters_ignore_the_status_filter_but_follow_the_other_filters(): void
+    {
+        $area = UnidadOrganica::factory()->create();
+        $docente = Usuario::factory()->create(['tipo_personal' => 'docente', 'unidad_organica_id' => $area->id]);
+        $this->documento($this->legajo($docente), -1);
+        $this->requerimiento($this->legajo(), -3);
+        $this->documento($this->legajo(Usuario::factory()->create(['tipo_personal' => 'administrativo'])), 10);
+        $panorama = ['personas' => 3, 'vencidos' => 1, 'fuera_de_plazo' => 1, 'por_vencer' => 1];
+
+        // Mismos contadores con cualquier estado; las filas sí cambian.
+        foreach (['' => 3, 'vencido' => 1, 'fuera_de_plazo' => 1, 'por_vencer' => 1] as $estado => $filas) {
+            $this->getJson('/api/v1/vencimientos?estado='.$estado)->assertOk()->assertJsonPath('resumen', $panorama)->assertJsonPath('total', $filas);
+        }
+        // Los demás filtros sí los cambian.
+        $this->getJson('/api/v1/vencimientos?tipo_personal=docente&estado=por_vencer')->assertOk()
+            ->assertJsonPath('resumen', ['personas' => 1, 'vencidos' => 1, 'fuera_de_plazo' => 0, 'por_vencer' => 0])->assertJsonPath('total', 0);
+        $this->getJson('/api/v1/vencimientos?unidad_id='.$area->id)->assertOk()->assertJsonPath('resumen.personas', 1);
+        $this->getJson('/api/v1/vencimientos?origen=requerimiento')->assertOk()->assertJsonPath('resumen', ['personas' => 1, 'vencidos' => 0, 'fuera_de_plazo' => 1, 'por_vencer' => 0]);
+        $this->getJson('/api/v1/vencimientos?dias=5&estado=vencido')->assertOk()->assertJsonPath('resumen', ['personas' => 2, 'vencidos' => 1, 'fuera_de_plazo' => 1, 'por_vencer' => 0]);
+        $this->getJson('/api/v1/vencimientos?q='.$docente->numero_doc_identidad)->assertOk()->assertJsonPath('resumen.personas', 1);
+    }
+
+    public function test_area_follows_the_same_rule_as_the_legajo_header(): void
+    {
+        $vigente = UnidadOrganica::factory()->create(['nombre' => 'AREA VIGENTE']);
+        $persona = Usuario::factory()->create(['unidad_organica_id' => UnidadOrganica::factory()->create(['nombre' => 'AREA DE LA PERSONA'])->id]);
+        $legajo = $this->legajo($persona);
+        $this->documento($legajo, 2);
+        $abierto = fn (array $datos) => VinculoLaboral::factory()->create(['usuario_id' => $persona->id, 'anulado' => false, 'fecha_cese' => null, ...$datos]);
+        // El vigente manda sobre otro abierto más reciente que todavía no empieza y sobre uno con el plazo vencido.
+        $abierto(['unidad_organica_id' => $vigente->id, 'fecha_inicio' => '2025-01-01', 'fecha_fin_prevista' => null]);
+        $abierto(['unidad_organica_id' => UnidadOrganica::factory()->create(['nombre' => 'AREA FUTURA'])->id, 'fecha_inicio' => '2026-12-01', 'fecha_fin_prevista' => null]);
+        $abierto(['unidad_organica_id' => UnidadOrganica::factory()->create(['nombre' => 'AREA VENCIDA'])->id, 'fecha_inicio' => '2026-02-01', 'fecha_fin_prevista' => '2026-06-30']);
+        $mismaQueLaFicha = function () use ($persona): void {
+            $ficha = PuestoActual::de($persona->fresh());
+            $this->getJson('/api/v1/vencimientos')->assertOk()->assertJsonPath('data.0.area', $ficha['unidad_organica']);
+        };
+        $mismaQueLaFicha();
+        $this->getJson('/api/v1/vencimientos?unidad_id='.$vigente->id)->assertOk()->assertJsonPath('total', 1);
+
+        // Sin vigente: el abierto más reciente (el que empieza en diciembre), como la ficha.
+        VinculoLaboral::query()->where('unidad_organica_id', $vigente->id)->update(['fecha_cese' => '2026-10-01']);
+        $mismaQueLaFicha();
+        $this->getJson('/api/v1/vencimientos')->assertJsonPath('data.0.area', 'AREA FUTURA');
+
+        // Sin vínculo abierto: la unidad registrada en la persona.
+        VinculoLaboral::query()->where('usuario_id', $persona->id)->update(['fecha_cese' => '2026-10-01']);
+        $mismaQueLaFicha();
+        $this->getJson('/api/v1/vencimientos')->assertJsonPath('data.0.area', 'AREA DE LA PERSONA');
     }
 
     public function test_paginates_people_without_duplicates_and_limits_detail_to_five_motives(): void

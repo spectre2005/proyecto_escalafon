@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { apiErrorMessage } from '../../axios'
 import { useLiveQuery } from '../../shared/queries/useLiveQuery'
 import { usePuede } from '../auth/session'
 import { destinoMotivo } from './destinosVencimiento'
+import { aplicarDias, conFiltro, DIAS_POR_DEFECTO, opcionesEstado } from './filtrosVencimiento'
 
 const panel = 'rounded-2xl border border-slate-200 bg-white'
 const control = 'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700'
@@ -20,6 +22,20 @@ function Campo({ label, children }) {
   return <label className="block text-sm font-medium text-slate-700"><span className="mb-2 block">{label}</span>{children}</label>
 }
 
+// Próximos días: se aplica al confirmar (Enter o salir del campo), no con cada dígito. Se reinicia al cambiar el valor de la
+// dirección (key), p. ej. con «Limpiar»; un valor inválido vuelve al vigente.
+function CampoDias({ params, setParams }) {
+  const vigente = params.get('dias') || String(DIAS_POR_DEFECTO)
+  const [dias, setDias] = useState(vigente)
+  function confirmar() {
+    const siguiente = aplicarDias(params, dias)
+    if (siguiente) setParams(siguiente)
+    else setDias(vigente)
+  }
+  return <Campo label="Próximos días (incluye hoy)"><input name="dias" required type="number" min={1} max={365} value={dias} onChange={e => setDias(e.target.value)} onBlur={confirmar}
+    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); confirmar() } }} className={control} /></Campo>
+}
+
 function Resultados() {
   const [params, setParams] = useSearchParams()
   const formKey = new URLSearchParams(params)
@@ -28,14 +44,9 @@ function Resultados() {
   const request = useLiveQuery(`/vencimientos?${params.toString()}`)
   const result = request.data
   const fuentes = Object.fromEntries((result?.origenes || []).map(origen => [origen.id, origen.nombre]))
-  function filtrar(event) {
-    event.preventDefault()
-    const next = new URLSearchParams()
-    for (const [key, value] of new FormData(event.currentTarget)) {
-      if (String(value).trim()) next.set(key, String(value).trim())
-    }
-    setParams(next)
-  }
+  const gestionaRequerimientos = usePuede('requerimientos.gestionar')
+  // Desplegables: se aplican al cambiar. Próximos días: al confirmar (CampoDias).
+  const cambiar = clave => event => setParams(conFiltro(params, clave, event.target.value))
   function pagina(numero) {
     const next = new URLSearchParams(params)
     next.set('page', numero)
@@ -45,19 +56,14 @@ function Resultados() {
     <header className="mb-7"><p className="text-xs font-semibold uppercase tracking-widest text-teal-700">Seguimiento del personal</p><h1 className="mt-2 text-3xl font-bold text-slate-800">Vencimientos</h1><p className="mt-3 text-sm text-slate-600">Personas con documentos, contratos u otros datos con fecha que vencen o ya vencieron, y requerimientos próximos a su plazo o fuera de plazo.</p></header>
     <section className={`${panel} mb-6 p-5`} aria-label="Criterios del panel"><p className="text-sm leading-relaxed text-slate-700">Se revisan legajos activos. «Por vencer» incluye hoy y los próximos {result?.dias ?? params.get('dias') ?? 30} días. «Vencido»: la fecha ya pasó (por ejemplo, un contrato sin cese registrado o un DNI caducado). «Requerimiento fuera de plazo»: la persona no entregó lo pedido a tiempo.</p><p className="mt-2 text-xs text-slate-600">Rojo: vencido o menos de 7 días. Amarillo: desde 7 días hasta el límite elegido. Solo generan alertas los datos que vencen o se renuevan y tienen fecha registrada. Los datos sensibles, la sección 07 y los requerimientos se muestran según tus permisos.</p></section>
     {result && <section aria-label="Resumen según los filtros" className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[['Personal con alertas', result.resumen.personas, 'text-slate-800'], ['Con vencidos', result.resumen.vencidos, 'text-rose-800'], ['Requerimientos fuera de plazo', result.resumen.fuera_de_plazo, 'text-orange-900'], ['Solo por vencer', result.resumen.por_vencer, 'text-amber-900']].map(([label, count, color]) => <div key={label} className={`${panel} p-5`}><h2 className="text-sm text-slate-600">{label}</h2><p className={`mt-2 text-3xl font-bold ${color}`}>{count}</p></div>)}</section>}
-    <section className={`${panel} mb-6 p-5`} aria-label="Filtros de vencimientos"><form key={formKey.toString()} onSubmit={filtrar} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      <Campo label="Nombre o documento de identidad"><input name="q" maxLength={120} value={params.get('q') || ''} onChange={e => {
-        const next = new URLSearchParams(params)
-        e.target.value ? next.set('q', e.target.value) : next.delete('q')
-        next.delete('page')
-        setParams(next, { replace: true })
-      }} className={control} /></Campo>
-      <Campo label="Próximos días (incluye hoy)"><input name="dias" required type="number" min={1} max={365} defaultValue={params.get('dias') || 30} className={control} /></Campo>
-      <Campo label="Estado del seguimiento"><select name="estado" defaultValue={params.get('estado') || ''} className={control}><option value="">Todos los estados</option>{Object.entries(estados).map(([key, [label]]) => <option key={key} value={key}>{label}</option>)}</select></Campo>
-      <Campo label="Motivo de la alerta"><select name="origen" defaultValue={params.get('origen') || ''} className={control}><option value="">Todos los motivos</option>{(result?.origenes || []).map(origen => <option key={origen.id} value={origen.id}>{origen.nombre}</option>)}</select></Campo>
-      <Campo label="Tipo de personal"><select name="tipo_personal" defaultValue={params.get('tipo_personal') || ''} className={control}><option value="">Todo el personal</option><option value="docente">Docente</option><option value="administrativo">Administrativo</option></select></Campo>
-      <Campo label="Área / unidad orgánica"><select key={result?.areas.length ?? 0} name="unidad_id" defaultValue={params.get('unidad_id') || ''} className={control}><option value="">Todas las áreas</option>{result?.areas.map(area => <option key={area.id} value={area.id}>{area.nombre}</option>)}</select></Campo>
-      <div className="flex flex-wrap gap-3 sm:col-span-2 xl:col-span-3"><button type="submit" className={button}>Aplicar filtros</button><button type="button" onClick={() => setParams({})} className={button}>Limpiar</button></div>
+    <section className={`${panel} mb-6 p-5`} aria-label="Filtros de vencimientos"><form key={formKey.toString()} onSubmit={event => event.preventDefault()} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <Campo label="Nombre o documento de identidad"><input name="q" maxLength={120} value={params.get('q') || ''} onChange={e => setParams(conFiltro(params, 'q', e.target.value), { replace: true })} className={control} /></Campo>
+      <CampoDias key={params.get('dias') || ''} params={params} setParams={setParams} />
+      <Campo label="Estado del seguimiento"><select name="estado" value={params.get('estado') || ''} onChange={cambiar('estado')} className={control}><option value="">Todos los estados</option>{opcionesEstado(gestionaRequerimientos).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></Campo>
+      <Campo label="Motivo de la alerta"><select name="origen" value={params.get('origen') || ''} onChange={cambiar('origen')} className={control}><option value="">Todos los motivos</option>{(result?.origenes || []).map(origen => <option key={origen.id} value={origen.id}>{origen.nombre}</option>)}</select></Campo>
+      <Campo label="Tipo de personal"><select name="tipo_personal" value={params.get('tipo_personal') || ''} onChange={cambiar('tipo_personal')} className={control}><option value="">Todo el personal</option><option value="docente">Docente</option><option value="administrativo">Administrativo</option></select></Campo>
+      <Campo label="Área / unidad orgánica"><select name="unidad_id" value={params.get('unidad_id') || ''} onChange={cambiar('unidad_id')} className={control}><option value="">Todas las áreas</option>{result?.areas.map(area => <option key={area.id} value={area.id}>{area.nombre}</option>)}</select></Campo>
+      <div className="flex flex-wrap gap-3 sm:col-span-2 xl:col-span-3"><button type="button" onClick={() => setParams({})} className={button}>Limpiar</button></div>
     </form></section>
     {request.error && <div role="alert" className="mb-5 rounded-xl bg-rose-50 p-4 text-sm text-rose-900">{apiErrorMessage(request.error)} <button onClick={request.retry} className={`${button} ml-3`}>Reintentar</button></div>}
     {request.loading && !result && <p role="status" className={`${panel} p-8`}>Consultando vencimientos…</p>}
