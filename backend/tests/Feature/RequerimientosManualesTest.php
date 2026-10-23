@@ -46,6 +46,39 @@ class RequerimientosManualesTest extends TestCase
             'descripcion' => 'Presentar el documento actualizado', 'fecha_limite' => now('America/Lima')->addWeek()->toDateString()];
     }
 
+    public function test_manual_response_stores_separate_subject_date_and_response_kind(): void
+    {
+        $u = $this->persona();
+        $r = RequerimientoDocumento::factory()->create(['usuario_id' => $u->id, 'estado' => 'abierto', 'cerrado_en' => null]);
+        $data = ['remitente' => $u->email_institucional, 'asunto_correo' => 'Respuesta al requerimiento',
+            'fecha_recepcion' => now('America/Lima')->toDateString(), 'tipo_respuesta' => 'ampliacion',
+            'mensaje' => 'Solicito más plazo para entregar el documento.'];
+        $this->postJson('/api/v1/solicitudes-legajo/'.$r->id.'/registrar-entrega', [...$data,
+            'fecha_recepcion' => now('America/Lima')->addDay()->toDateString()])->assertUnprocessable();
+        $this->assertSame('abierto', $r->fresh()->estado);
+        $this->postJson('/api/v1/solicitudes-legajo/'.$r->id.'/registrar-entrega', $data)
+            ->assertOk()->assertJsonPath('data.estado', 'en_revision');
+        $evento = collect($r->fresh()->seguimiento)->last();
+        $this->assertSame($data['asunto_correo'], $evento['asunto_correo']);
+        $this->assertSame($data['fecha_recepcion'], $evento['fecha_recepcion']);
+        $this->assertSame('ampliacion', $evento['tipo_respuesta']);
+        $this->assertSame($data['asunto_correo'].' — '.$data['fecha_recepcion'], $evento['referencia_correo']);
+        $this->assertNull($r->fresh()->prorroga_hasta);
+        $this->getJson('/api/v1/solicitudes-legajo?requerimiento='.$r->id)->assertOk()
+            ->assertJsonPath('data.0.usuario.email_institucional', $u->email_institucional);
+        Http::assertNothingSent();
+    }
+
+    public function test_manual_response_still_accepts_previous_reference_format(): void
+    {
+        $u = $this->persona();
+        $r = RequerimientoDocumento::factory()->create(['usuario_id' => $u->id, 'estado' => 'abierto', 'cerrado_en' => null]);
+        $this->postJson('/api/v1/solicitudes-legajo/'.$r->id.'/registrar-entrega', [
+            'remitente' => $u->email_institucional, 'referencia_correo' => 'Correo recibido ayer',
+            'mensaje' => 'Adjunto respuesta.'])->assertOk();
+        $this->assertSame('Correo recibido ayer', collect($r->fresh()->seguimiento)->last()['referencia_correo']);
+    }
+
     public function test_batch_registers_separate_requirements_and_explicit_sends_do_not_drain_old_notices(): void
     {
         $u = $this->persona();

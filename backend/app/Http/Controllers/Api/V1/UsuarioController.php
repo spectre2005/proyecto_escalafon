@@ -159,7 +159,7 @@ class UsuarioController extends Controller
             $this->insertar([$registro], $request);
             $legajo = AperturaLegajo::abrir($registro['id']);
             // El tipo de personal y la ley del vínculo son los de la persona; el tipo de vínculo, el que se indicó.
-            $vinculo = VinculoLaboral::query()->create([...$request->vinculo(), 'usuario_id' => $registro['id'], 'tipo_personal' => $registro['tipo_personal'],
+            $vinculo = VinculoLaboral::query()->create([...$request->vinculo(), 'usuario_id' => $registro['id'], 'legajo_id' => $legajo->id, 'tipo_personal' => $registro['tipo_personal'],
                 'regimen_normativo_id' => $registro['regimen_normativo_id'], 'registrado_por' => $actor->getAuthIdentifier()]);
             // Sin datos del puesto (todos opcionales en el administrativo) no se crea un perfil vacío: se registra después en 2.2.
             $perfil = $request->datosPuesto() === [] ? null

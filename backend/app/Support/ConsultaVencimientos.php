@@ -53,7 +53,7 @@ final class ConsultaVencimientos
             $detalle = ($motivos->get($persona->usuario_id) ?? collect())->map(function ($alerta) use ($hoy): array {
                 $dias = (int) $hoy->diffInDays(CarbonImmutable::parse($alerta->fecha, 'America/Lima'), false);
 
-                return ['origen' => $alerta->origen, 'detalle' => $alerta->detalle, 'fecha' => substr($alerta->fecha, 0, 10),
+                return ['alerta_id' => $alerta->alerta_id, 'origen' => $alerta->origen, 'detalle' => $alerta->detalle, 'fecha' => substr($alerta->fecha, 0, 10),
                     'dias_restantes' => $dias, 'criticidad' => $dias < 7 ? 'rojo' : 'amarillo'];
             })->all();
 
@@ -74,7 +74,7 @@ final class ConsultaVencimientos
             ->whereNotNull('d.fecha_caducidad')->whereDate('d.fecha_caducidad', '<=', $hoy->addDays($dias)->toDateString())
             ->whereNotExists(fn (Builder $q) => $q->selectRaw('1')->from('documentos_usuario as reemplazo')
                 ->whereColumn('reemplazo.subsana_a_documento_id', 'd.id')->whereColumn('reemplazo.usuario_id', 'd.usuario_id')
-                ->whereColumn('reemplazo.legajo_id', 'd.legajo_id')->whereNotNull('reemplazo.archivo_id')->whereNotIn('reemplazo.estado', ['anulado', 'falso', 'pendiente']))
+                ->whereColumn('reemplazo.legajo_id', 'd.legajo_id')->whereNotNull('reemplazo.archivo_id')->where('reemplazo.estado', 'aceptado'))
             ->selectRaw("d.usuario_id, d.id as alerta_id, 'documento' as origen, d.fecha_caducidad as fecha, t.nombre as detalle");
         if (! $actor->veDatosSensibles()) {
             $documentos->whereNotIn('d.seccion_legajo_id', [1, 9, 10])->where('t.es_dato_sensible', false)->where('t.es_dato_salud', false);

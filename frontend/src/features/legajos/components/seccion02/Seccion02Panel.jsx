@@ -1,3 +1,4 @@
+import FinalizarLegajo from '../FinalizarLegajo'
 import Aviso from '../documentos/AvisoSeccion'
 import AvisosExpediente from '../documentos/AvisosExpediente'
 import DocumentoModal from '../documentos/DocumentoModal'
@@ -419,7 +420,7 @@ function Formalizacion({ usuario, data, sinLegajo }) {
   const editarPuesto = vinculo => editable(vinculo) && <button disabled={ocupado || !!sinLegajo} onClick={() => empezar(() => setForm({ tipo: 'puesto', vinculo }))} className={enlace}>{vinculo.datos_puesto.length ? 'Editar' : 'Registrar datos del puesto'}</button>
   const corregir = vinculo => editable(vinculo) && <button disabled={ocupado || !!sinLegajo} onClick={() => empezar(() => setForm({ tipo: 'vinculo', record: vinculo }))} className={enlace}>Corregir</button>
   const anularVinculo = vinculo => puedeAnular && <button disabled={ocupado} onClick={() => empezar(() => setAnulando({ tipo: 'vinculos-laborales', record: vinculo, vinculoId: vinculo.id, titulo: v => v.values.nombre_puesto }))} className="text-xs font-semibold text-rose-700 disabled:opacity-50">Anular vínculo</button>
-  const bloqueoDe = vinculo => puedeRegistrar && (sinLegajo || vinculo.cerrado) && <Bloqueo>{sinLegajo || `Vínculo cerrado por cese el ${fecha(vinculo.values.fecha_cese)}: no se corrige ni recibe adendas. Para una nueva incorporación, usa «Registrar vínculo».`}</Bloqueo>
+  const bloqueoDe = vinculo => puedeRegistrar && (sinLegajo || vinculo.cerrado) && <Bloqueo>{sinLegajo || `Vínculo cerrado por cese el ${fecha(vinculo.values.fecha_cese)}: no se corrige ni recibe adendas. Si todos los vínculos de este legajo terminaron, ciérralo y abre otro antes de registrar la reincorporación.`}</Bloqueo>
   const anularForm = vinculo => anulando?.vinculoId === vinculo.id && <AnularForm record={anulando.record} titulo={anulando.titulo} busy={busy} onCancel={() => setAnulando(null)} onConfirm={anular} />
   const formulario = form && (form.tipo === 'adenda'
     ? <AdendaForm usuario={usuario} vinculos={[form.vinculo]} onSaved={() => cerrar(true)} onCancel={() => cerrar(false)} />
@@ -440,9 +441,10 @@ function Formalizacion({ usuario, data, sinLegajo }) {
   // posibilidad de varios vínculos vigentes está pendiente de confirmar y no se bloquea.
   const registrarVinculo = () => empezar(() => { setConfirmandoOtro(false); setForm({ tipo: 'vinculo' }) })
   const botonRegistrar = vigentes.length
-    ? <button disabled={ocupado || !!sinLegajo} onClick={() => { setAviso(''); setError(''); setConfirmandoOtro(true) }} className={enlace}>Registrar otro vínculo</button>
-    : <button disabled={ocupado || !!sinLegajo} onClick={registrarVinculo} className={boton}>Registrar vínculo</button>
+    ? <button disabled={ocupado || !!sinLegajo || data.requiere_cierre_legajo} onClick={() => { setAviso(''); setError(''); setConfirmandoOtro(true) }} className={enlace}>Registrar otro vínculo</button>
+    : <button disabled={ocupado || !!sinLegajo || data.requiere_cierre_legajo} onClick={registrarVinculo} className={boton}>Registrar vínculo</button>
   return <section aria-label="Vínculos laborales" className="mb-8">
+    {data.requiere_cierre_legajo && <FinalizarLegajo usuario={usuario} legajo={data.legajo} />}
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h3 className="text-base font-semibold text-slate-800">Vínculos laborales</h3>{puedeRegistrar && <div className="flex flex-wrap items-center gap-3">{sinLegajo && <Bloqueo>{sinLegajo}</Bloqueo>}{botonRegistrar}</div>}</div>
     {confirmandoOtro && <DocumentoModal titulo="Registrar otro vínculo" onCancel={() => setConfirmandoOtro(false)}><Aviso accion={<div className="flex flex-wrap gap-3"><button onClick={registrarVinculo} className={enlace}>Sí, registrar otro vínculo</button><button onClick={() => setConfirmandoOtro(false)} className="text-sm text-slate-600">Cancelar</button></div>}>
       La persona ya tiene {vigentes.length === 1 ? 'un vínculo vigente' : `${vigentes.length} vínculos vigentes`}: {vigentes.map(v => v.values.nombre_puesto).join(', ')}. Para corregirlo usa «Corregir» en su tarjeta; registra otro solo si es un vínculo distinto (por ejemplo, simultáneo).</Aviso></DocumentoModal>}
@@ -450,9 +452,9 @@ function Formalizacion({ usuario, data, sinLegajo }) {
     {error && <p role="alert" className="mb-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
     {formulario && <EnZona titulo={form.tipo === 'adenda' ? `Registrar adenda: ${form.vinculo.values.nombre_puesto}` : form.tipo === 'puesto' ? `Datos del puesto: ${form.vinculo.values.nombre_puesto}` : form.record ? `Corregir vínculo: ${form.record.values.nombre_puesto}` : 'Registrar vínculo'}>{formulario}</EnZona>}
     {data.vinculos.length === 0 && <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">No hay vínculos laborales registrados. {sinLegajo ? 'Primero se debe abrir el legajo.' : 'Registra el vínculo (resolución o contrato) para habilitar adendas, inducciones y período de prueba.'}</p>}
-    {data.vinculos.length > 0 && vigentes.length === 0 && <div role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+    {data.vinculos.length > 0 && vigentes.length === 0 && !data.requiere_cierre_legajo && <div role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
       <p className="font-semibold">La persona no tiene un vínculo vigente.</p>
-      <p className="mt-1">Los vínculos del historial están cesados, vencidos o aún no inician. Esto no impide registrar un vínculo nuevo; los anteriores se conservan.</p>
+      <p className="mt-1">Los vínculos del historial están cesados, vencidos o aún no inician. Si aún hay vínculos sin cese, puedes registrar un vínculo adicional. Si todos terminaron en este legajo, primero debes cerrarlo y abrir otro para la reincorporación.</p>
       {sinLegajo ? <p className="mt-2">Primero se debe abrir el legajo.</p> : !puedeRegistrar && <p className="mt-2">Tu cuenta no tiene permiso para registrar vínculos.</p>}
     </div>}
     <div className="space-y-4">{vigentes.map(v => tarjeta(v, true))}</div>

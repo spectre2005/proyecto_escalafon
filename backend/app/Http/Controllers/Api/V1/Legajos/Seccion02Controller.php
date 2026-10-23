@@ -103,6 +103,7 @@ class Seccion02Controller extends Controller
 
         return response()->json(['data' => [
             'legajo' => $legajo?->only(['id', 'numero_legajo', 'estado_legajo']),
+            'requiere_cierre_legajo' => VinculoLaboral::requiereCierreLegajo($legajo),
             // Titular por defecto de los documentos que se suban (se puede cambiar en el formulario).
             'titular' => ['nombre' => trim($persona->nombres.' '.$persona->apellido_paterno.' '.$persona->apellido_materno), 'documento' => $persona->numero_doc_identidad],
             'hoy' => today()->format('Y-m-d'),
@@ -153,7 +154,12 @@ class Seccion02Controller extends Controller
 
         // vinculos_laborales no tiene documento_id: el documento (c a f) apunta al vínculo.
         return $this->creado(DB::transaction(function () use ($data, $usuario, $documento, $request): VinculoLaboral {
-            $vinculo = VinculoLaboral::query()->create([...collect($data)->except('documento_id')->all(), 'usuario_id' => $usuario, 'registrado_por' => $request->user()->getAuthIdentifier()]);
+            Usuario::query()->whereKey($usuario)->lockForUpdate()->firstOrFail();
+            $this->exigirLegajo($usuario);
+            $legajo = $this->legajoAbierto($usuario);
+            abort_if(VinculoLaboral::requiereCierreLegajo($legajo), 409,
+                'Todos los vínculos de este legajo terminaron. Cierra el legajo y abre uno nuevo para registrar la reincorporación.');
+            $vinculo = VinculoLaboral::query()->create([...collect($data)->except('documento_id')->all(), 'usuario_id' => $usuario, 'legajo_id' => $legajo->id, 'registrado_por' => $request->user()->getAuthIdentifier()]);
             // Enlace de una sola vez: si otra carga ya lo enlazó entre tanto, no se pisa.
             if ($documento && DocumentoUsuario::query()->whereKey($documento->id)->whereNull('vinculo_laboral_id')->update(['vinculo_laboral_id' => $vinculo->id]) !== 1) {
                 throw ValidationException::withMessages(['documento_id' => 'El documento ya está enlazado a otro vínculo.']);

@@ -1,6 +1,5 @@
 import AbrirLegajo from './AbrirLegajo'
 import CerrarLegajo from './CerrarLegajo'
-import ReabrirLegajo from './ReabrirLegajo'
 import PersonalPhoto from './PersonalPhoto'
 import EmisionesPersonales from '../../reportes/components/EmisionesPersonales'
 import { puestoActual, textoRegimen } from '../config/seccion02'
@@ -31,7 +30,8 @@ export default function PersonalHeader({ data, usuario, compacto = false, onVerF
         <p className="mt-0.5 text-xs text-slate-500">{documentType ? documentType.toUpperCase() : 'Documento'} {person.numero_doc_identidad || 'no registrado'} · {personnelType || 'Tipo de personal no registrado'} · {actual.puesto || 'Sin puesto registrado'}{legajo ? ` · Legajo ${legajo.values.numero_legajo || 'sin número'} (${legajo.values.estado_legajo === 'activo' ? 'activo' : 'cerrado'})` : ' · Sin legajo'}</p>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        {!activo && <AbrirLegajo usuario={usuario} />}
+        {activo && <CerrarLegajo usuario={usuario} legajo={activo.id} />}
+        <AbrirLegajo usuario={usuario} legajoActivo={!!activo} />
         {onVerFicha && <button type="button" onClick={onVerFicha} className="text-xs font-semibold text-teal-700 hover:underline">Ver ficha completa</button>}
       </div>
     </header>
@@ -61,10 +61,9 @@ export default function PersonalHeader({ data, usuario, compacto = false, onVerF
               <span className="mt-1 block text-teal-700">Estado: {legajo.values.estado_legajo === 'pasivo' ? 'Cerrado' : legajo.values.estado_legajo ? legajo.values.estado_legajo.replaceAll('_', ' ') : 'No registrado'}</span>
               </div>
               {legajo.values.estado_legajo === 'activo' && <CerrarLegajo usuario={usuario} legajo={legajo.id} />}
-              {['pasivo', 'cerrado'].includes(legajo.values.estado_legajo) && !data.legajos.some(item => item.values.estado_legajo === 'activo') && <ReabrirLegajo usuario={usuario} legajo={legajo.id} />}
             </li>)}
           </ul> : <p className="mt-2 text-sm text-slate-500">No hay legajos registrados para esta persona.</p>}
-          {!data.legajos.some(legajo => legajo.values.estado_legajo === 'activo') && <AbrirLegajo usuario={usuario} className="mt-3" />}
+          <div className="mt-3"><p className="mb-2 text-xs text-slate-600">Para una nueva incorporación abre otro legajo. Los anteriores conservan su número y documentos como históricos.</p><AbrirLegajo usuario={usuario} className="mt-3" legajoActivo={data.legajos.some(legajo => legajo.values.estado_legajo === 'activo')} /></div>
         </section>
         {data.legajos.length > 0 && <EmisionesPersonales usuario={usuario} />}
       </div>

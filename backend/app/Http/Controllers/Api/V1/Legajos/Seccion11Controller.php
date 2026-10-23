@@ -10,6 +10,7 @@ use App\Models\Legajo;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
+use App\Support\Auditoria;
 use App\Support\Documentos\EstadoDocumento;
 use App\Support\Documentos\FormulariosDatos;
 use App\Support\Seccion11;
@@ -27,9 +28,8 @@ use Illuminate\Validation\ValidationException;
  * Sección 11 (Desvinculación) desde la ficha: un registro de desvinculación por cada vínculo que termina y los documentos
  * de la sección por tipo (literales a a g, aceptación de renuncia del Anexo 05 y otros de la universidad).
  *
- * La fecha de cese de referencia es la del vínculo (sección 02, que no se modifica aquí): la desvinculación debe coincidir
- * con ella, y si el vínculo aún no tiene cese, primero se registra en la 02. Nada se elimina: se anula con motivo.
- * El legajo no pasa a pasivo automáticamente (pendiente de confirmar con el cliente).
+ * El flujo unificado registra el cese del vínculo y su desvinculación en la misma transacción.
+ * Los registros anteriores conservan la validación de coincidencia. El cierre del legajo es una acción explícita.
  */
 class Seccion11Controller extends Controller
 {
@@ -55,6 +55,7 @@ class Seccion11Controller extends Controller
         return response()->json(['data' => [
             'legajo' => Legajo::paraConsulta($usuario)?->only(['id', 'numero_legajo', 'estado_legajo']),
             'titular' => ['nombre' => trim($persona->nombres.' '.$persona->apellido_paterno.' '.$persona->apellido_materno), 'documento' => $persona->numero_doc_identidad],
+            'requiere_cierre_legajo' => VinculoLaboral::requiereCierreLegajo(Legajo::paraConsulta($usuario)),
             'motivos_cese' => Seccion11::MOTIVOS_CESE,
             'vinculos' => $vinculos->map(fn (VinculoLaboral $v): array => [
                 ...$this->fila($v, ['tipo_personal', 'regimen_laboral', 'nombre_puesto', 'numero_documento_vinculo', 'fecha_inicio', 'fecha_fin_prevista', 'fecha_cese']),
@@ -66,6 +67,7 @@ class Seccion11Controller extends Controller
 
                 return [...$this->filas(collect([$d]))[0],
                     // La fecha de referencia es la del vínculo; si se corrigió en la 02, se avisa.
+                    'sustento_registrado' => $d->documento_id !== null,
                     'coincide_fecha_vinculo' => $vinculo?->fecha_cese?->format('Y-m-d') === $d->fecha_cese?->format('Y-m-d')];
             })->values(),
             'tipos' => $tipos,
@@ -84,13 +86,25 @@ class Seccion11Controller extends Controller
     public function store(Request $request, string $usuario): JsonResponse
     {
         $this->exigirLegajo($usuario);
-        $data = $this->validar($request, [...$this->reglas($usuario), 'documento_id' => 'nullable|uuid']);
+        $data = $this->validar($request, [...$this->reglas($usuario), 'documento_id' => 'nullable|uuid', 'registrar_cese' => 'sometimes|boolean', 'confirmar_cierre_vinculo' => 'exclude_unless:registrar_cese,true|required|accepted']);
 
         $registro = DB::transaction(function () use ($data, $usuario, $request): Desvinculacion {
+            Usuario::query()->whereKey($usuario)->lockForUpdate()->firstOrFail();
+            $this->legajoBloqueado($usuario);
+            $vinculo = VinculoLaboral::query()->where('usuario_id', $usuario)->where('anulado', false)->lockForUpdate()->findOrFail($data['vinculo_laboral_id']);
+            if (! empty($data['registrar_cese']) && $vinculo->fecha_cese === null) {
+                $this->validarFechaCese($data['fecha_cese'], $vinculo);
+                $antes = $vinculo->getAttributes();
+                $vinculo->update(['fecha_cese' => $data['fecha_cese']]);
+                Auditoria::registrar($request, 'vinculo.cesar', 'vinculos_laborales', $vinculo->id, $usuario, $antes, $vinculo->getAttributes());
+            }
             $this->exigirCoherencia($data);
-            $registro = new Desvinculacion([...collect($data)->except('documento_id')->all(), 'usuario_id' => $usuario, 'registrado_por' => $request->user()->getAuthIdentifier()]);
+            $registro = new Desvinculacion([...collect($data)->except(['documento_id', 'registrar_cese', 'confirmar_cierre_vinculo'])->all(), 'usuario_id' => $usuario, 'registrado_por' => $request->user()->getAuthIdentifier()]);
 
-            return FormulariosDatos::crearEnlazado('desvinculaciones', $usuario, $data['documento_id'] ?? null, $registro);
+            $registro = FormulariosDatos::crearEnlazado('desvinculaciones', $usuario, $data['documento_id'] ?? null, $registro);
+            Auditoria::registrar($request, 'desvinculacion.registrar', 'desvinculaciones', $registro->id, $usuario, null, $registro->getAttributes());
+
+            return $registro;
         });
 
         return (new JsonResource($this->fila($registro, self::CAMPOS)))->response()->setStatusCode(201);
@@ -119,6 +133,44 @@ class Seccion11Controller extends Controller
         });
 
         return new JsonResource($this->fila($actual->refresh(), self::CAMPOS));
+    }
+
+    public function corregirCese(Request $request, string $usuario, string $registro): JsonResponse
+    {
+        $data = $request->validate(['fecha_cese' => 'required|date_format:Y-m-d|before_or_equal:today',
+            'motivo_correccion' => 'required|string|min:10|max:2000']);
+        DB::transaction(function () use ($request, $usuario, $registro, $data): void {
+            Usuario::query()->whereKey($usuario)->lockForUpdate()->firstOrFail();
+            $this->legajoBloqueado($usuario);
+            $d = Desvinculacion::query()->where('usuario_id', $usuario)->findOrFail($registro);
+            $v = VinculoLaboral::query()->where('usuario_id', $usuario)->where('anulado', false)->lockForUpdate()->findOrFail($d->vinculo_laboral_id);
+            $d = Desvinculacion::query()->where('anulado', false)->lockForUpdate()->findOrFail($registro);
+            abort_if($d->documento && $d->documento->legajo?->estado_legajo !== 'activo', 409, 'El sustento pertenece a un legajo cerrado y no se modifica.');
+            $this->validarFechaCese($data['fecha_cese'], $v);
+            $antesV = $v->getAttributes();
+            $antesD = $d->getAttributes();
+            $v->update(['fecha_cese' => $data['fecha_cese']]);
+            $d->update(['fecha_cese' => $data['fecha_cese']]);
+            foreach ([['vinculos_laborales', $v, $antesV], ['desvinculaciones', $d, $antesD]] as [$tabla, $modelo, $antes]) {
+                Auditoria::registrar($request, 'cese.corregir', $tabla, $modelo->id, $usuario, $antes,
+                    [...$modelo->getAttributes(), 'motivo_correccion' => $data['motivo_correccion']]);
+            }
+        });
+
+        return response()->json(['message' => 'Fecha de cese corregida en el vínculo y la desvinculación. El motivo quedó en auditoría.']);
+    }
+
+    private function validarFechaCese(string $fecha, VinculoLaboral $vinculo): void
+    {
+        if ($fecha < $vinculo->fecha_inicio->format('Y-m-d') || $fecha > now('America/Lima')->toDateString()) {
+            throw ValidationException::withMessages(['fecha_cese' => 'El cese debe estar entre la fecha de ingreso y hoy.']);
+        }
+    }
+
+    private function legajoBloqueado(string $usuario): void
+    {
+        abort_unless(Legajo::query()->where('usuario_id', $usuario)->where('estado_legajo', 'activo')->lockForUpdate()->first(),
+            409, 'La persona no tiene un legajo activo.');
     }
 
     public function anularRegistro(Request $request, string $usuario, string $registro): JsonResource|JsonResponse
@@ -155,7 +207,7 @@ class Seccion11Controller extends Controller
             throw ValidationException::withMessages(['vinculo_laboral_id' => 'El vínculo aún no tiene fecha de cese. Primero registra el cese en la sección 02 (Formalización del vínculo).']);
         }
         if ($vinculo->fecha_cese->format('Y-m-d') !== $data['fecha_cese']) {
-            throw ValidationException::withMessages(['fecha_cese' => 'La fecha de cese debe coincidir con la del vínculo ('.$vinculo->fecha_cese->format('d/m/Y').'). Si es incorrecta, corrígela en la sección 02.']);
+            throw ValidationException::withMessages(['fecha_cese' => 'La fecha de cese debe coincidir con la del vínculo ('.$vinculo->fecha_cese->format('d/m/Y').'). Si es incorrecta, usa la corrección excepcional de cese (administración).']);
         }
         $duplicada = Desvinculacion::query()->where('vinculo_laboral_id', $vinculo->id)->where('anulado', false)
             ->when($excepto, fn ($q) => $q->whereKeyNot($excepto))->exists();

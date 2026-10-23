@@ -89,7 +89,7 @@ class VencimientosPanelTest extends TestCase
         $cerrado->update(['estado_legajo' => 'pasivo']);
         $activo = $this->legajo();
         $antiguo = $this->documento($activo, -1);
-        $this->documento($activo, 365)->update(['subsana_a_documento_id' => $antiguo->id]);
+        $this->documento($activo, 365)->update(['subsana_a_documento_id' => $antiguo->id, 'estado' => 'aceptado']);
         foreach (['anulado', 'falso', 'pendiente'] as $estado) {
             $this->documento($activo, -1)->update(['estado' => $estado]);
         }
@@ -143,6 +143,89 @@ class VencimientosPanelTest extends TestCase
         foreach (['dias=0', 'dias=366', 'dias=abc', 'estado=otro', 'origen=otro', 'unidad_id=invalid', 'page=0'] as $filtro) {
             $this->getJson('/api/v1/vencimientos?'.$filtro)->assertUnprocessable();
         }
+    }
+
+    public function test_prepares_document_alert_and_preserves_origin_without_sending_mail(): void
+    {
+        $legajo = $this->legajo();
+        $doc = $this->documento($legajo, -1);
+        $url = '/api/v1/solicitudes-legajo/desde-vencimiento?origen=documento&alerta_id='.$doc->id;
+        $this->getJson($url)->assertOk()->assertJsonPath('usuario_id', $legajo->usuario_id)
+            ->assertJsonPath('tipo_documento_id', $doc->tipo_documento_id)->assertJsonPath('motivo', 'Vencido')
+            ->assertJsonPath('existente', null);
+        $this->assertDatabaseCount('requerimientos_documentos', 0);
+        $datos = ['usuario_id' => $legajo->usuario_id, 'clase' => 'documentos',
+            'tipo_documento_ids' => [$doc->tipo_documento_id], 'descripcion' => 'Presentar renovación',
+            'fecha_limite' => now('America/Lima')->addWeek()->toDateString(), 'alerta_origen' => 'documento', 'alerta_id' => $doc->id];
+        $r = $this->postJson('/api/v1/solicitudes-legajo', $datos)->assertCreated()->assertJsonPath('enviados', 0);
+        $id = $r->json('data.0.id');
+        $this->assertSame($doc->id, RequerimientoDocumento::findOrFail($id)->seguimiento[0]['alerta_id']);
+        $this->getJson($url)->assertOk()->assertJsonPath('existente.id', $id);
+        $this->postJson('/api/v1/solicitudes-legajo', $datos)->assertConflict();
+        $this->getJson('/api/v1/solicitudes-legajo?requerimiento='.$id)->assertOk()->assertJsonPath('total', 1)->assertJsonPath('data.0.id', $id);
+    }
+
+    public function test_contract_alert_reuses_its_request_and_rejects_wrong_person(): void
+    {
+        $legajo = $this->legajo();
+        $otro = $this->legajo();
+        $vinculo = $this->contrato($legajo, 5);
+        $datos = ['usuario_id' => $otro->usuario_id, 'clase' => 'actualizacion',
+            'tipo_documento_ids' => [], 'descripcion' => 'Actualizar vínculo', 'fecha_limite' => now('America/Lima')->addWeek()->toDateString(),
+            'alerta_origen' => 'contrato', 'alerta_id' => $vinculo->id];
+        $this->postJson('/api/v1/solicitudes-legajo', $datos)->assertUnprocessable();
+        $datos['usuario_id'] = $legajo->usuario_id;
+        $r = $this->postJson('/api/v1/solicitudes-legajo', $datos)->assertCreated();
+        $this->getJson('/api/v1/solicitudes-legajo/desde-vencimiento?origen=contrato&alerta_id='.$vinculo->id)
+            ->assertOk()->assertJsonPath('existente.id', $r->json('data.0.id'));
+        $this->postJson('/api/v1/solicitudes-legajo', $datos)->assertConflict();
+    }
+
+    public function test_preparation_rejects_hidden_and_obsolete_alerts_and_opens_overdue_request(): void
+    {
+        $legajo = $this->legajo();
+        $doc = $this->documento($legajo, 400);
+        $this->getJson('/api/v1/solicitudes-legajo/desde-vencimiento?origen=documento&alerta_id='.$doc->id)->assertNotFound();
+        $r = $this->requerimiento($legajo, -1);
+        $this->getJson('/api/v1/solicitudes-legajo/desde-vencimiento?origen=requerimiento&alerta_id='.$r->id)
+            ->assertOk()->assertJsonPath('existente.id', $r->id);
+        $doc->update(['fecha_caducidad' => now()->subDay()->toDateString()]);
+        $doc->legajo->update(['estado_legajo' => 'cerrado']);
+        $this->getJson('/api/v1/solicitudes-legajo/desde-vencimiento?origen=documento&alerta_id='.$doc->id)->assertNotFound();
+    }
+
+    public function test_pending_replacement_keeps_alert_until_accepted(): void
+    {
+        $legajo = $this->legajo();
+        $original = $this->documento($legajo, -1);
+        $reemplazo = $this->documento($legajo, 400);
+        $reemplazo->update(['subsana_a_documento_id' => $original->id, 'estado' => 'cargado']);
+        $this->getJson('/api/v1/vencimientos')->assertOk()->assertJsonPath('total', 1);
+        $reemplazo->update(['estado' => 'aceptado']);
+        $this->getJson('/api/v1/vencimientos')->assertOk()->assertJsonPath('total', 0);
+    }
+
+    public function test_person_task_list_includes_all_alerts_and_open_requests_without_duplicates(): void
+    {
+        $legajo = $this->legajo();
+        $otro = $this->legajo();
+        $this->documento($otro, -1);
+        $docs = [];
+        for ($i = 0; $i < 7; $i++) {
+            $docs[] = $this->documento($legajo, $i);
+        }
+        $r = RequerimientoDocumento::factory()->create(['usuario_id' => $legajo->usuario_id,
+            'tipo_documento_id' => $docs[0]->tipo_documento_id, 'estado' => 'en_revision', 'cerrado_en' => null,
+            'fecha_limite' => now()->addWeek()->toDateString()]);
+        $this->getJson('/api/v1/solicitudes-legajo/tareas-persona?usuario_id='.$legajo->usuario_id)
+            ->assertOk()->assertJsonCount(7, 'tareas')->assertJsonPath('persona.id', $legajo->usuario_id)
+            ->assertJsonPath('tareas.0.existente.id', $r->id)->assertJsonPath('tareas.0.existente.estado', 'en_revision');
+        $pendiente = $this->requerimiento($legajo, -1);
+        $this->getJson('/api/v1/solicitudes-legajo/tareas-persona?usuario_id='.$legajo->usuario_id)
+            ->assertOk()->assertJsonCount(8, 'tareas');
+        $pendiente->update(['estado' => 'aceptado', 'cerrado_en' => now()]);
+        $this->getJson('/api/v1/solicitudes-legajo/tareas-persona?usuario_id='.$legajo->usuario_id)
+            ->assertOk()->assertJsonCount(7, 'tareas');
     }
 
     private function legajo(?Usuario $persona = null): Legajo

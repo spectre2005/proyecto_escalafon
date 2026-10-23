@@ -10,11 +10,13 @@ use App\Models\RequerimientoDocumento;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Support\ConsultaReportes;
+use App\Support\ConsultaVencimientos;
 use App\Support\CorreoRequerimiento;
 use App\Support\Documentos\ArchivoPdf;
 use App\Support\GmailCorreo;
 use App\Support\Parametros;
 use App\Support\RequerimientosAutomaticos;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,8 +38,8 @@ class SolicitudLegajoController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $data = $request->validate(['clase' => 'nullable|in:documentos,actualizacion', 'estado' => 'nullable|in:abierto,observado,en_revision,aceptado,cancelado', 'q' => 'nullable|string|max:120', 'page' => 'sometimes|integer|min:1']);
-        $q = $this->consulta($request)->with(['usuario:id,nombres,apellido_paterno,apellido_materno', 'tipoDocumento:id,nombre', 'documento:id,nombre,estado', 'notificacionesUsuario' => fn ($q) => $q->whereNotNull('correo_estado')->orderByDesc('created_at')->limit(1)]);
+        $data = $request->validate(['clase' => 'nullable|in:documentos,actualizacion', 'estado' => 'nullable|in:abierto,observado,en_revision,aceptado,cancelado', 'q' => 'nullable|string|max:120', 'page' => 'sometimes|integer|min:1', 'requerimiento' => 'nullable|uuid']);
+        $q = $this->consulta($request)->with(['usuario:id,nombres,apellido_paterno,apellido_materno,email_institucional', 'tipoDocumento:id,nombre', 'documento:id,nombre,estado', 'notificacionesUsuario' => fn ($q) => $q->whereNotNull('correo_estado')->orderByDesc('created_at')->limit(1)]);
         foreach (['clase', 'estado'] as $campo) {
             if (! empty($data[$campo])) {
                 $q->where($campo, $data[$campo]);
@@ -46,6 +48,9 @@ class SolicitudLegajoController extends Controller
         if (! empty($data['q'])) {
             $term = '%'.mb_strtolower(trim($data['q'])).'%';
             $q->where(fn (Builder $q) => $q->whereRaw('LOWER(descripcion) LIKE ?', [$term])->orWhereHas('usuario', fn (Builder $u) => $u->whereRaw('LOWER(nombres) LIKE ?', [$term])->orWhereRaw('LOWER(apellido_paterno) LIKE ?', [$term])->orWhereRaw('LOWER(apellido_materno) LIKE ?', [$term])->orWhere('numero_doc_identidad', 'like', $term)));
+        }
+        if (! empty($data['requerimiento'])) {
+            $q->whereKey($data['requerimiento']);
         }
         $pagina = $q->orderByDesc('created_at')->orderBy('id')->paginate(20)->withQueryString();
         $pagina->getCollection()->transform(function (RequerimientoDocumento $r): array {
@@ -95,10 +100,74 @@ class SolicitudLegajoController extends Controller
         return response()->json(['personas' => $personas, 'tipos' => $tipos, 'maximo_pdf_kb' => Parametros::entero('tamano_maximo_pdf_kb')]);
     }
 
+    public function tareasPersona(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->can('legajo.ver'), 403);
+        $data = $request->validate(['usuario_id' => 'required|uuid', 'dias' => 'sometimes|integer|min:1|max:365']);
+        $persona = Usuario::query()->whereHas('legajos', fn (Builder $q) => $q->where('estado_legajo', 'activo'))
+            ->findOrFail($data['usuario_id'], ['id', 'nombres', 'apellido_paterno', 'apellido_materno', 'numero_doc_identidad']);
+        $alertas = DB::query()->fromSub(ConsultaVencimientos::alertas($request->user(), CarbonImmutable::now('America/Lima')->startOfDay(), $data['dias'] ?? 30, null), 'a')
+            ->where('usuario_id', $persona->id)->orderBy('fecha')->get();
+        $tareas = [];
+        $incluidos = [];
+        foreach ($alertas as $alerta) {
+            $contexto = $this->contextoVencimiento($request, $alerta->origen, $alerta->alerta_id);
+            $clave = $contexto['existente']['id'] ?? $alerta->origen.':'.$alerta->alerta_id;
+            if (! isset($incluidos[$clave])) {
+                $tareas[] = $contexto;
+                $incluidos[$clave] = true;
+            }
+        }
+        foreach ($this->consulta($request)->where('usuario_id', $persona->id)->whereNull('cerrado_en')->whereIn('estado', self::ABIERTOS)->orderBy('fecha_limite')->get() as $r) {
+            if (! isset($incluidos[$r->id])) {
+                $tareas[] = ['detalle' => $r->descripcion, 'motivo' => 'Requerimiento pendiente',
+                    'fecha' => ($r->prorroga_hasta ?? $r->fecha_limite)->toDateString(),
+                    'existente' => ['id' => $r->id, 'clase' => $r->clase, 'estado' => $r->estado]];
+                $incluidos[$r->id] = true;
+            }
+        }
+
+        return response()->json(['persona' => $persona, 'tareas' => $tareas])->header('Cache-Control', 'private, no-store');
+    }
+
+    public function desdeVencimiento(Request $request): JsonResponse
+    {
+        $data = $request->validate(['origen' => 'required|in:documento,contrato,requerimiento', 'alerta_id' => 'required|uuid']);
+
+        return response()->json($this->contextoVencimiento($request, $data['origen'], $data['alerta_id']));
+    }
+
+    private function contextoVencimiento(Request $request, string $origen, string $id): array
+    {
+        abort_unless($request->user()->can('legajo.ver'), 403);
+        $alerta = DB::query()->fromSub(ConsultaVencimientos::alertas($request->user(), CarbonImmutable::now('America/Lima')->startOfDay(), 365, $origen), 'a')
+            ->where('alerta_id', $id)->first();
+        abort_unless($alerta, 404, 'La alerta ya no está vigente o no tienes acceso. Actualiza Vencimientos.');
+        $tipo = $origen === 'documento' ? DocumentoUsuario::query()->findOrFail($id)->tipo_documento_id : null;
+        $existente = $origen === 'requerimiento' ? $this->consulta($request)->findOrFail($id) : $this->consulta($request)
+            ->where('usuario_id', $alerta->usuario_id)->whereNull('cerrado_en')->whereIn('estado', self::ABIERTOS)
+            ->when($tipo, fn (Builder $q) => $q->where('tipo_documento_id', $tipo))
+            ->get()->first(function (RequerimientoDocumento $r) use ($tipo, $origen, $id): bool {
+                return $tipo !== null || collect($r->seguimiento ?? [])->contains(
+                    fn (array $evento): bool => ($evento['origen_alerta'] ?? null) === $origen && ($evento['alerta_id'] ?? null) === $id);
+            });
+        $fecha = substr($alerta->fecha, 0, 10);
+        $motivo = $origen === 'requerimiento' ? 'Requerimiento fuera de plazo' : ($fecha < now('America/Lima')->toDateString() ? 'Vencido' : 'Próximo a vencer');
+        $descripcion = $origen === 'contrato'
+            ? "Presentar la documentación que corresponda para actualizar el vínculo laboral: {$alerta->detalle}. Vencimiento registrado: {$fecha}."
+            : "Presentar la actualización de {$alerta->detalle}. Vencimiento registrado: {$fecha}.";
+
+        return ['usuario_id' => $alerta->usuario_id, 'origen' => $origen, 'alerta_id' => $id, 'tipo_documento_id' => $tipo,
+            'motivo' => $motivo, 'detalle' => $alerta->detalle, 'fecha' => $fecha, 'descripcion' => mb_substr($descripcion, 0, 300),
+            'clase' => $origen === 'contrato' ? 'actualizacion' : 'documentos',
+            'existente' => $existente ? ['id' => $existente->id, 'clase' => $existente->clase, 'estado' => $existente->estado] : null];
+    }
+
     public function store(Request $request): JsonResponse
     {
         abort_unless($request->user()->can('requerimientos.gestionar'), 403);
         $data = $request->validate([
+            'alerta_origen' => 'nullable|required_with:alerta_id|in:documento,contrato', 'alerta_id' => 'nullable|required_with:alerta_origen|uuid',
             'clase' => 'required|in:documentos,actualizacion', 'usuario_id' => 'required|uuid|exists:usuarios,id',
             'descripcion' => 'required|string|max:300', 'tipo_documento_id' => 'nullable|uuid|exists:tipos_documento,id',
             'tipo_documento_ids' => 'sometimes|array|max:20',
@@ -114,6 +183,13 @@ class SolicitudLegajoController extends Controller
         $registros = DB::transaction(function () use ($data, $tipos, $request, &$notificaciones): array {
             Usuario::query()->whereKey($data['usuario_id'])->lockForUpdate()->firstOrFail();
             $this->legajoActivo($data['usuario_id']);
+            $contexto = ! empty($data['alerta_id']) ? $this->contextoVencimiento($request, $data['alerta_origen'], $data['alerta_id']) : null;
+            if ($contexto) {
+                abort_if($contexto['existente'], 409, 'Ya existe un requerimiento pendiente. Abre el requerimiento desde Vencimientos.');
+                abort_unless($contexto['usuario_id'] === $data['usuario_id'] && $contexto['clase'] === $data['clase']
+                    && $tipos === ($contexto['tipo_documento_id'] ? [$contexto['tipo_documento_id']] : []), 422, 'La persona y el documento deben corresponder a la alerta seleccionada.');
+            }
+            unset($data['alerta_origen'], $data['alerta_id']);
             $registros = [];
             foreach ($tipos ?: [null] as $tipo) {
                 $duplicado = RequerimientoDocumento::query()->where('usuario_id', $data['usuario_id'])->where('clase', $data['clase'])->whereIn('estado', self::ABIERTOS);
@@ -135,7 +211,10 @@ class SolicitudLegajoController extends Controller
                 } else {
                     $r = RequerimientoDocumento::query()->create($valores);
                 }
-                $this->evento($r, $request, 'creada por administración', $descripcion);
+                $this->evento($r, $request, 'creada por administración', $descripcion, $contexto ? [
+                    'origen_alerta' => $contexto['origen'], 'alerta_id' => $contexto['alerta_id'],
+                    'motivo' => $contexto['motivo'], 'documento_origen' => $contexto['detalle'], 'fecha_vencimiento' => $contexto['fecha'],
+                ] : []);
                 $notificaciones[] = $this->notificar($r, 'Requerimiento de documentación', $descripcion)->id;
                 $registros[] = $r;
             }
@@ -162,7 +241,13 @@ class SolicitudLegajoController extends Controller
     public function registrarEntrega(Request $request, string $record): JsonResponse
     {
         abort_unless($request->user()->can('requerimientos.gestionar'), 403);
-        $data = $request->validate(['remitente' => 'required|email|max:255', 'referencia_correo' => 'required|string|max:300', 'mensaje' => 'required|string|max:3000', 'pdf' => 'nullable|file|max:'.Parametros::entero('tamano_maximo_pdf_kb')]);
+        $data = $request->validate(['remitente' => 'required|email|max:255', 'referencia_correo' => 'required_without:asunto_correo|nullable|string|max:300',
+            'asunto_correo' => 'required_without:referencia_correo|nullable|string|max:250',
+            'fecha_recepcion' => 'required_with:asunto_correo|nullable|date_format:Y-m-d|before_or_equal:'.now('America/Lima')->toDateString(),
+            'tipo_respuesta' => 'nullable|in:documento,ampliacion,no_corresponde,otro', 'mensaje' => 'required|string|max:3000', 'pdf' => 'nullable|file|max:'.Parametros::entero('tamano_maximo_pdf_kb')]);
+        if (! empty($data['asunto_correo'])) {
+            $data['referencia_correo'] = $data['asunto_correo'].' — '.$data['fecha_recepcion'];
+        }
         $pdf = $request->file('pdf');
         if ($pdf && ! ArchivoPdf::esPdf($pdf)) {
             throw ValidationException::withMessages(['pdf' => 'El archivo debe ser un PDF válido.']);
@@ -178,11 +263,13 @@ class SolicitudLegajoController extends Controller
                 }
                 $this->legajoActivo($r->usuario_id);
                 abort_unless(in_array($r->estado, ['abierto', 'observado'], true), 409, 'La solicitud ya fue enviada a revisión o está cerrada.');
-                $extra = ['canal' => 'correo_manual', 'remitente' => $data['remitente'], 'referencia_correo' => $data['referencia_correo']];
+                $extra = ['canal' => 'correo_manual', 'remitente' => $data['remitente'], 'referencia_correo' => $data['referencia_correo'],
+                    'asunto_correo' => $data['asunto_correo'] ?? null, 'fecha_recepcion' => $data['fecha_recepcion'] ?? null,
+                    'tipo_respuesta' => $data['tipo_respuesta'] ?? 'otro'];
                 if ($pdf) {
                     $ruta = $pdf->store('solicitudes/'.$r->id, $disco);
                     abort_unless($ruta, 500, 'No se pudo guardar el archivo.');
-                    $extra = ['canal' => 'correo_manual', 'remitente' => $data['remitente'], 'referencia_correo' => $data['referencia_correo'], 'ruta' => $ruta, 'disco' => $disco, 'archivo' => mb_substr($pdf->getClientOriginalName(), 0, 255), 'hash' => ArchivoPdf::hash($pdf)];
+                    $extra = [...$extra, 'ruta' => $ruta, 'disco' => $disco, 'archivo' => mb_substr($pdf->getClientOriginalName(), 0, 255), 'hash' => ArchivoPdf::hash($pdf)];
                 }
                 $this->evento($r, $request, 'respuesta', $data['mensaje'], $extra);
                 $r->update(['estado' => 'en_revision']);

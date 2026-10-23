@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\VinculoLaboralFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -20,6 +21,7 @@ class VinculoLaboral extends Model
 
     protected $fillable = [
         'usuario_id',
+        'legajo_id',
         'tipo_personal',
         'regimen_laboral',
         'regimen_normativo_id',
@@ -56,6 +58,35 @@ class VinculoLaboral extends Model
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
+    }
+
+    public function legajo(): BelongsTo
+    {
+        return $this->belongsTo(Legajo::class);
+    }
+
+    public function scopeDelLegajo(Builder $query, Legajo $legajo): Builder
+    {
+        $sinHistorico = ! Legajo::query()->where('usuario_id', $legajo->usuario_id)->whereKeyNot($legajo->id)->exists();
+
+        return $query->where('usuario_id', $legajo->usuario_id)->where(function (Builder $q) use ($legajo, $sinHistorico): void {
+            $q->where('legajo_id', $legajo->id)->orWhere(function (Builder $legacy) use ($legajo, $sinHistorico): void {
+                $legacy->whereNull('legajo_id');
+                if (! $sinHistorico) {
+                    $legacy->whereHas('documentosUsuario', fn (Builder $d) => $d->where('legajo_id', $legajo->id));
+                }
+            });
+        });
+    }
+
+    public static function requiereCierreLegajo(?Legajo $legajo): bool
+    {
+        if (! $legajo || $legajo->estado_legajo !== 'activo') {
+            return false;
+        }
+        $query = self::query()->delLegajo($legajo)->where('anulado', false);
+
+        return (clone $query)->exists() && ! (clone $query)->whereNull('fecha_cese')->exists();
     }
 
     public function usuario(): BelongsTo

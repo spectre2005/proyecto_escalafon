@@ -12,6 +12,7 @@ use App\Models\RegimenNormativo;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
 use Database\Seeders\Seccion02CatalogoSeeder;
+use Database\Seeders\SeccionesLegajoCatalogoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -33,6 +34,38 @@ class Seccion02ApiTest extends TestCase
             'tiene_periodo_prueba' => true, 'proceso_seleccion' => 'CAS 001-2025', 'fecha_resultado_seleccion' => '2025-01-20',
             'numero_documento_vinculo' => 'CONTRATO 010-2025', 'fecha_inicio' => '2025-02-01', 'fecha_fin_prevista' => '2025-12-31',
         ], ...$cambios];
+    }
+
+    public function test_reincorporation_requires_closure_and_another_legajo(): void
+    {
+        $this->actuarComo();
+        $this->seed(SeccionesLegajoCatalogoSeeder::class);
+        $persona = Usuario::factory()->create();
+        $legajo = Legajo::factory()->create(['usuario_id' => $persona->id, 'estado_legajo' => 'activo']);
+        $v = VinculoLaboral::factory()->create(['usuario_id' => $persona->id, 'legajo_id' => $legajo->id,
+            'fecha_inicio' => '2020-01-01', 'fecha_cese' => '2021-01-01', 'anulado' => false]);
+        $datos = $this->vinculoValido();
+        $this->postJson($this->url($persona, 'vinculos-laborales'), $datos)->assertConflict();
+        $this->assertSame(1, VinculoLaboral::where('usuario_id', $persona->id)->count());
+        $this->getJson($this->url($persona, 'seccion-02'))->assertOk()->assertJsonPath('data.requiere_cierre_legajo', true);
+        $this->postJson($this->url($persona, 'legajos/'.$legajo->id.'/cerrar'))->assertOk();
+        $nuevo = $this->postJson($this->url($persona, 'legajo'))->assertCreated()->json('data.id');
+        $this->getJson($this->url($persona, 'seccion-02'))->assertOk()->assertJsonPath('data.requiere_cierre_legajo', false);
+        $this->postJson($this->url($persona, 'vinculos-laborales'), $datos)->assertCreated()->assertJsonPath('data.legajo_id', $nuevo);
+        $this->assertSame($legajo->id, $v->fresh()->legajo_id);
+        $this->assertSame('pasivo', $legajo->fresh()->estado_legajo);
+    }
+
+    public function test_additional_link_is_allowed_if_another_link_in_current_legajo_is_open(): void
+    {
+        $this->actuarComo();
+        $persona = Usuario::factory()->create();
+        $legajo = Legajo::factory()->create(['usuario_id' => $persona->id]);
+        foreach ([null, '2021-01-01'] as $cese) {
+            VinculoLaboral::factory()->create(['usuario_id' => $persona->id, 'legajo_id' => $legajo->id,
+                'fecha_inicio' => '2020-01-01', 'fecha_cese' => $cese, 'anulado' => false]);
+        }
+        $this->postJson($this->url($persona, 'vinculos-laborales'), $this->vinculoValido())->assertCreated()->assertJsonPath('data.legajo_id', $legajo->id);
     }
 
     public function test_a_new_link_takes_the_person_law_and_type_when_omitted_and_is_audited(): void
@@ -106,7 +139,7 @@ class Seccion02ApiTest extends TestCase
         $this->patchJson($this->url(Usuario::factory()->create(), 'vinculos-laborales').'/'.$id, ['nombre_puesto' => 'Otro'])->assertConflict();
     }
 
-    public function test_a_person_with_three_ceased_links_can_register_a_new_link_without_changing_history(): void
+    public function test_three_ceased_links_preserve_history_after_opening_another_legajo(): void
     {
         $this->travelTo('2026-10-19 12:00:00');
         $this->actuarComo();
@@ -120,6 +153,11 @@ class Seccion02ApiTest extends TestCase
         $antes = $this->getJson($this->url($persona, 'seccion-02'))->assertOk()->json('data.vinculos');
         $this->assertCount(3, $antes);
         $this->assertSame([false, false, false], array_column($antes, 'vigente'));
+        $this->seed(SeccionesLegajoCatalogoSeeder::class);
+        $anterior = Legajo::query()->where('usuario_id', $persona->id)->where('estado_legajo', 'activo')->firstOrFail();
+        $this->postJson($this->url($persona, 'vinculos-laborales'), $this->vinculoValido())->assertConflict();
+        $this->postJson($this->url($persona, 'legajos/'.$anterior->id.'/cerrar'))->assertOk();
+        $this->postJson($this->url($persona, 'legajo'))->assertCreated();
         $nuevo = $this->postJson($this->url($persona, 'vinculos-laborales'), $this->vinculoValido([
             'fecha_inicio' => '2026-10-19', 'fecha_fin_prevista' => '2026-11-19', 'numero_documento_vinculo' => 'NUEVA-INCORPORACION',
         ]))->assertCreated()->json('data.id');

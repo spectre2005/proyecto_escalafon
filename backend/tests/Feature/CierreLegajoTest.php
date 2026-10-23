@@ -6,6 +6,7 @@ use App\Models\DocumentoUsuario;
 use App\Models\Legajo;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
+use App\Models\VinculoLaboral;
 use Database\Seeders\SeccionesLegajoCatalogoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -128,26 +129,40 @@ class CierreLegajoTest extends TestCase
         $this->assertNull(DocumentoUsuario::query()->findOrFail($documento)->fecha_recepcion);
     }
 
-    public function test_reopening_keeps_the_same_legajo_and_documents_and_resumes_edits_and_folios(): void
+    public function test_reincorporation_opens_another_legajo_and_preserves_previous_documents(): void
     {
         $id = $this->abrir();
-        $legajo = Legajo::query()->findOrFail($id);
         $tipo = TipoDocumento::query()->where('codigo', 'S01_A_FICHA_DATOS')->firstOrFail();
         $documento = $this->subir($this->persona, $this->metadatos($tipo, 1, 2))->assertCreated()->json('data.id');
         $this->cerrar($id);
-        $this->postJson($this->url.'/legajos/'.$id.'/reabrir')->assertOk()
-            ->assertJsonPath('data.id', $id)->assertJsonPath('data.numero_legajo', $legajo->numero_legajo)
-            ->assertJsonPath('data.estado_legajo', 'activo')->assertJsonPath('data.fecha_pasivo', null);
-        $this->assertDatabaseCount('legajos', 1);
-        $this->assertSame($legajo->fecha_apertura->toDateString(), $legajo->refresh()->fecha_apertura->toDateString());
-        $this->getJson($this->url)->assertOk()->assertJsonPath('data.usuario.values.activo', true);
-        $this->patchJson($this->url, ['nombres' => 'Servidor reincorporado'])->assertOk();
-        $this->postJson($this->url.'/documentos/'.$documento.'/recepcionar')->assertOk();
-        $this->subir($this->persona, $this->metadatos($tipo, 3, 4, ['subsana_a_documento_id' => $documento]))
-            ->assertCreated()->assertJsonPath('data.folio_inicio', 3);
-        Storage::disk(config('legajo.disco_documentos'))->assertExists(DocumentoUsuario::query()->findOrFail($documento)->archivo->storage_path);
-        $this->assertDatabaseHas('auditoria_eventos', ['entidad_id' => $id, 'accion' => 'legajo.cerrar']);
-        $this->assertDatabaseHas('auditoria_eventos', ['entidad_id' => $id, 'accion' => 'legajo.reabrir']);
+        $this->postJson($this->url.'/legajos/'.$id.'/reabrir')->assertConflict();
+        $nuevo = $this->abrir();
+        $this->assertNotSame($id, $nuevo);
+        $this->assertNotSame(Legajo::findOrFail($id)->numero_legajo, Legajo::findOrFail($nuevo)->numero_legajo);
+        $this->assertSame('pasivo', Legajo::findOrFail($id)->estado_legajo);
+        $this->assertSame($id, DocumentoUsuario::findOrFail($documento)->legajo_id);
+        $this->assertDatabaseCount('legajos', 2);
+        $this->postJson($this->url.'/documentos/'.$documento.'/recepcionar')->assertConflict();
+        $this->assertDatabaseMissing('auditoria_eventos', ['accion' => 'legajo.reabrir']);
+    }
+
+    public function test_legajo_closure_requires_cessation_even_if_expected_end_passed(): void
+    {
+        $id = $this->abrir();
+        $v = VinculoLaboral::factory()->create(['usuario_id' => $this->persona->id,
+            'fecha_inicio' => '2020-01-01', 'fecha_fin_prevista' => '2021-01-01', 'fecha_cese' => null, 'anulado' => false]);
+        $this->postJson($this->url.'/legajos/'.$id.'/cerrar')->assertConflict();
+        $this->assertSame('activo', Legajo::findOrFail($id)->estado_legajo);
+        $v->update(['fecha_cese' => '2021-01-01']);
+        $this->cerrar($id);
+    }
+
+    public function test_generic_update_cannot_reopen_a_historical_legajo(): void
+    {
+        $id = $this->abrir();
+        $this->cerrar($id);
+        $this->patchJson('/api/v1/legajos/'.$id, ['estado_legajo' => 'activo', 'fecha_pasivo' => null])->assertConflict();
+        $this->assertSame('pasivo', Legajo::findOrFail($id)->estado_legajo);
     }
 
     public function test_reopening_checks_owner_permission_and_prevents_two_active_legajos(): void

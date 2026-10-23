@@ -1,9 +1,12 @@
+import FinalizarLegajo from '../FinalizarLegajo'
+import Campo, { Formulario } from '../seccion01/Campo'
+import { useBorrador, useGuardar, hoy } from '../seccion01/useGuardar'
 import Aviso from '../documentos/AvisoSeccion'
 import Icon from '../../../../components/ui/Icon'
 import { useState } from 'react'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../../auth/session'
-import { anularDesvinculacion } from '../../api/seccion11Api'
+import { anularDesvinculacion, corregirFechaCese } from '../../api/seccion11Api'
 import { useNoAplicables } from '../../api/useNoAplicables'
 import { ofrecerTipo, tiposQueAcreditan } from '../../config/aplicacion'
 import { precargaDesdeRegistro } from '../../config/acreditacion'
@@ -32,8 +35,8 @@ function Etiqueta({ children, clase }) {
   return <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${clase}`}>{children}</span>
 }
 
-// Vínculos que pueden recibir una desvinculación nueva: con cese registrado en la 02 y sin desvinculación vigente.
-const disponibles = data => data.vinculos.filter(v => v.values.fecha_cese && !v.desvinculacion_id)
+// Vínculos disponibles para el cese unificado o para completar un cese anterior.
+const disponibles = data => data.vinculos.filter(v => !v.desvinculacion_id)
 const vinculoDe = (data, id) => data.vinculos.find(v => v.id === id)
 const etiquetaDesvinculacion = (data, d) => `${etiqueta(motivosCese, d.values.motivo_cese)} · cese ${fecha(d.values.fecha_cese)} · ${vinculoDe(data, d.values.vinculo_laboral_id)?.values.nombre_puesto || 'vínculo no encontrado'}`
 
@@ -64,12 +67,12 @@ function Vinculos({ data, onNavigate }) {
       <tbody>{data.vinculos.map(v => <tr key={v.id} className="border-t border-slate-100 text-slate-700">
         <td className="px-4 py-3">{etiquetaVinculo11(v)}</td>
         <td className={`px-4 py-3 ${v.values.regimen_laboral ? '' : 'text-slate-600'}`}>{tipoVinculo(v.values.regimen_laboral)}</td>
-        <td className="px-4 py-3">{v.values.fecha_cese ? fecha(v.values.fecha_cese) : <span className="text-slate-600">Sin cese: regístralo primero en la sección 02</span>}</td>
-        <td className="px-4 py-3">{v.desvinculacion_id ? <Etiqueta clase="bg-teal-50 text-teal-800">Registrada</Etiqueta> : <Etiqueta clase="bg-slate-100 text-slate-600">{v.values.fecha_cese ? 'Pendiente de registrar' : 'No aplica aún'}</Etiqueta>}</td>
+        <td className="px-4 py-3">{v.values.fecha_cese ? fecha(v.values.fecha_cese) : <span className="text-slate-600">Sin cese: usa «Registrar cese y desvinculación»</span>}</td>
+        <td className="px-4 py-3">{v.desvinculacion_id ? <Etiqueta clase="bg-teal-50 text-teal-800">Registrada</Etiqueta> : <Etiqueta clase="bg-slate-100 text-slate-600">{v.values.fecha_cese ? 'Pendiente de registrar' : 'Pendiente de cese'}</Etiqueta>}</td>
         <td className="px-4 py-3">{v.documentos}</td>
       </tr>)}</tbody>
     </table></div>
-    {data.vinculos.some(v => !v.values.fecha_cese) && <p className="mt-2 text-xs text-slate-500">La fecha de cese de referencia es la del vínculo. <button onClick={() => onNavigate('s02-vinculo')} className="font-semibold text-teal-700 hover:underline">Registrar el cese en 2.2</button></p>}
+    {data.vinculos.some(v => !v.values.fecha_cese) && <p className="mt-2 text-xs text-slate-500">El cese se registra junto con la desvinculación en este panel.  Al confirmar se actualiza también el vínculo de la sección 02.</p>}
   </section>
 }
 
@@ -109,17 +112,39 @@ function Adjuntar({ usuario, data, record, sinLegajo }) {
     precarga={(tipo, id) => precargaDe(tipo, data, id)} bloqueo={sinLegajo} />
 }
 
+function CorreccionCeseForm({ usuario, record, onClose }) {
+  const [draft, set] = useBorrador({ fecha_cese: record.values.fecha_cese || '', motivo_correccion: '' })
+  const { busy, error, errors, guardar } = useGuardar(data => corregirFechaCese(usuario, record.id, data), onClose)
+  return <Formulario titulo="Corrección excepcional de cese" guardar="Confirmar corrección" busy={busy} error={error} onSubmit={() => guardar(draft)} onCancel={onClose}
+    nota="Se actualizará la fecha en el vínculo y la desvinculación. Se conservarán la fecha anterior, el motivo y el responsable en auditoría. No reabre el vínculo.">
+    <Campo label="Fecha efectiva de cese" required error={errors.fecha_cese}><input type="date" required max={hoy()} value={draft.fecha_cese} onChange={set('fecha_cese')} /></Campo>
+    <Campo label="Motivo de la corrección" required error={errors.motivo_correccion}><textarea required minLength={10} maxLength={2000} value={draft.motivo_correccion} onChange={set('motivo_correccion')} /></Campo>
+  </Formulario>
+}
+
+function CorreccionCese({ usuario, record, sinLegajo }) {
+  const admin = usePuede('sistema.administrar')
+  const editar = usePuede('legajo.editar')
+  const [abierto, setAbierto] = useState(false)
+  if (!admin || !editar || sinLegajo) return null
+  return <><button type="button" className={enlace} onClick={() => setAbierto(true)}>Corregir fecha de cese</button>
+    {abierto && <CorreccionCeseForm usuario={usuario} record={record} onClose={() => setAbierto(false)} />}</>
+}
+
 function Desvinculaciones({ usuario, data, sinLegajo, onNavigate }) {
   const libres = disponibles(data)
-  const bloqueo = sinLegajo || (!libres.length && 'No hay vínculos con cese registrado pendientes de desvinculación (el cese se registra en la sección 02).')
+  const bloqueo = sinLegajo || (!libres.length && 'Todos los vínculos tienen una desvinculación registrada. Para otra incorporación registra un nuevo vínculo.')
   return <>
+    {data.requiere_cierre_legajo && <FinalizarLegajo usuario={usuario} legajo={data.legajo} />}
     <Vinculos data={data} onNavigate={onNavigate} />
-    {data.desvinculaciones.some(d => !d.coincide_fecha_vinculo) && <Aviso>Hay desvinculaciones cuya fecha de cese ya no coincide con la del vínculo (se corrigió en la sección 02). Corrígelas para que coincidan.</Aviso>}
-    <Registros documento={record => <DocumentoDeRegistro tipos={data.tipos} record={record} />} titulo="Desvinculaciones" agregar="Registrar desvinculación" registros={data.desvinculaciones} bloqueo={bloqueo} permisos={permisosSeccion11}
-      adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} sinLegajo={sinLegajo} />}
+    {data.desvinculaciones.some(d => !d.coincide_fecha_vinculo) && <Aviso>Hay desvinculaciones cuya fecha de cese ya no coincide con la del vínculo (se corrigió en la sección 02). Solicita a administración la corrección excepcional de cese.</Aviso>}
+    <Registros documento={record => <DocumentoDeRegistro tipos={data.tipos} record={record} />} titulo="Desvinculaciones" agregar="Registrar cese y desvinculación" registros={data.desvinculaciones} bloqueo={bloqueo} permisos={permisosSeccion11}
+      adjuntar={record => <><span className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">{record.values.documento_id ? 'Sustento vinculado' : 'Pendiente de sustento'}</span><Adjuntar usuario={usuario} data={data} record={record} sinLegajo={sinLegajo} /><CorreccionCese usuario={usuario} record={record} sinLegajo={sinLegajo} /></>}
+      aviso={<p className="mb-3 text-xs text-slate-600">Anular una desvinculación conserva su historial y no reabre el vínculo ni elimina el cese. Si la fecha es incorrecta, administración debe usar «Corregir fecha de cese».</p>}
       vacio="No hay desvinculaciones registradas. No todas las personas han cesado."
       tituloRegistro={d => etiqueta(motivosCese, d.values.motivo_cese)} subtitulo={d => `${vinculoDe(data, d.values.vinculo_laboral_id) ? etiquetaVinculo11(vinculoDe(data, d.values.vinculo_laboral_id)) : 'Vínculo no encontrado'} · cese ${fecha(d.values.fecha_cese)}`}
       campos={[
+        ['Sustento documental', v => v.documento_id ? 'Sustento vinculado: revisar su estado y archivo' : 'Pendiente de adjuntar sustento'],
         ['N.º de resolución', v => texto(v.numero_resolucion)],
         ['Entrega de cargo', v => fecha(v.fecha_entrega_cargo)],
         ['Informe de gestión', v => v.informe_gestion_presentado ? 'Presentado' : 'No registrado'],
@@ -181,9 +206,9 @@ function TipoDocumento({ usuario, data, tipo, sinLegajo, ofrecer, modo, onTermin
       onRegistrarNuevo={tipo.principal ? () => { setRegistrando(recuperando.id); setRecuperando(null) } : null}
       onDone={registro => { setRecuperando(null); setAviso(`Documento enlazado${registro ? ` a: ${registro}` : ''}.`) }} onCancel={() => setRecuperando(null)} /></EnZona>}
     {subsanando && <div className="mt-4"><SubirDocumentoForm usuario={usuario} seccion={11} tipo={tipo} titular={data.titular} subsanar={subsanando} onSaved={subido} onCancel={() => setSubsanando(null)} /></div>}
-    {registrando && <EnZona titulo={tituloPaso('Registrar la desvinculación que acredita', tipo)}>{libres.length
+    {registrando && <EnZona titulo={tituloPaso('Registrar el cese y la desvinculación que acredita', tipo)}>{libres.length
       ? <div className="mt-4"><DesvinculacionForm usuario={usuario} vinculos={libres} motivos={tipo.motivos} documentoId={registrando} onSaved={() => { setRegistrando(null); setAviso('Desvinculación registrada y acreditada por el documento.'); onTerminar?.('Documento y desvinculación guardados correctamente.') }} onCancel={() => { setRegistrando(null); setAviso('El documento quedó cargado sin desvinculación enlazada.'); onTerminar?.('Documento guardado correctamente.') }} /></div>
-      : <div className="mt-4"><Aviso accion={<button onClick={() => { setRegistrando(null); onTerminar?.('Documento guardado correctamente.') }} className={enlace}>Entendido</button>}>El documento quedó cargado, pero no hay vínculos con cese registrado pendientes de desvinculación{tipo.solo_plazo_determinado ? ' de plazo determinado' : ''}. Registra el cese en la sección 02.</Aviso></div>}</EnZona>}
+      : <div className="mt-4"><Aviso accion={<button onClick={() => { setRegistrando(null); onTerminar?.('Documento guardado correctamente.') }} className={enlace}>Entendido</button>}>El documento quedó cargado, pero no hay vínculos disponibles para registrar la desvinculación{tipo.solo_plazo_determinado ? ' de plazo determinado' : ''}. Registra el cese y la desvinculación desde este panel.</Aviso></div>}</EnZona>}
   </li>
 }
 

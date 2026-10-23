@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditoriaEvento;
 use App\Models\Legajo;
 use App\Models\Usuario;
+use App\Models\VinculoLaboral;
 use App\Support\AperturaLegajo;
 use App\Support\Auditoria;
 use Illuminate\Http\JsonResponse;
@@ -19,7 +20,7 @@ use Illuminate\Support\Str;
  * legajo activo por persona. La sección adicional de legajos pasivos (art. 3.2, "13") es optativa y no se
  * inicializa aquí, aunque exista en el catálogo: si llega a usarse, Folios::reservar crea su fila.
  * TODO pendiente de confirmar con el cliente: formato_legajo (hoy el valor por defecto del esquema, digital),
- * ubicación física y si una persona con legajo pasivo abre uno nuevo (hoy se permite).
+ * ubicación física. Una reincorporación abre un legajo nuevo; los cerrados se conservan.
  */
 class AperturaLegajoController extends Controller
 {
@@ -30,6 +31,8 @@ class AperturaLegajoController extends Controller
             Usuario::query()->whereKey($usuario)->lockForUpdate()->firstOrFail();
             $registro = Legajo::query()->where('usuario_id', $usuario)->lockForUpdate()->findOrFail($legajo);
             abort_unless($registro->estado_legajo === 'activo', 409, 'El legajo ya está cerrado.');
+            abort_if(VinculoLaboral::query()->where('usuario_id', $usuario)->where('anulado', false)->whereNull('fecha_cese')->lockForUpdate()->first(),
+                409, 'No se puede cerrar el legajo: hay vínculos laborales sin cese. Registra primero su cese y desvinculación en la sección 11.');
             $antes = $registro->only(['estado_legajo', 'fecha_pasivo']);
             $registro->update(['estado_legajo' => 'pasivo', 'fecha_pasivo' => today()]);
             $this->registrarCambio($request, $registro, 'legajo.cerrar', $antes);
@@ -42,21 +45,9 @@ class AperturaLegajoController extends Controller
 
     public function reabrir(Request $request, string $usuario, string $legajo): JsonResponse
     {
-        abort_if($request->all() !== [], 422, 'La reapertura no recibe datos adicionales.');
-        $registro = DB::transaction(function () use ($usuario, $legajo, $request): Legajo {
-            Usuario::query()->whereKey($usuario)->lockForUpdate()->firstOrFail();
-            $registro = Legajo::query()->where('usuario_id', $usuario)->lockForUpdate()->findOrFail($legajo);
-            abort_unless(in_array($registro->estado_legajo, ['pasivo', 'cerrado'], true), 409, 'Solo se puede reabrir un legajo cerrado.');
-            abort_if(Legajo::query()->where('usuario_id', $usuario)->where('estado_legajo', 'activo')->exists(), 409,
-                'La persona ya tiene otro legajo activo.');
-            $antes = $registro->only(['estado_legajo', 'fecha_pasivo']);
-            $registro->update(['estado_legajo' => 'activo', 'fecha_pasivo' => null]);
-            $this->registrarCambio($request, $registro, 'legajo.reabrir', $antes);
+        Legajo::query()->where('usuario_id', $usuario)->findOrFail($legajo);
 
-            return $registro;
-        });
-
-        return response()->json(['data' => $registro->only(['id', 'numero_legajo', 'estado_legajo', 'fecha_apertura', 'fecha_pasivo'])]);
+        return response()->json(['message' => 'Los legajos cerrados se conservan como históricos. Para una reincorporación abre un nuevo legajo de la misma persona.'], 409);
     }
 
     private function registrarCambio(Request $request, Legajo $legajo, string $accion, array $antes): void

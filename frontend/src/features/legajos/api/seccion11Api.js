@@ -10,3 +10,7 @@ export function saveDesvinculacion(usuario, id, data) {
 export function anularDesvinculacion(usuario, id, motivo) {
   return api.post(`/expedientes/${usuario}/seccion-11/desvinculaciones/${id}/anular`, { motivo_anulacion: motivo })
 }
+
+export function corregirFechaCese(usuario, id, data) {
+  return api.post(`/expedientes/${usuario}/seccion-11/desvinculaciones/${id}/corregir-cese`, data)
+}

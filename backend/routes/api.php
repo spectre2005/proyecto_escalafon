@@ -114,6 +114,8 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
     Route::prefix('solicitudes-legajo')->middleware('can:requerimientos.gestionar')->controller(SolicitudLegajoController::class)->group(function (): void {
         Route::get('/', 'index');
         Route::get('opciones', 'opciones');
+        Route::get('desde-vencimiento', 'desdeVencimiento');
+        Route::get('tareas-persona', 'tareasPersona');
         Route::get('sugerencias', 'sugerencias');
         Route::post('/', 'store');
         Route::post('sincronizar', 'sincronizar')->middleware('throttle:10,1');
@@ -278,6 +280,8 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
         Route::post('expedientes/{usuario}/seccion-11/desvinculaciones', [Seccion11Controller::class, 'store'])->whereUuid('usuario');
         Route::patch('expedientes/{usuario}/seccion-11/desvinculaciones/{registro}', [Seccion11Controller::class, 'update'])->whereUuid(['usuario', 'registro']);
     });
+    Route::post('expedientes/{usuario}/seccion-11/desvinculaciones/{registro}/corregir-cese', [Seccion11Controller::class, 'corregirCese'])
+        ->middleware(['can:sistema.administrar', 'can:legajo.editar'])->whereUuid(['usuario', 'registro']);
     Route::post('expedientes/{usuario}/seccion-11/desvinculaciones/{registro}/anular', [Seccion11Controller::class, 'anularRegistro'])
         ->middleware('can:sistema.administrar')->whereUuid(['usuario', 'registro']);
 

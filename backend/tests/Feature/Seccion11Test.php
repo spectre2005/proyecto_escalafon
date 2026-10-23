@@ -80,6 +80,46 @@ class Seccion11Test extends TestCase
         Sanctum::actingAs($this->asignarRol(Usuario::factory()->create(), $codigo, [], ['ve_datos_sensibles' => $sensibles])->refresh());
     }
 
+    public function test_unified_cessation_closes_link_and_registers_once_with_audit(): void
+    {
+        $this->actuarComo();
+        $datos = $this->desvinculacion('vigente', ['registrar_cese' => true, 'confirmar_cierre_vinculo' => true]);
+        $this->postJson($this->url('/desvinculaciones'), [...$datos, 'confirmar_cierre_vinculo' => false])->assertUnprocessable();
+        $this->assertNull($this->vinculos['vigente']->fresh()->fecha_cese);
+        $id = $this->postJson($this->url('/desvinculaciones'), $datos)->assertCreated()->json('data.id');
+        $this->assertSame('2025-01-01', $this->vinculos['vigente']->fresh()->fecha_cese->toDateString());
+        $this->assertDatabaseHas('auditoria_eventos', ['entidad_id' => $id, 'accion' => 'desvinculacion.registrar']);
+        $this->postJson($this->url('/desvinculaciones'), $datos)->assertUnprocessable();
+        $this->assertSame(1, Desvinculacion::query()->where('vinculo_laboral_id', $this->vinculos['vigente']->id)->count());
+    }
+
+    public function test_unified_cessation_rolls_back_if_evidence_is_invalid(): void
+    {
+        $this->actuarComo();
+        $this->postJson($this->url('/desvinculaciones'), $this->desvinculacion('vigente', [
+            'registrar_cese' => true, 'confirmar_cierre_vinculo' => true,
+            'documento_id' => '00000000-0000-4000-8000-000000000001',
+        ]))->assertUnprocessable();
+        $this->assertNull($this->vinculos['vigente']->fresh()->fecha_cese);
+        $this->assertDatabaseCount('desvinculaciones', 0);
+        $this->assertDatabaseMissing('auditoria_eventos', ['accion' => 'vinculo.cesar']);
+    }
+
+    public function test_exceptional_correction_requires_administration_and_keeps_dates_together(): void
+    {
+        $this->actuarComo();
+        $id = $this->postJson($this->url('/desvinculaciones'), $this->desvinculacion('carrera'))->assertCreated()->json('data.id');
+        $url = $this->url('/desvinculaciones/'.$id.'/corregir-cese');
+        $this->postJson($url, ['fecha_cese' => '2022-12-30'])->assertUnprocessable();
+        $this->postJson($url, ['fecha_cese' => '2010-01-01', 'motivo_correccion' => 'Error de transcripción comprobado'])->assertUnprocessable();
+        $this->postJson($url, ['fecha_cese' => '2022-12-30', 'motivo_correccion' => 'Error de transcripción comprobado'])->assertOk();
+        $this->assertSame('2022-12-30', $this->vinculos['carrera']->fresh()->fecha_cese->toDateString());
+        $this->assertSame('2022-12-30', Desvinculacion::query()->findOrFail($id)->fecha_cese->toDateString());
+        $this->assertDatabaseHas('auditoria_eventos', ['entidad_id' => $id, 'accion' => 'cese.corregir']);
+        $this->actuarConPermisos(['legajo.ver', 'legajo.editar']);
+        $this->postJson($url, ['fecha_cese' => '2022-12-29', 'motivo_correccion' => 'Otro cambio sin permiso'])->assertForbidden();
+    }
+
     public function test_catalog_has_the_directive_types_none_mandatory(): void
     {
         $this->seed(Seccion11CatalogoSeeder::class);
