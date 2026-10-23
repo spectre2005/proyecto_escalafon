@@ -148,9 +148,9 @@ class RegistroDatosPersonalesTest extends TestCase
 
         $this->postJson(self::CONSULTA, ['dni' => '71000001'])->assertOk()
             ->assertJsonPath('data.ubicacion', ['id' => $lugar->id, 'region' => 'Cusco', 'provincia' => 'La Convención', 'distrito' => 'Santa Ana'])
-            ->assertJsonPath('data.ubicacion_estado', 'asignada')
-            // Dirección y fecha de nacimiento del proveedor no se usan (no están confirmadas en el plan).
-            ->assertJsonMissingPath('data.direccion')->assertJsonMissingPath('data.fecha_nacimiento');
+            ->assertJsonPath('data.ubicacion_estado', 'asignada')->assertJsonPath('data.direccion', 'JR. NO SE USA 9')
+            // La fecha de nacimiento del proveedor no se usa (no llega con datos en el plan contratado).
+            ->assertJsonMissingPath('data.fecha_nacimiento');
     }
 
     public function test_location_without_match_or_ambiguous_is_left_for_manual_selection(): void
@@ -174,7 +174,25 @@ class RegistroDatosPersonalesTest extends TestCase
         $this->factiliza(['departamento' => 'CUSCO', 'provincia' => '', 'distrito' => null]);
 
         $this->postJson(self::CONSULTA, ['dni' => '71000001'])->assertOk()->assertJsonPath('data.nombres', 'ROSA')
-            ->assertJsonPath('data.ubicacion', null)->assertJsonPath('data.ubicacion_estado', 'sin_dato');
+            ->assertJsonPath('data.ubicacion', null)->assertJsonPath('data.ubicacion_estado', 'sin_dato')->assertJsonPath('data.direccion', null);
+    }
+
+    public function test_the_address_is_proposed_when_it_arrives_even_without_location(): void
+    {
+        // Como en el plan contratado: dirección con datos y ubicación, ubigeos y fecha de nacimiento vacíos.
+        $this->actuarComo();
+        $this->factiliza(['departamento' => '', 'provincia' => '', 'distrito' => '', 'ubigeo' => '', 'direccion' => '  AV. FICTICIA 456  ', 'fecha_nacimiento' => '']);
+
+        $this->postJson(self::CONSULTA, ['dni' => '71000001'])->assertOk()->assertJsonPath('data.direccion', 'AV. FICTICIA 456')
+            ->assertJsonPath('data.ubicacion_estado', 'sin_dato')->assertJsonMissingPath('data.fecha_nacimiento');
+    }
+
+    public function test_an_address_longer_than_the_address_field_is_not_proposed(): void
+    {
+        $this->actuarComo();
+        $this->factiliza(['direccion' => str_repeat('A', 251)]);
+
+        $this->postJson(self::CONSULTA, ['dni' => '71000001'])->assertOk()->assertJsonPath('data.nombres', 'ROSA')->assertJsonPath('data.direccion', null);
     }
 
     public function test_without_sensitive_data_permission_the_lookup_returns_no_location(): void
@@ -188,7 +206,7 @@ class RegistroDatosPersonalesTest extends TestCase
         });
 
         $respuesta = $this->postJson(self::CONSULTA, ['dni' => '71000001'])->assertOk()->assertJsonPath('data.nombres', 'ROSA')
-            ->assertJsonMissingPath('data.ubicacion')->assertJsonMissingPath('data.ubicacion_estado');
+            ->assertJsonMissingPath('data.ubicacion')->assertJsonMissingPath('data.ubicacion_estado')->assertJsonMissingPath('data.direccion');
         $this->assertStringNotContainsString('Cusco', $respuesta->getContent());
         $this->assertSame(0, $consultas);
     }

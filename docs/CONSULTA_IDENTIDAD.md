@@ -2,8 +2,8 @@
 
 Estado (21/10/2026): proveedores **simulado** (datos ficticios, solo local y pruebas) y **Factiliza** (servicio
 externo de pago, NO oficial; aceptado por el equipo el 21/10/2026). No hay conexión con RENIEC ni con PIDE. La consulta
-completa nombres y apellidos y, para quien ve datos sensibles, la ubicación del catálogo (22/10/2026), en el paso 1 del
-registro manual, y **solo ahí**: ni la edición del legajo ni los
+completa nombres y apellidos y, para quien ve datos sensibles, la ubicación del catálogo y el domicilio (22/10/2026), en
+el paso 1 del registro manual, y **solo ahí**: ni la edición del legajo ni los
 formularios de plataforma la usan. Es opcional: el registro manual funciona igual sin ella. La importación masiva no la
 usa.
 
@@ -12,7 +12,7 @@ usa.
 | Pieza | Archivo | Responsabilidad |
 |---|---|---|
 | Contrato | `backend/app/Support/Identidad/ConsultaDni.php` | `nombre()`, `esOficial()`, `esSimulado()`, `consultar($dni)` → `ResultadoIdentidad`; lanza `ProveedorNoDisponible` si falla |
-| Resultado | `ResultadoIdentidad.php` | `nombres`, `apellidoPaterno`, `apellidoMaterno` y, opcional, `ubicacion` (departamento, provincia y distrito tal como los informa el proveedor), o «sin coincidencia» |
+| Resultado | `ResultadoIdentidad.php` | `nombres`, `apellidoPaterno`, `apellidoMaterno` y, opcionales, `ubicacion` (departamento, provincia y distrito tal como los informa el proveedor) y `direccion`, o «sin coincidencia» |
 | Ubicación | `UbicacionCatalogo.php` | Empareja esa ubicación con la tabla `ubigeo` de la institución (ver «Ubicación») |
 | Selección | `ProveedorIdentidad.php` | Lee `config('identidad.proveedor')`. Devuelve `null` (no disponible) si el valor es `ninguno`, desconocido, el simulado fuera de local/testing o Factiliza sin token |
 | Simulado | `ConsultaDniSimulada.php` | Casos ficticios fijos, sin red; se niega a responder fuera de `local`/`testing` |
@@ -32,7 +32,7 @@ permisos del registro manual.
 
 | Caso | Respuesta |
 |---|---|
-| Coincidencia | 200 `{ encontrado: true, simulada, nombres, apellido_paterno, apellido_materno }` y, solo con `datos_sensibles.ver`, `ubicacion` (`{ id, region, provincia, distrito }` o `null`) y `ubicacion_estado` |
+| Coincidencia | 200 `{ encontrado: true, simulada, nombres, apellido_paterno, apellido_materno }` y, solo con `datos_sensibles.ver`, `ubicacion` (`{ id, region, provincia, distrito }` o `null`), `ubicacion_estado` y `direccion` (texto o `null`) |
 | Sin coincidencia | 200 `{ encontrado: false, simulada }` |
 | DNI inválido o campo extra | 422 (errores de validación) |
 | Sin permiso | 401 sin sesión / 403 |
@@ -79,9 +79,12 @@ Servicio externo **de pago y no oficial** (no es RENIEC). Se activa con `IDENTID
   de 3 s y espera total de `IDENTIDAD_TIEMPO_ESPERA` (8 s).
 - Respuesta válida: `success: true` y `data.numero` igual al DNI consultado, con `nombres` y `apellido_paterno` no vacíos
   (máx. 120 y 80 caracteres). `apellido_materno` es opcional. `departamento`, `provincia` y `distrito` (máx. 100) se
-  toman solo si vienen los tres. Todo lo demás se descarta: `direccion`, `fecha_nacimiento`, `sexo`, ubigeos… Su
-  documentación lista dirección y fecha de nacimiento, pero en su propio ejemplo la fecha viene vacía y no está
-  confirmado que el plan contratado las devuelva: esos dos datos se ingresan a mano.
+  toman solo si vienen los tres; `direccion` (máx. 250, como el domicilio) si trae texto. Todo lo demás se descarta:
+  `fecha_nacimiento`, `sexo`, ubigeos…
+- **Comprobado el 22/10/2026 con el plan contratado** (una consulta autorizada, sin registrar valores): la respuesta trae
+  todos esos campos, pero solo nombres, apellidos y `direccion` vienen con datos; `departamento`, `provincia`,
+  `distrito`, los ubigeos y `fecha_nacimiento` llegan vacíos. Por eso, con ese plan, la ubicación y la fecha de
+  nacimiento se ingresan a mano y el formulario avisa que el servicio no informó la ubicación.
 - 404 = sin coincidencia. Conexión fallida, tiempo agotado, 401/403 (token inválido o revocado), 429 (límite del plan),
   5xx o respuesta con otra forma o de otro DNI = `ProveedorNoDisponible` (503 `proveedor_no_disponible`). El log solo
   lleva el código HTTP, nunca el DNI, la URL, el cuerpo ni el token.
@@ -99,7 +102,11 @@ Servicio externo **de pago y no oficial** (no es RENIEC). Se activa con `IDENTID
 - Es un dato sensible: sin `datos_sensibles.ver` la respuesta no trae `ubicacion` ni `ubicacion_estado` y el catálogo ni
   se consulta.
 - En el formulario, la ubicación elegida a mano prevalece; la que trajo una consulta se descarta al cambiar el DNI, y
-  una respuesta tardía de otro DNI no se aplica. Nada se guarda hasta pulsar «Registrar personal».
+  una respuesta tardía de otro DNI no se aplica. Si el proveedor no la envió, se avisa. Nada se guarda hasta pulsar
+  «Registrar personal».
+- **Domicilio:** la `direccion` del proveedor se propone en el domicilio, con las mismas reglas que los nombres (rellena
+  si está vacío, pide confirmación antes de reemplazar y se marca como dato de la consulta). Al cambiar el DNI se borra
+  si sigue siendo el de la consulta anterior. No se deduce el distrito a partir de la dirección.
 - La lógica de emparejamiento se tomó de `origin/feature/accesos-dni`, sin su tabla `identidades_dni`: no se guarda
   ninguna identidad consultada.
 
@@ -111,7 +118,7 @@ con datos reales. Casos de demostración (personas ficticias):
 
 | DNI | Resultado |
 |---|---|
-| `00000001` | Ana Lucía Demostración Ficticia (ubicación CUSCO / LA CONVENCION / SANTA ANA, del catálogo nacional) |
+| `00000001` | Ana Lucía Demostración Ficticia (ubicación CUSCO / LA CONVENCION / SANTA ANA, del catálogo nacional, y dirección ficticia) |
 | `00000002` | Carlos Alberto Prueba Simulado |
 | `00000003` | María Ejemplo (sin apellido materno) |
 | `00000004` | Lucía Fernanda Muestra Simulada (los tres campos; ubicación ficticia que no está en ningún catálogo) |

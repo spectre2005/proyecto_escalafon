@@ -8,8 +8,9 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Factiliza: servicio externo de PAGO, no oficial (no es RENIEC ni PIDE). Recibe el DNI en la URL y el token del
- * servidor (identidad.factiliza.token, FACTILIZA_TOKEN); el frontend nunca lo ve. Se toman nombres, apellidos y, si vienen
- * los tres, departamento, provincia y distrito; lo demás (dirección, fecha de nacimiento…) se descarta y nada se guarda. Cualquier fallo, tiempo agotado o respuesta
+ * servidor (identidad.factiliza.token, FACTILIZA_TOKEN); el frontend nunca lo ve. Se toman nombres, apellidos, la dirección
+ * y, si vienen los tres, departamento, provincia y distrito; lo demás (fecha de nacimiento, sexo…) se descarta y nada se
+ * guarda. Que un campo exista en la respuesta no asegura que traiga datos: vacío equivale a no recibido. Cualquier fallo, tiempo agotado o respuesta
  * que no sea la esperada se convierte en ProveedorNoDisponible, sin el DNI en el mensaje ni en el log.
  */
 final class ConsultaDniFactiliza implements ConsultaDni
@@ -74,6 +75,7 @@ final class ConsultaDniFactiliza implements ConsultaDni
         // Ubicación opcional: solo con los tres niveles; si falta alguno, la persona se registra igual y se elige a mano.
         $ubicacion = ['departamento' => $texto('departamento', 100), 'provincia' => $texto('provincia', 100), 'distrito' => $texto('distrito', 100)];
 
-        return ResultadoIdentidad::coincidencia($nombres, $paterno, $texto('apellido_materno', 80), in_array(null, $ubicacion, true) ? null : $ubicacion);
+        // Dirección opcional (máx. 250, como el domicilio): propone el domicilio del formulario.
+        return ResultadoIdentidad::coincidencia($nombres, $paterno, $texto('apellido_materno', 80), in_array(null, $ubicacion, true) ? null : $ubicacion, $texto('direccion', 250));
     }
 }

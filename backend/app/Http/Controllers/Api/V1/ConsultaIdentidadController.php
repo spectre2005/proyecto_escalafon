@@ -17,7 +17,7 @@ use Throwable;
 
 /**
  * Consulta de identidad por DNI para completar nombres, apellidos y, para quien ve datos sensibles, la ubicación del
- * catálogo (UbicacionCatalogo) en el registro manual. No crea ni guarda personas:
+ * catálogo (UbicacionCatalogo) y la dirección en el registro manual. No crea ni guarda personas:
  * solo devuelve datos para el formulario. Exige los mismos permisos que el registro manual (usuarios.gestionar en la
  * ruta, legajo.abrir y legajo.editar aquí) y el módulo «consulta_dni» activo en la institución de la sesión (la del
  * subdominio; el cliente no puede elegir otra). Cada consulta que llega al proveedor queda en auditoria_eventos sin el
@@ -69,10 +69,11 @@ class ConsultaIdentidadController extends Controller
         $this->auditar($request, $proveedor, $dni, $resultado->encontrado ? 'coincidencia' : 'sin_coincidencia');
         $simulada = $proveedor->esSimulado();
         $datos = ['encontrado' => true, 'simulada' => $simulada, 'nombres' => $resultado->nombres, 'apellido_paterno' => $resultado->apellidoPaterno, 'apellido_materno' => $resultado->apellidoMaterno];
-        // La ubicación es un dato sensible (región, provincia y distrito): sin datos_sensibles.ver no sale ni se busca.
+        // Ubicación y dirección son datos sensibles (región, provincia, distrito y domicilio): sin datos_sensibles.ver no salen
+        // y el catálogo ni se consulta.
         if ($resultado->encontrado && $request->user()->veDatosSensibles()) {
             ['estado' => $estado, 'ubicacion' => $ubicacion] = UbicacionCatalogo::emparejar($resultado->ubicacion);
-            $datos += ['ubicacion' => $ubicacion, 'ubicacion_estado' => $estado];
+            $datos += ['ubicacion' => $ubicacion, 'ubicacion_estado' => $estado, 'direccion' => $resultado->direccion];
         }
 
         return response()->json(['data' => $resultado->encontrado ? $datos : ['encontrado' => false, 'simulada' => $simulada]])

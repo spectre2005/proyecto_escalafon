@@ -31,15 +31,20 @@ export function consultarAlCompletar({ modo, dni, ultimoConsultado, ocupado }) {
   return modo === 'boton' && !ocupado && dniValido(dni) && String(dni).trim() !== ultimoConsultado
 }
 
-/** Valores de la respuesta para el borrador (apellido materno ausente = vacío). */
+/**
+ * Valores de la respuesta para el borrador (apellido materno ausente = vacío). La dirección, si llega con texto, propone el
+ * domicilio; si no llega (o el usuario no ve datos sensibles), el domicilio no se toca.
+ */
 export function valoresIdentidad(datos) {
-  return Object.fromEntries(CAMPOS_IDENTIDAD.map(campo => [campo, String(datos?.[campo] ?? '').trim()]))
+  const valores = Object.fromEntries(CAMPOS_IDENTIDAD.map(campo => [campo, String(datos?.[campo] ?? '').trim()]))
+  const direccion = String(datos?.direccion ?? '').trim()
+  return direccion ? { ...valores, domicilio: direccion } : valores
 }
 
 /** Campos ya escritos que la respuesta cambiaría: si hay alguno, se pide confirmación antes de reemplazar. */
 export function camposPorReemplazar(draft, datos) {
   const nuevos = valoresIdentidad(datos)
-  return CAMPOS_IDENTIDAD.filter(campo => String(draft[campo] || '').trim() && String(draft[campo]).trim() !== nuevos[campo])
+  return Object.keys(nuevos).filter(campo => String(draft[campo] || '').trim() && String(draft[campo]).trim() !== nuevos[campo])
 }
 
 /**
@@ -48,7 +53,13 @@ export function camposPorReemplazar(draft, datos) {
  */
 export function aplicarIdentidad(draft, datos, dominio = '') {
   const nuevos = valoresIdentidad(datos)
-  return CAMPOS_IDENTIDAD.reduce((borrador, campo) => updateUserDraft(borrador, campo, nuevos[campo], dominio), draft)
+  return Object.keys(nuevos).reduce((borrador, campo) => updateUserDraft(borrador, campo, nuevos[campo], dominio), draft)
+}
+
+/** Al cambiar el DNI, el domicilio que trajo la consulta anterior se borra; uno escrito o corregido a mano se conserva. */
+export function domicilioTrasCambioDni(draft, origen) {
+  const traido = origen?.valores?.domicilio
+  return traido && draft.domicilio === traido ? { ...draft, domicilio: '' } : draft
 }
 
 /** Mensaje para el usuario según la respuesta del backend; nunca el detalle técnico. Siempre deja seguir a mano. */
@@ -122,5 +133,7 @@ export function mensajeUbicacion(actual, datos) {
   const estado = datos?.ubicacion_estado
   if (estado === 'asignada') return actual.origen === 'manual' ? 'Se conservó la ubicación que elegiste.' : 'Se completó la ubicación con el catálogo. Revísala antes de continuar.'
   if (estado === 'sin_coincidencia' || estado === 'ambigua') return 'La ubicación del DNI no coincide con un único lugar del catálogo: selecciónala manualmente.'
+  // El proveedor no la envió: se avisa, salvo que ya haya una elegida a mano.
+  if (estado === 'sin_dato' && actual.origen !== 'manual') return 'El servicio no informó la ubicación de este DNI: selecciónala manualmente.'
   return null
 }

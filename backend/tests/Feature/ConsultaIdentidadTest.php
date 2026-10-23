@@ -59,12 +59,13 @@ class ConsultaIdentidadTest extends TestCase
         $this->postJson(self::URL, ['dni' => '00000001'])->assertOk()->assertExactJson(['data' => [
             'encontrado' => true, 'simulada' => true, 'nombres' => 'Ana Lucía', 'apellido_paterno' => 'Demostración', 'apellido_materno' => 'Ficticia',
             'ubicacion' => ['id' => $lugar->id, 'region' => 'Cusco', 'provincia' => 'La Convención', 'distrito' => 'Santa Ana'], 'ubicacion_estado' => 'asignada',
+            'direccion' => 'JR. DEMOSTRACION 123',
         ]]);
         $this->postJson(self::URL, ['dni' => '00000003'])->assertOk()->assertJsonPath('data.apellido_materno', null)
             ->assertJsonPath('data.ubicacion', null)->assertJsonPath('data.ubicacion_estado', 'sin_dato');
         $this->postJson(self::URL, ['dni' => '00000004'])->assertOk()->assertExactJson(['data' => [
             'encontrado' => true, 'simulada' => true, 'nombres' => 'Lucía Fernanda', 'apellido_paterno' => 'Muestra', 'apellido_materno' => 'Simulada',
-            'ubicacion' => null, 'ubicacion_estado' => 'sin_coincidencia',
+            'ubicacion' => null, 'ubicacion_estado' => 'sin_coincidencia', 'direccion' => null,
         ]]);
 
         Http::assertNothingSent();
@@ -89,7 +90,7 @@ class ConsultaIdentidadTest extends TestCase
         // Catálogo cerrado: cambiar o añadir un caso exige actualizar esta prueba y docs/CONSULTA_IDENTIDAD.md.
         $this->assertSame([
             '00000001' => ['nombres' => 'Ana Lucía', 'apellido_paterno' => 'Demostración', 'apellido_materno' => 'Ficticia',
-                'ubicacion' => ['departamento' => 'CUSCO', 'provincia' => 'LA CONVENCION', 'distrito' => 'SANTA ANA']],
+                'ubicacion' => ['departamento' => 'CUSCO', 'provincia' => 'LA CONVENCION', 'distrito' => 'SANTA ANA'], 'direccion' => 'JR. DEMOSTRACION 123'],
             '00000002' => ['nombres' => 'Carlos Alberto', 'apellido_paterno' => 'Prueba', 'apellido_materno' => 'Simulado'],
             '00000003' => ['nombres' => 'María', 'apellido_paterno' => 'Ejemplo', 'apellido_materno' => null],
             '00000004' => ['nombres' => 'Lucía Fernanda', 'apellido_paterno' => 'Muestra', 'apellido_materno' => 'Simulada',

@@ -17,11 +17,11 @@ final class ConsultaDniSimulada implements ConsultaDni
     /**
      * DNI de demostración → nombres ficticios. Los apellidos dicen que son de prueba. La ubicación, cuando la hay, se
      * escribe como la informan los proveedores (mayúsculas, sin tildes): 00000001 está en el catálogo nacional y 00000004
-     * no existe en ningún catálogo (se elige a mano).
+     * no existe en ningún catálogo (se elige a mano). 00000001 trae además una dirección ficticia.
      */
     public const CASOS = [
         '00000001' => ['nombres' => 'Ana Lucía', 'apellido_paterno' => 'Demostración', 'apellido_materno' => 'Ficticia',
-            'ubicacion' => ['departamento' => 'CUSCO', 'provincia' => 'LA CONVENCION', 'distrito' => 'SANTA ANA']],
+            'ubicacion' => ['departamento' => 'CUSCO', 'provincia' => 'LA CONVENCION', 'distrito' => 'SANTA ANA'], 'direccion' => 'JR. DEMOSTRACION 123'],
         '00000002' => ['nombres' => 'Carlos Alberto', 'apellido_paterno' => 'Prueba', 'apellido_materno' => 'Simulado'],
         '00000003' => ['nombres' => 'María', 'apellido_paterno' => 'Ejemplo', 'apellido_materno' => null],
         '00000004' => ['nombres' => 'Lucía Fernanda', 'apellido_paterno' => 'Muestra', 'apellido_materno' => 'Simulada',
@@ -61,6 +61,6 @@ final class ConsultaDniSimulada implements ConsultaDni
         }
         $caso = self::CASOS[$dni] ?? null;
 
-        return $caso ? ResultadoIdentidad::coincidencia($caso['nombres'], $caso['apellido_paterno'], $caso['apellido_materno'], $caso['ubicacion'] ?? null) : ResultadoIdentidad::sinCoincidencia();
+        return $caso ? ResultadoIdentidad::coincidencia($caso['nombres'], $caso['apellido_paterno'], $caso['apellido_materno'], $caso['ubicacion'] ?? null, $caso['direccion'] ?? null) : ResultadoIdentidad::sinCoincidencia();
     }
 }

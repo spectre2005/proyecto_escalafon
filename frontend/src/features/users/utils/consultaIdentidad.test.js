@@ -3,7 +3,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
 import { datosPuestoInicial, vinculoInicial } from '../../legajos/components/seccion02/borradoresVinculo.js'
-import { AVISO_SIMULACION, aplicarIdentidad, camposPorReemplazar, consultarAlCompletar, crearConsultaIdentidad, ESPERA_CONSULTA_MS, mensajeErrorConsulta, mensajeUbicacion, modoConsulta, NO_DISPONIBLE, UBICACION_VACIA, ubicacionManual, ubicacionTrasCambioDni, ubicacionTrasConsulta, valoresIdentidad } from './consultaIdentidad.js'
+import { AVISO_SIMULACION, aplicarIdentidad, camposPorReemplazar, consultarAlCompletar, crearConsultaIdentidad, domicilioTrasCambioDni, ESPERA_CONSULTA_MS, mensajeErrorConsulta, mensajeUbicacion, modoConsulta, NO_DISPONIBLE, UBICACION_VACIA, ubicacionManual, ubicacionTrasCambioDni, ubicacionTrasConsulta, valoresIdentidad } from './consultaIdentidad.js'
 import { armarRegistro, erroresPersona, personaExistente } from './registroPasos.js'
 import { updateUserDraft } from './usuariosEmail.js'
 
@@ -211,9 +211,11 @@ test('without a match, with an ambiguous one or without location the selection i
     assert.equal(ubicacionTrasConsulta(UBICACION_VACIA, '71000001', datos), UBICACION_VACIA)
     assert.match(mensajeUbicacion(UBICACION_VACIA, datos), /selecciónala manualmente/)
   }
-  // Solo nombres (sin_dato) o un usuario sin datos sensibles (sin las claves): ni ubicación ni aviso.
+  // El proveedor no la envió (sin_dato): no cambia nada y se avisa, salvo que ya haya una elegida a mano.
   assert.equal(ubicacionTrasConsulta(UBICACION_VACIA, '71000001', { encontrado: true, ubicacion: null, ubicacion_estado: 'sin_dato' }), UBICACION_VACIA)
-  assert.equal(mensajeUbicacion(UBICACION_VACIA, { encontrado: true, ubicacion_estado: 'sin_dato' }), null)
+  assert.equal(mensajeUbicacion(UBICACION_VACIA, { encontrado: true, ubicacion_estado: 'sin_dato' }), 'El servicio no informó la ubicación de este DNI: selecciónala manualmente.')
+  assert.equal(mensajeUbicacion(ubicacionManual({ region: 'Lima', provincia: 'Lima', distrito: 'Miraflores' }, 'u'), { encontrado: true, ubicacion_estado: 'sin_dato' }), null)
+  // Un usuario sin datos sensibles no recibe las claves: ni ubicación ni aviso.
   assert.equal(ubicacionTrasConsulta(UBICACION_VACIA, '71000001', { encontrado: true, nombres: 'ROSA' }), UBICACION_VACIA)
   assert.equal(mensajeUbicacion(UBICACION_VACIA, { encontrado: true, nombres: 'ROSA' }), null)
 })
@@ -248,4 +250,30 @@ test('a lookup still running when the DNI changes never brings its location to t
   assert.equal(resultado.estado, 'obsoleta')
   if (resultado.estado === 'ok') ubicacion = ubicacionTrasConsulta(ubicacion, '71000001', resultado.datos)
   assert.equal(ubicacion, UBICACION_VACIA)
+})
+
+const conDireccion = { encontrado: true, nombres: 'ROSA', apellido_paterno: 'FICTICIA', apellido_materno: '', direccion: ' AV. FICTICIA 456 ' }
+
+test('an address that arrives fills an empty domicilio and asks before replacing a written one', () => {
+  const vacio = { nombres: '', apellido_paterno: '', apellido_materno: '', domicilio: '' }
+  assert.equal(valoresIdentidad(conDireccion).domicilio, 'AV. FICTICIA 456')
+  assert.deepEqual(camposPorReemplazar(vacio, conDireccion), [])
+  assert.equal(aplicarIdentidad(vacio, conDireccion).domicilio, 'AV. FICTICIA 456')
+  assert.deepEqual(camposPorReemplazar({ ...vacio, domicilio: 'JR. ESCRITO A MANO 1' }, conDireccion), ['domicilio'])
+})
+
+test('without an address the domicilio is never touched', () => {
+  const borrador = { nombres: '', apellido_paterno: '', apellido_materno: '', domicilio: 'JR. ESCRITO A MANO 1' }
+  for (const datos of [{ ...conDireccion, direccion: null }, { ...conDireccion, direccion: '  ' }, { encontrado: true, nombres: 'ROSA', apellido_paterno: 'FICTICIA' }]) {
+    assert.equal('domicilio' in valoresIdentidad(datos), false)
+    assert.deepEqual(camposPorReemplazar(borrador, datos), [])
+    assert.equal(aplicarIdentidad(borrador, datos).domicilio, 'JR. ESCRITO A MANO 1')
+  }
+})
+
+test('changing the DNI drops the domicilio brought by the previous lookup but keeps one written by hand', () => {
+  const origen = { simulada: false, valores: valoresIdentidad(conDireccion) }
+  assert.equal(domicilioTrasCambioDni({ domicilio: 'AV. FICTICIA 456' }, origen).domicilio, '')
+  assert.equal(domicilioTrasCambioDni({ domicilio: 'AV. FICTICIA 456 DPTO 2' }, origen).domicilio, 'AV. FICTICIA 456 DPTO 2')
+  assert.equal(domicilioTrasCambioDni({ domicilio: 'JR. A MANO' }, null).domicilio, 'JR. A MANO')
 })

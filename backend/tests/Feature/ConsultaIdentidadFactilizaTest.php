@@ -65,10 +65,11 @@ class ConsultaIdentidadFactilizaTest extends TestCase
         $lugar = Ubigeo::factory()->create(['region' => 'Cusco', 'provincia' => 'La Convención', 'distrito' => 'Santa Ana']);
 
         $this->getJson(self::URL)->assertOk()->assertExactJson(['data' => ['habilitada' => true, 'disponible' => true, 'simulada' => false]]);
-        // Del resto de la respuesta (dirección…) no sale nada: solo nombres y el lugar del catálogo.
+        // Del resto de la respuesta no sale nada: solo nombres, el lugar del catálogo y la dirección.
         $this->postJson(self::URL, ['dni' => self::DNI])->assertOk()->assertExactJson(['data' => [
             'encontrado' => true, 'simulada' => false, 'nombres' => 'Rosa Elena', 'apellido_paterno' => 'Ficticia', 'apellido_materno' => 'De Prueba',
             'ubicacion' => ['id' => $lugar->id, 'region' => 'Cusco', 'provincia' => 'La Convención', 'distrito' => 'Santa Ana'], 'ubicacion_estado' => 'asignada',
+            'direccion' => 'Calle Inventada 123',
         ]]);
 
         // Una sola petición, al endpoint de referencia, con el token del servidor y el DNI en la ruta.

@@ -13,7 +13,7 @@ import { columns, hoyLima } from '../utils/usuariosCsv'
 import { updateUserDraft } from '../utils/usuariosEmail'
 import { consultarIdentidad, estadoConsultaIdentidad } from '../api/usuariosApi'
 import { usePuede } from '../../auth/session'
-import { AVISO_SIMULACION, aplicarIdentidad, camposPorReemplazar, consultarAlCompletar, crearConsultaIdentidad, ESPERA_CONSULTA_MS, mensajeErrorConsulta, modoConsulta, mensajeUbicacion, NO_DISPONIBLE, UBICACION_VACIA, ubicacionManual, ubicacionTrasCambioDni, ubicacionTrasConsulta, valoresIdentidad } from '../utils/consultaIdentidad'
+import { AVISO_SIMULACION, aplicarIdentidad, camposPorReemplazar, consultarAlCompletar, crearConsultaIdentidad, domicilioTrasCambioDni, ESPERA_CONSULTA_MS, mensajeErrorConsulta, modoConsulta, mensajeUbicacion, NO_DISPONIBLE, UBICACION_VACIA, ubicacionManual, ubicacionTrasCambioDni, ubicacionTrasConsulta, valoresIdentidad } from '../utils/consultaIdentidad'
 import { armarRegistro, erroresDe, erroresPersona, PASOS, personaDelPaso, personaExistente, primerPasoConError, rutaFicha, sugerenciaTipoVinculo } from '../utils/registroPasos'
 
 // Registro manual en tres pasos dentro de la ventana «Agregar personal»: persona, primer vínculo laboral y datos del
@@ -34,7 +34,7 @@ const camposPersona = [
 const camposSensibles = ['fecha_nacimiento', 'domicilio']
 const largo = { numero_doc_identidad: 8, telefono: 9, nombres: 120, email_institucional: 255, domicilio: 250 }
 const tiposPersonal = { docente: 'Docente', administrativo: 'Administrativo' }
-const etiquetas = Object.fromEntries(camposPersona.map(([key, label]) => [key, label.toLowerCase()]))
+const etiquetas = { ...Object.fromEntries(camposPersona.map(([key, label]) => [key, label.toLowerCase()])), domicilio: 'domicilio' }
 const identidadInicial = { cargando: false, mensaje: null, origen: null, pendiente: null, ubicacion: null }
 const estilosMensaje = { ok: 'bg-[#eaf4ee] text-[#2c7650]', info: 'border border-[#f1d9a6] bg-[#fff8e8] text-[#7a5a17]', error: 'bg-[#fff0ed] text-[#ac4d3a]' }
 const botonSecundario = 'rounded-lg border border-[#dbe6e1] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#4f6d63] hover:bg-[#edf6f2]'
@@ -144,7 +144,7 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   function aplicarConsulta(dni, datos, avisoUbicacion = null) {
     setDraft(previo => previo.numero_doc_identidad.trim() === dni ? aplicarIdentidad(previo, datos, dominioCorreo) : previo)
     setIdentidad({ cargando: false, pendiente: null, origen: { simulada: datos.simulada, valores: valoresIdentidad(datos) }, ubicacion: avisoUbicacion,
-      mensaje: { tipo: 'ok', texto: 'Se completaron nombres y apellidos. Revísalos antes de continuar; puedes corregirlos.' } })
+      mensaje: { tipo: 'ok', texto: `Se completaron nombres y apellidos${valoresIdentidad(datos).domicilio ? ' y el domicilio' : ''}. Revísalos antes de continuar; puedes corregirlos.` } })
   }
 
   async function consultarDni(dni = draftRef.current.numero_doc_identidad.trim()) {
@@ -241,8 +241,11 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
         aria-invalid={erroresPersonaCampo[key] ? true : undefined}
         onChange={event => {
           const valor = numerico ? event.target.value.replace(/\D/g, '').slice(0, largo[key]) : event.target.value
-          if (key === 'numero_doc_identidad' && valor !== draft.numero_doc_identidad) reiniciarIdentidad(valor)
-          setDraft(updateUserDraft(draft, key, valor, dominioCorreo))
+          const cambiaDni = key === 'numero_doc_identidad' && valor !== draft.numero_doc_identidad
+          const siguiente = updateUserDraft(draft, key, valor, dominioCorreo)
+          if (cambiaDni) reiniciarIdentidad(valor)
+          // El domicilio que trajo la consulta del DNI anterior no pasa a la persona nueva.
+          setDraft(cambiaDni ? domicilioTrasCambioDni(siguiente, identidad.origen) : siguiente)
         }} />
       {key === 'email_institucional' && <small className="text-[10px] text-[#8b9c91]">{dominioCorreo ? 'Se sugiere con el nombre y el apellido; puedes cambiarlo. ' : ''}Se utiliza para enviar requerimientos y notificaciones. Si la persona tiene una cuenta habilitada en el sistema, también puede utilizarse para iniciar sesión.</small>}
       {identidad.origen && draft[key] && identidad.origen.valores[key] === draft[key] && <small className="text-[10px] font-semibold text-[#7a5a17]">{identidad.origen.simulada ? 'Dato simulado (ficticio)' : 'Dato de la consulta de identidad'}</small>}
