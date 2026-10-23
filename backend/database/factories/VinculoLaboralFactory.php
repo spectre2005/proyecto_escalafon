@@ -21,7 +21,8 @@ class VinculoLaboralFactory extends Factory
             'regimen_laboral' => 'plazo_determinado',
             'regimen_normativo_id' => RegimenNormativo::factory(),
             'nombre_puesto' => substr(fake()->word(), 0, 150),
-            'fecha_inicio' => now(),
+            // Día de Lima, como VigenciaLaboral: con now() en UTC, de 19:00 a 24:00 en Lima el vínculo nacería «con inicio futuro».
+            'fecha_inicio' => now('America/Lima')->toDateString(),
         ];
     }
 }
