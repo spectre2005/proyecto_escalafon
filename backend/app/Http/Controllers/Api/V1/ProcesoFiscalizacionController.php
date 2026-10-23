@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Models\ProcesoFiscalizacion;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Resources\Json\JsonResource;
 
 class ProcesoFiscalizacionController extends ResourceController
 {
@@ -23,4 +25,14 @@ class ProcesoFiscalizacionController extends ResourceController
         'comunicado_procuraduria_en' => 'nullable|date',
         'comunicado_stpad_en' => 'nullable|date',
     ];
+
+    protected function indexQuery(): Builder
+    {
+        return app(FiscalizacionController::class)->consultaVisible(request())->orderBy('id');
+    }
+
+    public function show(string $record): JsonResource
+    {
+        return new JsonResource($this->indexQuery()->findOrFail($record));
+    }
 }

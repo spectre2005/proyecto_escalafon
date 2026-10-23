@@ -273,6 +273,10 @@ class Seccion05Controller extends Controller
     /** @return array{id: string, values: array<string, mixed>} */
     private function fila(Model $registro, array $campos): array
     {
+        if ($registro instanceof DocumentoUsuario) {
+            $campos = array_values(array_unique([...$campos, 'fiscalizado', 'resultado_fiscalizacion', 'proceso_fiscalizacion_id']));
+        }
+
         $values = [];
         foreach ($campos as $campo) {
             $valor = $registro->getAttribute($campo);

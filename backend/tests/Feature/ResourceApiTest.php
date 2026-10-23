@@ -7,8 +7,8 @@ use App\Models\ArchivoDocumento;
 use App\Models\ConexionCorreo;
 use App\Models\ConfiguracionFuncionalidad;
 use App\Models\Controversia;
-use App\Models\Desvinculacion;
 use App\Models\Desplazamiento;
+use App\Models\Desvinculacion;
 use App\Models\DocumentoUsuario;
 use App\Models\EvaluacionDesempeno;
 use App\Models\Familiar;
@@ -21,6 +21,7 @@ use App\Models\PerfilAdministrativo;
 use App\Models\PerfilDocente;
 use App\Models\PeriodoPrueba;
 use App\Models\PeriodoVacacional;
+use App\Models\ProcesoFiscalizacion;
 use App\Models\ProgresionCarrera;
 use App\Models\RatificacionDocente;
 use App\Models\Reconocimiento;
@@ -28,6 +29,7 @@ use App\Models\RecursoImpugnatorio;
 use App\Models\RegistroSstBienestar;
 use App\Models\Rol;
 use App\Models\Sancion;
+use App\Models\SolicitudFiscalizacion;
 use App\Models\Usuario;
 use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
@@ -158,7 +160,7 @@ class ResourceApiTest extends TestCase
             unset($payload['registrado_por']);
         }
         $uri = '/api/v1/'.str_replace('_', '-', $model->getTable());
-        $soloLectura = $model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento || in_array($class, [...self::SECCION_02, ...self::SECCION_05, ...self::SECCION_07, ...self::SECCION_08, ...self::SECCION_09, ...self::SECCION_10, ...self::SECCION_11], true);
+        $soloLectura = $model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento || $model instanceof ProcesoFiscalizacion || $model instanceof SolicitudFiscalizacion || in_array($class, [...self::SECCION_02, ...self::SECCION_05, ...self::SECCION_07, ...self::SECCION_08, ...self::SECCION_09, ...self::SECCION_10, ...self::SECCION_11], true);
         if ($soloLectura) {
             // Documentos y archivos se crean únicamente por la carga del legajo (folios, hash y bitácora); los registros de
             // las secciones 02 y 05, solo desde Seccion02Controller y Seccion05Controller.

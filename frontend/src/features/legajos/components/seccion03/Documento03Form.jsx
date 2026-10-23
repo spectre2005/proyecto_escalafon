@@ -1,3 +1,4 @@
+import ReconocerTitulo from './ReconocerTitulo'
 import FormSplit from '../../../../components/pdf/FormSplit'
 import PdfPreviewField from '../../../../components/pdf/PdfPreviewField'
 import { useEffect, useRef, useState } from 'react'
@@ -16,7 +17,8 @@ function datosDe(doc) {
   const registro = doc.datos || {}
   return conValor({
     nombre: doc.nombre, emisor: doc.emisor, fecha_emision: doc.fecha_emision, modalidad_presentacion: doc.modalidad_presentacion,
-    nivel: registro.nivel, numero_registro: registro.numero_registro, numero_colegiatura: registro.numero_colegiatura, vigente_hasta: registro.vigente_hasta,
+    nivel: registro.nivel, numero_registro: registro.numero_registro,
+    pais: registro.pais, numero_diploma: registro.numero_diploma, fecha_obtencion: registro.fecha_obtencion, numero_colegiatura: registro.numero_colegiatura, vigente_hasta: registro.vigente_hasta,
     tipo_capacitacion: registro.tipo_capacitacion, horas: registro.horas === undefined || registro.horas === null ? '' : String(registro.horas),
   })
 }
@@ -39,6 +41,12 @@ export default function Documento03Form({
   }, [])
 
   const [pdf, setPdf] = useState(null)
+  const [lecturaOcupada, setLecturaOcupada] = useState(false)
+  const [versionArchivo, setVersionArchivo] = useState(0)
+  const [reconocimientoToken, setReconocimientoToken] = useState('')
+  const esTitulo = ['b', 'e'].includes(item.letra)
+  const esBasico = item.letra === 'a'
+  const esReconocible = esTitulo || esBasico
   const [errorPdf, setErrorPdf] = useState('')
   const [paginas, setPaginas] = useState(null)
 
@@ -53,7 +61,10 @@ export default function Documento03Form({
     // Última modalidad usada en este navegador (se puede cambiar).
     modalidad_presentacion: modalidadRecordada(),
     numero_registro: '',
-    nivel: '',
+    pais: '',
+    numero_diploma: '',
+    fecha_obtencion: '',
+    nivel: esBasico ? 'educacion_basica' : '',
     numero_colegiatura: '',
     vigente_hasta: '',
     tipo_capacitacion: '',
@@ -91,7 +102,8 @@ export default function Documento03Form({
     ]
 
     const especificos = ['b', 'e'].includes(item.letra)
-      ? ['numero_registro', 'nivel']
+      ? ['numero_registro', 'nivel', 'pais', 'numero_diploma', 'fecha_obtencion']
+      : esBasico ? ['nivel', 'pais', 'numero_diploma', 'fecha_obtencion']
       : item.letra === 'c'
         ? ['numero_colegiatura', 'vigente_hasta']
         : ['f', 'g'].includes(item.letra)
@@ -109,7 +121,8 @@ export default function Documento03Form({
       usuario,
       {
         ...payload,
-        tipo_documento_id: item.id
+        tipo_documento_id: item.id,
+        ...(reconocimientoToken ? { reconocimiento_token: reconocimientoToken, reconocimiento_confirmado: 1 } : {})
       },
       pdf
     )
@@ -120,34 +133,42 @@ export default function Documento03Form({
       modal
       titulo={draft.subsana_a_documento_id ? 'Subsanar documento' : 'Agregar documento'}
       guardar="Guardar documento"
-      busy={busy}
+      busy={busy || lecturaOcupada}
+      busyText={lecturaOcupada ? 'Leyendo documento…' : 'Guardando…'}
       error={error}
       onCancel={onCancel}
       onSubmit={() => {
-        if (pdf && !errorPdf) guardar(draft)
+        if (pdf && !errorPdf && !lecturaOcupada) guardar(draft)
       }}
       nota="Lo registrado no se edita ni se elimina: para corregirlo, agrega un documento nuevo que subsane al anterior."
     >
       <FormSplit
         pdf={
           <PdfPreviewField
-            label={`Archivo PDF (máximo ${datos.tamano_maximo_kb} KB)`}
+            label={`${esReconocible ? esBasico ? 'PDF o imagen del certificado' : 'PDF o imagen del título' : 'Archivo PDF'} (máximo ${datos.tamano_maximo_kb} KB)`}
+            allowImages={esReconocible}
             required
             maxMB={
               datos.tamano_maximo_kb
                 ? datos.tamano_maximo_kb / 1024
                 : 2
             }
-            help="Selecciona el PDF para ver su contenido antes de guardarlo."
+            help={esReconocible ? 'Selecciona un PDF, JPG o PNG. Las imágenes se incorporan como PDF. Puedes reconocer los datos antes de guardar.' : 'Selecciona el PDF para ver su contenido antes de guardarlo.'}
             error={errorPdf || errors.pdf}
             onPages={setPaginas}
             onChange={(file, message) => {
               setPdf(file)
+              setVersionArchivo(version => version + 1)
+              setReconocimientoToken('')
+              setLecturaOcupada(false)
               setErrorPdf(message)
             }}
           />
         }
       >
+        {esReconocible && pdf && !errorPdf && <ReconocerTitulo key={versionArchivo} archivo={pdf} usuario={usuario} item={item} draft={draft} onBusy={setLecturaOcupada} onApply={(campos, token) => { for (const [campo, valor] of Object.entries(campos)) poner(campo)(valor); setReconocimientoToken(token) }} />}
+        {esBasico && <p className="col-span-full text-xs leading-relaxed text-slate-500">Puedes <a className="font-semibold text-teal-700 underline" href="/ejemplos/certificado-estudios-basicos-prueba.pdf" download>descargar un formato de prueba sin validez</a> para ensayar el escaneo. No corresponde a un estudiante ni acredita estudios.</p>}
+        {errors.reconocimiento_token && <p role="alert" className="col-span-full text-xs text-rose-700">{errors.reconocimiento_token.join(' ')}</p>}
         <Campo
           label="Nombre del documento"
           required
@@ -209,7 +230,7 @@ export default function Documento03Form({
               </select>
             </Campo>
 
-            <Campo
+            {!esBasico && <Campo
               label="N.º de registro (opcional)"
               error={errors.numero_registro}
             >
@@ -218,9 +239,16 @@ export default function Documento03Form({
                 value={draft.numero_registro}
                 onChange={set('numero_registro')}
               />
-            </Campo>
+            </Campo>}
           </>
         )}
+
+        {esReconocible && <>
+          <Campo label="País de la institución (si se conoce)" error={errors.pais}><input maxLength={60} value={draft.pais} onChange={set('pais')} /></Campo>
+          <Campo label={esBasico ? "Serie y número del certificado (si figuran)" : "Número de diploma (si figura)"} error={errors.numero_diploma}><input maxLength={40} value={draft.numero_diploma} onChange={set('numero_diploma')} /></Campo>
+          <Campo label="Fecha de obtención (si difiere de la expedición)" error={errors.fecha_obtencion}><input type="date" max={hoy()} value={draft.fecha_obtencion} onChange={set('fecha_obtencion')} /></Campo>
+          <p className="col-span-full text-xs leading-relaxed text-slate-500">{esBasico ? 'Registra la institución educativa o CEBA que expide el certificado. La serie y el número no son un registro SUNEDU. Un formato en blanco no acredita estudios.' : 'El país, número de diploma y registro oficial se conservan por separado. Un título extranjero requiere revisar su reconocimiento o revalidación; cargarlo no los acredita.'}</p>
+        </>}
 
         {item.letra === 'c' && (
           <>

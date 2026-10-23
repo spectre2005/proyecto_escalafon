@@ -20,6 +20,7 @@ export const antivirus03 = {
 }
 
 export const niveles03 = {
+  a: { educacion_basica: 'Educación básica' },
   b: { tecnico: 'Técnico', bachiller: 'Bachiller', titulo_profesional: 'Título profesional' },
   e: { maestria: 'Maestría', doctorado: 'Doctorado' },
 }

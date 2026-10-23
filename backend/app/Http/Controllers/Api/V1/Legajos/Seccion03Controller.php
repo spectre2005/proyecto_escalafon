@@ -9,12 +9,14 @@ use App\Models\DocumentoUsuario;
 use App\Models\FormacionAcademica;
 use App\Models\Legajo;
 use App\Models\ObservacionDocumento;
+use App\Models\Plataforma\Institucion;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Support\Documentos\ArchivoPdf;
 use App\Support\Documentos\AuditoriaDocumento;
 use App\Support\Documentos\CargaDocumento;
 use App\Support\Documentos\Folios;
+use App\Support\Documentos\ReconocimientoTitulo;
 use App\Support\Documentos\RevisionDocumento;
 use App\Support\Parametros;
 use App\Support\PerfilDocumental;
@@ -22,8 +24,11 @@ use App\Support\ResumenSeccion03;
 use Carbon\CarbonInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class Seccion03Controller extends Controller
 {
@@ -72,6 +77,41 @@ class Seccion03Controller extends Controller
         ]]);
     }
 
+    public function reconocer(Request $request, string $usuario, ReconocimientoTitulo $lector): JsonResponse
+    {
+        $persona = Usuario::query()->findOrFail($usuario);
+        abort_unless($this->legajo($persona), 409, 'Primero abre el legajo de esta persona.');
+        $request->validate([
+            'tipo_documento_id' => ['required', 'uuid', Rule::exists('tipos_documento', 'id')->where('seccion_legajo_id', 3)->where('activo', true)],
+            'archivo' => ['required', 'file', 'max:'.Parametros::entero('tamano_maximo_pdf_kb'), 'mimetypes:application/pdf,image/jpeg,image/png'],
+        ]);
+        $tipo = TipoDocumento::query()->findOrFail($request->input('tipo_documento_id'));
+        $this->exigirSensibles($request, $tipo);
+        abort_unless(in_array($tipo->codigo, ['FORM_ESTUDIOS_BASICOS', 'FORM_TITULO_GRADO_SUPERIOR', 'FORM_MAESTRIA_DOCTORADO'], true), 422, 'La lectura asistida está disponible para certificados de estudios básicos, grados y títulos.');
+        $archivo = $request->file('archivo');
+        $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($archivo->getRealPath());
+        if (($mime === 'application/pdf' && ! ArchivoPdf::esPdf($archivo)) || ! in_array($mime, ['application/pdf', 'image/jpeg', 'image/png'], true)) {
+            throw ValidationException::withMessages(['archivo' => 'El contenido no es un PDF, JPG o PNG válido.']);
+        }
+        $lectura = $lector->extraer($archivo);
+        $resultado = $lector->analizar($lectura['texto']);
+        $normalizar = fn (string $valor): string => trim(preg_replace('/[^a-z ]/', '', Str::lower(Str::ascii($valor))));
+        $titular = $normalizar($resultado['campos']['titular_nombre'] ?? '');
+        $nombres = $normalizar($persona->nombres.' '.$persona->apellido_paterno.' '.$persona->apellido_materno);
+        if ($titular !== '' && array_diff(array_filter(explode(' ', $nombres)), explode(' ', $titular)) !== []) {
+            $resultado['avisos'][] = 'El nombre leído no coincide completamente con el titular del legajo. Revisa la identidad antes de registrar.';
+        }
+        $recibo = [
+            'usuario' => $usuario, 'actor' => (string) $request->user()->getAuthIdentifier(), 'tipo' => $tipo->id,
+            'institucion' => app()->bound(Institucion::class) ? app(Institucion::class)->slug : 'unica',
+            'hash' => ArchivoPdf::hash($request->file('archivo')), 'vence' => now()->addHours(2)->timestamp,
+            'metodo' => $lectura['metodo'], 'paginas' => $lectura['paginas'], 'campos' => $resultado['campos'],
+            'evidencias' => $resultado['evidencias'], 'fecha_lectura' => now()->toIso8601String(),
+        ];
+
+        return response()->json(['data' => [...$lectura, ...$resultado, 'token' => Crypt::encryptString(json_encode($recibo, JSON_THROW_ON_ERROR))]]);
+    }
+
     public function store(Request $request, string $usuario): JsonResponse
     {
         $persona = Usuario::query()->with('vinculosLaborales')->findOrFail($usuario);
@@ -91,9 +131,14 @@ class Seccion03Controller extends Controller
             'pdf' => ['required', 'file', 'max:'.Parametros::entero('tamano_maximo_pdf_kb')],
             'subsana_a_documento_id' => 'nullable|uuid',
         ];
-        if (in_array($letra, ['b', 'e'], true)) {
-            $reglas['numero_registro'] = 'nullable|string|max:40';
-            $reglas['nivel'] = ['required', Rule::in($letra === 'b' ? ['tecnico', 'bachiller', 'titulo_profesional'] : ['maestria', 'doctorado'])];
+        if (in_array($letra, ['a', 'b', 'e'], true)) {
+            $reglas['numero_registro'] = $letra === 'a' ? 'prohibited' : 'nullable|string|max:40';
+            $reglas['numero_diploma'] = 'nullable|string|max:40';
+            $reglas['pais'] = 'nullable|string|max:60';
+            $reglas['fecha_obtencion'] = 'nullable|date_format:Y-m-d|before_or_equal:today';
+            $reglas['reconocimiento_token'] = 'nullable|string|max:20000';
+            $reglas['reconocimiento_confirmado'] = 'exclude_without:reconocimiento_token|required|accepted';
+            $reglas['nivel'] = $letra === 'a' ? 'sometimes|in:educacion_basica' : ['required', Rule::in($letra === 'b' ? ['tecnico', 'bachiller', 'titulo_profesional'] : ['maestria', 'doctorado'])];
         }
         if ($letra === 'c') {
             $reglas['numero_colegiatura'] = 'required|string|max:30';
@@ -113,6 +158,20 @@ class Seccion03Controller extends Controller
         if (! ArchivoPdf::esPdf($request->file('pdf'))) {
             throw ValidationException::withMessages(['pdf' => 'El archivo no contiene un PDF válido. Selecciona un PDF e intenta nuevamente.']);
         }
+        $reconocimiento = null;
+        if (! empty($datos['reconocimiento_token'])) {
+            try {
+                $reconocimiento = json_decode(Crypt::decryptString($datos['reconocimiento_token']), true, flags: JSON_THROW_ON_ERROR);
+                $slug = app()->bound(Institucion::class) ? app(Institucion::class)->slug : 'unica';
+                if (! is_array($reconocimiento) || $reconocimiento['usuario'] !== $usuario || $reconocimiento['actor'] !== (string) $request->user()->getAuthIdentifier()
+                    || $reconocimiento['tipo'] !== $tipo->id || $reconocimiento['institucion'] !== $slug || $reconocimiento['vence'] < now()->timestamp
+                    || ! hash_equals($reconocimiento['hash'], ArchivoPdf::hash($request->file('pdf')))) {
+                    throw new \RuntimeException('Lectura no vigente.');
+                }
+            } catch (Throwable) {
+                throw ValidationException::withMessages(['reconocimiento_token' => 'La lectura no corresponde a este archivo o ha vencido. Reconoce el documento nuevamente o ingresa los datos manualmente.']);
+            }
+        }
         $metadatos = collect($datos)->only(['nombre', 'emisor', 'fecha_emision', 'folio_inicio', 'folio_fin', 'modalidad_presentacion'])->map(fn ($valor) => is_string($valor) ? trim($valor) : $valor)->all();
         $metadatos = [...$metadatos,
             'num_resolucion' => $datos['numero_registro'] ?? null, 'fecha_incorporacion' => today()->toDateString(),
@@ -120,10 +179,14 @@ class Seccion03Controller extends Controller
             'titular_documento' => $persona->numero_doc_identidad, 'relacion_titular' => 'servidor',
         ];
         $documento = CargaDocumento::registrar($legajo, $tipo, $request->file('pdf'), $metadatos, $request->user()->getAuthIdentifier(), $request->ip(),
-            $datos['subsana_a_documento_id'] ?? null, completar: function (DocumentoUsuario $doc) use ($datos, $letra, $request): void {
+            $datos['subsana_a_documento_id'] ?? null, completar: function (DocumentoUsuario $doc) use ($datos, $letra, $request, $reconocimiento): void {
                 abort_unless($doc->legajo->estado_legajo === 'activo', 409, 'El legajo se cerró durante la carga. Actualiza la ficha.');
                 $this->registrarDatos($doc, $datos, $letra);
                 AuditoriaDocumento::registrar($doc, $request, 'formacion.documento.creado');
+                if ($reconocimiento !== null) {
+                    AuditoriaDocumento::registrar($doc, $request, 'formacion.reconocimiento.confirmado', $reconocimiento,
+                        [...collect($datos)->except(['pdf', 'reconocimiento_token', 'reconocimiento_confirmado'])->all(), 'hash_archivo' => $reconocimiento['hash'], 'revision_humana' => true]);
+                }
             });
 
         return response()->json(['data' => $documento->only(['id', 'nombre', 'estado', 'folio_inicio', 'folio_fin'])], 201);
@@ -143,6 +206,7 @@ class Seccion03Controller extends Controller
 
         return array_filter([
             'nivel' => $formacion?->nivel, 'numero_registro' => $formacion?->numero_registro_sunedu,
+            'pais' => $formacion?->pais, 'numero_diploma' => $formacion?->numero_diploma, 'fecha_obtencion' => $formacion?->fecha_obtencion?->format('Y-m-d'),
             'numero_colegiatura' => $colegiatura?->numero_colegiatura, 'vigente_hasta' => $colegiatura?->vigente_hasta?->format('Y-m-d'),
             'tipo_capacitacion' => $capacitacion?->tipo, 'horas' => $capacitacion?->horas,
         ], fn (mixed $valor): bool => $valor !== null);
@@ -175,7 +239,8 @@ class Seccion03Controller extends Controller
         if (in_array($letra, ['a', 'b', 'd', 'e'], true)) {
             FormacionAcademica::query()->create([...$base,
                 'nivel' => $datos['nivel'] ?? ($letra === 'a' ? 'educacion_basica' : 'diplomado_especializacion'),
-                'denominacion' => $doc->nombre, 'institucion' => $doc->emisor, 'fecha_obtencion' => $doc->fecha_emision,
+                'denominacion' => $doc->nombre, 'institucion' => $doc->emisor, 'fecha_obtencion' => $datos['fecha_obtencion'] ?? $doc->fecha_emision,
+                'pais' => $datos['pais'] ?? 'No determinado', 'numero_diploma' => $datos['numero_diploma'] ?? null,
                 'numero_registro_sunedu' => $datos['numero_registro'] ?? null,
             ]);
         } elseif ($letra === 'c') {
@@ -192,7 +257,7 @@ class Seccion03Controller extends Controller
 
     private function documento(DocumentoUsuario $doc, Request $request): array
     {
-        return [...$doc->only(['id', 'nombre', 'emisor', 'num_resolucion', 'folio_inicio', 'folio_fin', 'fedateado', 'fiscalizado', 'modalidad_presentacion', 'subsana_a_documento_id']),
+        return [...$doc->only(['id', 'nombre', 'emisor', 'num_resolucion', 'folio_inicio', 'folio_fin', 'fedateado', 'fiscalizado', 'resultado_fiscalizacion', 'proceso_fiscalizacion_id', 'modalidad_presentacion', 'subsana_a_documento_id']),
             'nombre' => $doc->nombre ?: ($doc->archivo?->nombre_original ?? 'Documento sin archivo'),
             'fecha_emision' => $doc->fecha_emision?->format('Y-m-d'), 'fecha_recepcion' => $doc->fecha_recepcion?->format('Y-m-d'),
             'estado' => ResumenSeccion03::estadoDocumento($doc->estado), 'estado_original' => $doc->estado,

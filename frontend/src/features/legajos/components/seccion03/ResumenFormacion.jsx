@@ -30,7 +30,7 @@ export default function ResumenFormacion({ items }) {
   if (!formacion.length && !colegiaturas.length && !capacitaciones.length) return null
   return <section aria-labelledby="resumen-formacion" className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5">
     <h2 id="resumen-formacion" className="text-sm font-semibold text-slate-800">Resumen de formación</h2>
-    <Tabla titulo="Grados y títulos" filas={formacion} columnas={['Denominación', 'Nivel', 'Institución', 'Obtención', 'Registro SUNEDU']}
+    <Tabla titulo="Grados y títulos" filas={formacion} columnas={['Denominación', 'Nivel', 'Institución', 'Obtención', 'Registro SUNEDU / MINEDU']}
       celdas={f => [texto(f.denominacion), nivelesFormacion[f.nivel] || texto(f.nivel), `${texto(f.institucion)}${f.pais && f.pais !== 'Perú' ? ` (${f.pais})` : ''}${f.es_revalidado ? ' · Revalidado' : ''}`, fecha(f.fecha_obtencion), texto(f.numero_registro_sunedu)]} />
     <Tabla titulo="Colegiatura" filas={colegiaturas} columnas={['Colegio profesional', 'N.º', 'Habilitado', 'Vigente hasta']}
       celdas={c => [texto(c.colegio_profesional), texto(c.numero_colegiatura), c.habilitado ? 'Sí' : 'No', fecha(c.vigente_hasta)]} />

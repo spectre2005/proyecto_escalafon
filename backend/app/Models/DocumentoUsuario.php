@@ -45,6 +45,8 @@ class DocumentoUsuario extends Model
         'fedateado',
         'fecha_fedateo',
         'fedatario_id',
+        'resultado_fiscalizacion',
+        'proceso_fiscalizacion_id',
         'fiscalizado',
         'fecha_fiscalizacion',
         'fiscalizado_por',

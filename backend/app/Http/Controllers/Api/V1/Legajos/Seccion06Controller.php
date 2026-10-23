@@ -133,7 +133,7 @@ class Seccion06Controller extends Controller
 
     private function documento(DocumentoUsuario $doc, Request $request): array
     {
-        return [...$doc->only(['id', 'nombre', 'emisor', 'num_resolucion', 'folio_inicio', 'folio_fin', 'fedateado', 'fiscalizado', 'modalidad_presentacion', 'subsana_a_documento_id']),
+        return [...$doc->only(['id', 'nombre', 'emisor', 'num_resolucion', 'folio_inicio', 'folio_fin', 'fedateado', 'fiscalizado', 'resultado_fiscalizacion', 'proceso_fiscalizacion_id', 'modalidad_presentacion', 'subsana_a_documento_id']),
             'nombre' => $doc->nombre ?: ($doc->archivo?->nombre_original ?? 'Documento sin archivo'),
             'fecha_emision' => $doc->fecha_emision?->format('Y-m-d'), 'fecha_incorporacion' => $doc->fecha_incorporacion?->format('Y-m-d'),
             'titular_nombre' => $doc->titular_nombre, 'titular_documento' => $doc->titular_documento, 'fecha_recepcion' => $doc->fecha_recepcion?->format('Y-m-d'),

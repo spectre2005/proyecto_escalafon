@@ -36,6 +36,9 @@ final class EstadoDocumento
     /** TODO pendiente de confirmar con el cliente: si un documento "observado" cuenta como presente. */
     public static function aprobado(DocumentoUsuario $documento, TipoDocumento $tipo): bool
     {
+        if ($documento->resultado_fiscalizacion === 'no_autentico') {
+            return false;
+        }
         if ($documento->estado === 'aceptado') {
             return $documento->archivo !== null && $documento->archivo->estado_antivirus !== 'infectado';
         }

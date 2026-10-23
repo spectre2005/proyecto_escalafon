@@ -19,6 +19,7 @@ class ProcesoFiscalizacion extends Model
     protected $table = 'procesos_fiscalizacion';
 
     protected $fillable = [
+        'codigo', 'motivo', 'fundamento', 'revisor_id', 'revision_observaciones', 'presentado_en', 'revisado_en',
         'usuario_id',
         'legajo_id',
         'tipo_muestra',
@@ -38,6 +39,8 @@ class ProcesoFiscalizacion extends Model
     protected function casts(): array
     {
         return [
+            'presentado_en' => 'datetime',
+            'revisado_en' => 'datetime',
             'fecha_vinculacion' => 'date',
             'fecha_inicio' => 'date',
             'fecha_limite' => 'date',

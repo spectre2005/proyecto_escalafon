@@ -71,7 +71,7 @@ final class GmailCorreo
             $c->update(['access_token' => null, 'expira_en' => null]);
         }
         if (! $respuesta->successful() || ! $respuesta->json('id')) {
-            throw new RuntimeException('Gmail no confirmó el envío del requerimiento.');
+            throw new RuntimeException('Gmail no confirmó el envío del requerimiento.', $respuesta->successful() ? 0 : $respuesta->status());
         }
 
         return (string) $respuesta->json('id');

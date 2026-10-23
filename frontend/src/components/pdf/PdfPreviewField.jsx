@@ -7,13 +7,16 @@ import { validatePdf } from './pdfValidation'
 const button = 'rounded-lg border border-slate-200 px-3 py-2 text-xs text-teal-800 focus-visible:outline-2 focus-visible:outline-teal-600 disabled:opacity-40'
 
 // onPages(n): páginas del PDF elegido (null sin archivo nuevo o si no se pudo leer), para sugerir el folio final.
-export default function PdfPreviewField({ name, id, label, help, maxMB = 2, currentUrl, currentName, required, error, onChange, onPages }) {
+export default function PdfPreviewField({ name, id, label, help, maxMB = 2, currentUrl, currentName, required, error, onChange, onPages, allowImages = false, previewFile = null }) {
   const generatedId = useId()
   const helpId = `${generatedId}-help`
   const input = useRef(null)
+  const selection = useRef(0)
+  const [converting, setConverting] = useState(false)
+  useEffect(() => () => { selection.current++ }, [])
   const panel = useRef(null)
   const canvas = useRef(null)
-  const [file, setFile] = useState(null)
+  const [file, setFile] = useState(previewFile)
   const [validation, setValidation] = useState('')
   const [previewError, setPreviewError] = useState('')
   const [pdf, setPdf] = useState(null)
@@ -96,16 +99,34 @@ export default function PdfPreviewField({ name, id, label, help, maxMB = 2, curr
     return () => { disposed = true; render?.cancel() }
   }, [pdf, page, width])
 
-  function select(event) {
-    const selected = event.target.files?.[0] || null
-    const message = validatePdf(selected, maxMB)
-    setValidation(message)
-    setHidden(false)
-    setFile(message ? null : selected)
-    onChange(message ? null : selected, message)
-    if (message) event.target.value = ''
+  async function select(event) {
+    const inputElement = event.target
+    const selected = inputElement.files?.[0] || null
+    const current = ++selection.current
+    setValidation(''); setHidden(false); setFile(null); onChange(null, '')
+    setConverting(false)
+    try {
+      let candidate = selected
+      if (allowImages && selected && ['image/jpeg', 'image/png'].includes(selected.type)) {
+        setConverting(true)
+        const { imagenAPdf } = await import('./imagenAPdf')
+        candidate = await imagenAPdf(selected, maxMB)
+      }
+      if (current !== selection.current) return
+      const message = validatePdf(candidate, maxMB)
+      setValidation(message)
+      setFile(message ? null : candidate)
+      onChange(message ? null : candidate, message)
+      if (message) inputElement.value = ''
+    } catch (failure) {
+      if (current !== selection.current) return
+      const message = failure.message || 'No se pudo convertir la imagen. Selecciona otro archivo.'
+      setValidation(message); onChange(null, message); inputElement.value = ''
+    } finally { if (current === selection.current) setConverting(false) }
   }
   function remove() {
+    selection.current++
+    setConverting(false)
     input.current.value = ''
     setFile(null)
     setHidden(true)
@@ -114,11 +135,12 @@ export default function PdfPreviewField({ name, id, label, help, maxMB = 2, curr
   }
   const message = validation || error
   return <section className="flex h-full min-w-0 flex-col gap-3">
-    <label className="grid min-w-0 gap-2 text-xs font-medium text-slate-600" htmlFor={id}>
+    {!previewFile && <label className="grid min-w-0 gap-2 text-xs font-medium text-slate-600" htmlFor={id}>
       <span className="flex items-center gap-2"><Icon name="paperclip" size={18} />{label}{required ? ' *' : ''}</span>
-      <input ref={input} name={name} id={id} type="file" accept="application/pdf,.pdf" required={required && !currentUrl} onChange={select} aria-describedby={helpId} aria-invalid={Boolean(message)} className="min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus-visible:outline-2 focus-visible:outline-teal-600" />
-    </label>
+      <input ref={input} name={name} id={id} type="file" accept={allowImages ? 'application/pdf,.pdf,image/jpeg,image/png,.jpg,.jpeg,.png' : 'application/pdf,.pdf'} required={required && !currentUrl} onChange={select} aria-describedby={helpId} aria-invalid={Boolean(message)} className="min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus-visible:outline-2 focus-visible:outline-teal-600" />
+    </label>}
     <p id={helpId} className="text-xs text-slate-500">{help}</p>
+    {converting && <p role="status" className="text-xs text-teal-700">Preparando la imagen como PDF…</p>}
     {message && <p role="alert" className="text-xs text-rose-700">{[].concat(message).join(' ')}</p>}
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
       <div className="flex min-w-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3">
@@ -126,7 +148,7 @@ export default function PdfPreviewField({ name, id, label, help, maxMB = 2, curr
         <button type="button" className={button} disabled={!pdf || page <= 1} onClick={() => setPage(value => value - 1)} aria-label="Página anterior">Anterior</button>
         <span aria-live="polite" className="text-xs text-slate-600">{pdf ? `${page} de ${pdf.numPages}` : '0 de 0'}</span>
         <button type="button" className={button} disabled={!pdf || page >= pdf.numPages} onClick={() => setPage(value => value + 1)} aria-label="Página siguiente">Siguiente</button>
-        <button type="button" className={button} disabled={!active && !validation} onClick={remove}>Quitar</button>
+        {!previewFile && <button type="button" className={button} disabled={!active && !validation} onClick={remove}>Quitar</button>}
       </div>
       <div ref={panel} className="min-h-[420px] min-w-0 flex-1" aria-busy={loading}>
         {loading && <p className="p-6 text-sm text-slate-500">Cargando vista previa…</p>}

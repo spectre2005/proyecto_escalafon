@@ -1,3 +1,4 @@
+import EstadoFiscalizacion from '../../../fiscalizacion/EstadoFiscalizacion'
 import { useState } from 'react'
 import { apiErrorMessage } from '../../../../axios'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
@@ -76,7 +77,7 @@ export default function Seccion06Panel({ usuario }) {
             {doc.tiempos_reconocidos.map(p => <p key={p.id} className="mt-2 break-words text-xs text-slate-600">Tiempo reconocido: {p.anios} años, {p.meses} meses y {p.dias} días · Resolución {p.numero_resolucion} · {fecha(p.fecha_resolucion)}{p.anulado && ' · Registro anulado'}</p>)}
             {doc.compensaciones.map(p => <p key={p.id} className="mt-2 break-words text-xs text-slate-600">{p.tipo === 'economica' ? 'Económica' : 'No económica'} · {p.concepto} · {fecha(p.fecha)}{p.numero_documento && ` · Documento ${p.numero_documento}`}{p.anulado && ' · Registro anulado'}</p>)}
             <p className="mt-2 break-words text-xs text-slate-500">Incorporado el {fecha(doc.fecha_incorporacion)} · Titular: {doc.titular_nombre || 'No registrado'}</p>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500"><span>Folios {folios(doc.folio_inicio, doc.folio_fin)}</span><span>{doc.fedateado ? 'Fedateado' : 'Sin fedatear'}</span><span>{doc.fiscalizado ? 'Verificado con la entidad emisora' : 'Sin fiscalización registrada'}</span><span>{doc.archivo ? `PDF · ${antivirus03[doc.archivo.estado_antivirus] || 'Estado antivirus no confirmado'}` : 'Sin archivo'}</span><span>Recepción: {fecha(doc.fecha_recepcion)}</span></div>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500"><span>Folios {folios(doc.folio_inicio, doc.folio_fin)}</span><span>{doc.fedateado ? 'Fedateado' : 'Sin fedatear'}</span><EstadoFiscalizacion documento={doc} /><span>{doc.archivo ? `PDF · ${antivirus03[doc.archivo.estado_antivirus] || 'Estado antivirus no confirmado'}` : 'Sin archivo'}</span><span>Recepción: {fecha(doc.fecha_recepcion)}</span></div>
             {doc.subsanado && <p className="mt-3 text-xs text-slate-500">Subsanado por otro documento. Se conserva en el historial y no cuenta en el avance.</p>}
             {doc.observaciones.map((obs, indice) => <p key={indice} className="mt-3 break-words rounded-lg bg-rose-50 p-3 text-xs text-rose-800"><strong>Observación:</strong> {obs.descripcion} · Plazo: {fecha(obs.plazo_subsanacion)}</p>)}
             <div className="mt-3 flex flex-wrap gap-2">

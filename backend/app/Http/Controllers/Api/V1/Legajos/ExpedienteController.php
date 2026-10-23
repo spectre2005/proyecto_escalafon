@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Legajos;
 
+use App\Http\Controllers\Api\V1\FiscalizacionController;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UpdateExpedienteRequest;
 use App\Models\Afiliacion;
@@ -394,6 +395,7 @@ class ExpedienteController extends Controller
         abort_if($section === 'sanciones' && ! $request->user()->can('seccion08.sanciones.ver')
             && ! $request->user()->can('seccion08.sanciones.registrar') && ! $request->user()->can('seccion08.sanciones.revisar'),
             403, 'Tu perfil no tiene acceso a sanciones disciplinarias.');
+        abort_if(in_array($section, ['procesos-fiscalizacion', 'solicitudes-fiscalizacion'], true) && ! $request->user()->can('fiscalizacion.ver'), 403, 'Tu perfil no tiene acceso a fiscalización.');
         $veSensibles = $request->user()->can('datos_sensibles.ver');
         abort_if(in_array($section, self::SENSIBLES, true) && ! $veSensibles, 403, 'Esta sección contiene datos sensibles.');
         $filters = $request->validate([
@@ -429,6 +431,10 @@ class ExpedienteController extends Controller
                 ->union(SolicitudFiscalizacion::query()->whereIn('proceso_fiscalizacion_id', ProcesoFiscalizacion::query()->where('usuario_id', $usuario)->whereIn('legajo_id', (clone $legajos)->select('id'))->select('id'))->whereNotNull('oficio_archivo_id')->select('oficio_archivo_id')),
             default => null,
         };
+        if (in_array($section, ['procesos-fiscalizacion', 'solicitudes-fiscalizacion'], true)) {
+            $visibles = app(FiscalizacionController::class)->consultaVisible($request)->select('id');
+            $query->whereIn($section === 'procesos-fiscalizacion' ? 'id' : 'proceso_fiscalizacion_id', $visibles);
+        }
         if ($ids !== null) {
             $query->whereIn($config['field'], $ids);
         } elseif ($config['scope'] === 'persona') {

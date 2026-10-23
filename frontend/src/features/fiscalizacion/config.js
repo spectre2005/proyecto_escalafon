@@ -1,0 +1,12 @@
+export const estados = { abierto: 'Abierto', en_verificacion: 'En verificación', en_revision: 'En revisión', cerrado: 'Cerrado' }
+export const resultados = { pendiente: 'Pendiente de evaluación', conforme: 'Conforme al alcance evaluado', observado: 'Requiere aclaración', no_concluyente: 'No concluyente', no_autentico: 'No auténtico, con sustento' }
+export const tecnicos = { en_curso: 'Consulta en curso', completada: 'Consulta completada', no_configurado: 'Sin configurar', no_disponible: 'Servicio no disponible', bloqueado: 'Archivo bloqueado' }
+export const fuentes = { apisted_minedu: 'Institutos · APIsTED / MINEDU', apisted_sunedu: 'Universitarios · APIsTED / SUNEDU', consistencia: 'Consistencia de datos', integridad: 'Integridad del archivo', firma_peru: 'Firma Perú', emisor: 'Entidad emisora', sunedu: 'SUNEDU / PIDE', minedu: 'MINEDU', rnssc: 'SERVIR / RNSSC', otro: 'Otra fuente' }
+export const resultadosFuente = { registros_encontrados: 'Registros encontrados: contrastar con el documento', sin_coincidencias: 'Sin coincidencias: requiere revisión adicional', datos_con_observaciones: 'Datos que requieren revisión', sin_alertas_internas: 'Sin alertas en las reglas comprobadas', integridad_coincide: 'Huella coincidente', integridad_no_coincide: 'La huella no coincide', sin_huella: 'Sin huella de referencia', firma_valida: 'Firma digital válida', firma_no_valida: 'Firma digital no válida', firma_indeterminada: 'Firma indeterminada', sin_firmas: 'Sin firmas digitales', no_ejecutada: 'Sin resultado de verificación', respuesta_no_reconocida: 'Respuesta requiere revisión técnica', consulta_interrumpida: 'Consulta interrumpida', pendiente: 'Pendiente' }
+export const persona = p => [p?.nombres, p?.apellido_paterno, p?.apellido_materno].filter(Boolean).join(' ') || 'No registrado'
+export const fecha = value => value ? String(value).slice(0, 10).split('-').reverse().join('/') : 'No registrada'
+export const hoy = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+export const nombreDocumento = doc => `${doc?.nombre || doc?.tipo || doc?.num_resolucion || 'Documento'} · Sección ${doc?.seccion_legajo_id ?? '—'} · Folios ${doc?.folio_inicio ?? '—'}–${doc?.folio_fin ?? '—'}`
+export function resumenAlcance(alcance = []) {
+  return { total: alcance.length, evaluados: alcance.filter(item => item.resultado !== 'pendiente').length, alertas: alcance.filter(item => ['observado', 'no_autentico'].includes(item.resultado)).length }
+}

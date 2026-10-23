@@ -15,6 +15,9 @@ return [
 
     // Catálogo cerrado: un permiso que no esté aquí no existe.
     'catalogo' => [
+        'fiscalizacion.ver' => 'Consultar procesos y evidencias de fiscalización.',
+        'fiscalizacion.gestionar' => 'Abrir procesos, registrar consultas y evaluar documentos.',
+        'fiscalizacion.aprobar' => 'Revisar informes y aprobar cierres de fiscalización.',
         'requerimientos.gestionar' => 'Gestionar requerimientos y registrar entregas recibidas por correo.',
         'personal.ver' => 'Ver la lista del personal.',
         'usuarios.gestionar' => 'Crear, editar y desactivar personal y cuentas.',
@@ -72,6 +75,9 @@ return [
         ],
 
         // Perfiles fijos del equipo institucional; se crean al otorgar su primer acceso.
+        'fiscalizador' => ['fiscalizacion.ver', 'fiscalizacion.gestionar', 'legajo.ver', 'personal.ver', 'documento.subir'],
+        'revisor_fiscalizacion' => ['fiscalizacion.ver', 'fiscalizacion.aprobar', 'legajo.ver', 'personal.ver'],
+
         'asistente_legajo' => [
             'requerimientos.gestionar',
             'personal.ver',

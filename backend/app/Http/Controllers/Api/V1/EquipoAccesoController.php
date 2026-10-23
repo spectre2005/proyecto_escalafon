@@ -17,7 +17,7 @@ use Illuminate\Validation\ValidationException;
 
 class EquipoAccesoController extends Controller
 {
-    private const PERFILES = ['autoservicio_legajo' => 'Acceso docente deshabilitado', 'asistente_legajo' => 'Asistente de legajos', 'suplente_legajo' => 'Suplente de administración'];
+    private const PERFILES = ['autoservicio_legajo' => 'Acceso docente deshabilitado', 'asistente_legajo' => 'Asistente de legajos', 'suplente_legajo' => 'Suplente de administración', 'fiscalizador' => 'Responsable de fiscalización', 'revisor_fiscalizacion' => 'Revisor de fiscalización'];
 
     public function index(): JsonResponse
     {

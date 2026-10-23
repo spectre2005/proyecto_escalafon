@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\V1\Evaluaciones\Seccion07Controller;
 use App\Http\Controllers\Api\V1\ExperienciaLaboralController;
 use App\Http\Controllers\Api\V1\FamiliarController;
 use App\Http\Controllers\Api\V1\FeriadoController;
+use App\Http\Controllers\Api\V1\FiscalizacionController;
 use App\Http\Controllers\Api\V1\FormacionAcademicaController;
 use App\Http\Controllers\Api\V1\FormatosDirectivaController;
 use App\Http\Controllers\Api\V1\GmailCorreoController;
@@ -122,6 +123,26 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
         Route::get('{record}/documentos', 'documentos')->whereUuid('record');
         Route::get('{record}/archivos/{indice}/{adjunto}', 'archivo')->whereUuid('record')->whereNumber('indice')->whereNumber('adjunto');
         Route::get('{record}/archivos/{indice}', 'archivo')->whereUuid('record')->whereNumber('indice');
+    });
+    Route::prefix('fiscalizacion')->middleware('can:fiscalizacion.ver')->group(function (): void {
+        Route::get('procesos', [FiscalizacionController::class, 'index']);
+        Route::get('opciones', [FiscalizacionController::class, 'opciones']);
+        Route::get('procesos/{proceso}', [FiscalizacionController::class, 'show'])->whereUuid('proceso');
+        Route::middleware('can:fiscalizacion.gestionar')->group(function (): void {
+            Route::get('correo-institucional', [FiscalizacionController::class, 'correoInstitucional']);
+            Route::post('procesos/{proceso}/correos', [FiscalizacionController::class, 'enviarCorreo'])->whereUuid('proceso')->middleware('throttle:6,1');
+            Route::post('procesos', [FiscalizacionController::class, 'store']);
+            Route::post('procesos/{proceso}/documentos', [FiscalizacionController::class, 'agregarDocumento'])->whereUuid('proceso');
+            Route::post('procesos/{proceso}/verificar', [FiscalizacionController::class, 'verificar'])->whereUuid('proceso')->middleware('throttle:30,1');
+            Route::post('procesos/{proceso}/consultas/reconocer', [FiscalizacionController::class, 'reconocerConsulta'])->whereUuid('proceso')->middleware('throttle:6,1');
+            Route::post('procesos/{proceso}/consultas', [FiscalizacionController::class, 'consultaEmisor'])->whereUuid('proceso');
+            Route::post('procesos/{proceso}/consultas/{solicitud}/respuesta', [FiscalizacionController::class, 'respuesta'])->whereUuid(['proceso', 'solicitud']);
+            Route::post('procesos/{proceso}/documentos/{alcance}/evaluar', [FiscalizacionController::class, 'evaluar'])->whereUuid(['proceso', 'alcance']);
+            Route::post('procesos/{proceso}/presentar', [FiscalizacionController::class, 'presentar'])->whereUuid('proceso');
+            Route::post('procesos/{proceso}/derivaciones', [FiscalizacionController::class, 'derivar'])->whereUuid('proceso');
+            Route::post('procesos/{proceso}/derivaciones/{derivacion}/cargo', [FiscalizacionController::class, 'cargo'])->whereUuid(['proceso', 'derivacion']);
+        });
+        Route::post('procesos/{proceso}/revisar', [FiscalizacionController::class, 'revisar'])->whereUuid('proceso')->middleware('can:fiscalizacion.aprobar');
     });
     Route::get('reportes/opciones', [ReporteController::class, 'opciones']);
     // Formatos de la directiva (anexos 06 a 09): solo quien administra el sistema y ve legajos.
@@ -271,6 +292,7 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
     Route::middleware('can:documento.subir')->group(function (): void {
         Route::post('expedientes/{usuario}/seccion-06/documentos', [Seccion06Controller::class, 'store'])->whereUuid('usuario');
         Route::post('expedientes/{usuario}/seccion-04/documentos', [Seccion04Controller::class, 'store'])->whereUuid('usuario');
+        Route::post('expedientes/{usuario}/seccion-03/reconocer', [Seccion03Controller::class, 'reconocer'])->withoutMiddleware(LegajoSoloLectura::class)->middleware('throttle:6,1')->whereUuid('usuario');
         Route::post('expedientes/{usuario}/seccion-03/documentos', [Seccion03Controller::class, 'store'])->whereUuid('usuario');
         Route::get('expedientes/{usuario}/documentos/folio-sugerido', [DocumentoLegajoController::class, 'folio'])->whereUuid('usuario');
         Route::post('expedientes/{usuario}/documentos', [DocumentoLegajoController::class, 'store'])->whereUuid('usuario');
@@ -349,6 +371,8 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
 // anulan desde Legajos\Seccion09Controller.
 // desvinculaciones (sección 11): solo lectura; se registran, corrigen y anulan desde Legajos\Seccion11Controller.
 Route::prefix('v1')->middleware([ApiHabilitada::class.':crud', 'auth:sanctum', ExigeCambioPassword::class, 'can:sistema.administrar', FuncionalidadActiva::class])->group(function (): void {
+    Route::apiResource('procesos-fiscalizacion', ProcesoFiscalizacionController::class)->parameters(['procesos-fiscalizacion' => 'record'])->whereUuid('record')->only(['index', 'show'])->middleware('can:fiscalizacion.ver');
+    Route::apiResource('solicitudes-fiscalizacion', SolicitudFiscalizacionController::class)->parameters(['solicitudes-fiscalizacion' => 'record'])->whereUuid('record')->only(['index', 'show'])->middleware('can:fiscalizacion.ver');
     Route::apiResource('afiliaciones', AfiliacionController::class)->parameters(['afiliaciones' => 'record'])->whereUuid('record')->names('api.v1.afiliaciones')->only(['index', 'show'])->middleware('can:datos_sensibles.ver');
     Route::apiResource('archivos-documento', ArchivoDocumentoController::class)->parameters(['archivos-documento' => 'record'])->whereUuid('record')->names('api.v1.archivos-documento')->only(['index', 'show']);
     Route::apiResource('auditoria-eventos', AuditoriaEventoController::class)->parameters(['auditoria-eventos' => 'record'])->whereUuid('record')->names('api.v1.auditoria-eventos');
@@ -383,7 +407,6 @@ Route::prefix('v1')->middleware([ApiHabilitada::class.':crud', 'auth:sanctum', E
     Route::apiResource('perfil-docente', PerfilDocenteController::class)->parameters(['perfil-docente' => 'record'])->whereUuid('record')->names('api.v1.perfil-docente')->only(['index', 'show']);
     Route::apiResource('periodos-prueba', PeriodoPruebaController::class)->parameters(['periodos-prueba' => 'record'])->whereUuid('record')->names('api.v1.periodos-prueba')->only(['index', 'show']);
     Route::apiResource('periodos-vacacionales', PeriodoVacacionalController::class)->parameters(['periodos-vacacionales' => 'record'])->whereUuid('record')->names('api.v1.periodos-vacacionales')->only(['index', 'show']);
-    Route::apiResource('procesos-fiscalizacion', ProcesoFiscalizacionController::class)->parameters(['procesos-fiscalizacion' => 'record'])->whereUuid('record')->names('api.v1.procesos-fiscalizacion');
     Route::apiResource('progresiones-carrera', ProgresionCarreraController::class)->parameters(['progresiones-carrera' => 'record'])->whereUuid('record')->names('api.v1.progresiones-carrera')->only(['index', 'show']);
     Route::apiResource('ratificaciones-docentes', RatificacionDocenteController::class)->parameters(['ratificaciones-docentes' => 'record'])->whereUuid('record')->names('api.v1.ratificaciones-docentes')->only(['index', 'show']);
     Route::apiResource('reconocimientos', ReconocimientoController::class)->parameters(['reconocimientos' => 'record'])->whereUuid('record')->names('api.v1.reconocimientos')->only(['index', 'show']);
@@ -395,7 +418,6 @@ Route::prefix('v1')->middleware([ApiHabilitada::class.':crud', 'auth:sanctum', E
     Route::apiResource('sanciones', SancionController::class)->parameters(['sanciones' => 'record'])->whereUuid('record')->names('api.v1.sanciones')->only(['index', 'show'])->middleware('can:seccion08.sanciones.ver');
     Route::apiResource('secciones-legajo', SeccionLegajoController::class)->parameters(['secciones-legajo' => 'record'])->whereNumber('record')->names('api.v1.secciones-legajo');
     Route::apiResource('solicitudes-acceso-legajo', SolicitudAccesoLegajoController::class)->parameters(['solicitudes-acceso-legajo' => 'record'])->whereUuid('record')->names('api.v1.solicitudes-acceso-legajo');
-    Route::apiResource('solicitudes-fiscalizacion', SolicitudFiscalizacionController::class)->parameters(['solicitudes-fiscalizacion' => 'record'])->whereUuid('record')->names('api.v1.solicitudes-fiscalizacion');
     Route::apiResource('subsecciones-legajo', SubseccionLegajoController::class)->parameters(['subsecciones-legajo' => 'record'])->whereUuid('record')->names('api.v1.subsecciones-legajo');
     Route::apiResource('tiempo-servicios-reconocidos', TiempoServicioReconocidoController::class)->parameters(['tiempo-servicios-reconocidos' => 'record'])->whereUuid('record')->names('api.v1.tiempo-servicios-reconocidos');
     Route::apiResource('tipos-documento', TipoDocumentoController::class)->parameters(['tipos-documento' => 'record'])->whereUuid('record')->names('api.v1.tipos-documento');

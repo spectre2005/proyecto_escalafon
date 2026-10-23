@@ -1,3 +1,4 @@
+import EstadoFiscalizacion from '../../../fiscalizacion/EstadoFiscalizacion'
 import { useState } from 'react'
 import { apiErrorMessage } from '../../../../axios'
 import { usePuede } from '../../../auth/session'
@@ -64,6 +65,7 @@ export default function ListaDocumentos({ usuario, tipo, enlazado, onSubsanar, o
             <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${coloresEstadoDocumento[documento.estado_visible] || 'bg-slate-100 text-slate-700'}`}>{etiqueta(estadosDocumento, documento.estado_visible)}</span>
           </div>
         </div>
+        <p className="mt-2 text-xs text-slate-500"><EstadoFiscalizacion documento={v} /></p>
         {(() => {
           const dni = tipo.codigo === 'S01_B_DOCUMENTO_IDENTIDAD'
           const principales = dni ? [

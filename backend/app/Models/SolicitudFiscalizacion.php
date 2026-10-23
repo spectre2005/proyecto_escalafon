@@ -22,6 +22,7 @@ class SolicitudFiscalizacion extends Model
         'documento_id',
         'entidad_consultada',
         'medio',
+        'datos_medio',
         'numero_oficio',
         'fecha_envio',
         'oficio_archivo_id',
@@ -36,6 +37,7 @@ class SolicitudFiscalizacion extends Model
     protected function casts(): array
     {
         return [
+            'datos_medio' => 'array',
             'fecha_envio' => 'date',
             'fecha_respuesta' => 'date',
             'created_at' => 'datetime',

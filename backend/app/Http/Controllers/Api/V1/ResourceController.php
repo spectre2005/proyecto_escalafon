@@ -38,6 +38,10 @@ abstract class ResourceController extends Controller
 
     private function filtrarSst(Builder $query): Builder
     {
+        if ($this->model === AuditoriaEvento::class) {
+            $visibles = app(FiscalizacionController::class)->consultaVisible(request())->select('id');
+            $query->where(fn (Builder $q) => $q->where('entidad', '!=', 'procesos_fiscalizacion')->orWhereIn('entidad_id', $visibles));
+        }
         if (! request()->user()->veDatosSensibles()) {
             foreach ($this->camposDocumentoSst() as $campo) {
                 $query->where(function (Builder $filtro) use ($campo): void {
@@ -147,6 +151,7 @@ abstract class ResourceController extends Controller
 
     private function protegerSst(array $datos): void
     {
+        abort_if($this->model === AuditoriaEvento::class && ($datos['entidad'] ?? null) === 'procesos_fiscalizacion', 409, 'La auditoría de fiscalización se conserva sin modificaciones.');
         if ($this->model === AuditoriaEvento::class && ($datos['entidad'] ?? null) !== 'documentos_usuario') {
             return;
         }
