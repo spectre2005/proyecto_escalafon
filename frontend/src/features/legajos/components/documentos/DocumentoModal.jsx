@@ -1,9 +1,15 @@
 import { useEffect, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
 
-export default function DocumentoModal({ titulo, busy, onCancel, children, lateral = false, compacto = false }) {
+export default function DocumentoModal({ titulo, busy, onCancel, children, lateral = false, compacto = false, cerrarAlClickFuera = false }) {
   const dialog = useRef(null)
   const titleId = useId()
+  const inicioFuera = useRef(false)
+  function esFondo(event) {
+    if (event.target !== event.currentTarget) return false
+    const rect = event.currentTarget.getBoundingClientRect()
+    return event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom
+  }
 
   useEffect(() => {
     const modal = dialog.current
@@ -20,6 +26,11 @@ export default function DocumentoModal({ titulo, busy, onCancel, children, later
 
   return createPortal(
     <dialog ref={dialog} aria-labelledby={titleId}
+      onPointerDown={event => { inicioFuera.current = esFondo(event) }}
+      onClick={event => {
+        if (cerrarAlClickFuera && !busy && inicioFuera.current && esFondo(event)) onCancel()
+        inicioFuera.current = false
+      }}
       onCancel={event => { event.preventDefault(); if (!busy) onCancel() }}
       className={`fixed inset-0 overflow-y-auto border-0 bg-slate-50 p-4 text-slate-800 shadow-2xl backdrop:bg-slate-900/50 sm:p-6 ${lateral
         ? 'm-0 ml-auto h-dvh max-h-dvh w-full max-w-2xl sm:rounded-l-2xl'

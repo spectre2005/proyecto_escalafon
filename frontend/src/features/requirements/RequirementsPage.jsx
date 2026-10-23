@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import api, { apiErrorMessage } from '../../axios'
 import { useLiveQuery } from '../../shared/queries/useLiveQuery'
 import { usePuede, useSesion } from '../auth/session'
+import { separarHistorialCorreo } from './historialCorreo'
 import DocumentoModal from '../legajos/components/documentos/DocumentoModal'
 
 const panel = 'rounded-2xl border border-slate-200 bg-white p-5'
@@ -107,13 +108,33 @@ function Detalle({ record, admin, propio, onClose }) {
       try { setDocumentos((await api.get(`/solicitudes-legajo/${record.id}/documentos`)).data.data) } catch (e) { setError(apiErrorMessage(e)) }
     }
   }
-  return <DocumentoModal titulo="Seguimiento del requerimiento" busy={busy} onCancel={onClose} lateral>
+  return <DocumentoModal titulo="Seguimiento del requerimiento" busy={busy} onCancel={onClose} lateral cerrarAlClickFuera>
     <section aria-label="Detalle del requerimiento">
     <p className="mt-3 text-sm">{nombre(record.usuario)} · {record.descripcion}</p>
     {record.correo && <p className="mt-2 rounded-lg bg-white p-3 text-sm">Correo: {record.correo.correo_destinatario || 'Sin destinatario'} · {record.correo.correo_estado}{record.correo.correo_error && <span className="block text-rose-800">{record.correo.correo_error}</span>}</p>}
     {admin && abierto && ['pendiente', 'sin_configurar', 'error', 'sin_correo'].includes(record.correo?.correo_estado) && <button type="button" disabled={busy} className={`${button} mt-2`} onClick={enviarPendiente}>Enviar este correo pendiente</button>}
     <p className="mt-2 text-sm">Plazo: {fecha(record.prorroga_hasta || record.fecha_limite)} · {estados[record.estado] || record.estado}</p>
-    <h3 className="mt-5 font-semibold">Historial y entregas del docente</h3><ol className="my-3 space-y-3">{(record.seguimiento || []).map((item, i) => <li key={item.gmail_id || i} className="rounded-xl bg-slate-50 p-3 text-sm"><p className="font-semibold">{item.accion === 'respuesta' ? 'Entrega del docente' : item.accion} · {fecha(item.fecha)}</p>{item.accion === 'respuesta' && <p className="mt-1 text-xs text-teal-800">Canal: {item.canal === 'correo_manual' ? 'Correo registrado por administración' : item.canal === 'gmail' ? 'Gmail' : 'Plataforma (histórico)'}</p>}{item.remitente && <p className="mt-1 text-xs text-slate-600">Remitente: {item.remitente} · {item.referencia_correo}</p>}<p className="mt-1 whitespace-pre-wrap">{item.mensaje}</p>{(item.archivos || (item.archivo ? [{ archivo: item.archivo }] : [])).map((archivo, j) => <ArchivoEntrega key={`${archivo.hash || j}-${i}`} recordId={record.id} evento={i} adjunto={j} nombreArchivo={archivo.archivo} />)}{item.avisos_adjuntos?.map((aviso, j) => <p key={j} className="mt-2 text-xs text-amber-900">{aviso}</p>)}</li>)}</ol>
+    <h3 className="mt-5 font-semibold">Historial y entregas del docente</h3>
+    <ol className="my-3 space-y-3">{(record.seguimiento || []).map((item, i) => {
+      const esRespuesta = item.accion === 'respuesta'
+      const { respuesta, historial } = esRespuesta ? separarHistorialCorreo(item.mensaje) : { respuesta: item.mensaje }
+      const archivos = item.archivos || (item.archivo ? [{ archivo: item.archivo }] : [])
+      return <li key={item.gmail_id || i} className="rounded-xl bg-slate-50 p-3 text-sm">
+        <p className="font-semibold">{esRespuesta ? 'Entrega del docente' : item.accion} · {fecha(item.fecha)}</p>
+        {esRespuesta && <p className="mt-3 text-slate-700"><strong>Canal:</strong> {item.canal === 'correo_manual' ? 'Correo registrado por administración' : item.canal === 'gmail' ? 'Gmail' : 'Plataforma (histórico)'}</p>}
+        {item.remitente && <p className="mt-2 break-words text-slate-700"><strong>Remitente:</strong> {item.remitente}</p>}
+        {item.referencia_correo && <p className="mt-2 break-words text-slate-700"><strong>Asunto:</strong> {item.referencia_correo}</p>}
+        {esRespuesta && <p className="mt-3"><strong>Respuesta:</strong></p>}
+        <p className="mt-1 whitespace-pre-wrap break-words">{respuesta || (esRespuesta ? 'Sin mensaje de respuesta.' : '')}</p>
+        {historial && <details className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
+          <summary className="cursor-pointer font-semibold text-teal-800">Ver historial del correo</summary>
+          <p className="mt-3 whitespace-pre-wrap break-words text-slate-600">{historial}</p>
+        </details>}
+        {esRespuesta && <p className="mt-4"><strong>Documento:</strong>{!archivos.length && ' Sin documentos adjuntos.'}</p>}
+        {archivos.map((archivo, j) => <ArchivoEntrega key={`${archivo.hash || j}-${i}`} recordId={record.id} evento={i} adjunto={j} nombreArchivo={archivo.archivo} />)}
+        {item.avisos_adjuntos?.map((aviso, j) => <p key={j} className="mt-2 text-xs text-amber-900">{aviso}</p>)}
+      </li>
+    })}</ol>
     {error && <p role="alert" className="my-3 text-sm text-rose-800">{error}</p>}{success && <p role="status">{success}</p>}
     {admin && ['abierto', 'observado'].includes(record.estado) && <form onSubmit={e => enviar(e, 'registrar-entrega')} className="space-y-3 border-t pt-4"><h3 className="font-semibold">Registrar respuesta recibida por correo</h3><p className="text-xs text-slate-600">Las respuestas identificadas por Gmail se incorporan automáticamente. Usa este formulario solo para entregas que debas registrar manualmente.</p><Campo label="Correo del remitente"><input required type="email" name="remitente" maxLength={255} className={control} /></Campo><Campo label="Referencia del correo (asunto y fecha)"><input required name="referencia_correo" maxLength={300} className={control} /></Campo><Campo label="Respuesta o explicación de por qué no corresponde"><textarea required maxLength={3000} name="mensaje" className={control} /></Campo><Campo label="Documento PDF (opcional)"><input type="file" name="pdf" accept="application/pdf" className={control} /></Campo><p className="text-xs text-slate-600">La entrega quedará pendiente de revisión. El legajo se actualizará después de la aprobación.</p><button disabled={busy} className={button}>Registrar entrega para revisión</button></form>}
     {admin && abierto && <form onSubmit={e => enviar(e, 'gestionar')} className="mt-4 space-y-3 border-t pt-4"><h3 className="font-semibold">Gestión administrativa</h3><Campo label="Acción"><select name="accion" value={accion} onChange={e => elegirAccion(e.target.value)} className={control}><option value="observar" disabled={record.estado !== 'en_revision' || propio}>Observar entrega</option><option value="aceptar" disabled={record.estado !== 'en_revision' || propio}>Resolver requerimiento</option><option value="recordar">Enviar aviso por correo</option><option value="prorrogar">Ampliar plazo</option><option value="cancelar">Cancelar requerimiento</option></select></Campo>
