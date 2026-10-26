@@ -28,7 +28,7 @@ import GeneralDataEditor from '../components/GeneralDataEditor'
 import PersonalDocuments from '../components/PersonalDocuments'
 import { CATEGORIA_DOCUMENTOS, categoriaVigente, legajoSections, subseccionesSeccion10 } from '../config/legajoSections'
 import Icon from '../../../components/ui/Icon'
-import { esBandera, textoBandera } from '../../../shared/banderas'
+import { banderasPuesto, esBandera, textoBandera } from '../../../shared/banderas'
 
 const control = 'rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-teal-600 disabled:opacity-40'
 const panel = 'rounded-2xl border border-slate-200 bg-white'
@@ -70,13 +70,19 @@ function valueText(value, key) {
 }
 
 // Información personal: la ley y el tipo de vínculo vigente salen de data.regimen (regimen_laboral de la persona es solo
-// un respaldo del código de ley y no se muestra como régimen).
+// un respaldo del código de ley y no se muestra como régimen). Las condiciones del puesto se registran en el vínculo: se
+// muestra el valor que vale (condiciones.banderas), no la columna antigua de la persona. Con vínculo vigente, el puesto y
+// la unidad guardados antes en la persona no se muestran: los actuales salen del vínculo.
 function valoresGenerales(data) {
   const values = data.usuario.values
   const regimen = textoRegimen(data.regimen)
+  const banderas = data.condiciones?.banderas || {}
+  const conVinculo = data.puesto_actual?.origen === 'vinculo'
+  const ocultos = ['nombres', 'apellido_paterno', 'apellido_materno', 'foto_path', 'regimen_laboral', 'regimen_normativo_id', ...(conVinculo ? ['nombre_puesto', 'unidad_organica_id'] : [])]
   return Object.fromEntries([...['nombres', 'apellido_paterno', 'apellido_materno'].map(key => [key, values[key]]),
-    ...Object.entries(values).filter(([key]) => !['nombres', 'apellido_paterno', 'apellido_materno', 'foto_path', 'regimen_laboral', 'regimen_normativo_id'].includes(key))
-      .map(([key, value]) => [{ nombre_puesto: 'puesto_persona', unidad_organica_id: 'unidad_persona', activo: 'legajo_activo' }[key] || key, value]),
+    ...Object.entries(values).filter(([key]) => !ocultos.includes(key))
+      .map(([key, value]) => [{ nombre_puesto: 'puesto_persona', unidad_organica_id: 'unidad_persona', activo: 'legajo_activo' }[key] || key,
+        banderasPuesto.includes(key) && key in banderas ? banderas[key] : value]),
     ['ley', regimen.ley], ['tipo_vinculo', regimen.tipo],
     // El puesto y la unidad guardados en la persona (nombre_puesto, unidad_organica_id) siguen arriba como dato histórico.
     ...(data.puesto_actual?.origen === 'vinculo' ? [['puesto_actual', puestoActual(data.puesto_actual).puesto], ['unidad_actual', puestoActual(data.puesto_actual).unidad]] : [])])

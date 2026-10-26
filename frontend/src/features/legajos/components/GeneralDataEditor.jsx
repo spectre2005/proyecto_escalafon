@@ -42,13 +42,16 @@ const flags = [
 export default function GeneralDataEditor({ usuario, data, onSaved, onCancel, onUploadDni, onUploadFicha }) {
   // con_discapacidad es sensible: solo con discapacidad.editar (el backend lo valida y audita cada cambio).
   const puedeDiscapacidad = usePuede('discapacidad.editar')
+  // Con vínculo vigente, el puesto y la unidad se corrigen en el vínculo (2.2): no se editan aquí.
+  const conVinculo = data.puesto_actual?.origen === 'vinculo'
+  const campos = conVinculo ? fields.filter(([key]) => key !== 'nombre_puesto') : fields
   const [original] = useState(() => ({ ...data.usuario.values, ...data.edit_values }))
   const [version] = useState(data.version)
   const [draft, setDraft] = useState(() => ({
-    ...Object.fromEntries(fields.map(([key]) => [key, original[key] ?? ''])),
+    ...Object.fromEntries(campos.map(([key]) => [key, original[key] ?? ''])),
     ...Object.fromEntries(flags.map(([key]) => [key, valorBandera(original[key])])),
     tipo_personal: original.tipo_personal,
-    unidad_organica_id: original.unidad_organica_id ?? '',
+    ...(conVinculo ? {} : { unidad_organica_id: original.unidad_organica_id ?? '' }),
     regimen_normativo_id: original.regimen_normativo_id ?? '',
     nacionalidad: !original.nacionalidad || original.nacionalidad === 'Peruana' ? 'Peruano' : original.nacionalidad,
   }))
@@ -96,7 +99,7 @@ export default function GeneralDataEditor({ usuario, data, onSaved, onCancel, on
     <div className="mb-6 flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-lg font-semibold text-slate-800">Editar información personal</h2><p className="mt-2 text-xs text-slate-500">Los cambios se mostrarán al guardar.</p></div><div className="flex flex-wrap items-center gap-3">{onUploadFicha && <button type="button" disabled={saving} onClick={onUploadFicha} className="inline-flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-100"><Icon name="upload" size={17} />Subir ficha personal</button>}<button type="button" disabled={saving} onClick={onCancel} className="text-sm text-slate-500 hover:text-slate-800">Cancelar</button></div></div>
     {error && <p role="alert" className="mb-5 rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{error}</p>}
     <fieldset disabled={saving} className="grid gap-5 sm:grid-cols-2">
-      {fields.map(([key, title, type, maxLength, required]) => {
+      {campos.map(([key, title, type, maxLength, required]) => {
         const isDni = key === 'numero_doc_identidad' && draft.tipo_doc_identidad === 'dni'
         const digits = isDni ? 8 : key === 'telefono' ? 9 : null
         const props = { name: key, className: inputClass, required, value: draft[key], inputMode: digits ? 'numeric' : undefined, pattern: digits ? `[0-9]{${digits}}` : undefined, title: digits ? `Debe contener ${digits} dígitos.` : undefined, onChange: event => setDraft(previous => ({ ...previous, [key]: digits ? event.target.value.replace(/\D/g, '').slice(0, digits) : event.target.value })), 'aria-invalid': !!fieldErrors[key] }
@@ -115,13 +118,13 @@ export default function GeneralDataEditor({ usuario, data, onSaved, onCancel, on
         </div>
       })}
       <label className="flex flex-col gap-2 text-xs font-medium text-slate-600">Tipo de personal *<select name="tipo_personal" className={inputClass} value={draft.tipo_personal} onChange={event => setDraft(previous => ({ ...previous, tipo_personal: event.target.value, regimen_normativo_id: leyDelTipo(previous.regimen_normativo_id, event.target.value) }))}><option value="docente">Docente</option><option value="administrativo">Administrativo</option></select></label>
-      {[['unidad_organica_id', 'Unidad orgánica registrada en la persona', 'unidades', 'Sin asignar'], ['regimen_normativo_id', 'Ley / régimen normativo', 'regimenes', 'Sin definir']].map(([key, title, catalog, vacio]) => <label key={key} className="flex flex-col gap-2 text-xs font-medium text-slate-600">{title}<select name={key} className={inputClass} value={draft[key]} disabled={!options.data} onChange={event => setDraft(previous => ({ ...previous, [key]: event.target.value }))}><option value="">{vacio}</option>{!options.data && draft[key] && <option value={draft[key]}>{data.usuario.values[key]}</option>}{opcionesDe(catalog, draft[key]).map(item => <option key={item.id} value={item.id}>{item.nombre}{item.activo ? '' : ' (inactivo)'}</option>)}</select>{key === 'regimen_normativo_id' && <span className="font-normal text-slate-500">Leyes del personal {draft.tipo_personal}. El tipo de vínculo (carrera, plazo determinado o designado) se registra en el vínculo laboral, en 2.2.</span>}{fieldErrors[key] && <span className="text-rose-700">{fieldErrors[key].join(' ')}</span>}</label>)}
+      {[...(conVinculo ? [] : [['unidad_organica_id', 'Unidad orgánica registrada en la persona', 'unidades', 'Sin asignar']]), ['regimen_normativo_id', 'Ley / régimen normativo', 'regimenes', 'Sin definir']].map(([key, title, catalog, vacio]) => <label key={key} className="flex flex-col gap-2 text-xs font-medium text-slate-600">{title}<select name={key} className={inputClass} value={draft[key]} disabled={!options.data} onChange={event => setDraft(previous => ({ ...previous, [key]: event.target.value }))}><option value="">{vacio}</option>{!options.data && draft[key] && <option value={draft[key]}>{data.usuario.values[key]}</option>}{opcionesDe(catalog, draft[key]).map(item => <option key={item.id} value={item.id}>{item.nombre}{item.activo ? '' : ' (inactivo)'}</option>)}</select>{key === 'regimen_normativo_id' && <span className="font-normal text-slate-500">Leyes del personal {draft.tipo_personal}. El tipo de vínculo (carrera, plazo determinado o designado) se registra en el vínculo laboral, en 2.2.</span>}{fieldErrors[key] && <span className="text-rose-700">{fieldErrors[key].join(' ')}</span>}</label>)}
       {options.error && <p role="alert" className="col-span-full text-xs text-rose-700">No se pudieron cargar las unidades y regímenes. <button type="button" className="underline" onClick={options.retry}>Reintentar</button></p>}
       <div className="col-span-full border-t border-slate-100 pt-5"><h3 className="mb-4 text-sm font-semibold text-slate-700">Estado y condiciones del personal</h3><div className="grid gap-5 sm:grid-cols-2">{flags.map(([key, title, ayuda]) => {
         const bloqueada = key === 'con_discapacidad' && !puedeDiscapacidad
         return <TresEstados key={key} name={key} label={title} ayuda={bloqueada ? `${ayuda} Solo administración de la ORH puede registrarlo.` : ayuda} value={draft[key]} disabled={bloqueada} error={fieldErrors[key]}
           onChange={valor => setDraft(previous => ({ ...previous, [key]: valor }))} />
-      })}</div><p className="mt-4 text-xs text-slate-500">Las condiciones del puesto (declaración jurada de bienes y rentas, colegiatura, estudios básicos y período de prueba) se registran en el vínculo laboral, en la sección 02.</p></div>
+      })}</div><p className="mt-4 text-xs text-slate-500">Las condiciones del puesto (declaración jurada de bienes y rentas, colegiatura, estudios básicos y período de prueba){conVinculo ? ', el puesto y la unidad orgánica' : ''} se registran en el vínculo laboral, en la sección 02.</p></div>
       <div className="col-span-full border-t border-slate-100 pt-5"><h3 className="mb-4 text-sm font-semibold text-slate-700">Ubicación</h3><UbigeoFields value={location} onChange={setLocation} disabled={saving} /><p className="mt-3 text-xs text-slate-500">Selecciona región, provincia y distrito del catálogo.</p></div>
       <div className="col-span-full flex justify-end gap-3 border-t border-slate-100 pt-5"><button type="button" onClick={onCancel} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm">Cancelar</button><button type="submit" className="rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50">{saving ? 'Guardando…' : 'Guardar cambios'}</button></div>
     </fieldset>
