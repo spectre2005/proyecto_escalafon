@@ -43,7 +43,7 @@ class ReportesTest extends TestCase
         $this->getJson('/api/v1/reportes/personal?exportar=1')->assertForbidden();
         config(['permisos.roles.lector_personal' => ['personal.ver']]);
         $this->actuarComo(codigo: 'lector_personal');
-        $this->getJson('/api/v1/reportes/opciones')->assertOk()->assertJsonCount(2, 'data.reportes')->assertJsonPath('data.reportes.0.id', 'dotacion');
+        $this->getJson('/api/v1/reportes/opciones')->assertOk()->assertJsonCount(3, 'data.reportes')->assertJsonPath('data.reportes.0.id', 'dotacion');
         $this->getJson('/api/v1/reportes/pendientes')->assertForbidden();
     }
 
@@ -54,7 +54,7 @@ class ReportesTest extends TestCase
         $grupos = $reportes->pluck('grupo')->unique()->values()->all();
         $this->assertSame(['Personal y dotación', 'Contratos y plazos', 'Control documental', 'Formación y desarrollo', 'Vacaciones y licencias',
             'Consultas por sección del legajo'], $grupos);
-        $this->assertSame(['dotacion', 'personal', 'movimientos', 'contratos', 'pendientes', 'formacion', 'capacitaciones', 'vacaciones', 'licencias'],
+        $this->assertSame(['dotacion', 'personal', 'plana_docente', 'movimientos', 'contratos', 'pendientes', 'formacion', 'capacitaciones', 'vacaciones', 'licencias'],
             $reportes->where('grupo', '!=', 'Consultas por sección del legajo')->pluck('id')->values()->all());
         // Las consultas por sección, por número de sección; ningún reporte se pierde al reagrupar.
         $secciones = $reportes->where('grupo', 'Consultas por sección del legajo')->pluck('seccion_origen')->values()->all();

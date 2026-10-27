@@ -9,6 +9,7 @@ use App\Models\FormacionAcademica;
 use App\Models\GoceVacacional;
 use App\Models\Legajo;
 use App\Models\LicenciaPermiso;
+use App\Models\PerfilDocente;
 use App\Models\PeriodoVacacional;
 use App\Models\UnidadOrganica;
 use App\Models\Usuario;
@@ -40,6 +41,38 @@ class ReportesInstitucionalesTest extends TestCase
         $this->getJson('/api/v1/reportes/dotacion?tipo_personal=administrativo')->assertOk()->assertJsonCount(0, 'data');
         $this->getJson('/api/v1/reportes/dotacion?regimen_id='.$actual->regimen_normativo_id)->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('resumen.personas', 1);
         $this->getJson('/api/v1/reportes/personal?q=SISTEMA-REPORTE')->assertOk()->assertJsonCount(0, 'data');
+    }
+
+    public function test_teaching_staff_shows_profile_highest_degree_and_dedication_of_the_open_link(): void
+    {
+        $this->actuarComo();
+        $docente = Usuario::factory()->create(['numero_doc_identidad' => '70000001']);
+        Legajo::factory()->create(['usuario_id' => $docente->id]);
+        $vinculo = VinculoLaboral::factory()->create(['usuario_id' => $docente->id, 'tipo_personal' => 'docente', 'fecha_inicio' => today()->subYear()]);
+        PerfilDocente::factory()->create(['vinculo_laboral_id' => $vinculo->id, 'condicion_docente' => 'ordinario', 'categoria' => 'principal', 'dedicacion' => 'tiempo_completo', 'codigo_renacyt' => 'P0012345']);
+        FormacionAcademica::factory()->create(['usuario_id' => $docente->id, 'nivel' => 'maestria', 'anulado' => false]);
+        FormacionAcademica::factory()->create(['usuario_id' => $docente->id, 'nivel' => 'doctorado', 'anulado' => true]);
+        // Sin perfil: se lista con «Sin definir». Un vínculo administrativo o cesado no entra.
+        $sinPerfil = Usuario::factory()->create();
+        Legajo::factory()->create(['usuario_id' => $sinPerfil->id]);
+        VinculoLaboral::factory()->create(['usuario_id' => $sinPerfil->id, 'tipo_personal' => 'docente', 'fecha_inicio' => today()->subMonth()]);
+        $administrativo = Usuario::factory()->create();
+        Legajo::factory()->create(['usuario_id' => $administrativo->id]);
+        VinculoLaboral::factory()->create(['usuario_id' => $administrativo->id, 'tipo_personal' => 'administrativo']);
+        $cesado = Usuario::factory()->create();
+        Legajo::factory()->create(['usuario_id' => $cesado->id]);
+        VinculoLaboral::factory()->create(['usuario_id' => $cesado->id, 'tipo_personal' => 'docente', 'fecha_cese' => today()->subDay()]);
+
+        $respuesta = $this->getJson('/api/v1/reportes/plana_docente?exportar=1')->assertOk()->assertJsonCount(2, 'data')
+            ->assertJsonPath('resumen.por_estado.tiempo_completo', 1)->assertJsonPath('resumen.por_estado.sin_definir', 1);
+        $fila = collect($respuesta->json('data'))->firstWhere('documento', '70000001');
+        $this->assertSame(['Ordinario', 'Principal', 'Tiempo completo', 'Maestría', 'P0012345'], [$fila['condicion'], $fila['categoria'], $fila['estado'], $fila['grado'], $fila['renacyt']]);
+        $this->getJson('/api/v1/reportes/plana_docente?estado=tiempo_completo')->assertOk()->assertJsonCount(1, 'data');
+        $this->getJson('/api/v1/reportes/plana_docente?nivel=maestria')->assertOk()->assertJsonCount(1, 'data');
+        $this->getJson('/api/v1/reportes/plana_docente?nivel=doctorado')->assertOk()->assertJsonCount(0, 'data');
+        config(['permisos.roles.solo_legajos' => ['legajo.ver']]);
+        $this->actuarComo(codigo: 'solo_legajos');
+        $this->getJson('/api/v1/reportes/plana_docente')->assertForbidden();
     }
 
     public function test_contracts_use_the_last_valid_extension_and_the_unit_of_the_link(): void

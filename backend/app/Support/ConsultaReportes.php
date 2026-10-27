@@ -26,10 +26,20 @@ final class ConsultaReportes
 {
     public const MAX_EXPORTAR = 10000;
 
+    // Enums de perfil_docente y el orden de los grados (de mayor a menor) para «Plana docente».
+    private const DEDICACIONES = ['exclusiva' => 'Dedicación exclusiva', 'tiempo_completo' => 'Tiempo completo', 'tiempo_parcial' => 'Tiempo parcial', 'sin_definir' => 'Dedicación sin definir'];
+
+    private const CONDICIONES_DOCENTE = ['ordinario' => 'Ordinario', 'extraordinario' => 'Extraordinario', 'contratado' => 'Contratado'];
+
+    private const GRADOS = ['doctorado' => 'Doctorado', 'maestria' => 'Maestría', 'titulo_profesional' => 'Título profesional', 'bachiller' => 'Bachiller', 'tecnico' => 'Técnico'];
+
     public const REPORTES = [
         'dotacion' => ['pregunta' => '¿Cuánto personal hay y cómo se reparte por unidad y régimen?', 'titulo' => 'Dotación por unidad y régimen', 'descripcion' => 'Cuántas personas tienen vínculo abierto y cómo se distribuyen.', 'icono' => 'building',
             'fecha' => null, 'estados' => ['docente' => 'Docentes', 'administrativo' => 'Administrativos'],
             'ayuda' => 'Personas con vínculo no anulado y sin cese, según el criterio vigente del sistema. Cada persona se cuenta una vez en su vínculo abierto más reciente. No equivale a plazas presupuestadas, CAP, PAP ni a una certificación de vigencia contractual.'],
+        'plana_docente' => ['pregunta' => '¿Cómo está conformada la plana docente?', 'titulo' => 'Plana docente', 'descripcion' => 'Docentes con vínculo abierto: condición, categoría, dedicación, grado más alto y RENACYT.', 'icono' => 'users',
+            'fecha' => null, 'estados' => self::DEDICACIONES,
+            'ayuda' => 'Un resultado por docente con vínculo abierto (el más reciente sin cese, como en la dotación). Condición, categoría y dedicación salen del perfil docente de ese vínculo; sin perfil, «Sin definir». El grado es el más alto registrado y no anulado; no implica una verificación en SUNEDU. RENACYT es el código declarado. Sirve de base para indicadores como docentes a tiempo completo o con posgrado; no reemplaza el formato que pida la Sunedu.'],
         'contratos' => ['pregunta' => '¿Qué contratos y adendas vencen o ya vencieron?', 'titulo' => 'Contratos y adendas', 'descripcion' => 'Vínculos laborales, plazos y ampliaciones para planificar renovaciones.', 'icono' => 'file',
             'fecha' => 'Inicio del vínculo', 'estados' => ['abierto' => 'Abierto', 'plazo_vencido' => 'Plazo vencido sin cese', 'cesado' => 'Con cese registrado', 'programado' => 'Inicio futuro'],
             'ayuda' => 'Un resultado por vínculo no anulado. Se usa la fecha final de la última adenda no anulada por fecha de inicio e identificador; si no existe, el plazo original. La unidad corresponde al vínculo. Un plazo vencido no se interpreta automáticamente como cese.'],
@@ -72,7 +82,7 @@ final class ConsultaReportes
      * Desactivada, el reporte no se ofrece y su consulta responde 409. Sin entrada: no depende de ninguna.
      */
     public const FUNCIONALIDADES = [
-        'dotacion' => 's02.vinculos', 'contratos' => 's02.vinculos', 'movimientos' => 's02.vinculos',
+        'dotacion' => 's02.vinculos', 'plana_docente' => 's02.vinculos', 'contratos' => 's02.vinculos', 'movimientos' => 's02.vinculos',
         'formacion' => 's03.formacion', 'capacitaciones' => 's03.formacion', 'vacaciones' => 's05.vacaciones', 'licencias' => 's05.licencias',
         'evaluaciones' => 's07.evaluaciones',
         'ficha_personal' => 's01.identidad', 'familiares' => 's01.familiares', 'antecedentes' => 's01.declaraciones', 'discapacidad' => 's01.discapacidad',
@@ -96,7 +106,7 @@ final class ConsultaReportes
             return ReportesSecciones::puede($actor, $tipo);
         }
 
-        return $actor->can(in_array($tipo, ['personal', 'dotacion'], true) ? 'personal.ver' : 'legajo.ver')
+        return $actor->can(in_array($tipo, ['personal', 'dotacion', 'plana_docente'], true) ? 'personal.ver' : 'legajo.ver')
             && ($tipo !== 'evaluaciones' || $actor->can('seccion07.ver'));
     }
 
@@ -105,7 +115,7 @@ final class ConsultaReportes
      * Los reportes de una sola sección que no están aquí van al final, en CONSULTAS_SECCION, por número de sección.
      */
     public const PROPOSITOS = [
-        'Personal y dotación' => ['dotacion', 'personal', 'movimientos'],
+        'Personal y dotación' => ['dotacion', 'personal', 'plana_docente', 'movimientos'],
         'Contratos y plazos' => ['contratos'],
         'Control documental' => ['pendientes'],
         'Formación y desarrollo' => ['formacion', 'capacitaciones', 'evaluaciones'],
@@ -237,7 +247,7 @@ final class ConsultaReportes
 
             return;
         }
-        if (in_array($tipo, ['dotacion', 'contratos', 'movimientos', 'formacion', 'capacitaciones', 'vacaciones', 'licencias', 'evaluaciones'], true)) {
+        if (in_array($tipo, ['dotacion', 'plana_docente', 'contratos', 'movimientos', 'formacion', 'capacitaciones', 'vacaciones', 'licencias', 'evaluaciones'], true)) {
             yield from self::institucionales($actor, $tipo, $filtros);
 
             return;
@@ -450,6 +460,9 @@ final class ConsultaReportes
                 'desvinculacionesPorUsuario' => fn (Builder|Relation $q): Builder|Relation => $q->where('anulado', false)->whereNull('vinculo_laboral_id')->orderBy('fecha_cese')->orderBy('id')]);
         }
         $consulta->with(['vinculosLaborales' => fn (Builder|Relation $q): Builder|Relation => $q->where('anulado', false)->with(['unidadOrganica', 'regimenNormativo'])->orderByDesc('fecha_inicio')->orderByDesc('id')]);
+        if ($tipo === 'plana_docente') {
+            $consulta->with(['vinculosLaborales.perfilDocente', 'formacionAcademicaPorUsuario' => fn (Builder|Relation $q): Builder|Relation => $q->where('anulado', false)]);
+        }
         if ($relacion) {
             $consulta->with([$relacion => fn (Builder|Relation $q): Builder|Relation => $q->where('anulado', false)->with('documento.tipoDocumento')->orderBy('id')]);
         }
@@ -471,6 +484,26 @@ final class ConsultaReportes
                 }
                 $grupos[$clave]['personas_total']++;
                 $grupos[$clave]['_personas'][] = $persona->id;
+
+                continue;
+            }
+            if ($tipo === 'plana_docente') {
+                // Mismo vínculo abierto que la dotación; la dedicación es el «estado» (reparto y filtro).
+                // Docente es el vínculo (su tipo de personal), como en la dotación, no la ficha de la persona.
+                $actual = $persona->vinculosLaborales->whereNull('fecha_cese')->first();
+                if (! $actual || $actual->tipo_personal !== 'docente' || ! self::unidadCoincide($datos = self::contextoVinculo($base, $actual), $filtros)) {
+                    continue;
+                }
+                $perfil = $actual->perfilDocente->sortByDesc('created_at')->first();
+                $grado = collect(array_keys(self::GRADOS))->first(fn (string $nivel): bool => $persona->formacionAcademicaPorUsuario->contains('nivel', $nivel));
+                if (! empty($filtros['nivel']) && $grado !== $filtros['nivel']) {
+                    continue;
+                }
+                $dedicacion = isset(self::DEDICACIONES[$perfil?->dedicacion ?? '']) ? $perfil->dedicacion : 'sin_definir';
+                yield [...$datos, 'id' => $actual->id, 'estado_codigo' => $dedicacion, 'estado' => self::DEDICACIONES[$dedicacion],
+                    'condicion' => self::CONDICIONES_DOCENTE[$perfil?->condicion_docente ?? ''] ?? 'Sin definir',
+                    'categoria' => $perfil?->categoria ? ucfirst($perfil->categoria) : ($perfil?->condicion_docente === 'ordinario' ? 'Sin definir' : 'No aplica'),
+                    'grado' => $grado ? self::GRADOS[$grado] : 'Sin grado registrado', 'renacyt' => $perfil?->codigo_renacyt ?: 'No declarado'];
 
                 continue;
             }
@@ -632,6 +665,7 @@ final class ConsultaReportes
             'licencias' => ['detalle' => 'Tipo de licencia / permiso', 'fecha' => 'Inicio', 'fin' => 'Fin', 'dias' => 'Días registrados completos', 'estado' => 'Goce', 'numero' => 'Documento de autorización'],
             'evaluaciones' => ['periodo' => 'Ciclo', 'fecha' => 'Evaluación', 'estado' => 'Plan de mejora', 'sustento' => 'Estado del sustento'],
             'personal' => ['puesto' => 'Puesto', 'origen_puesto' => 'Fuente del puesto', 'ley' => 'Ley / régimen', 'tipo_vinculo' => 'Tipo de vínculo', 'vinculos' => 'Vínculos abiertos', 'estado' => 'Situación laboral'],
+            'plana_docente' => ['condicion' => 'Condición', 'categoria' => 'Categoría', 'estado' => 'Dedicación', 'grado' => 'Grado más alto', 'renacyt' => 'RENACYT', 'ley' => 'Ley / régimen'],
             'pendientes' => ['legajo' => 'Legajo', 'seccion' => 'Sección', 'detalle' => 'Documento / requisito', 'estado' => 'Pendiente', 'motivo' => 'Motivo'],
             default => ['origen' => 'Origen', 'detalle' => 'Concepto', 'fecha' => 'Vencimiento', 'dias' => 'Días restantes', 'estado' => 'Estado'],
         };

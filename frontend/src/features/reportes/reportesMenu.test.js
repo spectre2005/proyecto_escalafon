@@ -81,4 +81,5 @@ test('limpiar filtros deja solo el reporte y el tamaño de página', () => {
 test('en las consultas por sección el filtro de estado se llama «Sustento documental»', () => {
   assert.equal(tituloFiltroEstado({ id: 'colegiaturas', seccion_origen: 3 }), 'Sustento documental')
   assert.equal(tituloFiltroEstado({ id: 'contratos' }), 'Estado')
+  assert.equal(tituloFiltroEstado({ id: 'plana_docente' }), 'Dedicación')
 })

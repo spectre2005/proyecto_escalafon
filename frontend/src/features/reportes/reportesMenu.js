@@ -107,7 +107,7 @@ export function paramsLimpios(params, reporteId) {
   return siguiente
 }
 
-/** En las consultas por sección, «Estado» es en realidad si el registro tiene un archivo asociado. */
+/** Nombre real del «estado» de cada reporte: el sustento en las consultas por sección, la dedicación en la plana docente. */
 export function tituloFiltroEstado(reporte) {
-  return reporte.seccion_origen ? 'Sustento documental' : 'Estado'
+  return reporte.seccion_origen ? 'Sustento documental' : reporte.id === 'plana_docente' ? 'Dedicación' : 'Estado'
 }
