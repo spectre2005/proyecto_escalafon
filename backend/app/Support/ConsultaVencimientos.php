@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\RequerimientoDocumento;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
 use Carbon\CarbonImmutable;
@@ -68,12 +69,17 @@ final class ConsultaVencimientos
         $ordenadas = DB::query()->fromSub($alertas, 'd')->whereIn('usuario_id', $ids)->select('d.*')
             ->selectRaw('ROW_NUMBER() OVER (PARTITION BY usuario_id ORDER BY fecha, origen, alerta_id) as posicion');
         $motivos = DB::query()->fromSub($ordenadas, 'ordenadas')->where('posicion', '<=', 5)->orderBy('fecha')->get()->groupBy('usuario_id');
-        $pagina->through(function ($persona) use ($motivos, $hoy): array {
-            $detalle = ($motivos->get($persona->usuario_id) ?? collect())->map(function ($alerta) use ($hoy): array {
+        $requerimientos = RequerimientoDocumento::query()
+            ->whereIn('id', $motivos->flatten()->where('origen', 'requerimiento')->pluck('alerta_id'))
+            ->with(['tipoDocumento:id,codigo,seccion_legajo_id,subseccion_legajo_id', 'tipoDocumento.subseccionLegajo:id,codigo'])
+            ->get(['id', 'tipo_documento_id'])->keyBy('id');
+        $pagina->through(function ($persona) use ($motivos, $hoy, $requerimientos): array {
+            $detalle = ($motivos->get($persona->usuario_id) ?? collect())->map(function ($alerta) use ($hoy, $requerimientos): array {
                 $dias = (int) $hoy->diffInDays(CarbonImmutable::parse($alerta->fecha, 'America/Lima'), false);
 
                 // id: el del registro de origen (vínculo, certificado…), para enlazar a él desde el panel.
                 return ['id' => $alerta->alerta_id, 'origen' => $alerta->origen, 'detalle' => $alerta->detalle, 'fecha' => substr($alerta->fecha, 0, 10),
+                    'tipo_documento' => $alerta->origen === 'requerimiento' ? $requerimientos->get($alerta->alerta_id)?->tipoDocumento?->toArray() : null,
                     'estado' => self::estado($alerta->origen, (string) $alerta->fecha, $hoy), 'dias_restantes' => $dias, 'criticidad' => $dias < 7 ? 'rojo' : 'amarillo'];
             })->all();
 

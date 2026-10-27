@@ -1,3 +1,5 @@
+import { destinoDocumentoRequerido } from './destinoDocumentoRequerido.js'
+
 // Adónde lleva cada motivo de Vencimientos: la sección del legajo (?categoria=) y el registro (#registro-{id} o el bloque del
 // DNI), que DestinoLegajo despliega y resalta. Los requerimientos van a su página, filtrados por la persona.
 const SECCIONES = {
@@ -17,4 +19,12 @@ export function destinoMotivo(persona, motivo) {
   if (motivo.origen === 'documento') return { ruta: `/legajos/${persona.usuario_id}?categoria=general#bloque-S01_B_DOCUMENTO_IDENTIDAD`, texto: 'Ir al DNI' }
   const seccion = SECCIONES[motivo.origen]
   return seccion && motivo.id ? { ruta: `/legajos/${persona.usuario_id}?categoria=${seccion[0]}#registro-${motivo.id}`, texto: seccion[1] } : null
+}
+
+
+export function destinoRegistroMotivo(persona, motivo) {
+  if (motivo.origen === 'requerimiento' && motivo.tipo_documento) {
+    return destinoDocumentoRequerido({ usuario_id: persona.usuario_id, tipo_documento: motivo.tipo_documento })
+  }
+  return destinoMotivo(persona, motivo)?.ruta || `/legajos/${persona.usuario_id}`
 }

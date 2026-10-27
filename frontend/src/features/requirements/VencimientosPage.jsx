@@ -7,7 +7,7 @@ import Paginacion from '../../shared/Paginacion'
 import DocumentoModal from '../legajos/components/documentos/DocumentoModal'
 import { conPagina, conPorPagina, leerPaginacion, paginaCorregida } from '../../shared/paginacionUrl'
 import { usePuede } from '../auth/session'
-import { destinoMotivo } from './destinosVencimiento'
+import { destinoMotivo, destinoRegistroMotivo } from './destinosVencimiento'
 import { aplicarDias, conFiltro, DIAS_POR_DEFECTO, opcionesEstado } from './filtrosVencimiento'
 
 const panel = 'rounded-2xl border border-slate-200 bg-white'
@@ -41,8 +41,19 @@ function CampoDias({ params, setParams }) {
     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); confirmar() } }} className={control} /></Campo>
 }
 
-function Motivo({ persona, motivo, fuentes }) {
-  const destino = destinoMotivo(persona, motivo)
+function Motivo({ persona, motivo, fuentes, compacto = false }) {
+  const destino = motivo.origen === 'requerimiento' ? null : destinoMotivo(persona, motivo)
+  if (compacto) return <div className="space-y-2">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <span className="text-sm font-semibold text-slate-800">{fuentes[motivo.origen] || motivo.origen}</span>
+      <span className={`rounded-full px-2 py-1 text-xs font-medium ${motivo.criticidad === 'rojo' ? 'bg-rose-50 text-rose-800' : 'bg-amber-50 text-amber-900'}`}>{diasTexto(motivo.dias_restantes, motivo.estado)}</span>
+    </div>
+    {motivo.detalle && <p className="break-words text-xs leading-relaxed text-slate-600">{motivo.detalle}</p>}
+    <div className="flex items-center justify-between gap-3 text-xs">
+      <time className="text-slate-500" dateTime={motivo.fecha}>{fecha(motivo.fecha)}</time>
+      <Link to={destinoRegistroMotivo(persona, motivo)} aria-label={`Registrar ${fuentes[motivo.origen] || motivo.origen} de ${persona.nombre}${motivo.detalle ? `: ${motivo.detalle}` : ''}`} className={`${accion} ml-auto`}>Registrar →</Link>
+    </div>
+  </div>
   return <div className="space-y-1.5">
     <div className="flex flex-wrap items-center gap-2">
       <span className="font-semibold text-slate-800">{fuentes[motivo.origen] || motivo.origen}</span>
@@ -70,20 +81,19 @@ function AccionRequerimientos({ persona }) {
 }
 
 function AlertasPersona({ persona, fuentes }) {
-  const [principal, ...resto] = persona.motivos
+  const resto = persona.motivos.slice(1)
   const [abierto, setAbierto] = useState(false)
   const puedeGestionar = usePuede('requerimientos.gestionar')
   const hayMas = resto.length > 0 || persona.total_alertas > persona.motivos.length
   return <>
-    {principal && <Motivo persona={persona} motivo={principal} fuentes={fuentes} />}
-    {(hayMas || puedeGestionar) && <div className="mt-3 flex flex-wrap items-center gap-2">
-      {hayMas && <button type="button" className={accion} aria-haspopup="dialog" onClick={() => setAbierto(true)}>Mostrar otros vencimientos</button>}
+    {(hayMas || puedeGestionar) && <div className="flex flex-col items-stretch gap-2">
+      {hayMas && <button type="button" className={accion} aria-haspopup="dialog" onClick={() => setAbierto(true)}>Ver más</button>}
       <AccionRequerimientos persona={persona} />
     </div>}
     {abierto && <DocumentoModal titulo="Otros vencimientos" onCancel={() => setAbierto(false)} compacto cerrarAlClickFuera>
       <p className="mb-4 text-sm font-semibold text-slate-700">{persona.nombre}</p>
-      {resto.length > 0 && <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white px-4">{resto.map((motivo, index) => <li className="py-4" key={`${motivo.origen}-${motivo.id || index}`}><Motivo persona={persona} motivo={motivo} fuentes={fuentes} /></li>)}</ul>}
-      {persona.total_alertas > persona.motivos.length && <div className="mt-4 space-y-3 text-sm text-slate-600"><p>Este resumen incluye {persona.motivos.length} de {persona.total_alertas} alertas. Revisa el legajo para consultar los demás registros.</p><Link to={`/legajos/${persona.usuario_id}`} className={accion}>Abrir legajo completo →</Link></div>}
+      {resto.length > 0 && <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white px-4">{resto.map((motivo, index) => <li className="py-3" key={`${motivo.origen}-${motivo.id || index}`}><Motivo persona={persona} motivo={motivo} fuentes={fuentes} compacto /></li>)}</ul>}
+      {persona.total_alertas > persona.motivos.length && <div className="mt-4 space-y-3 text-sm text-slate-600"><p>{persona.total_alertas - persona.motivos.length} más en el legajo.</p><Link to={`/legajos/${persona.usuario_id}`} className={accion}>Ver legajo →</Link></div>}
     </DocumentoModal>}
   </>
 }
@@ -133,12 +143,25 @@ function Resultados() {
     </form></section>
     {request.error && <div role="alert" className="mb-5 rounded-xl bg-rose-50 p-4 text-sm text-rose-900">{apiErrorMessage(request.error)} <button onClick={request.retry} className={`${button} ml-3`}>Reintentar</button></div>}
     {request.loading && !result && <p role="status" className={`${panel} p-8`}>Consultando vencimientos…</p>}
-    {result && <section aria-label="Personal con alertas de vencimiento" aria-busy={request.loading} className={`${panel} overflow-hidden`}><p role="status" className="border-b border-slate-200 p-5 text-sm text-slate-700">{result.total} {result.total === 1 ? 'persona' : 'personas'} con alertas <span className="mt-1 block text-xs text-slate-500">Más antiguas primero · Actualizado al {fecha(result.hoy)} (Lima)</span></p>
+    {result && <section aria-label="Personal con alertas de vencimiento" aria-busy={request.loading} className="space-y-3">
       {corregida && result.total > 0 ? <p role="status" className="p-10 text-center text-sm text-slate-600">La página {result.current_page} no existe. Mostrando la última página disponible…</p>
-        : result.data.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">Personal con alertas, una fila por persona y ordenado por fecha ascendente</caption><thead className="bg-slate-50 text-slate-700"><tr>{['Personal', 'Área', 'Estado', 'Alerta principal'].map(label => <th key={label} scope="col" className="px-5 py-4 font-semibold">{label}</th>)}</tr></thead><tbody>{result.data.map(persona => <tr key={persona.usuario_id} className="border-t border-slate-200 align-top"><th scope="row" className="px-4 py-3 font-semibold text-slate-800">{persona.nombre}<span className="mt-1 block text-xs font-normal text-slate-600">{persona.numero_doc_identidad} · {persona.tipo_personal}</span></th><td className="px-4 py-3 text-slate-700">{persona.area || 'Sin área registrada'}</td><td className="px-4 py-3"><span className={`inline-block rounded-xl px-3 py-2 text-xs font-semibold ${estados[persona.estado]?.[1] || estados.por_vencer[1]}`}>{estados[persona.estado]?.[0] || persona.estado}</span><p className="mt-2 text-xs text-slate-600">{persona.total_alertas} {persona.total_alertas === 1 ? 'alerta' : 'alertas'}</p></td><td className="min-w-72 px-4 py-3"><AlertasPersona key={consulta.toString()} persona={persona} fuentes={fuentes} /></td></tr>)}</tbody></table></div> : <p className="p-10 text-center text-sm text-slate-600">No hay alertas con estos filtros. Prueba ampliar el período o limpiar los filtros.</p>}
-      {result.total > 0 && !corregida && <Paginacion tamano="amplio" etiqueta="Paginación de vencimientos" sustantivo="personas" desde={result.from ?? 0} hasta={result.to ?? 0} total={result.total}
+        : result.data.length ? <div className={`${panel} overflow-x-auto`}>
+          <table className="w-full min-w-[900px] table-fixed text-left text-sm">
+            <caption className="sr-only">Vencimientos del personal ordenados por fecha</caption>
+            <colgroup><col className="w-[23%]" /><col className="w-[15%]" /><col className="w-[13%]" /><col className="w-[32%]" /><col className="w-[17%]" /></colgroup>
+            <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-600"><tr>{['Personal', 'Área', 'Estado', 'Alerta principal', 'Acciones'].map(titulo => <th scope="col" key={titulo} className="px-4 py-3 font-semibold">{titulo}</th>)}</tr></thead>
+            <tbody className="divide-y divide-slate-100">{result.data.map(persona => <tr key={persona.usuario_id} className="align-middle transition-colors hover:bg-slate-50/70">
+              <th scope="row" className="break-words px-4 py-3 font-semibold text-slate-800">{persona.nombre}<span className="mt-1 block text-xs font-normal text-slate-500">{persona.numero_doc_identidad} · {persona.tipo_personal}</span></th>
+              <td className="break-words px-4 py-3 text-xs text-slate-600">{persona.area || <span className="text-slate-400">Sin asignar</span>}</td>
+              <td className="px-4 py-3"><span className={`inline-block whitespace-nowrap rounded-lg px-2 py-1 text-xs font-semibold ${estados[persona.estado]?.[1] || estados.por_vencer[1]}`}>{estados[persona.estado]?.[0] || persona.estado}</span><p className="mt-1 text-xs text-slate-500">{persona.total_alertas} {persona.total_alertas === 1 ? 'alerta' : 'alertas'}</p></td>
+              <td className="break-words px-4 py-3">{persona.motivos[0] && <Motivo persona={persona} motivo={persona.motivos[0]} fuentes={fuentes} />}</td>
+              <td className="px-4 py-3"><AlertasPersona key={consulta.toString()} persona={persona} fuentes={fuentes} /></td>
+            </tr>)}</tbody>
+          </table>
+        </div> : <p className="p-10 text-center text-sm text-slate-600">No hay alertas con estos filtros. Prueba ampliar el período o limpiar los filtros.</p>}
+      {result.total > 0 && !corregida && <div className={`${panel} overflow-hidden`}><Paginacion tamano="amplio" etiqueta="Paginación de vencimientos" sustantivo="personas" desde={result.from ?? 0} hasta={result.to ?? 0} total={result.total}
         pagina={result.current_page} paginas={result.last_page} porPagina={porPagina} ocupado={request.loading}
-        onPagina={pagina} onPorPagina={size => setParams(conPorPagina(params, size))} />}
+        onPagina={pagina} onPorPagina={size => setParams(conPorPagina(params, size))} /></div>}
     </section>}
   </>
 }
