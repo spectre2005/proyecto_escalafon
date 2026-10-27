@@ -11,9 +11,33 @@ export function gruposDe(reportes) {
   return [...new Set(reportes.map(reporte => reporte.grupo))]
 }
 
-/** El reporte pedido en la URL, o el de inicio. */
-export function reporteElegido(reportes, tipo) {
+// Pestañas: nombre que ve el usuario de cada grupo del backend. Es el único lugar donde se renombran; un grupo nuevo que
+// no esté aquí sale con su propio nombre. «Directiva» (anexos 06 a 09) es otra página, no un grupo de reportes.
+export const FAMILIAS = [
+  { id: 'personal', grupo: 'Personal y dotación', etiqueta: 'Personal y dotación' },
+  { id: 'contratos', grupo: 'Contratos y plazos', etiqueta: 'Contratos y plazos' },
+  { id: 'control', grupo: 'Control documental', etiqueta: 'Control del legajo' },
+  { id: 'formacion', grupo: 'Formación y desarrollo', etiqueta: 'Formación' },
+  { id: 'asistencia', grupo: 'Vacaciones y licencias', etiqueta: 'Asistencia' },
+]
+export const DIRECTIVA = { id: 'directiva', etiqueta: 'Directiva' }
+
+/** La pestaña de un grupo del backend; las consultas por sección no tienen pestaña («Más reportes»). */
+export function familiaDe(grupo) {
+  if (!grupo || grupo === CONSULTAS_SECCION) return null
+  return FAMILIAS.find(familia => familia.grupo === grupo) || { id: grupo, grupo, etiqueta: grupo }
+}
+
+/** Pestañas con al menos un reporte disponible, en el orden del backend. */
+export function familiasDe(reportes) {
+  return gruposDe(reportes).map(familiaDe).filter(Boolean)
+}
+
+/** El reporte pedido en la URL; si no hay, el primero de la pestaña elegida o el de inicio. */
+export function reporteElegido(reportes, tipo, familia = null) {
+  const grupo = familiasDe(reportes).find(item => item.id === familia)?.grupo
   return reportes.find(reporte => reporte.id === tipo)
+    || (grupo && reportes.find(reporte => reporte.grupo === grupo))
     || POR_DEFECTO.map(id => reportes.find(reporte => reporte.id === id)).find(Boolean)
     || reportes[0]
 }

@@ -4,9 +4,10 @@ import api, { apiErrorMessage } from '../../axios'
 import Icon from '../../components/ui/Icon'
 import Paginacion from '../../shared/Paginacion'
 import { conPagina, conPorPagina, leerPaginacion, paginaCorregida } from '../../shared/paginacionUrl'
-import { conFiltro, CONSULTAS_SECCION, etiquetaReporte, gruposDe, paramsLimpios, reporteElegido, tituloFiltroEstado, valoresIniciales } from './reportesMenu'
+import { conFiltro, CONSULTAS_SECCION, etiquetaReporte, familiaDe, familiasDe, paramsLimpios, reporteElegido, tituloFiltroEstado, valoresIniciales } from './reportesMenu'
 import { usePuede } from '../auth/session'
 import { defaultInstitution } from '../../config/institution'
+import ReportesPestanas from './ReportesPestanas'
 import { crearExcelReporte, crearPdfReporte, descargarExcel, describirFiltros, valorReporte } from './exportarReporte'
 
 const control = 'w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100 disabled:opacity-50'
@@ -151,22 +152,14 @@ function Distribucion({ reporte, resumen }) {
   </section>
 }
 
-// Elegir reporte: tarjetas con la pregunta que responde cada reporte principal, por propósito; las consultas de una sola
-// sección, en un desplegable aparte para no saturar la pantalla.
-function SelectorReportes({ reportes, grupos, reporte, abrir }) {
-  const principales = grupos.filter(grupo => grupo !== CONSULTAS_SECCION)
+// Elegir reporte: los de la pestaña, en botones compactos (la pregunta que responde cada uno va en el tooltip); las
+// consultas de una sola sección, en un desplegable aparte.
+function SelectorReportes({ reportes, familia, reporte, abrir }) {
   const consultas = reportes.filter(item => item.grupo === CONSULTAS_SECCION)
-  return <section aria-label="Elegir reporte" className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
-    <h2 className="text-sm font-semibold text-slate-800">¿Qué quieres consultar?</h2>
-    {principales.map(grupo => <div key={grupo}>
-      <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[.15em] text-slate-500">{grupo}</h3>
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">{reportes.filter(item => item.grupo === grupo).map(item => <button key={item.id} type="button" aria-pressed={item.id === reporte.id} onClick={() => abrir(item.id)}
-        className={`rounded-xl border px-3 py-2.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-teal-700 ${item.id === reporte.id ? 'border-teal-600 bg-teal-50' : 'border-slate-200 hover:border-teal-200 hover:bg-teal-50/40'}`}>
-        <span className="block text-sm font-semibold text-slate-800">{item.titulo}</span>
-        {item.pregunta && <span className="mt-0.5 block text-xs leading-snug text-slate-500">{item.pregunta}</span>}
-      </button>)}</div>
-    </div>)}
-    {consultas.length > 0 && <label className="grid gap-1.5 border-t border-slate-100 pt-4 text-xs font-medium text-slate-500 sm:max-w-xl">{CONSULTAS_SECCION}
+  return <section aria-label="Elegir reporte" className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+    <div className="flex flex-wrap gap-2">{reportes.filter(item => item.grupo === familia?.grupo).map(item => <button key={item.id} type="button" aria-pressed={item.id === reporte.id} title={item.pregunta || item.descripcion} onClick={() => abrir(item.id)}
+      className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-teal-700 ${item.id === reporte.id ? 'border-teal-600 bg-teal-50 font-semibold text-teal-800' : 'border-slate-200 text-slate-700 hover:border-teal-200 hover:bg-teal-50/40'}`}>{item.titulo}</button>)}</div>
+    {consultas.length > 0 && <label className="grid gap-1.5 border-t border-slate-100 pt-3 text-xs font-medium text-slate-500 sm:max-w-xl">{CONSULTAS_SECCION}
       <select value={reporte.grupo === CONSULTAS_SECCION ? reporte.id : ''} onChange={event => event.target.value && abrir(event.target.value)} className={control}>
         <option value="">Elegir una sección…</option>{consultas.map(item => <option key={item.id} value={item.id}>{etiquetaReporte(item)}</option>)}
       </select></label>}
@@ -178,22 +171,30 @@ function ContenidoReportes() {
   const [params, setParams] = useSearchParams()
   const institucion = useOutletContext()?.institution || defaultInstitution
   const reportes = opciones.data?.data.reportes || []
-  // Grupos por propósito, en el orden del backend; se abre la dotación si no se eligió otro.
-  const reporte = reporteElegido(reportes, params.get('tipo'))
-  const grupos = gruposDe(reportes)
-  const abrir = tipo => setParams({ tipo })
+  // Pestañas por familia, en el orden del backend; sin reporte elegido se ve el primero de la pestaña (o la dotación).
+  const familias = familiasDe(reportes)
+  const reporte = reporteElegido(reportes, params.get('tipo'), params.get('familia'))
+  const familia = familiaDe(reporte?.grupo)
+  const familiaMenu = familia || familias.find(item => item.id === params.get('familia')) || familias[0]
+  // El menú se pliega a una línea en cuanto se elige un reporte; «Cambiar» lo vuelve a abrir.
+  const [cambiando, setCambiando] = useState(false)
+  const menuAbierto = cambiando || !reportes.some(item => item.id === params.get('tipo'))
+  const abrir = tipo => { setCambiando(false); setParams({ tipo }) }
   const administra = usePuede('sistema.administrar')
   const veLegajos = usePuede('legajo.ver')
-  const formatos = administra && veLegajos
-  return <div className="mx-auto max-w-[1500px] space-y-6 pb-8">
-    <header className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-[10px] font-semibold uppercase tracking-[.2em] text-teal-700">Personal con legajo</p><h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-800">Reportes del personal</h1><p className="mt-2 text-sm leading-relaxed text-slate-500">Consulta y exporta la información registrada en las once secciones del legajo.</p></div>{formatos && <Link to="/reportes/formatos" className="inline-flex items-center gap-2 rounded-xl border border-teal-200 bg-white px-4 py-2.5 text-sm font-semibold text-teal-800 hover:bg-teal-50"><Icon name="file" size={17} />Formatos de la directiva (anexos 06 a 09)</Link>}</header>
+  return <div className="mx-auto max-w-[1500px] space-y-5 pb-8">
+    <header><h1 className="text-2xl font-bold tracking-tight text-slate-800">Reportes del personal</h1><p className="mt-1 text-sm text-slate-500">Consulta y exporta la información registrada en el legajo.</p></header>
     {opciones.loading && <p role="status" className="text-sm text-slate-500">Cargando reportes disponibles…</p>}
     {opciones.error && <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{apiErrorMessage(opciones.error)}</p>}
     {reporte && <>
-      <SelectorReportes reportes={reportes} grupos={grupos} reporte={reporte} abrir={abrir} />
-      <div><h2 className="text-xl font-semibold tracking-tight text-slate-800">{reporte.titulo}</h2><p className="mt-2 text-sm text-slate-500">{reporte.descripcion}</p>
+      <ReportesPestanas familias={familias} activa={familia?.id} directiva={administra && veLegajos} />
+      {menuAbierto && <SelectorReportes reportes={reportes} familia={familiaMenu} reporte={reporte} abrir={abrir} />}
+      <div>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1"><p className="text-xs text-slate-500">{familia?.etiqueta || CONSULTAS_SECCION} ›</p><h2 className="text-lg font-semibold tracking-tight text-slate-800">{etiquetaReporte(reporte)}</h2>
+          {!menuAbierto && <button type="button" onClick={() => setCambiando(true)} className="text-xs font-semibold text-teal-700 hover:underline focus-visible:outline-2 focus-visible:outline-teal-700">Cambiar</button>}</div>
+        <p className="mt-1 text-sm text-slate-500">{reporte.descripcion}</p>
         {/* El detalle técnico de qué se cuenta y qué no, plegado junto al título. */}
-        <details className="mt-2 text-xs text-slate-500"><summary className="cursor-pointer font-medium text-teal-800">Qué incluye y qué no este reporte</summary><p className="mt-2 max-w-4xl leading-relaxed">{reporte.ayuda}</p></details></div>
+        <details className="mt-1 text-xs text-slate-500"><summary className="cursor-pointer font-medium text-teal-800">Qué incluye y qué no este reporte</summary><p className="mt-2 max-w-4xl leading-relaxed">{reporte.ayuda}</p></details></div>
       <PanelReporte key={reporte.id} reporte={reporte} opciones={opciones.data.data} params={params} setParams={setParams} institucion={institucion} />
     </>}
   </div>

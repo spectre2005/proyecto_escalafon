@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { conFiltro, CONSULTAS_SECCION, etiquetaReporte, gruposDe, paramsLimpios, reporteElegido, tituloFiltroEstado, valoresIniciales } from './reportesMenu.js'
+import { conFiltro, CONSULTAS_SECCION, etiquetaReporte, familiaDe, familiasDe, gruposDe, paramsLimpios, reporteElegido, tituloFiltroEstado, valoresIniciales } from './reportesMenu.js'
 
 const reportes = [
   { id: 'dotacion', grupo: 'Personal y dotación', titulo: 'Dotación por unidad y régimen' },
@@ -20,6 +20,20 @@ test('se abre la dotación por defecto; si no está disponible, el padrón o el 
   assert.equal(reporteElegido(reportes, 'no-existe').id, 'dotacion')
   assert.equal(reporteElegido(reportes.slice(1), null).id, 'personal')
   assert.equal(reporteElegido(reportes.slice(2), null).id, 'contratos')
+})
+
+test('las pestañas renombran los grupos en un solo mapa y dejan fuera las consultas por sección', () => {
+  assert.deepEqual(familiasDe(reportes).map(familia => familia.etiqueta), ['Personal y dotación', 'Contratos y plazos'])
+  assert.equal(familiaDe('Control documental').etiqueta, 'Control del legajo')
+  assert.equal(familiaDe('Vacaciones y licencias').etiqueta, 'Asistencia')
+  assert.equal(familiaDe('Grupo nuevo').etiqueta, 'Grupo nuevo')
+  assert.equal(familiaDe(CONSULTAS_SECCION), null)
+})
+
+test('al abrir una pestaña sin reporte elegido se muestra su primer reporte', () => {
+  assert.equal(reporteElegido(reportes, null, 'contratos').id, 'contratos')
+  assert.equal(reporteElegido(reportes, 'colegiaturas', 'personal').id, 'colegiaturas')
+  assert.equal(reporteElegido(reportes, null, 'no-existe').id, 'dotacion')
 })
 
 test('solo las consultas por sección llevan el número de sección delante', () => {
