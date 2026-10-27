@@ -12,7 +12,7 @@ const SECCIONES = {
 
 /** { ruta, texto } del enlace de un motivo, o null si su origen no es conocido. */
 export function destinoMotivo(persona, motivo) {
-  if (motivo.origen === 'requerimiento') return { ruta: `/requerimientos?q=${encodeURIComponent(persona.nombre)}`, texto: 'Ver requerimientos' }
+  if (motivo.origen === 'requerimiento') return { ruta: `/requerimientos?clase=todas&q=${encodeURIComponent(persona.numero_doc_identidad || persona.nombre.split(' ')[0])}`, texto: 'Ver requerimientos' }
   // Solo el DNI pide fecha de caducidad (DocumentoLegajoController): va a su bloque en Información personal.
   if (motivo.origen === 'documento') return { ruta: `/legajos/${persona.usuario_id}?categoria=general#bloque-S01_B_DOCUMENTO_IDENTIDAD`, texto: 'Ir al DNI' }
   const seccion = SECCIONES[motivo.origen]

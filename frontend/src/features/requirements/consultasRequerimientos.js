@@ -20,7 +20,11 @@ export function urlSugerencias({ admin, clase, q = '', page = 1, porPagina = POR
  */
 export function parametrosLista(params, clase, { pagina, porPagina }) {
   const siguiente = conPagina(conPorPagina(params, porPagina), pagina)
-  if (clase === 'sugerencias') {
+  siguiente.delete('nuevo')
+  siguiente.delete('persona')
+  if (clase === 'todas') {
+    siguiente.delete('clase')
+  } else if (clase === 'sugerencias') {
     for (const clave of ['clase', 'q', 'page', 'por_pagina']) siguiente.delete(clave)
   } else {
     siguiente.set('clase', clase)

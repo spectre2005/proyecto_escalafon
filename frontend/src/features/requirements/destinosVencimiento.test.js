@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { destinoMotivo } from './destinosVencimiento.js'
 
-const persona = { usuario_id: 'persona-1', nombre: 'ANA FICTICIA' }
+const persona = { usuario_id: 'persona-1', nombre: 'ANA FICTICIA', numero_doc_identidad: '12345678' }
 
 test('each reason links to its own record inside the legajo section', () => {
   const casos = {
@@ -19,7 +19,12 @@ test('each reason links to its own record inside the legajo section', () => {
 
 test('the ID card, the requirements and unknown reasons', () => {
   assert.deepEqual(destinoMotivo(persona, { origen: 'documento', id: 'd1' }), { ruta: '/legajos/persona-1?categoria=general#bloque-S01_B_DOCUMENTO_IDENTIDAD', texto: 'Ir al DNI' })
-  assert.deepEqual(destinoMotivo(persona, { origen: 'requerimiento', id: 'q1' }), { ruta: '/requerimientos?q=ANA%20FICTICIA', texto: 'Ver requerimientos' })
+  assert.deepEqual(destinoMotivo(persona, { origen: 'requerimiento', id: 'q1' }), { ruta: '/requerimientos?clase=todas&q=12345678', texto: 'Ver requerimientos' })
   assert.equal(destinoMotivo(persona, { origen: 'otro', id: 'x' }), null)
   assert.equal(destinoMotivo(persona, { origen: 'contrato' }), null)
+})
+
+
+test('requirements links use a searchable word when the identity document is missing', () => {
+  assert.equal(destinoMotivo({ nombre: 'ANA FICTICIA' }, { origen: 'requerimiento' }).ruta, '/requerimientos?clase=todas&q=ANA')
 })

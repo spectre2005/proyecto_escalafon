@@ -22,9 +22,10 @@ function Campo({ label, children }) { return <label className="block text-sm tex
 
 const normalizar = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 
-function NuevoRequerimiento({ opciones, busy, error, progreso, onSubmit, onCancel }) {
-  const [busqueda, setBusqueda] = useState('')
-  const [persona, setPersona] = useState(null)
+function NuevoRequerimiento({ opciones, personaInicial, busy, error, progreso, onSubmit, onCancel }) {
+  const inicial = opciones?.personas?.find(p => p.id === personaInicial) || null
+  const [busqueda, setBusqueda] = useState(inicial ? `${nombre(inicial)} · ${inicial.numero_doc_identidad}` : '')
+  const [persona, setPersona] = useState(inicial)
   const [abierto, setAbierto] = useState(false)
   const [activo, setActivo] = useState(0)
   const [tipos, setTipos] = useState([])
@@ -217,7 +218,7 @@ function GestionRequerimientos() {
   const { usuario } = useSesion()
   const [params, setParams] = useSearchParams()
   const clase = params.get('clase') || 'documentos'
-  const [nuevo, setNuevo] = useState(false)
+  const [nuevo, setNuevo] = useState(params.get('nuevo') === '1')
   const [seleccion, setSeleccion] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -284,9 +285,9 @@ function GestionRequerimientos() {
     {resultadoEnvio && <p role="status" className="mb-5 rounded-xl border border-teal-200 p-4 text-sm text-teal-900">{resultadoEnvio}</p>}
     {request.data && !request.data.correo_configurado && <p role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">El correo de salida aún no está configurado. Los requerimientos pueden registrarse, pero sus correos no se enviarán. Conecta la cuenta institucional de Gmail desde Configuración o configura SMTP antes de realizar un envío manual.</p>}
     {!!request.data?.avisos?.length && <section className={`${panel} mb-5`} aria-label="Mis avisos"><h2 className="font-bold">Mis avisos recientes</h2><ul className="mt-3 space-y-2">{request.data.avisos.map(aviso => <li key={aviso.id} className="rounded-xl bg-teal-50 p-3 text-sm"><p className="font-semibold">{aviso.titulo} · {fecha(aviso.created_at)}</p><p>{aviso.mensaje}</p></li>)}</ul></section>}
-    <nav className="mb-5 flex flex-wrap gap-2" aria-label="Tipo de requerimientos">{[['documentos', 'Documentos pendientes'], ['actualizacion', 'Solicitudes de actualización'], ...(admin ? [['sugerencias', 'Completar perfil']] : [])].map(([key, label]) => <button key={key} className={`${button} ${clase === key ? 'bg-teal-100' : 'bg-white'}`} aria-pressed={clase === key} onClick={() => { const next = new URLSearchParams(); next.set('clase', key); setParams(next); setNuevo(false); setSeleccion(null) }}>{label}</button>)}</nav>
+    <nav className="mb-5 flex flex-wrap gap-2" aria-label="Tipo de requerimientos">{[['todas', 'Todos los requerimientos'], ['documentos', 'Documentos pendientes'], ['actualizacion', 'Solicitudes de actualización'], ...(admin ? [['sugerencias', 'Completar perfil']] : [])].map(([key, label]) => <button key={key} className={`${button} ${clase === key ? 'bg-teal-100' : 'bg-white'}`} aria-pressed={clase === key} onClick={() => { const next = new URLSearchParams(); next.set('clase', key); setParams(next); setNuevo(false); setSeleccion(null) }}>{label}</button>)}</nav>
     <section className={`${panel} mb-5`}><form className="flex flex-wrap items-end gap-3" onSubmit={e => { e.preventDefault(); filtrar('q', new FormData(e.currentTarget).get('q')) }}><div className="min-w-60 flex-1"><Campo label="Buscar por nombre, DNI o descripción"><input name="q" value={params.get('q') || ''} onChange={e => filtrar('q', e.target.value)} className={control} maxLength={120} /></Campo></div>{clase !== 'sugerencias' && <Campo label="Estado"><select className={control} value={params.get('estado') || ''} onChange={e => filtrar('estado', e.target.value)}><option value="">Todos</option>{Object.entries(estados).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></Campo>}<button className={button}>Buscar</button><button type="button" className={button} onClick={() => { setError(''); setNuevo(true) }}>Nuevo requerimiento</button></form></section>
-    {nuevo && <DocumentoModal titulo="Registrar y enviar requerimientos" busy={busy} onCancel={() => setNuevo(false)} compacto><NuevoRequerimiento opciones={opciones.data} busy={busy} error={error} progreso={progresoEnvio} onSubmit={crear} onCancel={() => setNuevo(false)} /></DocumentoModal>}
+    {nuevo && <DocumentoModal titulo="Registrar y enviar requerimientos" busy={busy} onCancel={() => setNuevo(false)} compacto><NuevoRequerimiento key={opciones.data ? 'cargado' : 'cargando'} personaInicial={params.get('persona')} opciones={opciones.data} busy={busy} error={error} progreso={progresoEnvio} onSubmit={crear} onCancel={() => setNuevo(false)} /></DocumentoModal>}
     {(request.error || opciones.error || (clase === 'sugerencias' && sugerencias.error)) && <p role="alert" className="mb-4 text-rose-800">No se pudo cargar la información. <button onClick={() => { request.retry(); opciones.retry(); sugerencias.retry() }} className="underline">Reintentar</button></p>}
     {!result && <p role="status" className={panel}>Consultando requerimientos…</p>}
     {result && <section className={panel}><div className="mb-4 flex justify-between"><h2 className="font-bold">{clase === 'sugerencias' ? 'Perfil por completar' : 'Requerimientos'}</h2><span className="flex items-center gap-3 text-sm text-slate-600">{result.total ?? result.meta?.total ?? 0} registros{clase === 'sugerencias' && <button type="button" className={button} disabled={sugerencias.loading} onClick={sugerencias.retry}>{sugerencias.loading ? 'Actualizando…' : 'Actualizar'}</button>}</span></div>

@@ -26,3 +26,9 @@ test('la lista principal conserva filtros y paginación, salvo en Sugerencias', 
   // Paginar Sugerencias no mueve la lista principal (que sigue aportando avisos y estado del correo).
   assert.equal(parametrosLista(new URLSearchParams('clase=sugerencias&q=ana&page=4&por_pagina=20'), 'sugerencias', { pagina: 4, porPagina: 20 }).toString(), '')
 })
+
+
+test('desde vencimientos consulta ambas clases y no envía parámetros del formulario', () => {
+  const params = new URLSearchParams('clase=todas&q=12345678&nuevo=1&persona=persona-1')
+  assert.equal(parametrosLista(params, 'todas', { pagina: 1, porPagina: 10 }).toString(), 'q=12345678')
+})
