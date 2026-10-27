@@ -1,4 +1,5 @@
 import AbrirLegajo from './AbrirLegajo'
+import DescargarExpedienteZip from './DescargarExpedienteZip'
 import CerrarLegajo from './CerrarLegajo'
 import ReabrirLegajo from './ReabrirLegajo'
 import PersonalPhoto from './PersonalPhoto'
@@ -67,6 +68,7 @@ export default function PersonalHeader({ data, usuario, compacto = false, onVerF
           {!data.legajos.some(legajo => legajo.values.estado_legajo === 'activo') && <AbrirLegajo usuario={usuario} className="mt-3" />}
         </section>
         {data.legajos.length > 0 && <EmisionesPersonales usuario={usuario} />}
+        {data.legajos.length > 0 && <DescargarExpedienteZip usuario={usuario} />}
       </div>
       <PersonalPhoto usuario={usuario} nombre={data.nombre} />
     </div>

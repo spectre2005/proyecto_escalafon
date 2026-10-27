@@ -269,10 +269,23 @@ class DocumentoLegajoController extends Controller
 
     private function exigirSensibles(Request $request, int $seccion, ?TipoDocumento $tipo = null): void
     {
-        if ($seccion === 8 && in_array($tipo?->codigo, ['SAN_RESOLUCION_SANCION', 'SAN_RESOLUCION_RECURSO'], true)) {
-            abort_unless($request->user()->can('seccion08.sanciones.ver') || $request->user()->can('seccion08.sanciones.revisar'), 403, 'Tu perfil no tiene acceso a documentos de sanciones.');
+        $motivo = self::restriccion($request->user(), $seccion, $tipo);
+        abort_if($motivo !== null, 403, (string) $motivo);
+    }
+
+    /**
+     * Por qué el usuario no puede ver los documentos de esta sección o tipo, o null si puede: sanciones sin
+     * seccion08.sanciones.ver/revisar; secciones 01, 09 y 10 y tipos sensibles o de salud sin datos_sensibles.ver.
+     * Lo usan el visor y la vista previa del expediente imprimible.
+     */
+    public static function restriccion(Usuario $usuario, int $seccion, ?TipoDocumento $tipo = null): ?string
+    {
+        if ($seccion === 8 && in_array($tipo?->codigo, ['SAN_RESOLUCION_SANCION', 'SAN_RESOLUCION_RECURSO'], true)
+            && ! $usuario->can('seccion08.sanciones.ver') && ! $usuario->can('seccion08.sanciones.revisar')) {
+            return 'Tu perfil no tiene acceso a documentos de sanciones.';
         }
         $sensible = in_array($seccion, self::SECCIONES_SENSIBLES, true) || $tipo?->es_dato_sensible || $tipo?->es_dato_salud;
-        abort_if($sensible && ! $request->user()->veDatosSensibles(), 403, 'Esta sección o tipo de documento contiene datos sensibles.');
+
+        return $sensible && ! $usuario->veDatosSensibles() ? 'Esta sección o tipo de documento contiene datos sensibles.' : null;
     }
 }

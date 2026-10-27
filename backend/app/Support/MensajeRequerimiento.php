@@ -84,11 +84,11 @@ final class MensajeRequerimiento
 
     /**
      * Nombre y oficina guardados en la configuración de la institución (su propia base, en ambos modos); en modo
-     * subdominio, si aún no se configuró, el nombre registrado en el panel.
+     * subdominio, si aún no se configuró, el nombre registrado en el panel. También lo usa el índice del expediente.
      *
      * @return array{nombre: string, oficina: string, color: string}
      */
-    private static function institucion(): array
+    public static function institucion(): array
     {
         $guardado = [];
         try {

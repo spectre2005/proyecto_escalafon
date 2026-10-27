@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\V1\LegajoController;
 use App\Http\Controllers\Api\V1\Legajos\AperturaLegajoController;
 use App\Http\Controllers\Api\V1\Legajos\DocumentoLegajoController;
 use App\Http\Controllers\Api\V1\Legajos\ExpedienteController;
+use App\Http\Controllers\Api\V1\Legajos\ExpedienteImprimibleController;
 use App\Http\Controllers\Api\V1\Legajos\FamiliarPersonalController;
 use App\Http\Controllers\Api\V1\Legajos\FotoPersonalController;
 use App\Http\Controllers\Api\V1\Legajos\Seccion01Controller;
@@ -172,6 +173,9 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
         Route::get('expediente-opciones', [ExpedienteController::class, 'editOptions']);
         Route::get('expedientes/{usuario}', [ExpedienteController::class, 'show'])->whereUuid('usuario');
         Route::get('expedientes/{usuario}/foto', [FotoPersonalController::class, 'show'])->whereUuid('usuario');
+        // Vista previa del expediente imprimible (fase 1, secciones 01 a 04); antes de la ruta genérica {section}.
+        Route::get('expedientes/{usuario}/expediente-imprimible', [ExpedienteImprimibleController::class, 'show'])->whereUuid('usuario');
+        Route::get('expedientes/{usuario}/expediente-imprimible/zip', [ExpedienteImprimibleController::class, 'descargar'])->whereUuid('usuario')->middleware('throttle:10,1');
         // Antes de la ruta genérica {section}. La sección 01 exige además datos_sensibles.ver.
         Route::get('expedientes/{usuario}/seccion-01', [Seccion01Controller::class, 'show'])->whereUuid('usuario')->middleware('can:datos_sensibles.ver');
         Route::get('expedientes/{usuario}/seccion-02', [Seccion02Controller::class, 'show'])->whereUuid('usuario');
