@@ -4,17 +4,18 @@ const fecha = valor => valor && /^\d{4}-\d{2}-\d{2}$/.test(valor) ? valor.split(
 export const valorReporte = (fila, columna) => fila[columna.key] === null || fila[columna.key] === undefined || fila[columna.key] === '' ? '—' : columna.type === 'date' ? fecha(fila[columna.key]) : fila[columna.key]
 
 export function describirFiltros(filtros, opciones) {
-  const nombres = { q: 'Persona', contenido: 'Contenido', tipo_personal: 'Personal', unidad_id: 'Unidad', estado: 'Estado', seccion: 'Sección', desde: 'Desde', hasta: 'Hasta', dias: 'Horizonte', anio: 'Año / ciclo', regimen_id: 'Ley / régimen', nivel: 'Nivel académico', modalidad: 'Tipo de capacitación' }
+  const nombres = { q: 'Persona', contenido: 'Contenido', tipo_personal: 'Personal', unidad_id: 'Unidad', estado: 'Estado', seccion: 'Sección', desde: 'Desde', hasta: 'Hasta', dias: 'Horizonte', origen: 'Motivo', anio: 'Año / ciclo', regimen_id: 'Ley / régimen', nivel: 'Nivel académico', modalidad: 'Tipo de capacitación' }
   return Object.entries(filtros).filter(([, valor]) => valor !== '' && valor !== null && valor !== undefined).map(([clave, valor]) => {
     let texto = valor
-    if (clave === 'unidad_id') texto = opciones.unidades.find(item => item.id === valor)?.nombre || valor
-    if (clave === 'seccion') texto = opciones.secciones.find(item => String(item.id) === String(valor))?.nombre || valor
+    if (clave === 'unidad_id') texto = opciones.unidades?.find(item => item.id === valor)?.nombre || valor
+    if (clave === 'seccion') texto = opciones.secciones?.find(item => String(item.id) === String(valor))?.nombre || valor
     if (clave === 'estado') texto = opciones.reporte?.estados?.[valor] || valor
     if (clave === 'regimen_id') texto = opciones.regimenes?.find(item => item.id === valor)?.nombre || valor
     if (clave === 'nivel') texto = opciones.niveles?.find(item => item.id === valor)?.nombre || valor
     if (clave === 'modalidad') texto = opciones.modalidades?.find(item => item.id === valor)?.nombre || valor
     if (clave === 'desde' || clave === 'hasta') texto = fecha(valor)
     if (clave === 'dias') texto = `${valor} días`
+    if (clave === 'origen') texto = opciones.origenes?.find(item => item.id === valor)?.nombre || valor
     return `${nombres[clave] || clave}: ${texto}`
   }).join(' · ') || 'Sin filtros adicionales'
 }

@@ -44,7 +44,7 @@ class ReportesTest extends TestCase
         config(['permisos.roles.lector_personal' => ['personal.ver']]);
         $this->actuarComo(codigo: 'lector_personal');
         $this->getJson('/api/v1/reportes/opciones')->assertOk()->assertJsonCount(2, 'data.reportes')->assertJsonPath('data.reportes.0.id', 'dotacion');
-        $this->getJson('/api/v1/reportes/inventario')->assertForbidden();
+        $this->getJson('/api/v1/reportes/pendientes')->assertForbidden();
     }
 
     public function test_reports_are_grouped_by_purpose_in_a_fixed_order_and_section_queries_go_last(): void
@@ -54,14 +54,15 @@ class ReportesTest extends TestCase
         $grupos = $reportes->pluck('grupo')->unique()->values()->all();
         $this->assertSame(['Personal y dotación', 'Contratos y plazos', 'Control documental', 'Formación y desarrollo', 'Vacaciones y licencias',
             'Consultas por sección del legajo'], $grupos);
-        $this->assertSame(['dotacion', 'personal', 'movimientos', 'contratos', 'vencimientos', 'ratificaciones', 'colegiaturas', 'pendientes', 'inventario',
-            'formacion', 'capacitaciones', 'evaluaciones', 'vacaciones', 'licencias'], $reportes->where('grupo', '!=', 'Consultas por sección del legajo')->pluck('id')->values()->all());
+        $this->assertSame(['dotacion', 'personal', 'movimientos', 'contratos', 'pendientes', 'formacion', 'capacitaciones', 'vacaciones', 'licencias'],
+            $reportes->where('grupo', '!=', 'Consultas por sección del legajo')->pluck('id')->values()->all());
         // Las consultas por sección, por número de sección; ningún reporte se pierde al reagrupar.
         $secciones = $reportes->where('grupo', 'Consultas por sección del legajo')->pluck('seccion_origen')->values()->all();
         $ordenadas = $secciones;
         sort($ordenadas);
         $this->assertSame($ordenadas, $secciones);
-        $this->assertCount(count(ConsultaReportes::catalogo()), $reportes);
+        // Ninguno se pierde: solo faltan los que se exportan desde su propio panel.
+        $this->assertCount(count(ConsultaReportes::catalogo()) - count(ConsultaReportes::EN_SU_PANEL), $reportes);
         // Los permisos siguen decidiendo qué se ofrece: sin datos sensibles no aparecen las consultas de las secciones 01 y 10.
         $this->actuarComo(codigo: 'asistente_legajo');
         $ids = collect($this->getJson('/api/v1/reportes/opciones')->assertOk()->json('data.reportes'))->pluck('id');
@@ -131,18 +132,25 @@ class ReportesTest extends TestCase
         $this->getJson($url.'&exportar=1&por_pagina=10&page=2')->assertOk()->assertJsonCount(23, 'data')->assertJsonPath('meta.total', 23);
     }
 
-    public function test_inventory_does_not_expose_sensitive_documents_or_folios_to_a_reader(): void
+    public function test_reports_with_their_own_panel_are_not_repeated_but_can_still_be_exported(): void
     {
-        $legajo = Legajo::factory()->create(['numero_legajo' => 'INV-PRUEBA']);
-        $this->documento($legajo, $this->tipo());
-        $this->documento($legajo, $this->tipo(['seccion_legajo_id' => 10, 'es_dato_salud' => true]), ['folio_inicio' => 1, 'folio_fin' => 9]);
-        $this->actuarComo(codigo: 'asistente_legajo');
-        $url = '/api/v1/reportes/inventario?q=INV-PRUEBA';
-        $this->getJson($url.'&exportar=1')->assertOk()->assertJsonPath('data.0.documentos', 1)->assertJsonPath('data.0.folios', 3)->assertJsonMissing(['seccion' => '10']);
-        $this->getJson('/api/v1/reportes/opciones')->assertOk()->assertJsonMissing(['id' => 10, 'nombre' => 'Seguridad y Salud en el Trabajo (SST) y Bienestar Social']);
         $this->actuarComo();
-        $this->getJson($url.'&seccion=3')->assertOk()->assertJsonPath('data.0.documentos', 1)
-            ->assertJsonPath('data.0.folios', 3)->assertJsonPath('data.0.por_seccion', '03: 3');
+        $ids = collect($this->getJson('/api/v1/reportes/opciones')->assertOk()->json('data.reportes'))->pluck('id');
+        $this->assertNotContains('vencimientos', $ids);
+        $this->assertNotContains('evaluaciones', $ids);
+        $this->getJson('/api/v1/reportes/vencimientos?exportar=1&origen=contrato')->assertOk();
+        $this->getJson('/api/v1/reportes/evaluaciones?exportar=1&anio=')->assertOk()->assertJsonPath('meta.filtros.anio', null);
+        $this->getJson('/api/v1/reportes/vencimientos?origen=otro')->assertUnprocessable();
+        // Sin el panel de Evaluaciones, su reporte vuelve al menú de Reportes.
+        ConfiguracionFuncionalidad::query()->updateOrCreate(['codigo' => 'menu.evaluaciones'], ['activa' => false, 'motivo' => 'Prueba', 'updated_by' => Usuario::query()->firstOrFail()->id]);
+        $this->getJson('/api/v1/reportes/opciones')->assertOk()->assertJsonFragment(['id' => 'evaluaciones']);
+        $this->getJson('/api/v1/reportes/inventario')->assertNotFound();
+    }
+
+    public function test_section_filter_hides_sensitive_sections_from_a_reader(): void
+    {
+        $this->actuarComo(codigo: 'asistente_legajo');
+        $this->getJson('/api/v1/reportes/opciones')->assertOk()->assertJsonMissing(['id' => 10, 'nombre' => 'Seguridad y Salud en el Trabajo (SST) y Bienestar Social']);
     }
 
     public function test_pending_report_distinguishes_missing_undetermined_and_superseded_documents(): void

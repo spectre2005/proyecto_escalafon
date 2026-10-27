@@ -54,9 +54,6 @@ final class ConsultaReportes
         'pendientes' => ['pregunta' => '¿Qué falta cargar o revisar en los legajos activos?', 'titulo' => 'Pendientes documentales', 'descripcion' => 'Qué falta cargar, recibir o revisar en los legajos activos.', 'icono' => 'file',
             'fecha' => null, 'estados' => ['faltante' => 'Falta documento', 'por_determinar' => 'Por determinar', 'observado' => 'Observado', 'recepcion' => 'Sin recepción', 'revision' => 'En revisión'],
             'ayuda' => 'Los requisitos por determinar se muestran aparte de los faltantes. Se excluyen los tipos no aplicables, desactivados y las versiones subsanadas.'],
-        'inventario' => ['pregunta' => '¿Dónde está cada legajo y cuántos documentos y folios tiene?', 'titulo' => 'Inventario de legajos', 'descripcion' => 'Expedientes, ubicación y documentos registrados.', 'icono' => 'folder',
-            'fecha' => 'Fecha de apertura', 'estados' => ['activo' => 'Activo', 'pasivo' => 'Pasivo', 'transferido' => 'Transferido'],
-            'ayuda' => 'Un resultado por legajo. Los documentos y folios incluyen su historial, excluyen anulados y se limitan a la información que puedes consultar.'],
         'vencimientos' => ['pregunta' => '¿Qué documentos, contratos o requerimientos vencen pronto?', 'titulo' => 'Vencimientos', 'descripcion' => 'Documentos, contratos, requerimientos y otros datos con fecha que necesitan seguimiento.', 'icono' => 'clock',
             'fecha' => 'Fecha de vencimiento', 'estados' => ['vencido' => 'Vencido', 'fuera_de_plazo' => 'Requerimiento fuera de plazo', 'por_vencer' => 'Por vencer'],
             'ayuda' => 'Se reutiliza la consulta de Vencimientos: DNI, contratos y adendas (también vencidos sin cese), requerimientos, colegiatura, período de prueba y, según tus permisos, certificado de discapacidad, examen médico ocupacional, ratificación docente y encargos o destaques.'],
@@ -109,13 +106,25 @@ final class ConsultaReportes
      */
     public const PROPOSITOS = [
         'Personal y dotación' => ['dotacion', 'personal', 'movimientos'],
-        'Contratos y plazos' => ['contratos', 'vencimientos', 'ratificaciones', 'colegiaturas'],
-        'Control documental' => ['pendientes', 'inventario'],
+        'Contratos y plazos' => ['contratos'],
+        'Control documental' => ['pendientes'],
         'Formación y desarrollo' => ['formacion', 'capacitaciones', 'evaluaciones'],
         'Vacaciones y licencias' => ['vacaciones', 'licencias'],
     ];
 
     public const CONSULTAS_SECCION = 'Consultas por sección del legajo';
+
+    /**
+     * Reportes que tienen su propio panel y se exportan desde allí: no se repiten en el menú de Reportes, aunque su
+     * consulta (con los mismos permisos y la misma configuración) sigue disponible para esa exportación. Evaluaciones
+     * vuelve al menú de Reportes si la institución desactiva su panel (módulo «evaluaciones»).
+     */
+    public const EN_SU_PANEL = ['vencimientos' => null, 'evaluaciones' => 'evaluaciones'];
+
+    private static function enSuPanel(string $tipo): bool
+    {
+        return array_key_exists($tipo, self::EN_SU_PANEL) && (self::EN_SU_PANEL[$tipo] === null || ModulosSistema::activa(self::EN_SU_PANEL[$tipo]));
+    }
 
     /** @return array{0: string, 1: int, 2: int} grupo, orden del grupo y orden dentro del grupo */
     private static function grupo(string $tipo): array
@@ -133,7 +142,7 @@ final class ConsultaReportes
 
     public static function opciones(Usuario $actor): array
     {
-        $reportes = collect(self::catalogo())->filter(fn (array $reporte, string $tipo): bool => self::puede($actor, $tipo) && ! self::inactivo($tipo))
+        $reportes = collect(self::catalogo())->filter(fn (array $reporte, string $tipo): bool => self::puede($actor, $tipo) && ! self::inactivo($tipo) && ! self::enSuPanel($tipo))
             ->map(fn (array $reporte, string $tipo): array => ['id' => $tipo, 'grupo' => self::grupo($tipo)[0], ...$reporte])
             ->sortBy(fn (array $reporte): array => array_slice(self::grupo($reporte['id']), 1))->values();
         $secciones = SeccionLegajo::query()->whereBetween('id', [1, 11])->orderBy('id')->get(['id', 'nombre'])
@@ -256,20 +265,6 @@ final class ConsultaReportes
                 $estado = $base['vinculos'] ? 'con_vinculo' : 'sin_vinculo';
                 yield [...$base, 'id' => $persona->id, 'fecha' => $persona->created_at?->toDateString(), 'estado_codigo' => $estado,
                     'estado' => self::catalogo()['personal']['estados'][$estado], 'cuenta' => $persona->activo ? 'Habilitada' : 'Deshabilitada'];
-            } elseif ($tipo === 'inventario') {
-                foreach ($persona->legajos as $legajo) {
-                    $documentos = $persona->documentosUsuarioPorUsuario->where('legajo_id', $legajo->id)
-                        ->filter(fn (DocumentoUsuario $d): bool => $d->archivo_id !== null && $d->tipoDocumento && self::tipoVisible($actor, $d->tipoDocumento));
-                    if (! empty($filtros['seccion'])) {
-                        $documentos = $documentos->where('seccion_legajo_id', (int) $filtros['seccion']);
-                    }
-                    $porSeccion = $documentos->groupBy('seccion_legajo_id')->map(fn ($docs): int => $docs->sum(fn ($d): int => max(0, (int) $d->folio_fin - (int) $d->folio_inicio + 1)));
-                    yield [...$base, 'id' => $legajo->id, 'legajo' => $legajo->numero_legajo, 'estado_codigo' => $legajo->estado_legajo,
-                        'estado' => ucfirst($legajo->estado_legajo), 'formato' => $legajo->formato_legajo ?? 'Sin definir', 'ubicacion' => $legajo->ubicacion ?? 'Sin ubicación',
-                        'fecha' => $legajo->fecha_apertura?->toDateString(), 'documentos' => $documentos->count(),
-                        'folios' => ! empty($filtros['seccion']) ? ($porSeccion[(int) $filtros['seccion']] ?? 0) : $porSeccion->sum(),
-                        'por_seccion' => $porSeccion->map(fn (int $folios, int $seccion): string => str_pad((string) $seccion, 2, '0', STR_PAD_LEFT).': '.$folios)->implode(' · ')];
-                }
             } else {
                 yield from self::pendientes($actor, $persona, $base, $tipos);
             }
@@ -409,7 +404,7 @@ final class ConsultaReportes
     private static function vencimientos(Usuario $actor, array $filtros): Generator
     {
         $hoy = CarbonImmutable::now('America/Lima')->startOfDay();
-        $consulta = DB::query()->fromSub(ConsultaVencimientos::alertas($actor, $hoy, (int) ($filtros['dias'] ?? 30), null), 'alertas')
+        $consulta = DB::query()->fromSub(ConsultaVencimientos::alertas($actor, $hoy, (int) ($filtros['dias'] ?? 30), $filtros['origen'] ?? null), 'alertas')
             ->orderBy('fecha')->orderBy('usuario_id')->orderBy('alerta_id');
         $pagina = 1;
         do {
@@ -637,7 +632,6 @@ final class ConsultaReportes
             'licencias' => ['detalle' => 'Tipo de licencia / permiso', 'fecha' => 'Inicio', 'fin' => 'Fin', 'dias' => 'Días registrados completos', 'estado' => 'Goce', 'numero' => 'Documento de autorización'],
             'evaluaciones' => ['periodo' => 'Ciclo', 'fecha' => 'Evaluación', 'estado' => 'Plan de mejora', 'sustento' => 'Estado del sustento'],
             'personal' => ['puesto' => 'Puesto', 'origen_puesto' => 'Fuente del puesto', 'ley' => 'Ley / régimen', 'tipo_vinculo' => 'Tipo de vínculo', 'vinculos' => 'Vínculos abiertos', 'estado' => 'Situación laboral'],
-            'inventario' => ['legajo' => 'Legajo', 'estado' => 'Estado', 'formato' => 'Formato', 'ubicacion' => 'Ubicación', 'documentos' => 'Documentos visibles', 'folios' => 'Folios visibles', 'por_seccion' => 'Folios por sección', 'fecha' => 'Apertura'],
             'pendientes' => ['legajo' => 'Legajo', 'seccion' => 'Sección', 'detalle' => 'Documento / requisito', 'estado' => 'Pendiente', 'motivo' => 'Motivo'],
             default => ['origen' => 'Origen', 'detalle' => 'Concepto', 'fecha' => 'Vencimiento', 'dias' => 'Días restantes', 'estado' => 'Estado'],
         };

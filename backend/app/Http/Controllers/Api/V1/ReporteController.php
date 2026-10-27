@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Support\ConsultaReportes;
+use App\Support\ConsultaVencimientos;
 use App\Support\PorPagina;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -39,6 +40,7 @@ class ReporteController extends Controller
             'desde' => 'nullable|date_format:Y-m-d',
             'hasta' => ['nullable', 'date_format:Y-m-d', ...($request->filled('desde') ? ['after_or_equal:desde'] : [])],
             'dias' => 'sometimes|integer|min:1|max:365',
+            'origen' => ['nullable', Rule::in(array_keys(ConsultaVencimientos::ORIGENES))],
             'anio' => 'nullable|integer|between:1900,2200',
             'page' => 'sometimes|integer|min:1',
             // Tabla: 10, 15 y 20 (PorPagina); 50 y 100 se siguen aceptando por compatibilidad con la API.
@@ -48,8 +50,9 @@ class ReporteController extends Controller
         if ($tipo === 'vencimientos') {
             $filtros['dias'] ??= 30;
         }
-        if ($tipo === 'evaluaciones') {
-            $filtros['anio'] ??= (int) now()->year;
+        // El año actual por defecto; «anio=» vacío (exportación del panel Evaluaciones sin año) pide todos los ciclos.
+        if ($tipo === 'evaluaciones' && ! $request->has('anio')) {
+            $filtros['anio'] = (int) now()->year;
         }
 
         return response()->json(ConsultaReportes::listar($request->user(), $tipo, $filtros));

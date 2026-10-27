@@ -17,3 +17,15 @@ export function findTipo(key, tipos = tiposSeccion07) {
 }
 
 export const porPagina = [10, 20, 50]
+
+/**
+ * Filtros de la pestaña Evaluaciones traducidos a los del reporte que se exporta (/reportes/evaluaciones): sin año se
+ * exportan todos los ciclos, como en la tabla («anio» vacío; sin él, el reporte tomaría el año actual).
+ */
+export function filtrosExportacion(params) {
+  const filtros = new URLSearchParams({ anio: params.get('anio') || '' })
+  if (params.get('q')) filtros.set('q', params.get('q'))
+  if (params.get('unidad_organica_id')) filtros.set('unidad_id', params.get('unidad_organica_id'))
+  if (['1', 'true'].includes(params.get('plan_mejora'))) filtros.set('estado', 'con_plan')
+  return filtros
+}

@@ -7,6 +7,7 @@ import Paginacion from '../../shared/Paginacion'
 import DocumentoModal from '../legajos/components/documentos/DocumentoModal'
 import { conPagina, conPorPagina, leerPaginacion, paginaCorregida } from '../../shared/paginacionUrl'
 import { usePuede } from '../auth/session'
+import ExportarReporte from '../reportes/ExportarReporte'
 import { destinoMotivo } from './destinosVencimiento'
 import { aplicarDias, conFiltro, DIAS_POR_DEFECTO, opcionesEstado } from './filtrosVencimiento'
 
@@ -113,6 +114,9 @@ function Resultados() {
   return <>
     <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
       <div><p className="text-xs font-semibold uppercase tracking-widest text-teal-700">Seguimiento del personal</p><h1 className="mt-2 text-3xl font-bold text-slate-800">Vencimientos</h1><p className="mt-2 text-sm text-slate-600">Identifica qué necesita atención y accede al registro para revisarlo.</p></div>
+      {/* Exporta el detalle (una fila por alerta) con los filtros aplicados; el reporte ya no se repite en Reportes. */}
+      {result && <div className="grid justify-items-end gap-1"><span className="text-xs text-slate-500">Exportar detalle de alertas</span>
+        <ExportarReporte tipo="vencimientos" filtros={params} opciones={{ unidades: result.areas, origenes: result.origenes, reporte: { estados: Object.fromEntries(Object.entries(estados).map(([clave, [nombre]]) => [clave, nombre])) } }} deshabilitado={!result.total} /></div>}
     </header>
     {result && <section aria-label="Resumen según los filtros" className={`mb-5 grid gap-3 ${gestionaRequerimientos ? 'grid-cols-2 xl:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>{[
       ['Personal con alertas', result.resumen.personas, '', 'text-teal-800', 'bg-teal-50'],

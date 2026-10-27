@@ -2,8 +2,9 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from '../../../shared/queries/useLiveQuery'
 import Seccion07Filtros from '../components/Seccion07Filtros'
 import Seccion07Tabla from '../components/Seccion07Tabla'
-import { findTipo, porPagina, tiposSeccion07, tiposVisibles } from '../config/seccion07'
+import { filtrosExportacion, findTipo, porPagina, tiposSeccion07, tiposVisibles } from '../config/seccion07'
 import { useFuncionalidades } from '../../../shared/useFuncionalidades'
+import ExportarReporte from '../../reportes/ExportarReporte'
 
 const panel = 'rounded-2xl border border-slate-200 bg-white'
 const control = 'rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-teal-600 disabled:opacity-40'
@@ -81,6 +82,7 @@ function ConsultaEvaluaciones() {
     {result && <section className={`${panel} overflow-hidden`} aria-label={tipo.label}>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
         <h2 className="text-sm font-semibold text-slate-800">{tipo.label} <span className="ml-2 rounded-full bg-teal-50 px-2 py-1 text-xs text-teal-700">{result.total}</span></h2>
+        {tipo.key === 'evaluaciones' && <ExportarReporte tipo="evaluaciones" filtros={filtrosExportacion(params)} opciones={{ unidades: opciones.data?.data?.unidades, reporte: { estados: { con_plan: 'Con plan de mejora', sin_plan: 'Sin plan de mejora' } } }} deshabilitado={!result.total} />}
         {tipo.key === 'evaluaciones' && opciones.data?.data && !opciones.data.data.ve_calificacion && <p className="text-xs text-slate-500">{opciones.data.data.puntaje_activo === false ? 'Calificación reservada' : 'Calificación y puntaje reservados'} hasta que la institución defina quién puede verlos.</p>}
       </div>
       {result.data.length ? <Seccion07Tabla tipo={tipo} registros={result.data} puntajeActivo={opciones.data?.data?.puntaje_activo} /> : <p className="p-10 text-center text-sm text-slate-500">{tipo.vacio}</p>}
