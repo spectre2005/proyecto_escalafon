@@ -2,6 +2,8 @@
 // no se reordenan ni se vuelven a agrupar.
 
 export const CONSULTAS_SECCION = 'Consultas por sección del legajo'
+// Nombre que ve el usuario para esas consultas, plegadas aparte de las pestañas.
+export const MAS_REPORTES = 'Más reportes'
 
 // Al entrar sin elegir: la dotación, que resume al personal; si el perfil no la tiene, el primero disponible.
 export const POR_DEFECTO = ['dotacion', 'personal']

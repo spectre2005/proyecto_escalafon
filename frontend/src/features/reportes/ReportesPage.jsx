@@ -4,7 +4,7 @@ import api, { apiErrorMessage } from '../../axios'
 import Icon from '../../components/ui/Icon'
 import Paginacion from '../../shared/Paginacion'
 import { conPagina, conPorPagina, leerPaginacion, paginaCorregida } from '../../shared/paginacionUrl'
-import { conFiltro, conFiltros, CONSULTAS_SECCION, etiquetaReporte, familiaDe, familiasDe, filtrosActivos, paramsLimpios, reporteElegido, tituloFiltroEstado, valoresIniciales } from './reportesMenu'
+import { conFiltro, conFiltros, CONSULTAS_SECCION, etiquetaReporte, familiaDe, familiasDe, filtrosActivos, MAS_REPORTES, paramsLimpios, reporteElegido, tituloFiltroEstado, valoresIniciales } from './reportesMenu'
 import { usePuede } from '../auth/session'
 import { defaultInstitution } from '../../config/institution'
 import ReportesPestanas from './ReportesPestanas'
@@ -62,13 +62,11 @@ function Resultados({ url, reporte, opciones, porPagina, onPagina, onPorPagina, 
   if (consulta.error) return <div role="alert" className="rounded-2xl border border-rose-100 bg-white p-6 text-sm text-rose-700">{apiErrorMessage(consulta.error)}<button type="button" onClick={onReintentar} className={`${boton} ml-3`}>Reintentar</button></div>
   const total = data.meta.total
   return <div className="space-y-4">
-    <div className="grid gap-3 sm:grid-cols-3">
-      {[[total.toLocaleString('es-PE'), reporte.id === 'dotacion' ? 'Grupos por unidad y régimen' : 'Registros filtrados', 'file'], [data.resumen.personas.toLocaleString('es-PE'), 'Personas incluidas', 'users'], [new Date(data.meta.generado_en).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' }), 'Última consulta · hora de Lima', 'clock']].map(([valor, etiqueta, icono]) => <div key={etiqueta} className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-4"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-50 text-teal-700"><Icon name={icono} /></span><div><p className="text-xl font-semibold tracking-tight text-slate-800">{valor}</p><p className="mt-0.5 text-xs text-slate-500">{etiqueta}</p></div></div>)}
-    </div>
-    <Distribucion reporte={reporte} resumen={data.resumen} />
     <section aria-label="Resultados del reporte" className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 p-5">
-        <div><h2 className="font-semibold text-slate-800">Vista previa</h2><p className="mt-1 text-xs text-slate-500">{total ? `Resultados ${(data.meta.current_page - 1) * data.meta.per_page + 1}–${Math.min(data.meta.current_page * data.meta.per_page, total)} de ${total}` : 'Sin resultados para estos filtros'} · La exportación incluye todos los resultados.</p></div>
+        <div><h2 className="font-semibold text-slate-800">{total.toLocaleString('es-PE')} {reporte.id === 'dotacion' ? 'grupos por unidad y régimen' : 'registros'}<span className="font-normal text-slate-500"> · {data.resumen.personas.toLocaleString('es-PE')} personas incluidas</span></h2>
+          <p className="mt-1 text-xs text-slate-500">{total ? `Mostrando ${(data.meta.current_page - 1) * data.meta.per_page + 1}–${Math.min(data.meta.current_page * data.meta.per_page, total)}` : 'Sin resultados para estos filtros'} · La exportación incluye todos los resultados.</p>
+          <Distribucion reporte={reporte} resumen={data.resumen} /></div>
         <div className="flex flex-wrap gap-2">
           <button type="button" disabled={!total || !!exportando} onClick={() => exportar('excel')} className={boton}><Icon name="file" size={17} />{exportando === 'excel' ? 'Generando Excel…' : 'Excel'}</button>
           <button type="button" disabled={!total || !!exportando} onClick={() => exportar('pdf')} className={boton}><Icon name="file" size={17} />{exportando === 'pdf' ? 'Generando PDF…' : 'PDF'}</button>
@@ -84,7 +82,7 @@ function Resultados({ url, reporte, opciones, porPagina, onPagina, onPorPagina, 
         desde={(data.meta.current_page - 1) * data.meta.per_page + 1} hasta={(data.meta.current_page - 1) * data.meta.per_page + 1 + data.data.length - 1} total={total} pagina={data.meta.current_page} paginas={data.meta.last_page}
         porPagina={porPagina} ocupado={!!exportando} onPagina={onPagina} onPorPagina={onPorPagina} />}
     </section>
-    <details className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500"><summary className="cursor-pointer font-medium">Filtros aplicados y fecha de los datos</summary><p className="mt-3">Filtros aplicados: {describirFiltros(data.meta.filtros, { ...opciones, reporte })}.</p><p className="mt-2">Los resultados corresponden únicamente a esta institución y a los permisos de tu sesión.</p></details>
+    <details className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500"><summary className="cursor-pointer font-medium">Filtros aplicados y fecha de los datos</summary><p className="mt-3">Filtros aplicados: {describirFiltros(data.meta.filtros, { ...opciones, reporte })}.</p><p className="mt-2">Datos consultados a las {new Date(data.meta.generado_en).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' })} (hora de Lima).</p><p className="mt-2">Los resultados corresponden únicamente a esta institución y a los permisos de tu sesión.</p></details>
   </div>
 }
 
@@ -140,27 +138,30 @@ function PanelReporte({ reporte, opciones, params, setParams, institucion }) {
   </div>
 }
 
+// Reparto por estado en una línea (vigentes, por vencer, vencidos…), sin repetir el total de la cabecera.
 function Distribucion({ reporte, resumen }) {
-  const entradas = Object.entries(resumen.por_estado)
-  const total = entradas.reduce((suma, [, cantidad]) => suma + cantidad, 0)
-  if (!total || entradas.length === 1 && entradas[0][0] === 'registrado') return null
-  return <section aria-label="Resumen visual del reporte" className="rounded-2xl border border-slate-200 bg-white p-5">
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold text-slate-800">{reporte.id === 'dotacion' ? 'Composición del personal con vínculo abierto' : 'Distribución de los resultados'}</h2>{reporte.id === 'capacitaciones' && <span className="text-xs text-teal-700">{resumen.horas.toLocaleString('es-PE')} horas declaradas</span>}</div>
-    <div className="grid gap-x-8 gap-y-4 sm:grid-cols-2">{entradas.map(([estado, cantidad]) => <div key={estado}><div className="mb-2 flex justify-between gap-3 text-xs"><span className="text-slate-500">{reporte.estados[estado] || estado}</span><span className="font-semibold text-slate-700">{cantidad.toLocaleString('es-PE')} <span className="font-normal text-slate-400">· {Math.round(cantidad / total * 100)}%</span></span></div><div className="h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-teal-600" style={{ width: `${cantidad / total * 100}%` }} /></div></div>)}</div>
-  </section>
+  const entradas = Object.entries(resumen.por_estado).filter(([, cantidad]) => cantidad > 0)
+  const horas = reporte.id === 'capacitaciones' && resumen.horas ? `${resumen.horas.toLocaleString('es-PE')} horas declaradas` : null
+  if (!horas && (!entradas.length || entradas.length === 1 && entradas[0][0] === 'registrado')) return null
+  return <p aria-label={reporte.id === 'dotacion' ? 'Composición del personal con vínculo abierto' : 'Reparto de los resultados'} className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+    {entradas.map(([estado, cantidad]) => <span key={estado}>{reporte.estados[estado] || estado}: <span className="font-semibold text-slate-700">{cantidad.toLocaleString('es-PE')}</span></span>)}
+    {horas && <span className="text-teal-700">{horas}</span>}
+  </p>
 }
 
 // Elegir reporte: los de la pestaña, en botones compactos (la pregunta que responde cada uno va en el tooltip); las
-// consultas de una sola sección, en un desplegable aparte.
+// consultas de una sola sección, plegadas en «Más reportes».
 function SelectorReportes({ reportes, familia, reporte, abrir }) {
   const consultas = reportes.filter(item => item.grupo === CONSULTAS_SECCION)
   return <section aria-label="Elegir reporte" className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
     <div className="flex flex-wrap gap-2">{reportes.filter(item => item.grupo === familia?.grupo).map(item => <button key={item.id} type="button" aria-pressed={item.id === reporte.id} title={item.pregunta || item.descripcion} onClick={() => abrir(item.id)}
       className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-teal-700 ${item.id === reporte.id ? 'border-teal-600 bg-teal-50 font-semibold text-teal-800' : 'border-slate-200 text-slate-700 hover:border-teal-200 hover:bg-teal-50/40'}`}>{item.titulo}</button>)}</div>
-    {consultas.length > 0 && <label className="grid gap-1.5 border-t border-slate-100 pt-3 text-xs font-medium text-slate-500 sm:max-w-xl">{CONSULTAS_SECCION}
-      <select value={reporte.grupo === CONSULTAS_SECCION ? reporte.id : ''} onChange={event => event.target.value && abrir(event.target.value)} className={control}>
-        <option value="">Elegir una sección…</option>{consultas.map(item => <option key={item.id} value={item.id}>{etiquetaReporte(item)}</option>)}
-      </select></label>}
+    {consultas.length > 0 && <details open={reporte.grupo === CONSULTAS_SECCION} className="border-t border-slate-100 pt-3 text-xs text-slate-500">
+      <summary className="cursor-pointer font-semibold text-teal-800">{MAS_REPORTES} <span className="font-normal text-slate-500">· {consultas.length} consultas por sección del legajo</span></summary>
+      <label className="mt-2 grid gap-1.5 font-medium sm:max-w-xl">Consulta por sección
+        <select value={reporte.grupo === CONSULTAS_SECCION ? reporte.id : ''} onChange={event => event.target.value && abrir(event.target.value)} className={control}>
+          <option value="">Elegir una sección…</option>{consultas.map(item => <option key={item.id} value={item.id}>{etiquetaReporte(item)}</option>)}
+        </select></label></details>}
   </section>
 }
 
@@ -188,7 +189,7 @@ function ContenidoReportes() {
       <ReportesPestanas familias={familias} activa={familia?.id} directiva={administra && veLegajos} />
       {menuAbierto && <SelectorReportes reportes={reportes} familia={familiaMenu} reporte={reporte} abrir={abrir} />}
       <div>
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1"><p className="text-xs text-slate-500">{familia?.etiqueta || CONSULTAS_SECCION} ›</p><h2 className="text-lg font-semibold tracking-tight text-slate-800">{etiquetaReporte(reporte)}</h2>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1"><p className="text-xs text-slate-500">{familia?.etiqueta || MAS_REPORTES} ›</p><h2 className="text-lg font-semibold tracking-tight text-slate-800">{etiquetaReporte(reporte)}</h2>
           {!menuAbierto && <button type="button" onClick={() => setCambiando(true)} className="text-xs font-semibold text-teal-700 hover:underline focus-visible:outline-2 focus-visible:outline-teal-700">Cambiar</button>}</div>
         <p className="mt-1 text-sm text-slate-500">{reporte.descripcion}</p>
         {/* El detalle técnico de qué se cuenta y qué no, plegado junto al título. */}
