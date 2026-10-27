@@ -51,6 +51,7 @@ class RecepcionGmailTest extends TestCase
         $n->update(['correo_estado' => 'enviado', 'correo_enviado_en' => now()->subHour(), 'correo_id_proveedor' => 'enviado-previamente']);
         Http::preventStrayRequests();
         Mail::shouldReceive('raw')->never();
+        Mail::shouldReceive('send')->never();
         Http::fake(function ($request) {
             if ($request->method() !== 'GET') {
                 $this->fail('Recibir respuestas no debe enviar correos ni modificar el buzón.');
@@ -82,12 +83,12 @@ class RecepcionGmailTest extends TestCase
         return rtrim(strtr(base64_encode($texto), '+/', '-_'), '=');
     }
 
-    private function mensaje(string $id = 'respuesta1', array $partes = []): array
+    private function mensaje(string $id = 'respuesta1', array $partes = [], ?string $asunto = null): array
     {
         return ['id' => $id, 'internalDate' => (string) now()->subMinute()->getTimestampMs(), 'labelIds' => ['INBOX'],
             'payload' => ['mimeType' => 'multipart/mixed', 'headers' => [
                 ['name' => 'From', 'value' => 'Docente <docente@gmail.com>'],
-                ['name' => 'Subject', 'value' => 'Re: [REQ-'.$this->requerimiento->id.'] Requerimiento'],
+                ['name' => 'Subject', 'value' => $asunto ?? 'Re: [REQ-'.$this->requerimiento->id.'] Requerimiento'],
                 ['name' => 'Authentication-Results', 'value' => 'mx.google.com; dkim=pass; spf=pass; dmarc=pass header.from=gmail.com'],
             ], 'parts' => $partes ?: [
                 ['mimeType' => 'text/plain', 'body' => ['data' => $this->codificar('Adjunto mi documento. Gracias.')]],
@@ -216,5 +217,34 @@ class RecepcionGmailTest extends TestCase
         $this->assertSame(0, RecepcionGmail::sincronizar());
         $this->assertDatabaseCount('correos_recibidos', 2);
         $this->assertNull($this->conexion->fresh()->recepcion_error);
+    }
+
+    public function test_usual_reply_and_forward_prefixes_keep_the_requirement_reference(): void
+    {
+        $ref = '[REQ-'.$this->requerimiento->id.']';
+        $asuntos = ['RE: RV: '.$ref.' Institución · Requerimiento de documentación', 'Fwd: Re: '.$ref.' Seguimiento de requerimiento',
+            'Re: '.strtoupper($ref).' Requerimiento'];
+        foreach ($asuntos as $i => $asunto) {
+            $this->mensajes['prefijo'.$i] = $this->mensaje('prefijo'.$i, [['mimeType' => 'text/plain', 'body' => ['data' => $this->codificar('Respuesta '.$i)]]], $asunto);
+        }
+        $this->assertSame(3, RecepcionGmail::sincronizar());
+        $this->assertSame(3, DB::table('correos_recibidos')->where('estado', 'importado')->where('requerimiento_id', $this->requerimiento->id)->count());
+        $this->assertCount(3, $this->requerimiento->fresh()->seguimiento);
+    }
+
+    public function test_subject_with_two_different_references_is_not_assigned_to_either_requirement(): void
+    {
+        $otro = RequerimientoDocumento::factory()->create(['usuario_id' => $this->requerimiento->usuario_id, 'clase' => 'documentos',
+            'estado' => 'abierto', 'cerrado_en' => null, 'seguimiento' => []]);
+        CorreoRequerimiento::programar($otro, 'Requerimiento', 'Otro documento')
+            ->update(['correo_estado' => 'enviado', 'correo_enviado_en' => now()->subHour()]);
+        $ref = '[REQ-'.$this->requerimiento->id.']';
+        $this->mensajes['dos'] = $this->mensaje('dos', [], 'Re: '.$ref.' y [REQ-'.$otro->id.'] Requerimientos');
+        $this->mensajes['repetida'] = $this->mensaje('repetida', [['mimeType' => 'text/plain', 'body' => ['data' => $this->codificar('Misma referencia')]]], 'Re: '.$ref.' Fwd: '.$ref);
+        $this->assertSame(1, RecepcionGmail::sincronizar());
+        $this->assertDatabaseHas('correos_recibidos', ['mensaje_id' => 'dos', 'estado' => 'ignorado', 'requerimiento_id' => null]);
+        $this->assertDatabaseHas('correos_recibidos', ['mensaje_id' => 'repetida', 'estado' => 'importado', 'requerimiento_id' => $this->requerimiento->id]);
+        $this->assertSame([], $otro->fresh()->seguimiento);
+        $this->assertCount(0, Storage::disk(config('legajo.disco_documentos'))->allFiles());
     }
 }

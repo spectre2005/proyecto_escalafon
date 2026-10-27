@@ -58,13 +58,17 @@ final class GmailCorreo
         ]);
     }
 
-    public static function enviar(string $destinatario, string $asunto, string $cuerpo): string
+    /** Con $html, Symfony Mime arma multipart/alternative (texto plano + HTML); Gmail recibe el MIME en base64url. */
+    public static function enviar(string $destinatario, string $asunto, string $cuerpo, ?string $html = null): string
     {
         $c = self::conexion();
         $access = self::token();
         $reply = self::recepcionLista() || ! filter_var(config('services.gmail.reply_to'), FILTER_VALIDATE_EMAIL)
             ? $c->email : config('services.gmail.reply_to');
         $email = (new Email)->from($c->email)->to($destinatario)->replyTo($reply)->subject($asunto)->text($cuerpo);
+        if ($html !== null) {
+            $email->html($html);
+        }
         $raw = rtrim(strtr(base64_encode($email->toString()), '+/', '-_'), '=');
         $respuesta = Http::withToken($access)->timeout(20)->post('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', ['raw' => $raw]);
         if ($respuesta->status() === 401) {

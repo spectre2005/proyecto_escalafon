@@ -92,6 +92,7 @@ class GmailCorreoTest extends TestCase
         $n = CorreoRequerimiento::programar($r, 'Documentación pendiente', 'Presentar constancia');
         $u->update(['email_institucional' => 'actual@gmail.com']);
         Mail::shouldReceive('raw')->never();
+        Mail::shouldReceive('send')->never();
         Http::fake([
             'oauth2.googleapis.com/token' => Http::response(['access_token' => 'access-renovado', 'expires_in' => 3600]),
             'gmail.googleapis.com/gmail/v1/users/me/messages/send' => Http::response(['id' => 'gmail-mensaje-123']),

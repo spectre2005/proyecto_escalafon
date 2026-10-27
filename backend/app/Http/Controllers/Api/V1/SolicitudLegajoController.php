@@ -13,6 +13,7 @@ use App\Support\ConsultaReportes;
 use App\Support\CorreoRequerimiento;
 use App\Support\Documentos\ArchivoPdf;
 use App\Support\GmailCorreo;
+use App\Support\MensajeRequerimiento;
 use App\Support\Parametros;
 use App\Support\RequerimientosAutomaticos;
 use App\Support\ResumenSeccion03;
@@ -170,7 +171,7 @@ class SolicitudLegajoController extends Controller
                     $r = RequerimientoDocumento::query()->create($valores);
                 }
                 $this->evento($r, $request, 'creada por administración', $descripcion);
-                $notificaciones[] = $this->notificar($r, 'Requerimiento de documentación', $descripcion)->id;
+                $notificaciones[] = $this->notificar($r, MensajeRequerimiento::TITULO_SOLICITUD, $descripcion)->id;
                 $registros[] = $r;
             }
 
@@ -280,7 +281,7 @@ class SolicitudLegajoController extends Controller
             $this->evento($r, $request, $data['accion'], $data['mensaje']);
             $r->update($cambios);
             if ($data['accion'] === 'recordar') {
-                $notificacion = $this->notificar($r, 'Seguimiento de tu requerimiento', $data['mensaje']);
+                $notificacion = $this->notificar($r, MensajeRequerimiento::TITULO_RECORDATORIO, $data['mensaje']);
             }
 
             return $r;

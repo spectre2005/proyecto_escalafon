@@ -36,6 +36,7 @@ class CorreoRequerimientoTest extends TestCase
     {
         config(['mail.default' => 'log']);
         Mail::shouldReceive('raw')->never();
+        Mail::shouldReceive('send')->never();
         $n = CorreoRequerimiento::programar($this->requerimiento(), 'Requerimiento', 'Falta documento');
         $this->assertSame('sin_configurar', $n->correo_estado);
         $this->assertSame(0, CorreoRequerimiento::procesar([$n->id]));
@@ -47,13 +48,19 @@ class CorreoRequerimientoTest extends TestCase
         $this->smtp();
         $r = $this->requerimiento();
         $n = CorreoRequerimiento::programar($r, 'Requerimiento', 'Presentar constancia');
-        Mail::shouldReceive('raw')->once()->andReturnUsing(function (string $body, \Closure $configure) use ($r) {
-            $this->assertStringContainsString('No necesitas ingresar al sistema', $body);
-            $this->assertStringContainsString('[REQ-'.$r->id.']', $body);
-            $message = new Message(new Email);
+        Mail::shouldReceive('send')->once()->andReturnUsing(function (array $view, array $data, \Closure $configure) use ($r) {
+            // Laravel añade el From global (MAIL_FROM_ADDRESS) al enviar; aquí se fija para poder generar el MIME.
+            $message = new Message((new Email)->from('escalafon@example.test'));
             $configure($message);
-            $this->assertSame('docente@example.test', $message->getSymfonyMessage()->getTo()[0]->getAddress());
-            $this->assertSame('respuestas@example.test', $message->getSymfonyMessage()->getReplyTo()[0]->getAddress());
+            $email = $message->getSymfonyMessage();
+            $this->assertStringStartsWith('[REQ-'.$r->id.'] ', $email->getSubject());
+            foreach ([$email->getTextBody(), $email->getHtmlBody()] as $body) {
+                $this->assertStringContainsString('No necesitas ingresar al sistema', $body);
+                $this->assertStringContainsString('[REQ-'.$r->id.']', $body);
+            }
+            $this->assertStringContainsString('multipart/alternative', $email->toString());
+            $this->assertSame('docente@example.test', $email->getTo()[0]->getAddress());
+            $this->assertSame('respuestas@example.test', $email->getReplyTo()[0]->getAddress());
 
             return Mockery::mock(SentMessage::class);
         });
@@ -67,11 +74,21 @@ class CorreoRequerimientoTest extends TestCase
     {
         $this->smtp();
         $n = CorreoRequerimiento::programar($this->requerimiento(), 'Aviso', 'Pendiente');
-        Mail::shouldReceive('raw')->once()->andThrow(new \RuntimeException('Error ficticio'));
+        Mail::shouldReceive('send')->once()->andThrow(new \RuntimeException('Error ficticio'));
         $this->assertSame(0, CorreoRequerimiento::procesar([$n->id]));
         $this->assertSame('error', $n->fresh()->correo_estado);
         $this->assertNull($n->fresh()->correo_enviado_en);
         $this->assertSame(0, CorreoRequerimiento::procesar());
+    }
+
+    public function test_unconfirmed_smtp_delivery_is_not_marked_as_sent(): void
+    {
+        $this->smtp();
+        $n = CorreoRequerimiento::programar($this->requerimiento(), 'Aviso', 'Pendiente');
+        Mail::shouldReceive('send')->once()->andReturnNull();
+        $this->assertSame(0, CorreoRequerimiento::procesar([$n->id]));
+        $this->assertSame('error', $n->fresh()->correo_estado);
+        $this->assertNull($n->fresh()->correo_enviado_en);
     }
 
     public function test_closed_requirement_is_not_sent(): void
@@ -80,7 +97,7 @@ class CorreoRequerimientoTest extends TestCase
         $r = $this->requerimiento();
         $n = CorreoRequerimiento::programar($r, 'Aviso', 'Pendiente');
         $r->update(['estado' => 'cancelado', 'cerrado_en' => now()]);
-        Mail::shouldReceive('raw')->never();
+        Mail::shouldReceive('send')->never();
         $this->assertSame(0, CorreoRequerimiento::procesar([$n->id]));
         $this->assertSame('cancelado', $n->fresh()->correo_estado);
     }
@@ -112,6 +129,7 @@ class CorreoRequerimientoTest extends TestCase
         $otro = RequerimientoDocumento::factory()->create(['usuario_id' => $r->usuario_id, 'estado' => 'abierto']);
         $n = CorreoRequerimiento::programar($r, 'Aviso anterior', 'No enviar automáticamente');
         Mail::shouldReceive('raw')->never();
+        Mail::shouldReceive('send')->never();
         $this->assertSame(0, CorreoRequerimiento::procesar());
         $this->artisan('legajo:enviar-requerimientos')->assertSuccessful();
         $this->assertSame('pendiente', $n->fresh()->correo_estado);

@@ -13,6 +13,9 @@ use Throwable;
 
 final class RecepcionGmail
 {
+    /** Adjuntos que se revisan por correo; los correos de requerimientos informan este mismo límite. */
+    public const MAXIMO_ADJUNTOS = 10;
+
     public static function sincronizar(): int
     {
         if (! GmailCorreo::recepcionLista()) {
@@ -126,8 +129,8 @@ final class RecepcionGmail
                         continue;
                     }
                     $adjuntos++;
-                    if ($adjuntos > 10 || strtolower(pathinfo($nombre, PATHINFO_EXTENSION)) !== 'pdf' || ($parte['body']['size'] ?? 0) > $maximo) {
-                        $avisos[] = mb_substr($nombre, 0, 150).': no incorporado (solo PDF, hasta '.($maximo / 1024).' KB y 10 adjuntos por correo).';
+                    if ($adjuntos > self::MAXIMO_ADJUNTOS || strtolower(pathinfo($nombre, PATHINFO_EXTENSION)) !== 'pdf' || ($parte['body']['size'] ?? 0) > $maximo) {
+                        $avisos[] = mb_substr($nombre, 0, 150).': no incorporado (solo PDF, hasta '.($maximo / 1024).' KB y '.self::MAXIMO_ADJUNTOS.' adjuntos por correo).';
 
                         continue;
                     }

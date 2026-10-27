@@ -65,17 +65,16 @@ final class CorreoRequerimiento
                         $n->correo_destinatario = $actual;
                         $n->correo_intentos++;
                         try {
-                            $referencia = '[REQ-'.$r->id.']';
-                            $cuerpo = $n->mensaje."\n\nRequerimiento: ".$r->descripcion."\nFecha límite: ".($r->prorroga_hasta ?? $r->fecha_limite)->format('d/m/Y')
-                                ."\n\nResponde a este mismo correo y adjunta el documento solicitado o explica por qué no corresponde. No necesitas ingresar al sistema ni crear una cuenta."
-                                ."\nConserva la referencia ".$referencia.' en el asunto para identificar tu entrega.';
+                            $correo = MensajeRequerimiento::construir($n, $r);
                             $proveedorId = null;
                             if (GmailCorreo::conexion()) {
-                                $proveedorId = GmailCorreo::enviar($n->correo_destinatario, $referencia.' '.$n->titulo, $cuerpo);
+                                $proveedorId = GmailCorreo::enviar($n->correo_destinatario, $correo['asunto'], $correo['texto'], $correo['html']);
                             } else {
-                                $resultado = Mail::raw($cuerpo, function (Message $mail) use ($n, $referencia): void {
-                                    $mail->to($n->correo_destinatario)->subject($referencia.' '.$n->titulo)
-                                        ->replyTo(config('mail.reply_to.address'), config('mail.reply_to.name'));
+                                // multipart/alternative: texto plano y HTML con la misma información.
+                                $resultado = Mail::send([], [], function (Message $mail) use ($n, $correo): void {
+                                    $mail->to($n->correo_destinatario)->subject($correo['asunto'])
+                                        ->replyTo(config('mail.reply_to.address'), config('mail.reply_to.name'))
+                                        ->text($correo['texto'])->html($correo['html']);
                                 });
                                 if (! $resultado) {
                                     throw new RuntimeException('El transporte no confirmó el envío.');
