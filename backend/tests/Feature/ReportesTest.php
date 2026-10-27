@@ -170,6 +170,19 @@ class ReportesTest extends TestCase
         $this->assertFalse($filas->has('Documento corregido'));
     }
 
+    public function test_a_loaded_document_is_not_pending_even_without_reception_because_it_arrives_validated(): void
+    {
+        $this->actuarComo();
+        $legajo = Legajo::factory()->create(['numero_legajo' => 'YA-VALIDADO']);
+        $cargado = $this->tipo(['nombre' => 'Documento cargado']);
+        $this->documento($legajo, $cargado, ['estado' => 'aceptado', 'fecha_recepcion' => null, 'recepcionado_por' => null]);
+        $observado = $this->tipo(['nombre' => 'Documento observado']);
+        $this->documento($legajo, $observado, ['estado' => 'observado']);
+        $filas = collect($this->getJson('/api/v1/reportes/pendientes?q=YA-VALIDADO&exportar=1')->assertOk()->json('data'))->keyBy('detalle');
+        $this->assertArrayNotHasKey('Documento cargado', $filas->all());
+        $this->assertSame('observado', $filas['Documento observado']['estado_codigo']);
+    }
+
     public function test_disabled_optional_and_inapplicable_types_do_not_create_missing_documents(): void
     {
         $this->actuarComo();

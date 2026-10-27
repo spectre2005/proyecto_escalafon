@@ -12,7 +12,6 @@ use App\Models\TipoDocumento;
 use App\Models\UnidadOrganica;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
-use App\Support\Documentos\EstadoDocumento;
 use Carbon\CarbonImmutable;
 use Generator;
 use Illuminate\Database\Eloquent\Builder;
@@ -61,9 +60,9 @@ final class ConsultaReportes
         'evaluaciones' => ['pregunta' => '¿Quién fue evaluado en el ciclo y quién tiene plan de mejora?', 'titulo' => 'Seguimiento de evaluaciones', 'descripcion' => 'Evaluaciones registradas y planes de mejora por ciclo.', 'icono' => 'check',
             'fecha' => 'Fecha de evaluación', 'estados' => ['con_plan' => 'Con plan de mejora', 'sin_plan' => 'Sin plan de mejora'],
             'ayuda' => 'Evaluaciones no anuladas del ciclo seleccionado. No presume que todo el personal está obligado a evaluarse ni calcula una cobertura sin padrón de elegibles. No incluye puntajes ni calificaciones.'],
-        'pendientes' => ['pregunta' => '¿Qué falta cargar o revisar en los legajos activos?', 'titulo' => 'Pendientes documentales', 'descripcion' => 'Qué falta cargar, recibir o revisar en los legajos activos.', 'icono' => 'file',
-            'fecha' => null, 'estados' => ['faltante' => 'Falta documento', 'por_determinar' => 'Por determinar', 'observado' => 'Observado', 'recepcion' => 'Sin recepción', 'revision' => 'En revisión'],
-            'ayuda' => 'Los requisitos por determinar se muestran aparte de los faltantes. Se excluyen los tipos no aplicables, desactivados y las versiones subsanadas.'],
+        'pendientes' => ['pregunta' => '¿Qué documentos faltan en los legajos activos?', 'titulo' => 'Pendientes documentales', 'descripcion' => 'Documentos que faltan cargar en los legajos activos, persona por persona.', 'icono' => 'file',
+            'fecha' => null, 'estados' => ['faltante' => 'Falta documento', 'por_determinar' => 'Por determinar', 'observado' => 'Observado'],
+            'ayuda' => 'Los documentos llegan ya validados: uno cargado no figura como pendiente. Se listan los que faltan, los que dependen de un dato aún sin responder («por determinar») y los marcados como observados. Se excluyen los tipos no aplicables, desactivados y las versiones subsanadas.'],
         'vencimientos' => ['pregunta' => '¿Qué documentos, contratos o requerimientos vencen pronto?', 'titulo' => 'Vencimientos', 'descripcion' => 'Documentos, contratos, requerimientos y otros datos con fecha que necesitan seguimiento.', 'icono' => 'clock',
             'fecha' => 'Fecha de vencimiento', 'estados' => ['vencido' => 'Vencido', 'fuera_de_plazo' => 'Requerimiento fuera de plazo', 'por_vencer' => 'Por vencer'],
             'ayuda' => 'Se reutiliza la consulta de Vencimientos: DNI, contratos y adendas (también vencidos sin cese), requerimientos, colegiatura, período de prueba y, según tus permisos, certificado de discapacidad, examen médico ocupacional, ratificación docente y encargos o destaques.'],
@@ -397,16 +396,13 @@ final class ConsultaReportes
 
             return;
         }
+        // Los documentos llegan al escalafón ya validados: uno cargado no queda pendiente por falta de recepción o revisión.
+        // Solo cuenta lo que falta (arriba) y lo que alguien marcó expresamente como observado o falso.
         foreach ($documentos as $doc) {
-            $estado = match (true) {
-                in_array($doc->estado, ['observado', 'falso'], true) => 'observado',
-                $doc->archivo_id !== null && ! EstadoDocumento::recepcionado($doc) => 'recepcion',
-                $doc->archivo_id !== null && ! in_array($doc->estado, ['aceptado', 'verificado', 'recepcionado'], true) && in_array($tipo->seccion_legajo_id, [3, 4, 6, 8, 10], true) => 'revision',
-                default => null,
-            };
+            $estado = in_array($doc->estado, ['observado', 'falso'], true) ? 'observado' : null;
             if ($estado) {
                 yield [...$comun, 'id' => $doc->id, 'fecha' => $doc->fecha_emision?->toDateString(), 'estado_codigo' => $estado,
-                    'estado' => self::catalogo()['pendientes']['estados'][$estado], 'motivo' => $estado === 'observado' ? 'El documento requiere subsanación o revisión.' : ($estado === 'recepcion' ? 'El archivo está cargado sin recepción registrada.' : 'Documento recibido pendiente de revisión.')];
+                    'estado' => self::catalogo()['pendientes']['estados'][$estado], 'motivo' => 'El documento fue marcado como observado y requiere subsanación.'];
             }
         }
     }
