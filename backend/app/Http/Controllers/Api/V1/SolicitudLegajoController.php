@@ -9,6 +9,7 @@ use App\Models\NotificacionUsuario;
 use App\Models\RequerimientoDocumento;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
+use App\Support\AplicacionDocumental;
 use App\Support\ConsultaReportes;
 use App\Support\CorreoRequerimiento;
 use App\Support\Documentos\ArchivoPdf;
@@ -123,9 +124,16 @@ class SolicitudLegajoController extends Controller
         $admin = $request->user()->can('requerimientos.gestionar');
         $personas = Usuario::query()->whereHas('legajos', fn (Builder $q) => $q->where('estado_legajo', 'activo'))
             ->when(! $admin, fn (Builder $q) => $q->whereKey($request->user()->id))->orderBy('apellido_paterno')->get(['id', 'nombres', 'apellido_paterno', 'apellido_materno', 'numero_doc_identidad', 'email_institucional']);
+        $data = $request->validate(['usuario_id' => 'sometimes|uuid']);
         $tipos = $this->tiposDisponibles()
             ->when(! $request->user()->veDatosSensibles(), fn (Builder $q) => $q->where('es_dato_sensible', false)->where('es_dato_salud', false)->whereNotIn('seccion_legajo_id', [1, 9, 10]))
-            ->orderBy('nombre')->get(['id', 'nombre']);
+            ->orderBy('nombre')->get();
+        // Con una persona: las mismas reglas que el legajo usa para cargar (AplicacionDocumental), tipo por tipo.
+        $aplicacion = isset($data['usuario_id']) && $personas->contains('id', $data['usuario_id'])
+            ? AplicacionDocumental::para(Usuario::query()->findOrFail($data['usuario_id'])) : null;
+        abort_if(isset($data['usuario_id']) && ! $aplicacion, 404);
+        $tipos = $tipos->map(fn (TipoDocumento $t): array => ['id' => $t->id, 'nombre' => $t->nombre,
+            ...($aplicacion ? ['no_aplica' => $aplicacion->noAplica($t), 'por_definir' => $aplicacion->porDefinir($t)] : [])])->values();
 
         return response()->json(['personas' => $personas, 'tipos' => $tipos, 'maximo_pdf_kb' => Parametros::entero('tamano_maximo_pdf_kb')]);
     }
@@ -144,11 +152,21 @@ class SolicitudLegajoController extends Controller
         foreach ($tipos as $tipo) {
             $this->tipoVisible($request, $tipo);
         }
+        $campoTipos = $request->has('tipo_documento_ids') ? 'tipo_documento_ids' : 'tipo_documento_id';
         unset($data['tipo_documento_ids'], $data['tipo_documento_id']);
         $notificaciones = [];
-        $registros = DB::transaction(function () use ($data, $tipos, $request, &$notificaciones): array {
-            Usuario::query()->whereKey($data['usuario_id'])->lockForUpdate()->firstOrFail();
+        $registros = DB::transaction(function () use ($data, $tipos, $request, $campoTipos, &$notificaciones): array {
+            $persona = Usuario::query()->whereKey($data['usuario_id'])->lockForUpdate()->firstOrFail();
             $this->legajoActivo($data['usuario_id']);
+            // Mismas reglas que la carga en el legajo: un tipo que no corresponde nunca podría cargarse ni cerrarse. Se
+            // revisan todos antes de crear nada; los «por definir» se registran, pero no se envían (enviable()).
+            $aplicacion = AplicacionDocumental::para($persona);
+            $rechazos = TipoDocumento::query()->whereKey($tipos)->orderBy('nombre')->get()
+                ->map(fn (TipoDocumento $t): ?string => ($motivo = $aplicacion->noAplica($t)) ? "«{$t->nombre}» no corresponde a esta persona. {$motivo}" : null)
+                ->filter()->values()->all();
+            if ($rechazos !== []) {
+                throw ValidationException::withMessages([$campoTipos => $rechazos]);
+            }
             $registros = [];
             foreach ($tipos ?: [null] as $tipo) {
                 $duplicado = RequerimientoDocumento::query()->where('usuario_id', $data['usuario_id'])->where('clase', $data['clase'])->whereIn('estado', self::ABIERTOS);
@@ -189,6 +207,7 @@ class SolicitudLegajoController extends Controller
         $data = $request->validate(['notificacion_id' => 'required|uuid']);
         $r = $this->consulta($request)->findOrFail($record);
         $n = $r->notificacionesUsuario()->whereNotNull('correo_estado')->findOrFail($data['notificacion_id']);
+        $this->enviable($r);
         CorreoRequerimiento::procesar([$n->id]);
 
         return response()->json(['correo' => $n->fresh()->only(['id', 'correo_estado', 'correo_destinatario', 'correo_error'])]);
@@ -239,6 +258,9 @@ class SolicitudLegajoController extends Controller
         abort_unless($request->user()->can('requerimientos.gestionar'), 403);
         $data = $request->validate(['accion' => 'required|in:observar,aceptar,cancelar,prorrogar,recordar', 'mensaje' => 'required|string|max:3000',
             'prorroga_hasta' => 'required_if:accion,prorrogar|nullable|date_format:Y-m-d|after_or_equal:'.now('America/Lima')->toDateString(), 'documento_id' => 'nullable|uuid|exists:documentos_usuario,id']);
+        if ($data['accion'] === 'recordar') {
+            $this->enviable($this->consulta($request)->findOrFail($record));
+        }
         $notificacion = null;
         $r = DB::transaction(function () use ($request, $record, $data, &$notificacion): RequerimientoDocumento {
             $r = $this->consulta($request)->lockForUpdate()->findOrFail($record);
@@ -331,6 +353,26 @@ class SolicitudLegajoController extends Controller
     private function legajoActivo(string $usuario): void
     {
         abort_unless(Legajo::query()->where('usuario_id', $usuario)->where('estado_legajo', 'activo')->lockForUpdate()->first(), 409, 'La persona no tiene un legajo activo.');
+    }
+
+    /**
+     * Antes de cada envío (aviso y recordatorio), el tipo pedido debe seguir correspondiendo a la persona y su
+     * aplicabilidad estar definida: las banderas o el vínculo pueden haber cambiado desde el registro.
+     */
+    private function enviable(RequerimientoDocumento $r): void
+    {
+        $tipo = $r->tipoDocumento;
+        // Cerrado o ya respondido: CorreoRequerimiento::procesar() cancela el aviso, como antes.
+        if (! $tipo || $r->cerrado_en || ! in_array($r->estado, ['abierto', 'observado'], true)) {
+            return;
+        }
+        $aplicacion = AplicacionDocumental::para($r->usuario()->firstOrFail());
+        if ($motivo = $aplicacion->noAplica($tipo)) {
+            throw ValidationException::withMessages(['tipo_documento_id' => "No se envió: «{$tipo->nombre}» no corresponde a esta persona. {$motivo} Si el requerimiento ya no procede, cancélalo."]);
+        }
+        if ($motivo = $aplicacion->porDefinir($tipo)) {
+            throw ValidationException::withMessages(['tipo_documento_id' => "No se envió: «{$tipo->nombre}». {$motivo} Complétalo y vuelve a enviar."]);
+        }
     }
 
     private function tipoVisible(Request $request, string $id): void

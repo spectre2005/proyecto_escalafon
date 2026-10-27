@@ -5,6 +5,7 @@ import { useLiveQuery } from '../../shared/queries/useLiveQuery'
 import { usePuede, useSesion } from '../auth/session'
 import { destinoDocumentoRequerido } from './destinoDocumentoRequerido'
 import { separarHistorialCorreo } from './historialCorreo'
+import { clasificarTipos, depurarSeleccion } from './tiposAplicables'
 import DocumentoModal from '../legajos/components/documentos/DocumentoModal'
 
 const panel = 'rounded-2xl border border-slate-200 bg-white p-5'
@@ -25,6 +26,24 @@ function NuevoRequerimiento({ opciones, busy, error, progreso, onSubmit, onCance
   const [tipos, setTipos] = useState([])
   const [otroAsunto, setOtroAsunto] = useState(false)
   const [filtroTipo, setFiltroTipo] = useState('')
+  // Tipos evaluados para la persona elegida (AplicacionDocumental en el backend): sin persona no se ofrece ninguno.
+  const [evaluacion, setEvaluacion] = useState({ personaId: null, tipos: null, error: '' })
+  useEffect(() => {
+    if (!persona) return undefined
+    const controller = new AbortController()
+    api.get(`/solicitudes-legajo/opciones?usuario_id=${persona.id}`, { signal: controller.signal })
+      .then(({ data }) => setEvaluacion({ personaId: persona.id, tipos: data.tipos, error: '' }))
+      .catch(e => { if (e.code !== 'ERR_CANCELED') setEvaluacion({ personaId: persona.id, tipos: null, error: apiErrorMessage(e) }) })
+    return () => controller.abort()
+  }, [persona])
+  const vigente = persona && evaluacion.personaId === persona.id ? evaluacion : { tipos: null, error: '' }
+  const tiposPersona = vigente.tipos
+  const errorTipos = vigente.error
+  const { seleccionables, noAplican } = clasificarTipos(tiposPersona || [])
+  // Solo cuenta (y se envía) la selección que corresponde a la persona actual; lo demás se descarta al marcar otro tipo.
+  const depurada = depurarSeleccion(tipos, tiposPersona || [])
+  const seleccion = depurada.seleccion
+  const quitados = tiposPersona ? depurada.quitados.length : 0
   const palabras = normalizar(busqueda).trim().split(/\s+/).filter(Boolean)
   const coincidencias = (opciones?.personas || []).filter(p => palabras.every(palabra => normalizar(`${nombre(p)} ${p.numero_doc_identidad}`).includes(palabra)))
   const resultados = coincidencias.slice(0, 15)
@@ -42,19 +61,29 @@ function NuevoRequerimiento({ opciones, busy, error, progreso, onSubmit, onCance
       if (resultados[activo]) elegir(resultados[activo])
     }
   }
-  return <form onSubmit={e => onSubmit(e, persona, tipos)} className="space-y-4">
+  return <form onSubmit={e => onSubmit(e, persona, otroAsunto ? [] : seleccion)} className="space-y-4">
     <div className="relative"><Campo label="Buscar persona por nombre o DNI"><input autoComplete="off" role="combobox" aria-expanded={abierto} aria-controls="personas-requerimiento" aria-autocomplete="list" aria-activedescendant={abierto && resultados[activo] ? `persona-${resultados[activo].id}` : undefined} value={busqueda} placeholder="Escribe un nombre, apellido o DNI" onFocus={() => setAbierto(true)} onBlur={() => setAbierto(false)} onKeyDown={teclado} onChange={e => { setBusqueda(e.target.value); setPersona(null); setActivo(0); setAbierto(true) }} className={control} required /></Campo>
       {abierto && <ul id="personas-requerimiento" role="listbox" aria-label="Personas con legajo activo" className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg">{resultados.map((p, i) => <li key={p.id} id={`persona-${p.id}`} role="option" aria-selected={activo === i}><button type="button" className={`w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-teal-50 ${activo === i ? 'bg-teal-50' : ''}`} onMouseDown={e => e.preventDefault()} onClick={() => elegir(p)}><span className="block font-medium">{nombre(p)}</span><span className="text-xs text-slate-500">DNI / documento: {p.numero_doc_identidad} · {p.email_institucional || 'Sin correo registrado'}</span></button></li>)}{!resultados.length && <li className="p-3 text-sm text-slate-500">No se encontraron personas con legajo activo.</li>}{coincidencias.length > 15 && <li className="p-3 text-xs text-slate-500">Escribe más letras o el DNI para precisar la búsqueda.</li>}</ul>}
     </div>
     {persona && <p className="rounded-xl bg-teal-50 p-3 text-sm text-teal-900">Destinatario: {persona.email_institucional || 'Sin correo: complétalo en Personal antes de enviar.'}</p>}
     <Campo label="Tipo de solicitud"><select value={otroAsunto ? 'otro' : 'documentos'} onChange={e => { setOtroAsunto(e.target.value === 'otro'); setTipos([]) }} className={control}><option value="documentos">Documento de las 11 secciones del legajo</option><option value="otro">Otro asunto (sin documento del legajo)</option></select></Campo>
-    {!otroAsunto && <fieldset className="space-y-2"><legend className="text-sm font-medium text-slate-700">Tipos de documento ({tipos.length} seleccionados)</legend><input aria-label="Filtrar tipos de documento" placeholder="Buscar tipo de documento" className={control} value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)} /><div className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-slate-200 p-2">{opciones?.tipos.filter(t => normalizar(t.nombre).includes(normalizar(filtroTipo))).map(t => <label key={t.id} className="flex cursor-pointer items-start gap-2 rounded-lg p-2 text-sm hover:bg-slate-50"><input type="checkbox" checked={tipos.includes(t.id)} onChange={e => setTipos(current => e.target.checked ? [...current, t.id] : current.filter(id => id !== t.id))} className="mt-0.5 accent-teal-700" /><span>{t.nombre}</span></label>)}</div><p className="text-xs text-slate-500">Selecciona hasta 20 documentos. Cada uno tendrá su propio requerimiento y correo. Para una solicitud sin documento del legajo, selecciona «Otro asunto».</p></fieldset>}
+    {!otroAsunto && <fieldset className="space-y-2"><legend className="text-sm font-medium text-slate-700">Tipos de documento ({seleccion.length} seleccionados)</legend>
+      {!persona ? <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">Selecciona primero a la persona: solo se ofrecen los documentos que le corresponden según su legajo.</p>
+        : errorTipos ? <p role="alert" className="text-sm text-rose-800">{errorTipos}</p>
+          : !tiposPersona ? <p role="status" className="text-sm text-slate-600">Consultando los documentos que corresponden a esta persona…</p>
+            : <>
+              {quitados > 0 && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Se quitaron {quitados} documento(s) de la selección porque no corresponden a esta persona.</p>}
+              <input aria-label="Filtrar tipos de documento" placeholder="Buscar tipo de documento" className={control} value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)} />
+              <div className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-slate-200 p-2">{seleccionables.filter(t => normalizar(t.nombre).includes(normalizar(filtroTipo))).map(t => <label key={t.id} className="flex cursor-pointer items-start gap-2 rounded-lg p-2 text-sm hover:bg-slate-50"><input type="checkbox" checked={seleccion.includes(t.id)} onChange={e => setTipos(e.target.checked ? [...seleccion, t.id] : seleccion.filter(id => id !== t.id))} className="mt-0.5 accent-teal-700" /><span>{t.nombre}{t.por_definir && <span className="mt-1 block text-xs text-amber-900">{t.por_definir} Se registrará, pero no se enviará hasta completarlo.</span>}</span></label>)}</div>
+              {noAplican.length > 0 && <details className="rounded-xl border border-slate-200 p-3 text-sm"><summary className="cursor-pointer text-slate-700">{noAplican.length} documento(s) no corresponden a esta persona</summary><ul className="mt-2 space-y-2">{noAplican.map(t => <li key={t.id}><span className="font-medium text-slate-700">{t.nombre}</span><span className="block text-xs text-slate-600">{t.no_aplica}</span></li>)}</ul></details>}
+            </>}
+      <p className="text-xs text-slate-500">Selecciona hasta 20 documentos. Cada uno tendrá su propio requerimiento y correo. Para una solicitud sin documento del legajo, selecciona «Otro asunto».</p></fieldset>}
     <Campo label="Detalle de lo solicitado"><textarea required name="descripcion" maxLength={300} className={control} /></Campo>
     <Campo label="Fecha límite"><input required name="fecha_limite" type="date" className={control} /></Campo>
     <p className="text-xs text-slate-600">El envío se realiza solo al pulsar este botón. Registrar una persona o abrir este panel no envía correos.</p>
     {progreso && <p role="status" className="text-sm text-teal-800">{progreso}</p>}
     {error && <p role="alert" className="text-sm text-rose-800">{error}</p>}
-    <div className="flex flex-wrap gap-2"><button disabled={busy || !opciones || !persona || (!otroAsunto && !tipos.length) || tipos.length > 20} className={button}>{busy ? 'Registrando y enviando…' : `Registrar y enviar ${tipos.length || 1} correo(s)`}</button><button type="button" className={button} disabled={busy} onClick={onCancel}>Cancelar</button></div>
+    <div className="flex flex-wrap gap-2"><button disabled={busy || !opciones || !persona || (!otroAsunto && (!tiposPersona || !seleccion.length)) || seleccion.length > 20} className={button}>{busy ? 'Registrando y enviando…' : `Registrar y enviar ${otroAsunto ? 1 : seleccion.length || 1} correo(s)`}</button><button type="button" className={button} disabled={busy} onClick={onCancel}>Cancelar</button></div>
   </form>
 }
 
@@ -213,17 +242,24 @@ function GestionRequerimientos() {
       const response = await api.post('/solicitudes-legajo', data)
       const { total, correos } = response.data
       let enviados = 0
+      const motivos = new Set()
       for (const [index, correo] of correos.entries()) {
         setProgresoEnvio(`Enviando correo ${index + 1} de ${total}…`)
         try {
           const envio = await api.post(`/solicitudes-legajo/${correo.requerimiento_id}/enviar`, { notificacion_id: correo.id }, { timeout: 60000 })
           if (envio.data.correo.correo_estado === 'enviado') enviados++
-        } catch { /* El registro se conserva y el resultado informa los envíos no confirmados. */ }
+        } catch (err) {
+          // El registro se conserva sin enviar (p. ej. falta definir si el documento corresponde) y se informa el motivo.
+          if (err.response?.status === 422) motivos.add(apiErrorMessage(err))
+        }
       }
       setNuevo(false); filtrar('clase', data.clase)
-      setResultadoEnvio(`${total} requerimiento(s) registrado(s). ${enviados} correo(s) enviado(s).${enviados < total ? ' Los restantes no se enviaron: revisa el correo de la persona y la conexión en Configuración. No se reintentarán automáticamente.' : ''}`)
+      setResultadoEnvio(`${total} requerimiento(s) registrado(s). ${enviados} correo(s) enviado(s).${enviados < total ? ' Los restantes no se enviaron: revisa el correo de la persona y la conexión en Configuración. No se reintentarán automáticamente.' : ''}${[...motivos].map(m => ` ${m}`).join('')}`)
       request.retry()
-    } catch (e) { setError(e.response?.data?.message || apiErrorMessage(e)) } finally { setBusy(false); setProgresoEnvio('') }
+    } catch (e) {
+      // 422: todos los motivos (p. ej. cada tipo que no corresponde); «message» solo trae el primero.
+      setError(e.response?.status === 422 ? apiErrorMessage(e) : e.response?.data?.message || apiErrorMessage(e))
+    } finally { setBusy(false); setProgresoEnvio('') }
   }
   return <>
     <header className="mb-6"><p className="text-xs font-semibold uppercase tracking-widest text-teal-700">Seguimiento documental</p><h1 className="mt-2 text-3xl font-bold text-slate-800">Requerimientos</h1><p className="mt-3 text-sm text-slate-600">Envía requerimientos por correo y revisa las respuestas y documentos recibidos automáticamente.</p><p className="mt-2 text-xs text-slate-500">Los docentes responden por correo; no necesitan ingresar al sistema ni crear una cuenta.</p></header>
