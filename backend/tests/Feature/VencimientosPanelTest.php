@@ -207,9 +207,48 @@ class VencimientosPanelTest extends TestCase
         foreach (range(-6, -1) as $dias) {
             $this->documento($legajo, $dias);
         }
-        $this->getJson('/api/v1/vencimientos')->assertOk()->assertJsonPath('total', 22)->assertJsonCount(20, 'data')
+        // 10 por defecto (PorPagina): 22 personas en tres páginas, sin repetir ninguna.
+        $primera = $this->getJson('/api/v1/vencimientos')->assertOk()->assertJsonPath('total', 22)->assertJsonCount(10, 'data')
+            ->assertJsonPath('per_page', 10)->assertJsonPath('from', 1)->assertJsonPath('to', 10)->assertJsonPath('last_page', 3)
             ->assertJsonPath('data.0.usuario_id', $legajo->usuario_id)->assertJsonPath('data.0.total_alertas', 6)->assertJsonCount(5, 'data.0.motivos');
-        $this->getJson('/api/v1/vencimientos?page=2')->assertOk()->assertJsonCount(2, 'data');
+        $segunda = $this->getJson('/api/v1/vencimientos?page=2')->assertOk()->assertJsonCount(10, 'data')->assertJsonPath('from', 11);
+        $ultima = $this->getJson('/api/v1/vencimientos?page=3')->assertOk()->assertJsonCount(2, 'data')->assertJsonPath('to', 22);
+        $ids = [...$primera->json('data.*.usuario_id'), ...$segunda->json('data.*.usuario_id'), ...$ultima->json('data.*.usuario_id')];
+        $this->assertCount(22, array_unique($ids));
+        // Página inexistente: sin filas, pero con los datos reales que usa el frontend para ir a la última válida.
+        $this->getJson('/api/v1/vencimientos?page=4')->assertOk()->assertJsonCount(0, 'data')->assertJsonPath('total', 22)
+            ->assertJsonPath('current_page', 4)->assertJsonPath('last_page', 3)->assertJsonPath('from', null);
+        $this->getJson('/api/v1/vencimientos?page=9&por_pagina=15&dias=30')->assertOk()->assertJsonCount(0, 'data')
+            ->assertJsonPath('current_page', 9)->assertJsonPath('last_page', 2)->assertJsonPath('per_page', 15);
+        // Una búsqueda sin resultados es otra cosa: total 0.
+        $this->getJson('/api/v1/vencimientos?page=2&q=NOEXISTE')->assertOk()->assertJsonPath('total', 0)->assertJsonPath('last_page', 1);
+    }
+
+    public function test_page_size_options_keep_filters_in_the_page_links_and_reject_other_sizes(): void
+    {
+        foreach (range(0, 20) as $dias) {
+            $this->documento($this->legajo(), $dias);
+        }
+        $this->getJson('/api/v1/vencimientos?por_pagina=15')->assertOk()->assertJsonCount(15, 'data')->assertJsonPath('last_page', 2);
+        $this->getJson('/api/v1/vencimientos?por_pagina=20')->assertOk()->assertJsonCount(20, 'data')->assertJsonPath('per_page', 20);
+        $this->getJson('/api/v1/vencimientos?por_pagina=10&dias=60&origen=documento')->assertOk()
+            ->assertJsonPath('next_page_url', fn (string $url): bool => str_contains($url, 'por_pagina=10') && str_contains($url, 'dias=60') && str_contains($url, 'origen=documento') && str_contains($url, 'page=2'));
+        foreach (['por_pagina=50', 'por_pagina=100', 'por_pagina=5', 'por_pagina=abc'] as $filtro) {
+            $this->getJson('/api/v1/vencimientos?'.$filtro)->assertUnprocessable()->assertJsonValidationErrors('por_pagina');
+        }
+    }
+
+    public function test_later_pages_apply_the_same_permissions(): void
+    {
+        foreach (range(1, 11) as $dias) {
+            $this->documento($this->legajo(), $dias, 10);
+        }
+        $this->documento($this->legajo(), 30, 3);
+        // Sin datos sensibles: las 11 alertas de la sección 10 no aparecen en ninguna página.
+        config(['permisos.roles.prueba_solo_legajo' => ['legajo.ver']]);
+        $this->actuarComo(null, 'prueba_solo_legajo');
+        $this->getJson('/api/v1/vencimientos')->assertOk()->assertJsonPath('total', 1)->assertJsonPath('last_page', 1);
+        $this->getJson('/api/v1/vencimientos?page=2')->assertOk()->assertJsonCount(0, 'data')->assertJsonPath('total', 1);
     }
 
     public function test_rejects_invalid_filters(): void

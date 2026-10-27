@@ -64,9 +64,11 @@ class ReportesTest extends TestCase
         $this->actuarComo();
         Usuario::factory()->has(Legajo::factory(), 'legajos')->count(23)->create(['apellido_paterno' => 'ReporteFiltro']);
         $url = '/api/v1/reportes/personal?q=ReporteFiltro';
-        $this->getJson($url)->assertOk()->assertJsonCount(20, 'data')->assertJsonPath('meta.total', 23)->assertJsonPath('meta.last_page', 2);
-        $this->getJson($url.'&page=2')->assertOk()->assertJsonCount(3, 'data');
+        $this->getJson($url)->assertOk()->assertJsonCount(10, 'data')->assertJsonPath('meta.total', 23)->assertJsonPath('meta.last_page', 3);
+        $this->getJson($url.'&page=3')->assertOk()->assertJsonCount(3, 'data');
         $this->getJson($url.'&exportar=1')->assertOk()->assertJsonCount(23, 'data')->assertJsonPath('meta.generado_por', fn ($valor) => is_string($valor));
+        // La exportación no depende del tamaño de la tabla aunque venga en la URL.
+        $this->getJson($url.'&exportar=1&por_pagina=10&page=2')->assertOk()->assertJsonCount(23, 'data')->assertJsonPath('meta.total', 23);
     }
 
     public function test_inventory_does_not_expose_sensitive_documents_or_folios_to_a_reader(): void

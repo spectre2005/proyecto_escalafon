@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { apiErrorMessage } from '../../axios'
 import { useLiveQuery } from '../../shared/queries/useLiveQuery'
+import Paginacion from '../../shared/Paginacion'
+import { conPagina, conPorPagina, leerPaginacion, paginaCorregida } from '../../shared/paginacionUrl'
 import { usePuede } from '../auth/session'
 import { destinoMotivo } from './destinosVencimiento'
 import { aplicarDias, conFiltro, DIAS_POR_DEFECTO, opcionesEstado } from './filtrosVencimiento'
@@ -41,17 +43,23 @@ function Resultados() {
   const formKey = new URLSearchParams(params)
   formKey.delete('q')
   formKey.delete('page')
-  const request = useLiveQuery(`/vencimientos?${params.toString()}`)
+  formKey.delete('por_pagina')
+  // Página y tamaño de la URL ya normalizados: un valor editado a mano no llega al servidor.
+  const { pagina: paginaActual, porPagina } = leerPaginacion(params)
+  const consulta = conPagina(conPorPagina(params, porPagina), paginaActual)
+  const request = useLiveQuery(`/vencimientos?${consulta.toString()}`)
   const result = request.data
+  // Página inexistente (URL editada o guardada): se reemplaza por la última válida, con los mismos filtros y tamaño.
+  const corregida = result ? paginaCorregida({ total: result.total, pagina: result.current_page, paginas: result.last_page }) : null
+  useEffect(() => {
+    if (corregida) setParams(conPagina(params, corregida), { replace: true })
+  }, [corregida, params, setParams])
   const fuentes = Object.fromEntries((result?.origenes || []).map(origen => [origen.id, origen.nombre]))
   const gestionaRequerimientos = usePuede('requerimientos.gestionar')
   // Desplegables: se aplican al cambiar. Próximos días: al confirmar (CampoDias).
   const cambiar = clave => event => setParams(conFiltro(params, clave, event.target.value))
-  function pagina(numero) {
-    const next = new URLSearchParams(params)
-    next.set('page', numero)
-    setParams(next)
-  }
+  // Página y tamaño entran en el historial: «atrás» vuelve a la página anterior.
+  const pagina = numero => setParams(conPagina(params, numero))
   return <>
     <header className="mb-7"><p className="text-xs font-semibold uppercase tracking-widest text-teal-700">Seguimiento del personal</p><h1 className="mt-2 text-3xl font-bold text-slate-800">Vencimientos</h1><p className="mt-3 text-sm text-slate-600">Personas con documentos, contratos u otros datos con fecha que vencen o ya vencieron, y requerimientos próximos a su plazo o fuera de plazo.</p></header>
     <section className={`${panel} mb-6 p-5`} aria-label="Criterios del panel"><p className="text-sm leading-relaxed text-slate-700">Se revisan legajos activos. «Por vencer» incluye hoy y los próximos {result?.dias ?? params.get('dias') ?? 30} días. «Vencido»: la fecha ya pasó (por ejemplo, un contrato sin cese registrado o un DNI caducado). «Requerimiento fuera de plazo»: la persona no entregó lo pedido a tiempo.</p><p className="mt-2 text-xs text-slate-600">Rojo: vencido o menos de 7 días. Amarillo: desde 7 días hasta el límite elegido. Solo generan alertas los datos que vencen o se renuevan y tienen fecha registrada. Los datos sensibles, la sección 07 y los requerimientos se muestran según tus permisos.</p></section>
@@ -68,8 +76,11 @@ function Resultados() {
     {request.error && <div role="alert" className="mb-5 rounded-xl bg-rose-50 p-4 text-sm text-rose-900">{apiErrorMessage(request.error)} <button onClick={request.retry} className={`${button} ml-3`}>Reintentar</button></div>}
     {request.loading && !result && <p role="status" className={`${panel} p-8`}>Consultando vencimientos…</p>}
     {result && <section aria-label="Personal con alertas de vencimiento" aria-busy={request.loading} className={`${panel} overflow-hidden`}><p role="status" className="border-b border-slate-200 p-5 text-sm text-slate-700">{result.total} persona(s) según filtros · Corte en Lima: {fecha(result.hoy)} · Orden por la fecha más antigua</p>
-      {result.data.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">Personal con alertas, una fila por persona y ordenado por fecha ascendente</caption><thead className="bg-slate-50 text-slate-700"><tr>{['Personal', 'Área', 'Estado', 'Motivos y fechas'].map(label => <th key={label} scope="col" className="px-5 py-4 font-semibold">{label}</th>)}</tr></thead><tbody>{result.data.map(persona => <tr key={persona.usuario_id} className="border-t border-slate-200 align-top"><th scope="row" className="px-5 py-5 font-semibold text-slate-800">{persona.nombre}<span className="mt-1 block text-xs font-normal text-slate-600">{persona.numero_doc_identidad} · {persona.tipo_personal}</span></th><td className="px-5 py-5 text-slate-700">{persona.area || 'Sin área registrada'}</td><td className="px-5 py-5"><span className={`inline-block rounded-xl px-3 py-2 text-xs font-semibold ${estados[persona.estado]?.[1] || estados.por_vencer[1]}`}>{estados[persona.estado]?.[0] || persona.estado}</span><p className="mt-2 text-xs text-slate-600">{persona.total_alertas} alerta(s)</p></td><td className="min-w-72 px-5 py-5"><ul className="space-y-3">{persona.motivos.map((motivo, index) => { const destino = destinoMotivo(persona, motivo); return <li key={motivo.id || index}><p className="font-medium text-slate-800">{fuentes[motivo.origen] || motivo.origen}{motivo.detalle ? `: ${motivo.detalle}` : ''}</p><p className={`mt-1 text-xs font-medium ${motivo.criticidad === 'rojo' ? 'text-rose-800' : 'text-amber-900'}`}><time dateTime={motivo.fecha}>{fecha(motivo.fecha)}</time> · {diasTexto(motivo.dias_restantes, motivo.estado)}</p>{destino && <Link to={destino.ruta} aria-label={`${destino.texto} de ${persona.nombre}`} className="mt-1 inline-block text-xs font-semibold text-teal-800 underline">{destino.texto}</Link>}</li> })}</ul>{persona.total_alertas > persona.motivos.length && <p className="mt-3 text-xs text-slate-600">Se muestran los primeros {persona.motivos.length} motivos de {persona.total_alertas}. Para el resto, <Link to={`/legajos/${persona.usuario_id}`} className="font-semibold text-teal-800 underline">abre la ficha completa</Link>.</p>}</td></tr>)}</tbody></table></div> : <p className="p-10 text-center text-sm text-slate-600">No hay personas con alertas para estos filtros. Los datos sin fecha registrada (por ejemplo, un contrato sin fecha de fin o un certificado permanente) no generan alertas.</p>}
-      {result.last_page > 1 && <nav aria-label="Paginación de vencimientos" className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 p-5"><span className="text-sm text-slate-700">Página {result.current_page} de {result.last_page}</span><div className="flex gap-3"><button className={button} disabled={result.current_page <= 1} onClick={() => pagina(result.current_page - 1)}>Anterior</button><button className={button} disabled={result.current_page >= result.last_page} onClick={() => pagina(result.current_page + 1)}>Siguiente</button></div></nav>}
+      {corregida && result.total > 0 ? <p role="status" className="p-10 text-center text-sm text-slate-600">La página {result.current_page} no existe. Mostrando la última página disponible…</p>
+        : result.data.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">Personal con alertas, una fila por persona y ordenado por fecha ascendente</caption><thead className="bg-slate-50 text-slate-700"><tr>{['Personal', 'Área', 'Estado', 'Motivos y fechas'].map(label => <th key={label} scope="col" className="px-5 py-4 font-semibold">{label}</th>)}</tr></thead><tbody>{result.data.map(persona => <tr key={persona.usuario_id} className="border-t border-slate-200 align-top"><th scope="row" className="px-5 py-5 font-semibold text-slate-800">{persona.nombre}<span className="mt-1 block text-xs font-normal text-slate-600">{persona.numero_doc_identidad} · {persona.tipo_personal}</span></th><td className="px-5 py-5 text-slate-700">{persona.area || 'Sin área registrada'}</td><td className="px-5 py-5"><span className={`inline-block rounded-xl px-3 py-2 text-xs font-semibold ${estados[persona.estado]?.[1] || estados.por_vencer[1]}`}>{estados[persona.estado]?.[0] || persona.estado}</span><p className="mt-2 text-xs text-slate-600">{persona.total_alertas} alerta(s)</p></td><td className="min-w-72 px-5 py-5"><ul className="space-y-3">{persona.motivos.map((motivo, index) => { const destino = destinoMotivo(persona, motivo); return <li key={motivo.id || index}><p className="font-medium text-slate-800">{fuentes[motivo.origen] || motivo.origen}{motivo.detalle ? `: ${motivo.detalle}` : ''}</p><p className={`mt-1 text-xs font-medium ${motivo.criticidad === 'rojo' ? 'text-rose-800' : 'text-amber-900'}`}><time dateTime={motivo.fecha}>{fecha(motivo.fecha)}</time> · {diasTexto(motivo.dias_restantes, motivo.estado)}</p>{destino && <Link to={destino.ruta} aria-label={`${destino.texto} de ${persona.nombre}`} className="mt-1 inline-block text-xs font-semibold text-teal-800 underline">{destino.texto}</Link>}</li> })}</ul>{persona.total_alertas > persona.motivos.length && <p className="mt-3 text-xs text-slate-600">Se muestran los primeros {persona.motivos.length} motivos de {persona.total_alertas}. Para el resto, <Link to={`/legajos/${persona.usuario_id}`} className="font-semibold text-teal-800 underline">abre la ficha completa</Link>.</p>}</td></tr>)}</tbody></table></div> : <p className="p-10 text-center text-sm text-slate-600">No hay personas con alertas para estos filtros. Los datos sin fecha registrada (por ejemplo, un contrato sin fecha de fin o un certificado permanente) no generan alertas.</p>}
+      {result.total > 0 && !corregida && <Paginacion tamano="amplio" etiqueta="Paginación de vencimientos" sustantivo="personas" desde={result.from ?? 0} hasta={result.to ?? 0} total={result.total}
+        pagina={result.current_page} paginas={result.last_page} porPagina={porPagina} ocupado={request.loading}
+        onPagina={pagina} onPorPagina={size => setParams(conPorPagina(params, size))} />}
     </section>}
   </>
 }

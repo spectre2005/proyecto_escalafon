@@ -36,7 +36,7 @@ class ExpedienteApiTest extends TestCase
         Legajo::factory()->create(['usuario_id' => $person->id, 'numero_legajo' => 'DEMO-001']);
         Usuario::factory()->count(21)->create();
         // Totales incluyen al usuario autenticado del test (sin legajo).
-        $this->getJson('/api/v1/expedientes')->assertOk()->assertJsonCount(20, 'data')->assertJsonPath('total', 23);
+        $this->getJson('/api/v1/expedientes')->assertOk()->assertJsonCount(10, 'data')->assertJsonPath('total', 23)->assertJsonPath('per_page', 10);
         $this->getJson('/api/v1/expedientes?q=demo-001')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $person->id);
         $this->getJson('/api/v1/expedientes?q=Persona%20Ficticia%20Ejemplo')->assertOk()->assertJsonCount(1, 'data');
         $this->getJson('/api/v1/expedientes?legajo=sin')->assertOk()->assertJsonPath('total', 22);

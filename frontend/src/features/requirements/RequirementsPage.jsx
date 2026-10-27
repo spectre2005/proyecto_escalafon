@@ -2,10 +2,14 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import api, { apiErrorMessage } from '../../axios'
 import { useLiveQuery } from '../../shared/queries/useLiveQuery'
+import { useManualQuery } from '../../shared/queries/useManualQuery'
 import { usePuede, useSesion } from '../auth/session'
 import { destinoDocumentoRequerido } from './destinoDocumentoRequerido'
 import { separarHistorialCorreo } from './historialCorreo'
 import { clasificarTipos, depurarSeleccion } from './tiposAplicables'
+import { parametrosLista, urlOpciones, urlSugerencias } from './consultasRequerimientos'
+import Paginacion from '../../shared/Paginacion'
+import { conPagina, conPorPagina, leerPaginacion, paginaCorregida } from '../../shared/paginacionUrl'
 import DocumentoModal from '../legajos/components/documentos/DocumentoModal'
 
 const panel = 'rounded-2xl border border-slate-200 bg-white p-5'
@@ -219,13 +223,25 @@ function GestionRequerimientos() {
   const [busy, setBusy] = useState(false)
   const [resultadoEnvio, setResultadoEnvio] = useState('')
   const [progresoEnvio, setProgresoEnvio] = useState('')
-  const queryParams = new URLSearchParams(params)
-  if (clase === 'sugerencias') queryParams.delete('clase')
-  else queryParams.set('clase', clase)
-  const request = useLiveQuery(`/solicitudes-legajo?${queryParams.toString()}`)
-  const opciones = useLiveQuery('/solicitudes-legajo/opciones')
-  const sugerencias = useLiveQuery(admin && clase === 'sugerencias' ? `/solicitudes-legajo/sugerencias?q=${encodeURIComponent(params.get('q') || '')}&page=${params.get('page') || 1}` : '/solicitudes-legajo/opciones')
+  // Una sola URL para las dos pestañas; cambiar de pestaña la reinicia, así que page y por_pagina son de la visible.
+  const { pagina: paginaActual, porPagina } = leerPaginacion(params)
+  const request = useLiveQuery(`/solicitudes-legajo?${parametrosLista(params, clase, { pagina: paginaActual, porPagina }).toString()}`)
+  // Sin sondeo: las opciones (todas las personas y el catálogo) solo con el formulario abierto, y las sugerencias (recorren
+  // el perfil de cada persona) al abrir su pestaña o al pulsar «Actualizar»; la búsqueda espera 300 ms entre teclas.
+  const opciones = useManualQuery(urlOpciones(nuevo))
+  const sugerencias = useManualQuery(urlSugerencias({ admin, clase, q: params.get('q') || '', page: paginaActual, porPagina }), 300)
   const result = clase === 'sugerencias' ? sugerencias.data : request.data
+  // La lista principal responde con el paginador en la raíz; Sugerencias (ConsultaReportes), dentro de «meta».
+  const meta = result ? (result.meta ?? result) : null
+  const total = meta?.total ?? 0
+  const paginaResultado = meta?.current_page ?? 1
+  const desde = total ? (paginaResultado - 1) * (meta.per_page ?? porPagina) + 1 : 0
+  const corregida = meta ? paginaCorregida({ total, pagina: paginaResultado, paginas: meta.last_page ?? 1 }) : null
+  useEffect(() => {
+    if (corregida) setParams(conPagina(params, corregida), { replace: true })
+  }, [corregida, params, setParams])
+  // Página y tamaño entran en el historial, como en Personal y Vencimientos; el tamaño vuelve a la primera página.
+  function navegar(siguiente) { setParams(siguiente); setSeleccion(null) }
   const selected = request.data?.data?.find(r => r.id === seleccion)
   function filtrar(key, value) {
     const next = new URLSearchParams(params); value ? next.set(key, value) : next.delete(key); if (key !== 'page') next.delete('page'); setParams(next, { replace: key === 'q' }); setSeleccion(null)
@@ -273,11 +289,15 @@ function GestionRequerimientos() {
     {nuevo && <DocumentoModal titulo="Registrar y enviar requerimientos" busy={busy} onCancel={() => setNuevo(false)} compacto><NuevoRequerimiento opciones={opciones.data} busy={busy} error={error} progreso={progresoEnvio} onSubmit={crear} onCancel={() => setNuevo(false)} /></DocumentoModal>}
     {(request.error || opciones.error || (clase === 'sugerencias' && sugerencias.error)) && <p role="alert" className="mb-4 text-rose-800">No se pudo cargar la información. <button onClick={() => { request.retry(); opciones.retry(); sugerencias.retry() }} className="underline">Reintentar</button></p>}
     {!result && <p role="status" className={panel}>Consultando requerimientos…</p>}
-    {result && <section className={panel}><div className="mb-4 flex justify-between"><h2 className="font-bold">{clase === 'sugerencias' ? 'Perfil por completar' : 'Requerimientos'}</h2><span className="text-sm text-slate-600">{result.total ?? result.meta?.total ?? 0} registros</span></div>
+    {result && <section className={panel}><div className="mb-4 flex justify-between"><h2 className="font-bold">{clase === 'sugerencias' ? 'Perfil por completar' : 'Requerimientos'}</h2><span className="flex items-center gap-3 text-sm text-slate-600">{result.total ?? result.meta?.total ?? 0} registros{clase === 'sugerencias' && <button type="button" className={button} disabled={sugerencias.loading} onClick={sugerencias.retry}>{sugerencias.loading ? 'Actualizando…' : 'Actualizar'}</button>}</span></div>
       {clase === 'sugerencias' && <p className="mb-4 text-sm text-slate-600">Estos requisitos todavía no generan requerimientos. Completa la información del perfil para determinar si corresponde pedir el documento.</p>}
       <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50"><tr>{['Persona', 'Detalle', 'Plazo / estado', 'Acción'].map(t => <th key={t} className="p-3">{t}</th>)}</tr></thead><tbody>{result.data?.map(r => <tr key={r.id} className="border-t border-slate-200 align-top"><td className="p-3">{clase === 'sugerencias' ? (r.persona || r.nombre) : nombre(r.usuario)}</td><td className="max-w-lg p-3"><p>{r.descripcion || r.detalle}</p>{r.origen === 'automatico' && <span className="mt-2 inline-block rounded-full bg-sky-50 px-2 py-1 text-xs text-sky-800">Detección anterior</span>}{r.tipo_documento && <p className="mt-1 text-xs text-slate-500">{r.tipo_documento.nombre}</p>}{r.correo && <p className="mt-2 text-xs text-slate-600">Correo: {({ pendiente: 'No enviado (envío manual)', sin_configurar: 'No enviado: revisar conexión', enviado: 'Enviado', error: 'Error de envío', sin_correo: 'Sin destinatario válido', cancelado: 'Envío cancelado' })[r.correo.correo_estado]} · {r.correo.correo_destinatario || 'Sin correo registrado'}</p>}</td><td className="p-3">{clase === 'sugerencias' ? r.estado : <><p>{fecha(r.prorroga_hasta || r.fecha_limite)}</p><span className={`mt-1 inline-block rounded-lg px-2 py-1 text-xs ${r.atrasado || r.estado === 'observado' ? 'bg-rose-100 text-rose-800' : 'bg-teal-50 text-teal-800'}`}>{estados[r.estado] || r.estado}{r.atrasado ? ' · Fuera de plazo' : ''}</span></>}</td><td className="p-3">{clase === 'sugerencias' ? <><Link to={r.destino_revision || `/legajos/${r.usuario_id}`} className="mt-2 block text-teal-800 underline">Revisar legajo</Link></> : <button className={button} onClick={() => setSeleccion(r.id)}>Ver y gestionar</button>}</td></tr>)}</tbody></table></div>
-      {!result.data?.length && <p className="p-8 text-center text-sm text-slate-600">No hay registros para estos filtros.</p>}
-      <div className="mt-5 flex items-center justify-between text-sm"><button className={button} disabled={(result.current_page ?? result.meta?.current_page ?? 1) <= 1} onClick={() => filtrar('page', Number(params.get('page') || 1) - 1)}>Anterior</button><span>Página {result.current_page ?? result.meta?.current_page ?? 1} de {result.last_page ?? result.meta?.last_page ?? 1}</span><button className={button} disabled={(result.current_page ?? result.meta?.current_page ?? 1) >= (result.last_page ?? result.meta?.last_page ?? 1)} onClick={() => filtrar('page', Number(params.get('page') || 1) + 1)}>Siguiente</button></div>
+      {corregida && total > 0 ? <p role="status" className="p-8 text-center text-sm text-slate-600">La página {paginaResultado} no existe. Mostrando la última página disponible…</p>
+        : !result.data?.length && <p className="p-8 text-center text-sm text-slate-600">No hay registros para estos filtros.</p>}
+      {total > 0 && !corregida && <div className="-mx-5 -mb-5"><Paginacion tamano="normal" etiqueta={clase === 'sugerencias' ? 'Paginación del perfil por completar' : 'Paginación de requerimientos'}
+        sustantivo={clase === 'sugerencias' ? 'requisitos' : 'requerimientos'} desde={desde} hasta={desde + (result.data?.length || 1) - 1} total={total}
+        pagina={paginaResultado} paginas={meta.last_page ?? 1} porPagina={porPagina} ocupado={clase === 'sugerencias' ? sugerencias.loading : request.loading}
+        onPagina={numero => navegar(conPagina(params, numero))} onPorPagina={size => navegar(conPorPagina(params, size))} /></div>}
     </section>}
     {selected && <Detalle key={`${selected.id}-${selected.estado}`} record={selected} admin={admin} propio={selected.usuario_id === usuario?.id} onClose={() => setSeleccion(null)} />}
   </>

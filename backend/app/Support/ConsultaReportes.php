@@ -107,7 +107,7 @@ final class ConsultaReportes
     public static function listar(Usuario $actor, string $tipo, array $filtros): array
     {
         $exportar = (bool) ($filtros['exportar'] ?? false);
-        $porPagina = (int) ($filtros['por_pagina'] ?? 20);
+        $porPagina = PorPagina::de($filtros);
         $pagina = (int) ($filtros['page'] ?? 1);
         $inicio = ($pagina - 1) * $porPagina;
         $filas = [];

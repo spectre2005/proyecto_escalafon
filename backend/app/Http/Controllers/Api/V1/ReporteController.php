@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Support\ConsultaReportes;
+use App\Support\PorPagina;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -37,7 +38,8 @@ class ReporteController extends Controller
             'dias' => 'sometimes|integer|min:1|max:365',
             'anio' => 'nullable|integer|between:1900,2200',
             'page' => 'sometimes|integer|min:1',
-            'por_pagina' => 'sometimes|integer|in:20,50,100',
+            // Tabla: 10, 15 y 20 (PorPagina); 50 y 100 se siguen aceptando por compatibilidad con la API.
+            'por_pagina' => PorPagina::regla([...PorPagina::OPCIONES, 50, 100]),
             'exportar' => 'sometimes|boolean',
         ]);
         if ($tipo === 'vencimientos') {

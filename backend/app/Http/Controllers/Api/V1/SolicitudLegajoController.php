@@ -16,6 +16,7 @@ use App\Support\Documentos\ArchivoPdf;
 use App\Support\GmailCorreo;
 use App\Support\MensajeRequerimiento;
 use App\Support\Parametros;
+use App\Support\PorPagina;
 use App\Support\RequerimientosAutomaticos;
 use App\Support\ResumenSeccion03;
 use App\Support\ResumenSeccion04;
@@ -49,7 +50,7 @@ class SolicitudLegajoController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $data = $request->validate(['clase' => 'nullable|in:documentos,actualizacion', 'estado' => 'nullable|in:abierto,observado,en_revision,aceptado,cancelado', 'q' => 'nullable|string|max:120', 'page' => 'sometimes|integer|min:1']);
+        $data = $request->validate(['clase' => 'nullable|in:documentos,actualizacion', 'estado' => 'nullable|in:abierto,observado,en_revision,aceptado,cancelado', 'q' => 'nullable|string|max:120', 'page' => 'sometimes|integer|min:1', 'por_pagina' => PorPagina::regla()]);
         $q = $this->consulta($request)->with(['usuario:id,nombres,apellido_paterno,apellido_materno', 'tipoDocumento:id,nombre,codigo,seccion_legajo_id,subseccion_legajo_id', 'tipoDocumento.subseccionLegajo:id,codigo', 'documento:id,nombre,estado', 'notificacionesUsuario' => fn ($q) => $q->whereNotNull('correo_estado')->orderByDesc('created_at')->limit(1)]);
         foreach (['clase', 'estado'] as $campo) {
             if (! empty($data[$campo])) {
@@ -60,7 +61,7 @@ class SolicitudLegajoController extends Controller
             $term = '%'.mb_strtolower(trim($data['q'])).'%';
             $q->where(fn (Builder $q) => $q->whereRaw('LOWER(descripcion) LIKE ?', [$term])->orWhereHas('usuario', fn (Builder $u) => $u->whereRaw('LOWER(nombres) LIKE ?', [$term])->orWhereRaw('LOWER(apellido_paterno) LIKE ?', [$term])->orWhereRaw('LOWER(apellido_materno) LIKE ?', [$term])->orWhere('numero_doc_identidad', 'like', $term)));
         }
-        $pagina = $q->orderByDesc('created_at')->orderBy('id')->paginate(20)->withQueryString();
+        $pagina = $q->orderByDesc('created_at')->orderBy('id')->paginate(PorPagina::de($data))->withQueryString();
         $pagina->getCollection()->transform(function (RequerimientoDocumento $r): array {
             $datos = $r->toArray();
             $datos['seguimiento'] = array_map(function (array $evento): array {
@@ -345,9 +346,9 @@ class SolicitudLegajoController extends Controller
     public function sugerencias(Request $request): JsonResponse
     {
         abort_unless($request->user()->can('requerimientos.gestionar') && ConsultaReportes::puede($request->user(), 'pendientes'), 403);
-        $data = $request->validate(['q' => 'nullable|string|max:120', 'page' => 'sometimes|integer|min:1']);
+        $data = $request->validate(['q' => 'nullable|string|max:120', 'page' => 'sometimes|integer|min:1', 'por_pagina' => PorPagina::regla()]);
 
-        return response()->json(ConsultaReportes::listar($request->user(), 'pendientes', [...$data, 'estado' => 'por_determinar', 'por_pagina' => 20]));
+        return response()->json(ConsultaReportes::listar($request->user(), 'pendientes', [...$data, 'estado' => 'por_determinar', 'por_pagina' => PorPagina::de($data)]));
     }
 
     private function legajoActivo(string $usuario): void

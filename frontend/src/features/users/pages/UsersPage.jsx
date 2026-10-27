@@ -14,6 +14,7 @@ import { situacionDe, situaciones, textoAcceso } from '../utils/situacion'
 import { conLey, leyDelRegistro, nombreLey } from '../utils/leyes'
 import { useLiveQuery } from '../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../auth/session'
+import Paginacion from '../../../shared/Paginacion'
 
 export default function UsersPage() {
   const { users, setUsers, loading, loadError } = useUsers()
@@ -345,25 +346,20 @@ export default function UsersPage() {
                 </p>
               </div>
             )}
-            <footer className="flex flex-wrap items-center justify-between gap-4 border-t border-[#edf2ee] px-4 py-4 text-xs text-[#60796c] md:px-6">
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-2">
-                  Usuarios por página
-                  <select value={pageSize} onChange={event => { setPageSize(Number(event.target.value)); changePage(1) }}>
-                    {[10, 15, 20].map(size => <option key={size} value={size}>{size}</option>)}
-                  </select>
-                </label>
-                <span aria-live="polite">
-                  {visible.length ? firstIndex + 1 : 0}–{firstIndex + pageUsers.length} de {visible.length} usuarios
-                  {visible.length !== users.length && ` (${users.length} en total)`}
-                </span>
-              </div>
-              <nav aria-label="Paginación de usuarios" className="flex items-center gap-3">
-                <button type="button" onClick={() => changePage(currentPage - 1)} disabled={currentPage === 1} className="rounded-lg border border-[#dbe6e1] bg-white px-3 py-2 text-[#4f6d63] hover:bg-[#edf6f2]">Anterior</button>
-                <span>Página {currentPage} de {totalPages}</span>
-                <button type="button" onClick={() => changePage(currentPage + 1)} disabled={currentPage === totalPages} className="rounded-lg border border-[#dbe6e1] bg-white px-3 py-2 text-[#4f6d63] hover:bg-[#edf6f2]">Siguiente</button>
-              </nav>
-            </footer>
+            <Paginacion
+              etiqueta="Paginación de usuarios"
+              tamano="compacto"
+              sustantivo="usuarios"
+              desde={visible.length ? firstIndex + 1 : 0}
+              hasta={firstIndex + pageUsers.length}
+              total={visible.length}
+              extra={visible.length !== users.length ? ` (${users.length} en total)` : ''}
+              pagina={currentPage}
+              paginas={totalPages}
+              porPagina={pageSize}
+              onPagina={changePage}
+              onPorPagina={size => { setPageSize(size); changePage(1) }}
+            />
           </section>
 
           <dialog

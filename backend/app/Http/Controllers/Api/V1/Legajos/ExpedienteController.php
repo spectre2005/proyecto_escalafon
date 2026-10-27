@@ -60,6 +60,7 @@ use App\Support\AplicacionDocumental;
 use App\Support\Auditoria;
 use App\Support\CambioDiscapacidad;
 use App\Support\PerfilPendiente;
+use App\Support\PorPagina;
 use App\Support\PuestoActual;
 use App\Support\RegimenesLaborales;
 use App\Support\Seccion05;
@@ -195,6 +196,7 @@ class ExpedienteController extends Controller
             'tipo' => 'nullable|in:docente,administrativo',
             'legajo' => 'nullable|in:con,sin',
             'page' => 'sometimes|integer|min:1',
+            'por_pagina' => PorPagina::regla(),
         ]);
         $veSensibles = $request->user()->can('datos_sensibles.ver');
         $query = Usuario::query()->select(['id', 'nombres', 'apellido_paterno', 'apellido_materno', 'numero_doc_identidad', 'tipo_personal', 'nombre_puesto', 'unidad_organica_id'])
@@ -218,7 +220,7 @@ class ExpedienteController extends Controller
         }
 
         // Puesto y unidad actuales: del vínculo vigente (o los registrados antes en la persona). Los vínculos no se envían.
-        $pagina = $query->orderBy('apellido_paterno')->orderBy('nombres')->orderBy('id')->paginate(20)->withQueryString()
+        $pagina = $query->orderBy('apellido_paterno')->orderBy('nombres')->orderBy('id')->paginate(PorPagina::de($filters))->withQueryString()
             ->through(fn (Usuario $persona): array => [...$persona->makeHidden('vinculosLaborales')->toArray(),
                 'puesto_actual' => PuestoActual::de($persona)]);
 
@@ -397,7 +399,7 @@ class ExpedienteController extends Controller
         $veSensibles = $request->user()->can('datos_sensibles.ver');
         abort_if(in_array($section, self::SENSIBLES, true) && ! $veSensibles, 403, 'Esta sección contiene datos sensibles.');
         $filters = $request->validate([
-            'legajo_id' => 'nullable|uuid', 'page' => 'sometimes|integer|min:1',
+            'legajo_id' => 'nullable|uuid', 'page' => 'sometimes|integer|min:1', 'por_pagina' => PorPagina::regla(),
             'seccion_id' => 'nullable|integer|exists:secciones_legajo,id',
             'estado' => 'nullable|string|max:20',
         ]);
@@ -480,7 +482,7 @@ class ExpedienteController extends Controller
                 $query->with($relation.'.tipoDocumento:id,nombre');
             }
         }
-        $page = $query->orderBy('id')->paginate(20)->withQueryString();
+        $page = $query->orderBy('id')->paginate(PorPagina::de($filters))->withQueryString();
         $page->setCollection($page->getCollection()->map(fn (Model $row): array => $this->present($row)));
         // Sección 07: sin seccion07.ver_calificacion no salen la calificación ni el puntaje (pendiente de decisión del cliente).
         if ($section === 'evaluaciones-desempeno' && ! $request->user()->can('seccion07.ver_calificacion')) {

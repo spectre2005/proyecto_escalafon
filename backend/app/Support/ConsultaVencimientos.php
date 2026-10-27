@@ -62,7 +62,7 @@ final class ConsultaVencimientos
             'por_vencer' => $consulta->where('p.vencidos', 0)->where('p.fuera_de_plazo', 0),
             default => null,
         };
-        $pagina = $consulta->orderBy('p.primera_fecha')->orderBy('p.usuario_id')->paginate(20)->withQueryString();
+        $pagina = $consulta->orderBy('p.primera_fecha')->orderBy('p.usuario_id')->paginate(PorPagina::de($filtros))->withQueryString();
         $ids = $pagina->getCollection()->pluck('usuario_id');
         // Cinco motivos por persona mantienen acotada la respuesta aunque un legajo tenga muchos documentos antiguos.
         $ordenadas = DB::query()->fromSub($alertas, 'd')->whereIn('usuario_id', $ids)->select('d.*')

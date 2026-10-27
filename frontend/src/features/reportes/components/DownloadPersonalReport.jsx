@@ -25,7 +25,8 @@ export default function DownloadPersonalReport({ usuario, blank = false, classNa
         let page = 1
         let lastPage
         do {
-          const result = await api.get(`/expedientes/${usuario}/familiares`, { params: { page } })
+          // Recorre todas las páginas; 20 (el máximo permitido) evita peticiones de más desde que el valor por defecto es 10.
+          const result = await api.get(`/expedientes/${usuario}/familiares`, { params: { page, por_pagina: 20 } })
           families.push(...result.data.data)
           lastPage = result.data.last_page
           page++

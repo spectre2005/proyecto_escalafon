@@ -1,7 +1,9 @@
-import { cloneElement, useEffect, useId, useState } from 'react'
+import { cloneElement, useCallback, useEffect, useId, useState } from 'react'
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom'
 import api, { apiErrorMessage } from '../../axios'
 import Icon from '../../components/ui/Icon'
+import Paginacion from '../../shared/Paginacion'
+import { conPagina, conPorPagina, leerPaginacion, paginaCorregida } from '../../shared/paginacionUrl'
 import { usePuede } from '../auth/session'
 import { defaultInstitution } from '../../config/institution'
 import { crearExcelReporte, crearPdfReporte, descargarExcel, describirFiltros, valorReporte } from './exportarReporte'
@@ -26,7 +28,7 @@ function Campo({ titulo, children }) {
   return <div className="grid min-w-0 gap-1.5 text-xs font-medium text-slate-500"><label htmlFor={id}>{titulo}</label>{cloneElement(children, { id })}</div>
 }
 
-function Resultados({ url, reporte, opciones, onPagina, onReintentar, institucion }) {
+function Resultados({ url, reporte, opciones, porPagina, onPagina, onPorPagina, onCorregir, onReintentar, institucion }) {
   const consulta = useConsulta(url)
   const [exportando, setExportando] = useState(null)
   const [errorExportar, setErrorExportar] = useState('')
@@ -49,6 +51,11 @@ function Resultados({ url, reporte, opciones, onPagina, onReintentar, institucio
       else (await crearPdfReporte(completo, institucion, filtros)).save(`${nombre}.pdf`)
     } catch (error) { setErrorExportar(apiErrorMessage(error)) } finally { setExportando(null) }
   }
+  // Página inexistente (URL editada o guardada): se reemplaza por la última válida, con los mismos filtros y tamaño.
+  const corregida = data ? paginaCorregida({ total: data.meta.total, pagina: data.meta.current_page, paginas: data.meta.last_page }) : null
+  useEffect(() => {
+    if (corregida) onCorregir(corregida)
+  }, [corregida, onCorregir])
   if (consulta.loading) return <div role="status" className="flex min-h-64 items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white text-sm text-slate-500"><span className="size-5 animate-spin rounded-full border-2 border-slate-200 border-t-teal-700" />Preparando reporte…</div>
   if (consulta.error) return <div role="alert" className="rounded-2xl border border-rose-100 bg-white p-6 text-sm text-rose-700">{apiErrorMessage(consulta.error)}<button type="button" onClick={onReintentar} className={`${boton} ml-3`}>Reintentar</button></div>
   const total = data.meta.total
@@ -67,10 +74,13 @@ function Resultados({ url, reporte, opciones, onPagina, onReintentar, institucio
       </div>
       {errorExportar && <p role="alert" className="mx-5 mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{errorExportar}</p>}
       {exportando && <p role="status" className="px-5 pt-4 text-xs text-teal-700">Preparando todos los resultados filtrados…</p>}
-      {total ? <div className="overflow-x-auto"><table className="w-full min-w-[800px] text-left text-sm"><thead className="border-b border-slate-100 bg-slate-50/70"><tr>{data.columnas.map(columna => <th key={columna.key} scope="col" className="whitespace-nowrap px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{columna.label}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{data.data.map((fila, indice) => <tr key={`${fila.id}:${indice}`} className="hover:bg-slate-50/60">{data.columnas.map(columna => <td key={columna.key} className={`px-5 py-4 align-top ${['detalle', 'motivo', 'unidad', 'nombre', 'por_seccion'].includes(columna.key) ? 'min-w-48 max-w-xs' : 'whitespace-nowrap'}`}>
+      {corregida && total ? <p role="status" className="p-8 text-center text-sm text-slate-500">La página {data.meta.current_page} no existe. Mostrando la última página disponible…</p>
+        : total ? <div className="overflow-x-auto"><table className="w-full min-w-[800px] text-left text-sm"><thead className="border-b border-slate-100 bg-slate-50/70"><tr>{data.columnas.map(columna => <th key={columna.key} scope="col" className="whitespace-nowrap px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{columna.label}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{data.data.map((fila, indice) => <tr key={`${fila.id}:${indice}`} className="hover:bg-slate-50/60">{data.columnas.map(columna => <td key={columna.key} className={`px-5 py-4 align-top ${['detalle', 'motivo', 'unidad', 'nombre', 'por_seccion'].includes(columna.key) ? 'min-w-48 max-w-xs' : 'whitespace-nowrap'}`}>
         {columna.key === 'nombre' ? puedeLegajo ? <Link to={`/legajos/${fila.usuario_id}`} className="font-medium text-slate-800 hover:text-teal-700 hover:underline">{fila.nombre}</Link> : <span className="font-medium text-slate-800">{fila.nombre}</span> : columna.key === 'estado' ? <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${['vencido', 'observado'].includes(fila.estado_codigo) ? 'bg-rose-50 text-rose-700' : ['activo', 'con_vinculo'].includes(fila.estado_codigo) ? 'bg-teal-50 text-teal-700' : 'bg-slate-100 text-slate-600'}`}>{fila.estado}</span> : <span className="break-words text-xs leading-relaxed text-slate-600">{valorReporte(fila, columna)}</span>}
       </td>)}</tr>)}</tbody></table></div> : <div className="grid min-h-56 place-content-center gap-3 p-8 text-center"><span className="mx-auto grid size-12 place-items-center rounded-2xl bg-teal-50 text-teal-700"><Icon name="search" size={23} /></span><h3 className="font-semibold text-slate-800">No encontramos coincidencias</h3><p className="max-w-sm text-sm text-slate-500">Prueba con otra búsqueda o amplía los filtros para consultar más registros.</p></div>}
-      {data.meta.last_page > 1 && <nav aria-label="Paginación del reporte" className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 p-4"><span className="text-xs text-slate-500">Página {data.meta.current_page} de {data.meta.last_page}</span><div className="flex gap-2"><button type="button" className={boton} disabled={data.meta.current_page <= 1 || !!exportando} onClick={() => onPagina(data.meta.current_page - 1)}>Anterior</button><button type="button" className={boton} disabled={data.meta.current_page >= data.meta.last_page || !!exportando} onClick={() => onPagina(data.meta.current_page + 1)}>Siguiente</button></div></nav>}
+      {total > 0 && !corregida && <Paginacion tamano="reporte" etiqueta="Paginación del reporte" sustantivo={reporte.id === 'dotacion' ? 'grupos' : 'registros'}
+        desde={(data.meta.current_page - 1) * data.meta.per_page + 1} hasta={(data.meta.current_page - 1) * data.meta.per_page + 1 + data.data.length - 1} total={total} pagina={data.meta.current_page} paginas={data.meta.last_page}
+        porPagina={porPagina} ocupado={!!exportando} onPagina={onPagina} onPorPagina={onPorPagina} />}
     </section>
     <details className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500"><summary className="cursor-pointer font-medium">Criterios y alcance del reporte</summary><p className="mt-3 leading-relaxed">{reporte.ayuda}</p><p className="mt-2">Filtros aplicados: {describirFiltros(data.meta.filtros, { ...opciones, reporte })}.</p><p className="mt-2">Los resultados corresponden únicamente a esta institución y a los permisos de tu sesión.</p></details>
   </div>
@@ -90,14 +100,19 @@ function PanelReporte({ reporte, opciones, params, setParams, institucion }) {
       setParams(siguiente, { replace: true })
     }
   }
-  const enviados = new URLSearchParams(params)
+  // Página y tamaño ya normalizados: un valor editado a mano no llega al servidor. 10, 15 o 20 (la exportación no los usa).
+  const { pagina, porPagina } = leerPaginacion(params)
+  const enviados = conPagina(conPorPagina(params, porPagina), pagina)
   enviados.delete('tipo')
+  const corregir = useCallback(numero => setParams(conPagina(params, numero), { replace: true }), [params, setParams])
   const url = `/reportes/${reporte.id}?${enviados}`
   function aplicar(event) {
     event.preventDefault()
     const siguiente = new URLSearchParams({ tipo: reporte.id })
     Object.entries({ ...formulario, q: params.get('q') || '', contenido: params.get('contenido') || '' }).forEach(([clave, valor]) => { if (valor) siguiente.set(clave, valor) })
     if (reporte.id !== 'vencimientos') siguiente.delete('dias')
+    // Aplicar filtros vuelve a la primera página, pero conserva el tamaño elegido.
+    if (params.get('por_pagina')) siguiente.set('por_pagina', params.get('por_pagina'))
     setParams(siguiente)
     setRevision(valor => valor + 1)
   }
@@ -118,9 +133,9 @@ function PanelReporte({ reporte, opciones, params, setParams, institucion }) {
         {reporte.fecha && <><Campo titulo={`${reporte.fecha} · desde`}><input type="date" value={formulario.desde} max={formulario.hasta || undefined} onChange={cambiar('desde')} className={control} /></Campo><Campo titulo="Hasta"><input type="date" value={formulario.hasta} min={formulario.desde || undefined} onChange={cambiar('hasta')} className={control} /></Campo></>}
         {reporte.id === 'vencimientos' && <Campo titulo="Próximos vencimientos"><select value={formulario.dias} onChange={cambiar('dias')} className={control}>{[7, 15, 30, 60, 90, 180, 365].map(dias => <option key={dias} value={dias}>{dias} días</option>)}</select></Campo>}
       </div>
-      <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" className={boton} onClick={() => { setFormulario({ q: '', contenido: '', regimen_id: '', nivel: '', modalidad: '', tipo_personal: '', unidad_id: '', estado: '', seccion: '', desde: '', hasta: '', dias: '30', anio: reporte.id === 'evaluaciones' ? String(new Date().getFullYear()) : '' }); setParams({ tipo: reporte.id }); setRevision(valor => valor + 1) }}>Limpiar filtros</button><button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"><Icon name="chart" size={17} />Generar reporte</button></div>
+      <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" className={boton} onClick={() => { setFormulario({ q: '', contenido: '', regimen_id: '', nivel: '', modalidad: '', tipo_personal: '', unidad_id: '', estado: '', seccion: '', desde: '', hasta: '', dias: '30', anio: reporte.id === 'evaluaciones' ? String(new Date().getFullYear()) : '' }); setParams(params.get('por_pagina') ? { tipo: reporte.id, por_pagina: params.get('por_pagina') } : { tipo: reporte.id }); setRevision(valor => valor + 1) }}>Limpiar filtros</button><button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"><Icon name="chart" size={17} />Generar reporte</button></div>
     </form>
-    <Resultados key={`${url}:${revision}`} url={url} reporte={reporte} opciones={opciones} institucion={institucion} onReintentar={() => setRevision(valor => valor + 1)} onPagina={pagina => { const siguiente = new URLSearchParams(params); siguiente.set('page', String(pagina)); setParams(siguiente) }} />
+    <Resultados key={`${url}:${revision}`} url={url} reporte={reporte} opciones={opciones} institucion={institucion} onReintentar={() => setRevision(valor => valor + 1)} porPagina={porPagina} onPagina={numero => setParams(conPagina(params, numero))} onPorPagina={numero => setParams(conPorPagina(params, numero))} onCorregir={corregir} />
   </div>
 }
 
@@ -155,7 +170,7 @@ function ContenidoReportes() {
         <Campo titulo="Reporte"><select value={reporte.id} onChange={event => abrir(event.target.value)} className={control}>{reportes.filter(item => item.grupo === reporte.grupo).map(item => <option key={item.id} value={item.id}>{item.titulo}</option>)}</select></Campo>
       </section>
       <div><h2 className="text-xl font-semibold tracking-tight text-slate-800">{reporte.titulo}</h2><p className="mt-2 text-sm text-slate-500">{reporte.descripcion}</p></div>
-      <PanelReporte key={`${reporte.id}:${new URLSearchParams([...params].filter(([clave]) => !['q', 'contenido', 'page'].includes(clave)))}`} reporte={reporte} opciones={opciones.data.data} params={params} setParams={setParams} institucion={institucion} />
+      <PanelReporte key={`${reporte.id}:${new URLSearchParams([...params].filter(([clave]) => !['q', 'contenido', 'page', 'por_pagina'].includes(clave)))}`} reporte={reporte} opciones={opciones.data.data} params={params} setParams={setParams} institucion={institucion} />
     </>}
   </div>
 }
