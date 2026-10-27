@@ -81,9 +81,11 @@ function ConsultaEvaluaciones() {
 
     {result && <section className={`${panel} overflow-hidden`} aria-label={tipo.label}>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
-        <h2 className="text-sm font-semibold text-slate-800">{tipo.label} <span className="ml-2 rounded-full bg-teal-50 px-2 py-1 text-xs text-teal-700">{result.total}</span></h2>
+        <div>
+          <h2 className="text-sm font-semibold text-slate-800">{tipo.label} <span className="ml-2 rounded-full bg-teal-50 px-2 py-1 text-xs text-teal-700">{result.total}</span></h2>
+          {tipo.key === 'evaluaciones' && opciones.data?.data && !opciones.data.data.ve_calificacion && <p className="mt-1 text-xs text-slate-500">{opciones.data.data.puntaje_activo === false ? 'Calificación reservada' : 'Calificación y puntaje reservados'} hasta que la institución defina quién puede verlos.</p>}
+        </div>
         {tipo.key === 'evaluaciones' && <ExportarReporte tipo="evaluaciones" filtros={filtrosExportacion(params)} opciones={{ unidades: opciones.data?.data?.unidades, reporte: { estados: { con_plan: 'Con plan de mejora', sin_plan: 'Sin plan de mejora' } } }} deshabilitado={!result.total} />}
-        {tipo.key === 'evaluaciones' && opciones.data?.data && !opciones.data.data.ve_calificacion && <p className="text-xs text-slate-500">{opciones.data.data.puntaje_activo === false ? 'Calificación reservada' : 'Calificación y puntaje reservados'} hasta que la institución defina quién puede verlos.</p>}
       </div>
       {result.data.length ? <Seccion07Tabla tipo={tipo} registros={result.data} puntajeActivo={opciones.data?.data?.puntaje_activo} /> : <p className="p-10 text-center text-sm text-slate-500">{tipo.vacio}</p>}
       {result.total > 0 && <Pagination data={result} perPage={result.per_page} onChange={change} />}
