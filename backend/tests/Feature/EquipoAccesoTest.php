@@ -55,11 +55,12 @@ class EquipoAccesoTest extends TestCase
     public function test_creating_an_account_returns_a_temporary_password_without_creating_a_legajo(): void
     {
         $this->actuarComo();
-        $data = ['nombres' => 'Ana', 'apellido_paterno' => 'Quispe', 'numero_doc_identidad' => '99887766',
+        $data = ['nombres' => 'Ana', 'apellido_paterno' => 'Quispe', 'apellido_materno' => 'Torres', 'numero_doc_identidad' => '99887766',
             'email' => 'Ana.Equipo@example.test', 'perfil' => 'suplente_legajo',
             'vigente_desde' => today()->toDateString(), 'vigente_hasta' => today()->addWeek()->toDateString(), 'motivo' => 'Suplencia durante vacaciones'];
         $respuesta = $this->postJson(self::URL, $data)->assertCreated();
         $usuario = Usuario::query()->findOrFail($respuesta->json('data.persona.id'));
+        $this->assertSame('Torres', $usuario->apellido_materno);
         $clave = $respuesta->json('credenciales.password_temporal');
         $this->assertTrue(Hash::check($clave, $usuario->password));
         $this->assertTrue($usuario->debe_cambiar_password);

@@ -53,6 +53,7 @@ class EquipoAccesoController extends Controller
             'usuario_id' => 'nullable|uuid|exists:usuarios,id',
             'nombres' => ['required_without:usuario_id', Rule::prohibitedIf($request->filled('usuario_id')), 'string', 'max:120'],
             'apellido_paterno' => ['required_without:usuario_id', Rule::prohibitedIf($request->filled('usuario_id')), 'string', 'max:80'],
+            'apellido_materno' => ['nullable', Rule::prohibitedIf($request->filled('usuario_id')), 'string', 'max:80'],
             'numero_doc_identidad' => ['required_without:usuario_id', Rule::prohibitedIf($request->filled('usuario_id')), 'digits:8', 'unique:usuarios,numero_doc_identidad'],
             'email' => ['required_without:usuario_id', Rule::prohibitedIf($request->filled('usuario_id')), 'email', 'max:255'],
             'perfil' => ['required', Rule::in(array_diff(array_keys(self::PERFILES), ['autoservicio_legajo']))],
@@ -72,7 +73,7 @@ class EquipoAccesoController extends Controller
                 }
                 $clave = Str::password(16, symbols: false);
                 $usuario = Usuario::query()->create([
-                    'nombres' => $data['nombres'], 'apellido_paterno' => $data['apellido_paterno'],
+                    'nombres' => $data['nombres'], 'apellido_paterno' => $data['apellido_paterno'], 'apellido_materno' => $data['apellido_materno'] ?? null,
                     'tipo_doc_identidad' => 'dni', 'numero_doc_identidad' => $data['numero_doc_identidad'],
                     'email_institucional' => $email, 'password' => $clave,
                     'tipo_personal' => 'administrativo', 'regimen_laboral' => 'No aplica', 'activo' => true,
