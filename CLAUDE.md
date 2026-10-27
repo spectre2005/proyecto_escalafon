@@ -79,15 +79,17 @@ Sistema de Escalafón y Expediente Digital Universitario: gestiona el legajo (ex
 
 **Metadatos obligatorios de cada documento:** sección, tipo, rango de folios, fecha de incorporación, emisor, fecha de emisión, titular (nombre/DNI), N° de resolución si aplica.
 
-**Estados:** Pendiente → Cargado → En fiscalización → Verificado | Observado | Falso.
-Un documento está "aprobado" solo si: está presente Y tiene recepción registrada Y (fiscalizado conforme, si acredita el perfil del puesto).
+**Documentos ya validados:** los documentos del personal llegan al escalafón ya validados. No hay paso de aprobación, recepción ni revisión: al subirse quedan en estado `aceptado` y cuentan como aprobados (desde d319a89; confirmado por el usuario el 27/10/2026).
+- Ningún reporte, contador ni aviso trata un documento cargado como pendiente por falta de recepción o fiscalización.
+- Solo cuenta como pendiente lo que **falta** cargar o lo marcado expresamente como `observado` o `falso`.
+- Los demás estados (pendiente, cargado, recepcionado, en fiscalización, verificado) pueden seguir en el esquema por compatibilidad; no se usan como requisito.
 
 **Quién hace qué (directiva):**
 - Arts. 2.3 y 5.3: prohibido eliminar o alterar documentos.
-- Art. 4.5: la recepción lleva sello, firma, fecha y el nombre de quien la hizo.
+- Art. 4.5: la recepción lleva sello, firma, fecha y el nombre de quien la hizo. Hoy el sistema no la exige (ver «Documentos ya validados»).
 - Art. 6.2: jefes y OCI leen sin datos sensibles ni de salud.
 - Art. 6.3 y 6.4: el jefe de la ORH decide los accesos; la carga la hace personal de la ORH.
-- Art. 7: la fiscalización posterior la conduce la ORH.
+- Art. 7: la fiscalización posterior la conduce la ORH. Hoy no es requisito para que un documento cuente.
 - Plazos en días hábiles (5 apertura, 30 actualización): verificar en el PDF antes de ponerlos en código.
 
 **Usuarios actuales:** administrador (jefe de ORH del cliente) y asistente. Los demás roles quedan para después.
@@ -99,7 +101,7 @@ Un documento está "aprobado" solo si: está presente Y tiene recepción registr
 - Documentos validados: no se eliminan ni se editan. Se anulan (`anulado = true` con motivo) o se subsana con un documento nuevo.
 - Folios correlativos por sección (sugerido: `ultimo_folio + 1`). Todo listado y contador excluye `anulado = true`.
 - Permisos: el backend manda una lista (ej. `documento.subir`) y el frontend pregunta "¿puede hacer esto?". Nunca se programa por nombre de rol. El backend valida siempre.
-- Quien sube un documento no es quien lo verifica.
+- No hay verificación posterior: quien sube un documento lo deja aceptado, porque los documentos llegan ya validados.
 - Secciones 01, 09 y 10 se bloquean si el rol no tiene `ve_datos_sensibles`.
 - Sin `entidad_id` en las tablas. La marca sale de `config/institution.js` y `parametros_sistema`.
 
