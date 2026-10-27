@@ -1,9 +1,10 @@
-import { cloneElement, useCallback, useEffect, useId, useState } from 'react'
+import { cloneElement, useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom'
 import api, { apiErrorMessage } from '../../axios'
 import Icon from '../../components/ui/Icon'
 import Paginacion from '../../shared/Paginacion'
 import { conPagina, conPorPagina, leerPaginacion, paginaCorregida } from '../../shared/paginacionUrl'
+import { conFiltro, CONSULTAS_SECCION, etiquetaReporte, gruposDe, paramsLimpios, reporteElegido, tituloFiltroEstado, valoresIniciales } from './reportesMenu'
 import { usePuede } from '../auth/session'
 import { defaultInstitution } from '../../config/institution'
 import { crearExcelReporte, crearPdfReporte, descargarExcel, describirFiltros, valorReporte } from './exportarReporte'
@@ -82,58 +83,59 @@ function Resultados({ url, reporte, opciones, porPagina, onPagina, onPorPagina, 
         desde={(data.meta.current_page - 1) * data.meta.per_page + 1} hasta={(data.meta.current_page - 1) * data.meta.per_page + 1 + data.data.length - 1} total={total} pagina={data.meta.current_page} paginas={data.meta.last_page}
         porPagina={porPagina} ocupado={!!exportando} onPagina={onPagina} onPorPagina={onPorPagina} />}
     </section>
-    <details className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500"><summary className="cursor-pointer font-medium">Criterios y alcance del reporte</summary><p className="mt-3 leading-relaxed">{reporte.ayuda}</p><p className="mt-2">Filtros aplicados: {describirFiltros(data.meta.filtros, { ...opciones, reporte })}.</p><p className="mt-2">Los resultados corresponden únicamente a esta institución y a los permisos de tu sesión.</p></details>
+    <details className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500"><summary className="cursor-pointer font-medium">Filtros aplicados y fecha de los datos</summary><p className="mt-3">Filtros aplicados: {describirFiltros(data.meta.filtros, { ...opciones, reporte })}.</p><p className="mt-2">Los resultados corresponden únicamente a esta institución y a los permisos de tu sesión.</p></details>
   </div>
 }
 
-function PanelReporte({ reporte, opciones, params, setParams, institucion }) {
-  const [formulario, setFormulario] = useState(() => Object.fromEntries(['q', 'tipo_personal', 'unidad_id', 'estado', 'seccion', 'desde', 'hasta', 'dias', 'anio', 'regimen_id', 'nivel', 'modalidad', 'contenido'].map(clave => [clave, params.get(clave) || (clave === 'dias' ? '30' : clave === 'anio' && reporte.id === 'evaluaciones' ? String(new Date().getFullYear()) : '')])))
-  const [revision, setRevision] = useState(0)
-  const cambiar = clave => event => {
-    const valor = event.target.value
-    setFormulario(anterior => ({ ...anterior, [clave]: valor }))
-    if (clave === 'q' || clave === 'contenido') {
-      const siguiente = new URLSearchParams(params)
-      siguiente.set('tipo', reporte.id)
-      valor ? siguiente.set(clave, valor) : siguiente.delete(clave)
-      siguiente.delete('page')
-      setParams(siguiente, { replace: true })
-    }
+// Campo de texto que aplica su valor al dejar de escribir (cada consulta recorre todos los registros del reporte). Si el
+// valor aplicado cambia por fuera (limpiar, atrás/adelante), el campo lo toma.
+function FiltroTexto({ valor, onAplicar, ...props }) {
+  const [texto, setTexto] = useState(valor)
+  const [aplicado, setAplicado] = useState(valor)
+  if (valor !== aplicado) {
+    setAplicado(valor)
+    setTexto(valor)
   }
+  // Lo último enviado: si el servidor aplica un valor por defecto (el año en Evaluaciones), no se reenvía en bucle.
+  const enviado = useRef(valor)
+  useEffect(() => {
+    if (texto === valor || texto === enviado.current) return undefined
+    const espera = setTimeout(() => { enviado.current = texto; onAplicar(texto) }, 400)
+    return () => clearTimeout(espera)
+  }, [texto, valor, onAplicar])
+  return <input {...props} value={texto} onChange={event => setTexto(event.target.value)} />
+}
+
+function PanelReporte({ reporte, opciones, params, setParams, institucion }) {
+  // Todos los filtros se aplican al cambiarlos y viven en la URL; los de texto, al dejar de escribir (FiltroTexto).
+  const valores = valoresIniciales(params, reporte.id)
+  const [revision, setRevision] = useState(0)
+  const cambiar = clave => event => setParams(conFiltro(params, reporte.id, clave, event.target.value))
+  const aplicarTexto = clave => valor => setParams(conFiltro(params, reporte.id, clave, valor), { replace: true })
   // Página y tamaño ya normalizados: un valor editado a mano no llega al servidor. 10, 15 o 20 (la exportación no los usa).
   const { pagina, porPagina } = leerPaginacion(params)
   const enviados = conPagina(conPorPagina(params, porPagina), pagina)
   enviados.delete('tipo')
   const corregir = useCallback(numero => setParams(conPagina(params, numero), { replace: true }), [params, setParams])
   const url = `/reportes/${reporte.id}?${enviados}`
-  function aplicar(event) {
-    event.preventDefault()
-    const siguiente = new URLSearchParams({ tipo: reporte.id })
-    Object.entries({ ...formulario, q: params.get('q') || '', contenido: params.get('contenido') || '' }).forEach(([clave, valor]) => { if (valor) siguiente.set(clave, valor) })
-    if (reporte.id !== 'vencimientos') siguiente.delete('dias')
-    // Aplicar filtros vuelve a la primera página, pero conserva el tamaño elegido.
-    if (params.get('por_pagina')) siguiente.set('por_pagina', params.get('por_pagina'))
-    setParams(siguiente)
-    setRevision(valor => valor + 1)
-  }
   return <div className="space-y-5">
-    <form onSubmit={aplicar} className="rounded-2xl border border-slate-200 bg-white p-5">
-      <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-800"><Icon name="search" size={17} />Filtrar resultados</div>
+    <form onSubmit={event => event.preventDefault()} className="rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-800"><Icon name="search" size={17} />Filtrar resultados<span className="font-normal text-xs text-slate-500">· se aplican al cambiarlos</span></div>
       <div className="grid items-end gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Campo titulo="Nombre, DNI o número de legajo"><input type="search" value={params.get('q') || ''} onChange={cambiar('q')} placeholder="Buscar persona…" maxLength={120} className={control} /></Campo>
-        <Campo titulo="Tipo de personal"><select value={formulario.tipo_personal} onChange={cambiar('tipo_personal')} className={control}><option value="">Todo el personal</option><option value="docente">Docentes</option><option value="administrativo">Administrativos</option></select></Campo>
-        <Campo titulo={['contratos', 'movimientos', 'vacaciones'].includes(reporte.id) ? 'Unidad del vínculo' : 'Unidad orgánica actual'}><select value={formulario.unidad_id} onChange={cambiar('unidad_id')} className={control}><option value="">Todas las unidades</option>{opciones.unidades.map(unidad => <option key={unidad.id} value={unidad.id}>{unidad.nombre}</option>)}</select></Campo>
-        {reporte.id !== 'dotacion' && Object.keys(reporte.estados).length > 1 && <Campo titulo="Estado"><select value={formulario.estado} onChange={cambiar('estado')} className={control}><option value="">Todos los estados</option>{Object.entries(reporte.estados).map(([clave, nombre]) => <option key={clave} value={clave}>{nombre}</option>)}</select></Campo>}
-        {['dotacion', 'contratos', 'movimientos', 'personal'].includes(reporte.id) && <Campo titulo="Ley / régimen"><select value={formulario.regimen_id} onChange={cambiar('regimen_id')} className={control}><option value="">Todos los regímenes</option>{opciones.regimenes.map(item => <option key={item.id} value={item.id}>{item.codigo} · {item.nombre}</option>)}</select></Campo>}
-        {reporte.id === 'formacion' && <Campo titulo="Nivel académico"><select value={formulario.nivel} onChange={cambiar('nivel')} className={control}><option value="">Todos los niveles</option>{opciones.niveles.map(item => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select></Campo>}
-        {reporte.id === 'capacitaciones' && <Campo titulo="Tipo de capacitación"><select value={formulario.modalidad} onChange={cambiar('modalidad')} className={control}><option value="">Todos los tipos</option>{opciones.modalidades.map(item => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select></Campo>}
-        {['inventario', 'pendientes'].includes(reporte.id) && <Campo titulo="Sección del legajo"><select value={formulario.seccion} onChange={cambiar('seccion')} className={control}><option value="">Todas las secciones permitidas</option>{opciones.secciones.map(seccion => <option key={seccion.id} value={seccion.id}>{String(seccion.id).padStart(2, '0')} · {seccion.nombre}</option>)}</select></Campo>}
-        {['vacaciones', 'evaluaciones'].includes(reporte.id) && <Campo titulo={reporte.id === 'evaluaciones' ? 'Ciclo de evaluación' : 'Año del período'}><input type="number" min="1900" max="2200" value={formulario.anio} onChange={cambiar('anio')} placeholder="Todos los períodos" className={control} /></Campo>}
-        {reporte.seccion_origen && <Campo titulo="Buscar en los datos del reporte"><input type="search" value={params.get('contenido') || ''} onChange={cambiar('contenido')} placeholder="Entidad, cargo, resultado…" maxLength={120} className={control} /></Campo>}
-        {reporte.fecha && <><Campo titulo={`${reporte.fecha} · desde`}><input type="date" value={formulario.desde} max={formulario.hasta || undefined} onChange={cambiar('desde')} className={control} /></Campo><Campo titulo="Hasta"><input type="date" value={formulario.hasta} min={formulario.desde || undefined} onChange={cambiar('hasta')} className={control} /></Campo></>}
-        {reporte.id === 'vencimientos' && <Campo titulo="Próximos vencimientos"><select value={formulario.dias} onChange={cambiar('dias')} className={control}>{[7, 15, 30, 60, 90, 180, 365].map(dias => <option key={dias} value={dias}>{dias} días</option>)}</select></Campo>}
+        <Campo titulo="Persona: nombre, DNI o n.º de legajo"><FiltroTexto type="search" valor={params.get('q') || ''} onAplicar={aplicarTexto('q')} placeholder="Buscar persona…" maxLength={120} className={control} /></Campo>
+        <Campo titulo="Tipo de personal"><select value={valores.tipo_personal} onChange={cambiar('tipo_personal')} className={control}><option value="">Todo el personal</option><option value="docente">Docentes</option><option value="administrativo">Administrativos</option></select></Campo>
+        <Campo titulo={['contratos', 'movimientos', 'vacaciones'].includes(reporte.id) ? 'Unidad del vínculo' : 'Unidad orgánica actual'}><select value={valores.unidad_id} onChange={cambiar('unidad_id')} className={control}><option value="">Todas las unidades</option>{opciones.unidades.map(unidad => <option key={unidad.id} value={unidad.id}>{unidad.nombre}</option>)}</select></Campo>
+        {reporte.id !== 'dotacion' && Object.keys(reporte.estados).length > 1 && <Campo titulo={tituloFiltroEstado(reporte)}><select value={valores.estado} onChange={cambiar('estado')} className={control}><option value="">Todos los estados</option>{Object.entries(reporte.estados).map(([clave, nombre]) => <option key={clave} value={clave}>{nombre}</option>)}</select></Campo>}
+        {['dotacion', 'contratos', 'movimientos', 'personal'].includes(reporte.id) && <Campo titulo="Ley / régimen"><select value={valores.regimen_id} onChange={cambiar('regimen_id')} className={control}><option value="">Todos los regímenes</option>{opciones.regimenes.map(item => <option key={item.id} value={item.id}>{item.codigo} · {item.nombre}</option>)}</select></Campo>}
+        {reporte.id === 'formacion' && <Campo titulo="Nivel académico"><select value={valores.nivel} onChange={cambiar('nivel')} className={control}><option value="">Todos los niveles</option>{opciones.niveles.map(item => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select></Campo>}
+        {reporte.id === 'capacitaciones' && <Campo titulo="Tipo de capacitación"><select value={valores.modalidad} onChange={cambiar('modalidad')} className={control}><option value="">Todos los tipos</option>{opciones.modalidades.map(item => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select></Campo>}
+        {['inventario', 'pendientes'].includes(reporte.id) && <Campo titulo="Sección del legajo"><select value={valores.seccion} onChange={cambiar('seccion')} className={control}><option value="">Todas las secciones permitidas</option>{opciones.secciones.map(seccion => <option key={seccion.id} value={seccion.id}>{String(seccion.id).padStart(2, '0')} · {seccion.nombre}</option>)}</select></Campo>}
+        {['vacaciones', 'evaluaciones'].includes(reporte.id) && <Campo titulo={reporte.id === 'evaluaciones' ? 'Ciclo de evaluación' : 'Año del período'}><FiltroTexto type="number" min="1900" max="2200" valor={valores.anio} onAplicar={aplicarTexto('anio')} placeholder="Todos los períodos" className={control} /></Campo>}
+        {reporte.seccion_origen && <Campo titulo="Buscar en los datos (entidad, cargo, resultado…)"><FiltroTexto type="search" valor={params.get('contenido') || ''} onAplicar={aplicarTexto('contenido')} placeholder="Texto de los registros…" maxLength={120} className={control} /></Campo>}
+        {reporte.fecha && <><Campo titulo={`${reporte.fecha} · desde`}><input type="date" value={valores.desde} max={valores.hasta || undefined} onChange={cambiar('desde')} className={control} /></Campo><Campo titulo="Hasta"><input type="date" value={valores.hasta} min={valores.desde || undefined} onChange={cambiar('hasta')} className={control} /></Campo></>}
+        {reporte.id === 'vencimientos' && <Campo titulo="Próximos vencimientos"><select value={valores.dias} onChange={cambiar('dias')} className={control}>{[7, 15, 30, 60, 90, 180, 365].map(dias => <option key={dias} value={dias}>{dias} días</option>)}</select></Campo>}
       </div>
-      <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" className={boton} onClick={() => { setFormulario({ q: '', contenido: '', regimen_id: '', nivel: '', modalidad: '', tipo_personal: '', unidad_id: '', estado: '', seccion: '', desde: '', hasta: '', dias: '30', anio: reporte.id === 'evaluaciones' ? String(new Date().getFullYear()) : '' }); setParams(params.get('por_pagina') ? { tipo: reporte.id, por_pagina: params.get('por_pagina') } : { tipo: reporte.id }); setRevision(valor => valor + 1) }}>Limpiar filtros</button><button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"><Icon name="chart" size={17} />Generar reporte</button></div>
+      <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" className={boton} onClick={() => setParams(paramsLimpios(params, reporte.id))}>Limpiar filtros</button><button type="button" onClick={() => setRevision(valor => valor + 1)} className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"><Icon name="chart" size={17} />Actualizar resultados</button></div>
     </form>
     <Resultados key={`${url}:${revision}`} url={url} reporte={reporte} opciones={opciones} institucion={institucion} onReintentar={() => setRevision(valor => valor + 1)} porPagina={porPagina} onPagina={numero => setParams(conPagina(params, numero))} onPorPagina={numero => setParams(conPorPagina(params, numero))} onCorregir={corregir} />
   </div>
@@ -149,13 +151,36 @@ function Distribucion({ reporte, resumen }) {
   </section>
 }
 
+// Elegir reporte: tarjetas con la pregunta que responde cada reporte principal, por propósito; las consultas de una sola
+// sección, en un desplegable aparte para no saturar la pantalla.
+function SelectorReportes({ reportes, grupos, reporte, abrir }) {
+  const principales = grupos.filter(grupo => grupo !== CONSULTAS_SECCION)
+  const consultas = reportes.filter(item => item.grupo === CONSULTAS_SECCION)
+  return <section aria-label="Elegir reporte" className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
+    <h2 className="text-sm font-semibold text-slate-800">¿Qué quieres consultar?</h2>
+    {principales.map(grupo => <div key={grupo}>
+      <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[.15em] text-slate-500">{grupo}</h3>
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">{reportes.filter(item => item.grupo === grupo).map(item => <button key={item.id} type="button" aria-pressed={item.id === reporte.id} onClick={() => abrir(item.id)}
+        className={`rounded-xl border px-3 py-2.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-teal-700 ${item.id === reporte.id ? 'border-teal-600 bg-teal-50' : 'border-slate-200 hover:border-teal-200 hover:bg-teal-50/40'}`}>
+        <span className="block text-sm font-semibold text-slate-800">{item.titulo}</span>
+        {item.pregunta && <span className="mt-0.5 block text-xs leading-snug text-slate-500">{item.pregunta}</span>}
+      </button>)}</div>
+    </div>)}
+    {consultas.length > 0 && <label className="grid gap-1.5 border-t border-slate-100 pt-4 text-xs font-medium text-slate-500 sm:max-w-xl">{CONSULTAS_SECCION}
+      <select value={reporte.grupo === CONSULTAS_SECCION ? reporte.id : ''} onChange={event => event.target.value && abrir(event.target.value)} className={control}>
+        <option value="">Elegir una sección…</option>{consultas.map(item => <option key={item.id} value={item.id}>{etiquetaReporte(item)}</option>)}
+      </select></label>}
+  </section>
+}
+
 function ContenidoReportes() {
   const opciones = useConsulta('/reportes/opciones')
   const [params, setParams] = useSearchParams()
   const institucion = useOutletContext()?.institution || defaultInstitution
   const reportes = opciones.data?.data.reportes || []
-  const reporte = reportes.find(item => item.id === params.get('tipo')) || reportes.find(item => item.id === 'personal') || reportes[0]
-  const grupos = [...new Set(reportes.map(item => item.grupo))].sort((a, b) => a.localeCompare(b, 'es'))
+  // Grupos por propósito, en el orden del backend; se abre la dotación si no se eligió otro.
+  const reporte = reporteElegido(reportes, params.get('tipo'))
+  const grupos = gruposDe(reportes)
   const abrir = tipo => setParams({ tipo })
   const administra = usePuede('sistema.administrar')
   const veLegajos = usePuede('legajo.ver')
@@ -165,12 +190,11 @@ function ContenidoReportes() {
     {opciones.loading && <p role="status" className="text-sm text-slate-500">Cargando reportes disponibles…</p>}
     {opciones.error && <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{apiErrorMessage(opciones.error)}</p>}
     {reporte && <>
-      <section aria-label="Elegir reporte" className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
-        <Campo titulo="Sección del reporte"><select value={reporte.grupo} onChange={event => abrir(reportes.find(item => item.grupo === event.target.value).id)} className={control}>{grupos.map(grupo => <option key={grupo} value={grupo}>{grupo}</option>)}</select></Campo>
-        <Campo titulo="Reporte"><select value={reporte.id} onChange={event => abrir(event.target.value)} className={control}>{reportes.filter(item => item.grupo === reporte.grupo).map(item => <option key={item.id} value={item.id}>{item.titulo}</option>)}</select></Campo>
-      </section>
-      <div><h2 className="text-xl font-semibold tracking-tight text-slate-800">{reporte.titulo}</h2><p className="mt-2 text-sm text-slate-500">{reporte.descripcion}</p></div>
-      <PanelReporte key={`${reporte.id}:${new URLSearchParams([...params].filter(([clave]) => !['q', 'contenido', 'page', 'por_pagina'].includes(clave)))}`} reporte={reporte} opciones={opciones.data.data} params={params} setParams={setParams} institucion={institucion} />
+      <SelectorReportes reportes={reportes} grupos={grupos} reporte={reporte} abrir={abrir} />
+      <div><h2 className="text-xl font-semibold tracking-tight text-slate-800">{reporte.titulo}</h2><p className="mt-2 text-sm text-slate-500">{reporte.descripcion}</p>
+        {/* El detalle técnico de qué se cuenta y qué no, plegado junto al título. */}
+        <details className="mt-2 text-xs text-slate-500"><summary className="cursor-pointer font-medium text-teal-800">Qué incluye y qué no este reporte</summary><p className="mt-2 max-w-4xl leading-relaxed">{reporte.ayuda}</p></details></div>
+      <PanelReporte key={reporte.id} reporte={reporte} opciones={opciones.data.data} params={params} setParams={setParams} institucion={institucion} />
     </>}
   </div>
 }

@@ -27,40 +27,40 @@ final class ConsultaReportes
     public const MAX_EXPORTAR = 10000;
 
     public const REPORTES = [
-        'dotacion' => ['titulo' => 'Dotación por unidad y régimen', 'descripcion' => 'Cuántas personas tienen vínculo abierto y cómo se distribuyen.', 'icono' => 'building',
+        'dotacion' => ['pregunta' => '¿Cuánto personal hay y cómo se reparte por unidad y régimen?', 'titulo' => 'Dotación por unidad y régimen', 'descripcion' => 'Cuántas personas tienen vínculo abierto y cómo se distribuyen.', 'icono' => 'building',
             'fecha' => null, 'estados' => ['docente' => 'Docentes', 'administrativo' => 'Administrativos'],
             'ayuda' => 'Personas con vínculo no anulado y sin cese, según el criterio vigente del sistema. Cada persona se cuenta una vez en su vínculo abierto más reciente. No equivale a plazas presupuestadas, CAP, PAP ni a una certificación de vigencia contractual.'],
-        'contratos' => ['titulo' => 'Contratos y adendas', 'descripcion' => 'Vínculos laborales, plazos y ampliaciones para planificar renovaciones.', 'icono' => 'file',
+        'contratos' => ['pregunta' => '¿Qué contratos y adendas vencen o ya vencieron?', 'titulo' => 'Contratos y adendas', 'descripcion' => 'Vínculos laborales, plazos y ampliaciones para planificar renovaciones.', 'icono' => 'file',
             'fecha' => 'Inicio del vínculo', 'estados' => ['abierto' => 'Abierto', 'plazo_vencido' => 'Plazo vencido sin cese', 'cesado' => 'Con cese registrado', 'programado' => 'Inicio futuro'],
             'ayuda' => 'Un resultado por vínculo no anulado. Se usa la fecha final de la última adenda no anulada por fecha de inicio e identificador; si no existe, el plazo original. La unidad corresponde al vínculo. Un plazo vencido no se interpreta automáticamente como cese.'],
-        'movimientos' => ['titulo' => 'Ingresos y ceses', 'descripcion' => 'Incorporaciones y salidas registradas durante un período.', 'icono' => 'arrow',
+        'movimientos' => ['pregunta' => '¿Quién ingresó o cesó en un período?', 'titulo' => 'Ingresos y ceses', 'descripcion' => 'Incorporaciones y salidas registradas durante un período.', 'icono' => 'arrow',
             'fecha' => 'Fecha del movimiento', 'estados' => ['ingreso' => 'Ingreso', 'cese' => 'Cese'],
             'ayuda' => 'Un ingreso por vínculo no anulado y un cese por su fecha de cese. Si existe una desvinculación no anulada, aporta la resolución y el motivo. Se incluyen también desvinculaciones sin vínculo; se evita duplicar el mismo cese. La unidad es la del vínculo, no la actual de la persona.'],
-        'formacion' => ['titulo' => 'Formación y grados académicos', 'descripcion' => 'Títulos, especialidades y grados registrados del personal.', 'icono' => 'folder',
+        'formacion' => ['pregunta' => '¿Qué títulos y grados tiene el personal?', 'titulo' => 'Formación y grados académicos', 'descripcion' => 'Títulos, especialidades y grados registrados del personal.', 'icono' => 'folder',
             'fecha' => 'Fecha de obtención', 'estados' => ['con_archivo' => 'Con archivo', 'sin_archivo' => 'Sin archivo'],
             'ayuda' => 'Un resultado por estudio no anulado, con su nivel y sustento documental. Tener un archivo no acredita por sí solo su validez ni una verificación en SUNEDU. Los registros sin fecha se excluyen al filtrar un período.'],
-        'capacitaciones' => ['titulo' => 'Capacitaciones del personal', 'descripcion' => 'Participaciones, entidades y horas de formación registradas.', 'icono' => 'chart',
+        'capacitaciones' => ['pregunta' => '¿Qué capacitaciones y cuántas horas registra cada persona?', 'titulo' => 'Capacitaciones del personal', 'descripcion' => 'Participaciones, entidades y horas de formación registradas.', 'icono' => 'chart',
             'fecha' => 'Fecha de finalización', 'estados' => ['con_archivo' => 'Con archivo', 'sin_archivo' => 'Sin archivo'],
             'ayuda' => 'Un resultado por capacitación no anulada. Las horas son las declaradas en el registro; los valores ausentes o negativos no se suman. No mide ejecución presupuestal ni cumplimiento del PDP: el sistema no registra esas metas.'],
-        'vacaciones' => ['titulo' => 'Vacaciones por período', 'descripcion' => 'Derechos registrados, goces y adelantos de cada período.', 'icono' => 'clock',
+        'vacaciones' => ['pregunta' => '¿Qué derechos, goces y adelantos de vacaciones hay por período?', 'titulo' => 'Vacaciones por período', 'descripcion' => 'Derechos registrados, goces y adelantos de cada período.', 'icono' => 'clock',
             'fecha' => null, 'estados' => ['con_movimientos' => 'Con goce o adelanto', 'sin_movimientos' => 'Sin goce ni adelanto'],
             'ayuda' => 'Un resultado por período no anulado. Se separan goce, adelanto y postergación; esta última no consume días. Los totales reflejan registros y pueden incluir programación futura. No se calcula saldo legal, deuda vacacional ni liquidación.'],
-        'licencias' => ['titulo' => 'Licencias y permisos', 'descripcion' => 'Ausencias autorizadas que coinciden con el período consultado.', 'icono' => 'file',
+        'licencias' => ['pregunta' => '¿Qué licencias y permisos coinciden con un período?', 'titulo' => 'Licencias y permisos', 'descripcion' => 'Ausencias autorizadas que coinciden con el período consultado.', 'icono' => 'file',
             'fecha' => 'Período de licencia o permiso', 'estados' => ['con_goce' => 'Con goce', 'sin_goce' => 'Sin goce', 'sin_definir' => 'Goce sin definir'],
             'ayuda' => 'Registros no anulados que se superponen con las fechas consultadas, aunque empiecen antes del período. Los días son los registrados para la licencia completa; no se prorratean. Se excluyen descansos médicos y documentos sensibles cuando la sesión no puede consultarlos. No equivale a control de asistencia ni a un cálculo de descuentos.'],
-        'evaluaciones' => ['titulo' => 'Seguimiento de evaluaciones', 'descripcion' => 'Evaluaciones registradas y planes de mejora por ciclo.', 'icono' => 'check',
+        'evaluaciones' => ['pregunta' => '¿Quién fue evaluado en el ciclo y quién tiene plan de mejora?', 'titulo' => 'Seguimiento de evaluaciones', 'descripcion' => 'Evaluaciones registradas y planes de mejora por ciclo.', 'icono' => 'check',
             'fecha' => 'Fecha de evaluación', 'estados' => ['con_plan' => 'Con plan de mejora', 'sin_plan' => 'Sin plan de mejora'],
             'ayuda' => 'Evaluaciones no anuladas del ciclo seleccionado. No presume que todo el personal está obligado a evaluarse ni calcula una cobertura sin padrón de elegibles. No incluye puntajes ni calificaciones.'],
-        'pendientes' => ['titulo' => 'Pendientes documentales', 'descripcion' => 'Qué falta cargar, recibir o revisar en los legajos activos.', 'icono' => 'file',
+        'pendientes' => ['pregunta' => '¿Qué falta cargar o revisar en los legajos activos?', 'titulo' => 'Pendientes documentales', 'descripcion' => 'Qué falta cargar, recibir o revisar en los legajos activos.', 'icono' => 'file',
             'fecha' => null, 'estados' => ['faltante' => 'Falta documento', 'por_determinar' => 'Por determinar', 'observado' => 'Observado', 'recepcion' => 'Sin recepción', 'revision' => 'En revisión'],
             'ayuda' => 'Los requisitos por determinar se muestran aparte de los faltantes. Se excluyen los tipos no aplicables, desactivados y las versiones subsanadas.'],
-        'inventario' => ['titulo' => 'Inventario de legajos', 'descripcion' => 'Expedientes, ubicación y documentos registrados.', 'icono' => 'folder',
+        'inventario' => ['pregunta' => '¿Dónde está cada legajo y cuántos documentos y folios tiene?', 'titulo' => 'Inventario de legajos', 'descripcion' => 'Expedientes, ubicación y documentos registrados.', 'icono' => 'folder',
             'fecha' => 'Fecha de apertura', 'estados' => ['activo' => 'Activo', 'pasivo' => 'Pasivo', 'transferido' => 'Transferido'],
             'ayuda' => 'Un resultado por legajo. Los documentos y folios incluyen su historial, excluyen anulados y se limitan a la información que puedes consultar.'],
-        'vencimientos' => ['titulo' => 'Vencimientos', 'descripcion' => 'Documentos, contratos, requerimientos y otros datos con fecha que necesitan seguimiento.', 'icono' => 'clock',
+        'vencimientos' => ['pregunta' => '¿Qué documentos, contratos o requerimientos vencen pronto?', 'titulo' => 'Vencimientos', 'descripcion' => 'Documentos, contratos, requerimientos y otros datos con fecha que necesitan seguimiento.', 'icono' => 'clock',
             'fecha' => 'Fecha de vencimiento', 'estados' => ['vencido' => 'Vencido', 'fuera_de_plazo' => 'Requerimiento fuera de plazo', 'por_vencer' => 'Por vencer'],
             'ayuda' => 'Se reutiliza la consulta de Vencimientos: DNI, contratos y adendas (también vencidos sin cese), requerimientos, colegiatura, período de prueba y, según tus permisos, certificado de discapacidad, examen médico ocupacional, ratificación docente y encargos o destaques.'],
-        'personal' => ['titulo' => 'Padrón del personal con legajo', 'descripcion' => 'Personal docente y administrativo, unidad, puesto y situación laboral.', 'icono' => 'users',
+        'personal' => ['pregunta' => '¿Quiénes tienen legajo y en qué situación laboral están?', 'titulo' => 'Padrón del personal con legajo', 'descripcion' => 'Personal docente y administrativo, unidad, puesto y situación laboral.', 'icono' => 'users',
             'fecha' => null, 'estados' => ['con_vinculo' => 'Con vínculo abierto', 'sin_vinculo' => 'Sin vínculo abierto'],
             'ayuda' => 'Un resultado por persona. El puesto y la unidad proceden del vínculo abierto más reciente; sin vínculo, se identifica el dato histórico de la ficha. Solo incluye personas con al menos un legajo; excluye cuentas técnicas.'],
     ];
@@ -80,20 +80,39 @@ final class ConsultaReportes
             && ($tipo !== 'evaluaciones' || $actor->can('seccion07.ver'));
     }
 
-    private static function grupo(string $tipo): string
-    {
-        $seccion = ReportesSecciones::DEFINICIONES[$tipo]['seccion'] ?? match ($tipo) {
-            'personal' => 1, 'contratos', 'movimientos' => 2, 'formacion', 'capacitaciones' => 3,
-            'vacaciones', 'licencias' => 5, 'evaluaciones' => 7, default => null,
-        };
+    /**
+     * Grupos por propósito (lo que la ORH quiere saber), en el orden en que se presentan, con sus reportes en orden.
+     * Los reportes de una sola sección que no están aquí van al final, en CONSULTAS_SECCION, por número de sección.
+     */
+    public const PROPOSITOS = [
+        'Personal y dotación' => ['dotacion', 'personal', 'movimientos'],
+        'Contratos y plazos' => ['contratos', 'vencimientos', 'ratificaciones', 'colegiaturas'],
+        'Control documental' => ['pendientes', 'inventario'],
+        'Formación y desarrollo' => ['formacion', 'capacitaciones', 'evaluaciones'],
+        'Vacaciones y licencias' => ['vacaciones', 'licencias'],
+    ];
 
-        return $seccion ? ReportesSecciones::GRUPOS[$seccion] : ($tipo === 'dotacion' ? 'Resumen del personal' : 'Control documental');
+    public const CONSULTAS_SECCION = 'Consultas por sección del legajo';
+
+    /** @return array{0: string, 1: int, 2: int} grupo, orden del grupo y orden dentro del grupo */
+    private static function grupo(string $tipo): array
+    {
+        $orden = 0;
+        foreach (self::PROPOSITOS as $grupo => $tipos) {
+            if (($posicion = array_search($tipo, $tipos, true)) !== false) {
+                return [$grupo, $orden, $posicion];
+            }
+            $orden++;
+        }
+
+        return [self::CONSULTAS_SECCION, $orden, (int) (ReportesSecciones::DEFINICIONES[$tipo]['seccion'] ?? 99) * 100 + (int) array_search($tipo, array_keys(ReportesSecciones::DEFINICIONES), true)];
     }
 
     public static function opciones(Usuario $actor): array
     {
         $reportes = collect(self::catalogo())->filter(fn (array $reporte, string $tipo): bool => self::puede($actor, $tipo))
-            ->map(fn (array $reporte, string $tipo): array => ['id' => $tipo, 'grupo' => self::grupo($tipo), ...$reporte])->values();
+            ->map(fn (array $reporte, string $tipo): array => ['id' => $tipo, 'grupo' => self::grupo($tipo)[0], ...$reporte])
+            ->sortBy(fn (array $reporte): array => array_slice(self::grupo($reporte['id']), 1))->values();
         $secciones = SeccionLegajo::query()->whereBetween('id', [1, 11])->orderBy('id')->get(['id', 'nombre'])
             ->filter(fn (SeccionLegajo $seccion): bool => self::seccionVisible($actor, $seccion->id))->values();
 

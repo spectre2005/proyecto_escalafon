@@ -12,46 +12,45 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 /** Campos explícitos de los informes del legajo; nunca serializa modelos completos. */
 final class ReportesSecciones
 {
-    public const GRUPOS = [1 => '01 · Información personal y familiar', 2 => '02 · Incorporación', 3 => '03 · Formación académica', 4 => '04 · Experiencia laboral', 5 => '05 · Movimientos del personal', 6 => '06 · Compensaciones y beneficios', 7 => '07 · Evaluación y carrera', 8 => '08 · Reconocimientos y sanciones', 9 => '09 · Afiliaciones', 10 => '10 · SST y bienestar', 11 => '11 · Desvinculación'];
-
     public const DEFINICIONES = [
-        'ficha_personal' => ['titulo' => 'Información personal y contacto', 'seccion' => 1, 'relacion' => null, 'campo_fecha' => 'fecha_nacimiento',
+        'ficha_personal' => ['descripcion' => 'Datos personales y de contacto de cada persona: nacimiento, domicilio, teléfono y correo.', 'titulo' => 'Información personal y contacto', 'seccion' => 1, 'relacion' => null, 'campo_fecha' => 'fecha_nacimiento',
             'campos' => ['fecha_nacimiento' => 'Nacimiento', 'edad' => 'Edad', 'nacionalidad' => 'Nacionalidad', 'estado_civil' => 'Estado civil', 'domicilio' => 'Domicilio', 'telefono' => 'Teléfono', 'email_institucional' => 'Correo electrónico']],
-        'familiares' => ['titulo' => 'Familiares y derechohabientes', 'seccion' => 1, 'relacion' => 'familiaresPorUsuario', 'campo_fecha' => 'fecha_nacimiento',
+        'familiares' => ['descripcion' => 'Familiares registrados y quiénes son derechohabientes.', 'titulo' => 'Familiares y derechohabientes', 'seccion' => 1, 'relacion' => 'familiaresPorUsuario', 'campo_fecha' => 'fecha_nacimiento',
             'campos' => ['parentesco' => 'Parentesco', 'apellidos_nombres' => 'Familiar', 'numero_doc_identidad' => 'Documento del familiar', 'fecha_nacimiento' => 'Nacimiento del familiar', 'es_derechohabiente' => 'Derechohabiente']],
-        'antecedentes' => ['titulo' => 'Declaraciones, antecedentes e impedimentos', 'seccion' => 1, 'relacion' => 'declaracionesVerificacionesPorUsuario', 'campo_fecha' => 'fecha',
+        'antecedentes' => ['descripcion' => 'Declaraciones juradas, antecedentes e impedimentos registrados, con su vigencia.', 'titulo' => 'Declaraciones, antecedentes e impedimentos', 'seccion' => 1, 'relacion' => 'declaracionesVerificacionesPorUsuario', 'campo_fecha' => 'fecha',
             'campos' => ['tipo' => 'Tipo de declaración / verificación', 'anio' => 'Año', 'fecha' => 'Fecha del registro', 'resultado' => 'Resultado registrado', 'vigente_hasta' => 'Vigencia declarada']],
-        'discapacidad' => ['titulo' => 'Certificados de discapacidad', 'seccion' => 1, 'relacion' => 'certificadosDiscapacidadPorUsuario', 'campo_fecha' => 'fecha_emision',
+        'discapacidad' => ['descripcion' => 'Certificados de discapacidad (CONADIS) del personal y de sus familiares, con su vigencia.', 'titulo' => 'Certificados de discapacidad', 'seccion' => 1, 'relacion' => 'certificadosDiscapacidadPorUsuario', 'campo_fecha' => 'fecha_emision',
             'campos' => ['persona' => 'Titular del certificado', 'familiar.apellidos_nombres' => 'Familiar asociado', 'numero_conadis' => 'Número CONADIS', 'fecha_emision' => 'Emisión', 'vigente_hasta' => 'Vigente hasta']],
-        'inducciones' => ['titulo' => 'Inducciones del personal', 'seccion' => 2, 'relacion' => 'induccionesPorUsuario', 'campo_fecha' => 'fecha',
+        'inducciones' => ['descripcion' => 'Inducciones registradas por persona: tipo, fecha y responsable.', 'titulo' => 'Inducciones del personal', 'seccion' => 2, 'relacion' => 'induccionesPorUsuario', 'campo_fecha' => 'fecha',
             'campos' => ['tipo' => 'Tipo de inducción', 'fecha' => 'Fecha de inducción', 'responsable' => 'Responsable']],
-        'periodos_prueba' => ['titulo' => 'Períodos de prueba', 'seccion' => 2, 'relacion' => 'periodosPruebaPorUsuario', 'campo_fecha' => 'fecha_inicio',
+        'periodos_prueba' => ['descripcion' => 'Períodos de prueba con sus fechas y su resultado.', 'titulo' => 'Períodos de prueba', 'seccion' => 2, 'relacion' => 'periodosPruebaPorUsuario', 'campo_fecha' => 'fecha_inicio',
             'campos' => ['fecha_inicio' => 'Inicio', 'fecha_fin' => 'Fin', 'resultado' => 'Resultado registrado', 'fecha_resultado' => 'Fecha del resultado']],
-        'colegiaturas' => ['titulo' => 'Colegiatura y habilitación profesional', 'seccion' => 3, 'relacion' => 'colegiaturasPorUsuario', 'campo_fecha' => 'fecha_colegiatura',
+        'colegiaturas' => ['pregunta' => '¿Quién tiene la colegiatura o la habilitación vencida o por vencer?', 'descripcion' => 'Colegio profesional, número de colegiatura, habilitación y su vigencia.', 'titulo' => 'Colegiatura y habilitación profesional', 'seccion' => 3, 'relacion' => 'colegiaturasPorUsuario', 'campo_fecha' => 'fecha_colegiatura',
             'campos' => ['colegio_profesional' => 'Colegio profesional', 'numero_colegiatura' => 'Número de colegiatura', 'fecha_colegiatura' => 'Colegiatura', 'habilitado' => 'Habilitación registrada', 'fecha_verificacion' => 'Última verificación', 'vigente_hasta' => 'Vigente hasta']],
-        'experiencia' => ['titulo' => 'Experiencia laboral y profesional', 'seccion' => 4, 'relacion' => 'experienciaLaboralPorUsuario', 'campo_fecha' => 'fecha_inicio',
+        'experiencia' => ['descripcion' => 'Experiencia laboral declarada: entidad, cargo y fechas.', 'titulo' => 'Experiencia laboral y profesional', 'seccion' => 4, 'relacion' => 'experienciaLaboralPorUsuario', 'campo_fecha' => 'fecha_inicio',
             'campos' => ['entidad_empresa' => 'Entidad / empresa', 'sector' => 'Sector', 'cargo' => 'Cargo', 'tipo_vinculo' => 'Vínculo declarado', 'fecha_inicio' => 'Inicio', 'fecha_fin' => 'Fin', 'es_ejercicio_profesional' => 'Ejercicio profesional', 'es_docencia_universitaria' => 'Docencia universitaria']],
-        'tiempo_servicios' => ['titulo' => 'Tiempo de servicios reconocido', 'seccion' => 6, 'relacion' => 'tiempoServiciosReconocidosPorUsuario', 'campo_fecha' => 'fecha_resolucion',
+        'tiempo_servicios' => ['descripcion' => 'Tiempo de servicios reconocido por resolución.', 'titulo' => 'Tiempo de servicios reconocido', 'seccion' => 6, 'relacion' => 'tiempoServiciosReconocidosPorUsuario', 'campo_fecha' => 'fecha_resolucion',
             'campos' => ['numero_resolucion' => 'Resolución', 'fecha_resolucion' => 'Fecha de resolución', 'anios' => 'Años reconocidos', 'meses' => 'Meses reconocidos', 'dias' => 'Días reconocidos']],
-        'beneficios' => ['titulo' => 'Compensaciones y beneficios', 'seccion' => 6, 'relacion' => 'compensacionesBeneficiosPorUsuario', 'campo_fecha' => 'fecha',
+        'beneficios' => ['descripcion' => 'Compensaciones y beneficios registrados, con su documento de sustento.', 'titulo' => 'Compensaciones y beneficios', 'seccion' => 6, 'relacion' => 'compensacionesBeneficiosPorUsuario', 'campo_fecha' => 'fecha',
             'campos' => ['tipo' => 'Tipo de beneficio', 'concepto' => 'Concepto', 'fecha' => 'Fecha', 'numero_documento' => 'Documento de sustento']],
-        'desplazamientos' => ['titulo' => 'Desplazamientos y encargos', 'seccion' => 7, 'relacion' => 'desplazamientosPorUsuario', 'campo_fecha' => 'fecha_inicio',
+        'desplazamientos' => ['descripcion' => 'Rotaciones, destaques, encargos y designaciones, con sus unidades y fechas.', 'titulo' => 'Desplazamientos y encargos', 'seccion' => 7, 'relacion' => 'desplazamientosPorUsuario', 'campo_fecha' => 'fecha_inicio',
             'campos' => ['tipo' => 'Tipo de desplazamiento', 'unidadOrigen.nombre' => 'Unidad de origen', 'unidadDestino.nombre' => 'Unidad de destino', 'puesto_destino' => 'Puesto de destino', 'fecha_inicio' => 'Inicio', 'fecha_fin' => 'Fin', 'numero_documento' => 'Documento']],
-        'progresiones' => ['titulo' => 'Progresión en la carrera administrativa', 'seccion' => 7, 'relacion' => 'progresionesCarreraPorUsuario', 'campo_fecha' => 'fecha_efectiva',
+        'progresiones' => ['descripcion' => 'Cambios de nivel en la carrera administrativa.', 'titulo' => 'Progresión en la carrera administrativa', 'seccion' => 7, 'relacion' => 'progresionesCarreraPorUsuario', 'campo_fecha' => 'fecha_efectiva',
             'campos' => ['nivel_anterior' => 'Nivel anterior', 'nivel_nuevo' => 'Nuevo nivel', 'fecha_efectiva' => 'Fecha efectiva', 'numero_resolucion' => 'Resolución']],
-        'ratificaciones' => ['titulo' => 'Nombramiento, ratificación y promoción docente', 'seccion' => 7, 'relacion' => 'ratificacionesDocentesPorUsuario', 'campo_fecha' => 'fecha_resolucion',
+        'ratificaciones' => ['pregunta' => '¿Qué nombramientos, ratificaciones o promociones docentes hay y cuándo vencen?', 'descripcion' => 'Nombramientos, ratificaciones y promociones docentes, con su categoría y vigencia.', 'titulo' => 'Nombramiento, ratificación y promoción docente', 'seccion' => 7, 'relacion' => 'ratificacionesDocentesPorUsuario', 'campo_fecha' => 'fecha_resolucion',
             'campos' => ['tipo' => 'Tipo de acto', 'categoria_anterior' => 'Categoría anterior', 'categoria_nueva' => 'Nueva categoría', 'resultado' => 'Resultado registrado', 'numero_resolucion' => 'Resolución', 'fecha_resolucion' => 'Fecha de resolución', 'fecha_inicio_periodo' => 'Inicio del período', 'fecha_vencimiento_periodo' => 'Vencimiento del período']],
-        'reconocimientos' => ['titulo' => 'Reconocimientos y distinciones', 'seccion' => 8, 'relacion' => 'reconocimientosPorUsuario', 'campo_fecha' => 'fecha',
+        'reconocimientos' => ['descripcion' => 'Felicitaciones, distinciones y reconocimientos registrados.', 'titulo' => 'Reconocimientos y distinciones', 'seccion' => 8, 'relacion' => 'reconocimientosPorUsuario', 'campo_fecha' => 'fecha',
             'campos' => ['tipo' => 'Reconocimiento', 'fecha' => 'Fecha', 'motivo' => 'Motivo', 'otorgado_por' => 'Otorgado por', 'numero_documento' => 'Documento']],
-        'sanciones' => ['titulo' => 'Sanciones y situación disciplinaria registrada', 'seccion' => 8, 'relacion' => 'sancionesPorUsuario', 'campo_fecha' => 'fecha_resolucion',
+        'sanciones' => ['descripcion' => 'Sanciones registradas y resultado de sus recursos.', 'titulo' => 'Sanciones y situación disciplinaria registrada', 'seccion' => 8, 'relacion' => 'sancionesPorUsuario', 'campo_fecha' => 'fecha_resolucion',
             'campos' => ['tipo' => 'Tipo de sanción', 'numero_resolucion' => 'Resolución', 'fecha_resolucion' => 'Fecha de resolución', 'fecha_inicio' => 'Inicio', 'fecha_fin' => 'Fin', 'dias_suspension' => 'Días de suspensión', 'resultado_recurso' => 'Resultado del recurso registrado', 'registrada_en_rnssc' => 'Registro RNSSC declarado']],
-        'controversias' => ['titulo' => 'Controversias y resoluciones', 'seccion' => 8, 'relacion' => 'controversiasPorUsuario', 'campo_fecha' => 'fecha_inicio',
+        // Sección 09 (Relaciones laborales), como en el catálogo y la Directiva: exige datos sensibles.
+        'controversias' => ['descripcion' => 'Controversias individuales y colectivas, con su instancia y resultado.', 'titulo' => 'Controversias y resoluciones', 'seccion' => 9, 'relacion' => 'controversiasPorUsuario', 'campo_fecha' => 'fecha_inicio',
             'campos' => ['tipo' => 'Tipo de controversia', 'instancia' => 'Instancia', 'materia' => 'Materia', 'fecha_inicio' => 'Inicio', 'estado' => 'Situación registrada', 'fecha_resolucion' => 'Resolución', 'resultado' => 'Resultado registrado']],
-        'afiliaciones' => ['titulo' => 'Afiliaciones del personal', 'seccion' => 9, 'relacion' => 'afiliacionesPorUsuario', 'campo_fecha' => 'fecha_inicio',
+        'afiliaciones' => ['descripcion' => 'Afiliaciones del personal (sindicato, EPS u otras), con sus fechas.', 'titulo' => 'Afiliaciones del personal', 'seccion' => 9, 'relacion' => 'afiliacionesPorUsuario', 'campo_fecha' => 'fecha_inicio',
             'campos' => ['tipo' => 'Tipo de afiliación', 'entidad' => 'Entidad', 'numero_afiliacion' => 'Número de afiliación', 'fecha_inicio' => 'Inicio', 'fecha_fin' => 'Fin']],
-        'sst_bienestar' => ['titulo' => 'Seguridad, salud y bienestar del personal', 'seccion' => 10, 'relacion' => 'registrosSstBienestarPorUsuario', 'campo_fecha' => 'fecha',
+        'sst_bienestar' => ['descripcion' => 'Registros de seguridad, salud y bienestar: exámenes, seguros, subsidios y EPS.', 'titulo' => 'Seguridad, salud y bienestar del personal', 'seccion' => 10, 'relacion' => 'registrosSstBienestarPorUsuario', 'campo_fecha' => 'fecha',
             'campos' => ['tipo' => 'Tipo de registro', 'fecha' => 'Fecha', 'entidad' => 'Entidad', 'numero_documento' => 'Documento', 'estado_tramite' => 'Estado del trámite', 'fecha_inicio' => 'Inicio', 'fecha_fin' => 'Fin', 'fecha_vencimiento' => 'Vencimiento']],
-        'desvinculaciones' => ['titulo' => 'Ceses y entrega de cargo', 'seccion' => 11, 'relacion' => 'desvinculacionesPorUsuario', 'campo_fecha' => 'fecha_cese',
+        'desvinculaciones' => ['descripcion' => 'Ceses con su motivo, entrega de cargo, informe de gestión y liquidación.', 'titulo' => 'Ceses y entrega de cargo', 'seccion' => 11, 'relacion' => 'desvinculacionesPorUsuario', 'campo_fecha' => 'fecha_cese',
             'campos' => ['motivo_cese' => 'Motivo de cese', 'fecha_cese' => 'Cese', 'numero_resolucion' => 'Resolución', 'fecha_entrega_cargo' => 'Entrega de cargo', 'informe_gestion_presentado' => 'Informe de gestión presentado', 'fecha_liquidacion' => 'Liquidación registrada']],
     ];
 
@@ -59,8 +58,9 @@ final class ReportesSecciones
     {
         $resultado = [];
         foreach (self::DEFINICIONES as $tipo => $definicion) {
-            $resultado[$tipo] = ['titulo' => $definicion['titulo'], 'descripcion' => 'Información registrada en la sección '.str_pad((string) $definicion['seccion'], 2, '0', STR_PAD_LEFT).' del legajo.',
-                'icono' => 'file', 'seccion_origen' => $definicion['seccion'], 'fecha' => $definicion['campos'][$definicion['campo_fecha']],
+            $resultado[$tipo] = ['titulo' => $definicion['titulo'], 'descripcion' => $definicion['descripcion'], 'pregunta' => $definicion['pregunta'] ?? null,
+                // Sin rango de fechas en la ficha: filtrar por fecha de nacimiento no responde ninguna consulta de la ORH.
+                'icono' => 'file', 'seccion_origen' => $definicion['seccion'], 'fecha' => $tipo === 'ficha_personal' ? null : $definicion['campos'][$definicion['campo_fecha']],
                 'estados' => $tipo === 'ficha_personal' ? ['registrado' => 'Registrado'] : ['con_archivo' => 'Con archivo asociado', 'sin_archivo' => 'Sin archivo asociado'],
                 'ayuda' => 'Solo personal con legajo. Un resultado por '.($tipo === 'ficha_personal' ? 'persona' : 'registro no anulado').'. La unidad y el puesto son los de la ficha actual. Los datos y resultados son los registrados; no constituyen una certificación externa. El período filtra por '.$definicion['campos'][$definicion['campo_fecha']].'. No se suman períodos ni importes ni se presume que un dato ausente sea negativo.'];
         }

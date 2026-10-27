@@ -13,6 +13,7 @@ use App\Models\Usuario;
 use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
 use App\Support\ConfiguracionFuncionalidades;
+use App\Support\ConsultaReportes;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -43,6 +44,64 @@ class ReportesTest extends TestCase
         $this->actuarComo(codigo: 'lector_personal');
         $this->getJson('/api/v1/reportes/opciones')->assertOk()->assertJsonCount(2, 'data.reportes')->assertJsonPath('data.reportes.0.id', 'dotacion');
         $this->getJson('/api/v1/reportes/inventario')->assertForbidden();
+    }
+
+    public function test_reports_are_grouped_by_purpose_in_a_fixed_order_and_section_queries_go_last(): void
+    {
+        $this->actuarComo();
+        $reportes = collect($this->getJson('/api/v1/reportes/opciones')->assertOk()->json('data.reportes'));
+        $grupos = $reportes->pluck('grupo')->unique()->values()->all();
+        $this->assertSame(['Personal y dotación', 'Contratos y plazos', 'Control documental', 'Formación y desarrollo', 'Vacaciones y licencias',
+            'Consultas por sección del legajo'], $grupos);
+        $this->assertSame(['dotacion', 'personal', 'movimientos', 'contratos', 'vencimientos', 'ratificaciones', 'colegiaturas', 'pendientes', 'inventario',
+            'formacion', 'capacitaciones', 'evaluaciones', 'vacaciones', 'licencias'], $reportes->where('grupo', '!=', 'Consultas por sección del legajo')->pluck('id')->values()->all());
+        // Las consultas por sección, por número de sección; ningún reporte se pierde al reagrupar.
+        $secciones = $reportes->where('grupo', 'Consultas por sección del legajo')->pluck('seccion_origen')->values()->all();
+        $ordenadas = $secciones;
+        sort($ordenadas);
+        $this->assertSame($ordenadas, $secciones);
+        $this->assertCount(count(ConsultaReportes::catalogo()), $reportes);
+        // Los permisos siguen decidiendo qué se ofrece: sin datos sensibles no aparecen las consultas de las secciones 01 y 10.
+        $this->actuarComo(codigo: 'asistente_legajo');
+        $ids = collect($this->getJson('/api/v1/reportes/opciones')->assertOk()->json('data.reportes'))->pluck('id');
+        foreach (['ficha_personal', 'familiares', 'discapacidad', 'sst_bienestar'] as $sensible) {
+            $this->assertNotContains($sensible, $ids);
+        }
+    }
+
+    public function test_controversies_belong_to_section_09_and_require_sensitive_data(): void
+    {
+        // Controversias es de la sección 09 (catálogo, s09.controversias, Anexo 1): sin datos sensibles no se ofrece ni se consulta.
+        $this->actuarComo(codigo: 'asistente_legajo');
+        $this->assertNotContains('controversias', collect($this->getJson('/api/v1/reportes/opciones')->assertOk()->json('data.reportes'))->pluck('id'));
+        $this->getJson('/api/v1/reportes/controversias')->assertForbidden();
+        $this->getJson('/api/v1/reportes/controversias?exportar=1')->assertForbidden();
+        $this->actuarComo();
+        $reporte = collect($this->getJson('/api/v1/reportes/opciones')->assertOk()->json('data.reportes'))->firstWhere('id', 'controversias');
+        $this->assertSame(9, $reporte['seccion_origen']);
+        $this->getJson('/api/v1/reportes/controversias')->assertOk();
+    }
+
+    public function test_every_main_report_states_its_question_and_section_queries_have_their_own_description(): void
+    {
+        $this->actuarComo();
+        $reportes = collect($this->getJson('/api/v1/reportes/opciones')->assertOk()->json('data.reportes'));
+        foreach ($reportes->where('grupo', '!=', ConsultaReportes::CONSULTAS_SECCION) as $reporte) {
+            $this->assertMatchesRegularExpression('/^¿.+\?$/u', (string) $reporte['pregunta'], $reporte['id']);
+        }
+        foreach ($reportes as $reporte) {
+            $this->assertStringNotContainsString('Información registrada en la sección', $reporte['descripcion'], $reporte['id']);
+            $this->assertNotSame('', trim($reporte['descripcion']), $reporte['id']);
+        }
+    }
+
+    public function test_personal_information_report_offers_no_birth_date_range_and_others_keep_theirs(): void
+    {
+        $this->actuarComo();
+        $reportes = collect($this->getJson('/api/v1/reportes/opciones')->assertOk()->json('data.reportes'))->keyBy('id');
+        $this->assertNull($reportes['ficha_personal']['fecha']);
+        $this->assertSame('Inicio del vínculo', $reportes['contratos']['fecha']);
+        $this->assertSame('Nacimiento del familiar', $reportes['familiares']['fecha']);
     }
 
     public function test_personnel_uses_current_unit_and_separates_account_from_employment(): void
