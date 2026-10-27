@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { destinoMotivo } from './destinosVencimiento.js'
+import { destinoMotivo, destinoRegistroMotivo } from './destinosVencimiento.js'
 
 const persona = { usuario_id: 'persona-1', nombre: 'ANA FICTICIA', numero_doc_identidad: '12345678' }
 
@@ -27,4 +27,11 @@ test('the ID card, the requirements and unknown reasons', () => {
 
 test('requirements links use a searchable word when the identity document is missing', () => {
   assert.equal(destinoMotivo({ nombre: 'ANA FICTICIA' }, { origen: 'requerimiento' }).ruta, '/requerimientos?clase=todas&q=ANA')
+})
+
+
+test('register requirement links target the exact document block', () => {
+  const tipo_documento = { id: 'tipo-1', codigo: 'S01_B_DOCUMENTO_IDENTIDAD', seccion_legajo_id: 1 }
+  assert.equal(destinoRegistroMotivo(persona, { origen: 'requerimiento', tipo_documento }), '/legajos/persona-1?categoria=general#bloque-S01_B_DOCUMENTO_IDENTIDAD')
+  assert.equal(destinoRegistroMotivo(persona, { origen: 'contrato', id: 'contrato-1' }), '/legajos/persona-1?categoria=s02-vinculo#registro-contrato-1')
 })

@@ -183,7 +183,7 @@ test('a failed external query leaves a plain message and the manual registration
   assert.deepEqual(camposPorReemplazar(manual, { encontrado: true, nombres: 'Escrito', apellido_paterno: 'A mano', apellido_materno: '' }), [])
 })
 
-test('only the manual registration uses the identity query (not legajo editing nor platform forms)', () => {
+test('identity lookup is limited to manual registration and new team accounts', () => {
   const raiz = new URL('../../../', import.meta.url).pathname
   const archivos = []
   const recorrer = dir => readdirSync(dir).forEach(nombre => {
@@ -193,7 +193,7 @@ test('only the manual registration uses the identity query (not legajo editing n
   })
   recorrer(raiz)
   const usan = archivos.filter(ruta => /consulta-dni|consultarIdentidad|consultaIdentidad/.test(readFileSync(ruta, 'utf8'))).map(ruta => ruta.slice(raiz.length)).sort()
-  assert.deepEqual(usan, ['features/users/api/usuariosApi.js', 'features/users/components/RegistroManual.jsx', 'features/users/utils/consultaIdentidad.js'])
+  assert.deepEqual(usan, ['features/settings/EquipoAccesosConfig.jsx', 'features/users/api/usuariosApi.js', 'features/users/components/RegistroManual.jsx', 'features/users/utils/consultaIdentidad.js'])
 })
 
 const lugar = { id: 'ubigeo-santa-ana', region: 'Cusco', provincia: 'La Convención', distrito: 'Santa Ana' }

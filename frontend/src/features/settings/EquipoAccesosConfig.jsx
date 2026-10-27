@@ -1,4 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { consultarIdentidad, estadoConsultaIdentidad } from '../users/api/usuariosApi'
+import { AVISO_SIMULACION, ESPERA_CONSULTA_MS, mensajeErrorConsulta, NO_DISPONIBLE } from '../users/utils/consultaIdentidad'
 import { apiErrorMessage } from '../../axios'
 import { buscarPersonasEquipo, consultarEquipo, otorgarAccesoEquipo, renovarAccesoEquipo, restablecerClaveEquipo, revocarAccesoEquipo } from './equipoAccesosApi'
 
@@ -6,6 +8,49 @@ const campo = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text
 const boton = 'rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium disabled:opacity-50'
 const principal = `${boton} bg-teal-700 text-white`
 const etiquetas = { vigente: 'Vigente', programado: 'Programado', vencido: 'Vencido', revocado: 'Revocado', inactivo: 'Inactivo' }
+
+function NuevaCuentaEquipo() {
+  const [dni, setDni] = useState('')
+  const [identidad, setIdentidad] = useState({ nombres: '', apellido_paterno: '', apellido_materno: '' })
+  const [estado, setEstado] = useState(null)
+  const [aviso, setAviso] = useState(null)
+  const [intento, setIntento] = useState(0)
+  useEffect(() => {
+    const controller = new AbortController()
+    estadoConsultaIdentidad(controller.signal).then(data => {
+      if (!controller.signal.aborted) setEstado(data)
+    }).catch(() => {
+      if (!controller.signal.aborted) setEstado({ habilitada: false })
+    })
+    return () => controller.abort()
+  }, [])
+  useEffect(() => {
+    if (!/^\d{8}$/.test(dni) || !estado?.habilitada || !estado.disponible) return
+    const controller = new AbortController()
+    const timer = setTimeout(async () => {
+      setAviso({ texto: 'Consultando DNI…', cargando: true })
+      try {
+        const data = await consultarIdentidad(dni, controller.signal)
+        if (controller.signal.aborted) return
+        if (data.encontrado) {
+          setIdentidad(actual => Object.fromEntries(Object.keys(actual).map(key => [key, actual[key] || String(data[key] || '').trim()])))
+          setAviso({ texto: data.simulada ? AVISO_SIMULACION : 'Datos completados. Puedes editarlos.' })
+        } else setAviso({ texto: 'DNI sin resultados. Completa los datos manualmente.', error: true })
+      } catch (error) {
+        if (!controller.signal.aborted) setAviso({ texto: mensajeErrorConsulta(error), error: true })
+      }
+    }, ESPERA_CONSULTA_MS)
+    return () => { clearTimeout(timer); controller.abort() }
+  }, [dni, estado, intento])
+
+  return <>
+    <label className="grid gap-2 text-sm">DNI<input name="numero_doc_identidad" required inputMode="numeric" pattern="[0-9]{8}" maxLength={8} className={campo} autoComplete="off" value={dni} onChange={event => { setDni(event.target.value.replace(/\D/g, '')); setIdentidad({ nombres: '', apellido_paterno: '', apellido_materno: '' }); setAviso(null) }} /></label>
+    {estado && (!estado.habilitada || !estado.disponible) && <p className="text-xs text-slate-500">{NO_DISPONIBLE}</p>}
+    {aviso && <p role="status" className={`text-xs ${aviso.error ? 'text-amber-800' : 'text-teal-800'}`}>{aviso.texto}{aviso.error && <button type="button" className="ml-2 font-semibold underline" onClick={() => setIntento(valor => valor + 1)}>Reintentar</button>}</p>}
+    {Object.entries({ nombres: 'Nombres', apellido_paterno: 'Apellido paterno', apellido_materno: 'Apellido materno' }).map(([key, label]) => <label key={key} className="grid gap-2 text-sm">{label}<input name={key} required={key !== 'apellido_materno'} maxLength={key === 'nombres' ? 120 : 80} className={campo} autoComplete="off" value={identidad[key]} onChange={event => setIdentidad(actual => ({ ...actual, [key]: event.target.value }))} /></label>)}
+    <label className="grid gap-2 text-sm">Correo<input name="email" type="email" required maxLength={255} className={campo} autoComplete="off" /></label>
+  </>
+}
 
 function DialogoEquipo({ seleccion, datos, cerrar, completado }) {
   const ref = useRef(null)
@@ -54,7 +99,7 @@ function DialogoEquipo({ seleccion, datos, cerrar, completado }) {
       let credenciales = null
       if (nuevo) {
         const cuenta = modo === 'existente' ? { usuario_id: persona.id } : {
-          nombres: form.get('nombres').trim(), apellido_paterno: form.get('apellido_paterno').trim(),
+          nombres: form.get('nombres').trim(), apellido_paterno: form.get('apellido_paterno').trim(), apellido_materno: form.get('apellido_materno').trim(),
           numero_doc_identidad: form.get('numero_doc_identidad').trim(), email: form.get('email').trim(),
         }
         const resultado = await otorgarAccesoEquipo({ ...cuenta, perfil, vigente_desde: form.get('vigente_desde'), vigente_hasta: hasta || null, motivo })
@@ -91,10 +136,7 @@ function DialogoEquipo({ seleccion, datos, cerrar, completado }) {
             <p className="text-xs text-slate-500">Se conservará su contraseña actual. Las cuentas con otros roles se gestionan por separado.</p>
           </div> : <>
             <p className="text-xs text-slate-500">Se creará su cuenta con contraseña temporal, sin abrir un legajo ni registrar un vínculo laboral.</p>
-            <label className="grid gap-2 text-sm">Nombres<input name="nombres" required maxLength={120} className={campo} autoComplete="off" /></label>
-            <label className="grid gap-2 text-sm">Apellido paterno<input name="apellido_paterno" required maxLength={80} className={campo} autoComplete="off" /></label>
-            <label className="grid gap-2 text-sm">DNI<input name="numero_doc_identidad" required inputMode="numeric" pattern="[0-9]{8}" maxLength={8} className={campo} autoComplete="off" /></label>
-            <label className="grid gap-2 text-sm">Correo<input name="email" type="email" required maxLength={255} className={campo} autoComplete="off" /></label>
+            <NuevaCuentaEquipo />
           </>}
           <label className="grid gap-2 text-sm">Perfil<select className={campo} value={perfil} onChange={event => setPerfil(event.target.value)}>{datos.perfiles.map(item => <option key={item.codigo} value={item.codigo}>{item.nombre}</option>)}</select></label>
           <div className="rounded-xl bg-slate-50 p-4 text-xs"><p className="font-semibold">Permisos que recibirá</p><ul className="mt-2 list-disc space-y-1 pl-4">{datos.perfiles.find(item => item.codigo === perfil)?.permisos.map(permiso => <li key={permiso}>{permiso}</li>)}</ul><p className="mt-3">Sin acceso a datos sensibles, gestión de cuentas ni configuración de módulos.</p></div>

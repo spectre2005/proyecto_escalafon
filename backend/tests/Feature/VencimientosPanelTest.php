@@ -46,6 +46,18 @@ class VencimientosPanelTest extends TestCase
             ->assertJsonPath('data.0.motivos.0.estado', 'fuera_de_plazo')->assertJsonPath('data.0.motivos.1.estado', 'vencido');
     }
 
+    public function test_requirement_alerts_include_the_document_destination(): void
+    {
+        $legajo = $this->legajo();
+        $tipo = TipoDocumento::query()->where('codigo', 'S01_B_DOCUMENTO_IDENTIDAD')->firstOrFail();
+        $this->requerimiento($legajo, 1)->update(['tipo_documento_id' => $tipo->id]);
+
+        $this->getJson('/api/v1/vencimientos?origen=requerimiento')->assertOk()
+            ->assertJsonPath('data.0.motivos.0.tipo_documento.id', $tipo->id)
+            ->assertJsonPath('data.0.motivos.0.tipo_documento.codigo', $tipo->codigo)
+            ->assertJsonPath('data.0.motivos.0.tipo_documento.seccion_legajo_id', $tipo->seccion_legajo_id);
+    }
+
     public function test_includes_today_and_day_thirty_uses_lima_and_red_below_seven(): void
     {
         $legajo = $this->legajo();
