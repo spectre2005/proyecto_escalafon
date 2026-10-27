@@ -47,8 +47,8 @@ export function etiquetaReporte(reporte) {
   return reporte.grupo === CONSULTAS_SECCION && reporte.seccion_origen ? `${String(reporte.seccion_origen).padStart(2, '0')} · ${reporte.titulo}` : reporte.titulo
 }
 
-// Filtros: todos se aplican al cambiarlos (los de texto, al dejar de escribir). Mismos valores por defecto que el
-// backend: 30 días en Vencimientos y el año actual en Evaluaciones.
+// Filtros: se editan juntos en el panel «Filtros» y se aplican con «Aplicar»; quitar una etiqueta o «Limpiar» se aplica
+// al instante. Mismos valores por defecto que el backend: 30 días en Vencimientos y el año actual en Evaluaciones.
 export const FILTROS = ['q', 'tipo_personal', 'unidad_id', 'estado', 'seccion', 'desde', 'hasta', 'dias', 'anio', 'regimen_id', 'nivel', 'modalidad', 'contenido']
 
 /** Valores que muestran los filtros: los aplicados en la URL o los de por defecto. */
@@ -66,6 +66,36 @@ export function conFiltro(params, reporteId, clave, valor) {
   else siguiente.delete(clave)
   siguiente.delete('page')
   return siguiente
+}
+
+/** «Aplicar»: los campos del formulario (solo los que se muestran para este reporte) reemplazan a los aplicados. */
+export function conFiltros(params, reporteId, campos) {
+  let siguiente = conFiltro(params, reporteId, 'page', '')
+  for (const [clave, valor] of campos) if (FILTROS.includes(clave)) siguiente = conFiltro(siguiente, reporteId, clave, valor)
+  return siguiente
+}
+
+const fecha = valor => valor.split('-').reverse().join('/')
+
+/** Etiquetas de los filtros aplicados en la URL, con el nombre de cada opción (unidad, régimen, estado…). */
+export function filtrosActivos(params, reporte, opciones) {
+  const nombre = (lista, valor) => lista?.find(item => String(item.id) === valor)
+  const texto = {
+    q: valor => `Persona: ${valor}`,
+    tipo_personal: valor => ({ docente: 'Docentes', administrativo: 'Administrativos' })[valor] || valor,
+    unidad_id: valor => `Unidad: ${nombre(opciones.unidades, valor)?.nombre || valor}`,
+    estado: valor => `${tituloFiltroEstado(reporte)}: ${reporte.estados?.[valor] || valor}`,
+    seccion: valor => `Sección ${String(valor).padStart(2, '0')}`,
+    desde: valor => `Desde ${fecha(valor)}`,
+    hasta: valor => `Hasta ${fecha(valor)}`,
+    dias: valor => `Próximos ${valor} días`,
+    anio: valor => `${reporte.id === 'evaluaciones' ? 'Ciclo' : 'Año'} ${valor}`,
+    regimen_id: valor => `Régimen: ${nombre(opciones.regimenes, valor)?.codigo || valor}`,
+    nivel: valor => nombre(opciones.niveles, valor)?.nombre || valor,
+    modalidad: valor => nombre(opciones.modalidades, valor)?.nombre || valor,
+    contenido: valor => `Texto: ${valor}`,
+  }
+  return FILTROS.filter(clave => params.get(clave)).map(clave => ({ clave, etiqueta: texto[clave](params.get(clave)) }))
 }
 
 /** «Limpiar filtros»: solo el reporte y el tamaño de página elegido. */

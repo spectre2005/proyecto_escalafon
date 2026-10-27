@@ -1,10 +1,10 @@
-import { cloneElement, useCallback, useEffect, useId, useRef, useState } from 'react'
+import { cloneElement, useCallback, useEffect, useId, useState } from 'react'
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom'
 import api, { apiErrorMessage } from '../../axios'
 import Icon from '../../components/ui/Icon'
 import Paginacion from '../../shared/Paginacion'
 import { conPagina, conPorPagina, leerPaginacion, paginaCorregida } from '../../shared/paginacionUrl'
-import { conFiltro, CONSULTAS_SECCION, etiquetaReporte, familiaDe, familiasDe, paramsLimpios, reporteElegido, tituloFiltroEstado, valoresIniciales } from './reportesMenu'
+import { conFiltro, conFiltros, CONSULTAS_SECCION, etiquetaReporte, familiaDe, familiasDe, filtrosActivos, paramsLimpios, reporteElegido, tituloFiltroEstado, valoresIniciales } from './reportesMenu'
 import { usePuede } from '../auth/session'
 import { defaultInstitution } from '../../config/institution'
 import ReportesPestanas from './ReportesPestanas'
@@ -88,56 +88,54 @@ function Resultados({ url, reporte, opciones, porPagina, onPagina, onPorPagina, 
   </div>
 }
 
-// Campo de texto que aplica su valor al dejar de escribir (cada consulta recorre todos los registros del reporte). Si el
-// valor aplicado cambia por fuera (limpiar, atrás/adelante), el campo lo toma.
-function FiltroTexto({ valor, onAplicar, ...props }) {
-  const [texto, setTexto] = useState(valor)
-  const [aplicado, setAplicado] = useState(valor)
-  if (valor !== aplicado) {
-    setAplicado(valor)
-    setTexto(valor)
+// Formulario de filtros: los campos parten de lo aplicado en la URL y se aplican juntos con «Aplicar» (Enter en el
+// buscador también). Solo se envían los campos que se muestran para este reporte.
+function FormularioFiltros({ reporte, opciones, valores, onAplicar, onCerrar }) {
+  function aplicar(event) {
+    event.preventDefault()
+    onAplicar([...new FormData(event.currentTarget).entries()])
   }
-  // Lo último enviado: si el servidor aplica un valor por defecto (el año en Evaluaciones), no se reenvía en bucle.
-  const enviado = useRef(valor)
-  useEffect(() => {
-    if (texto === valor || texto === enviado.current) return undefined
-    const espera = setTimeout(() => { enviado.current = texto; onAplicar(texto) }, 400)
-    return () => clearTimeout(espera)
-  }, [texto, valor, onAplicar])
-  return <input {...props} value={texto} onChange={event => setTexto(event.target.value)} />
+  return <form onSubmit={aplicar} aria-label="Filtros del reporte" className="rounded-2xl border border-slate-200 bg-white p-5">
+    <div className="grid items-end gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <Campo titulo="Persona: nombre, DNI o n.º de legajo"><input type="search" name="q" defaultValue={valores.q} placeholder="Buscar persona…" maxLength={120} className={control} /></Campo>
+      <Campo titulo="Tipo de personal"><select name="tipo_personal" defaultValue={valores.tipo_personal} className={control}><option value="">Todo el personal</option><option value="docente">Docentes</option><option value="administrativo">Administrativos</option></select></Campo>
+      <Campo titulo={['contratos', 'movimientos', 'vacaciones'].includes(reporte.id) ? 'Unidad del vínculo' : 'Unidad orgánica actual'}><select name="unidad_id" defaultValue={valores.unidad_id} className={control}><option value="">Todas las unidades</option>{opciones.unidades.map(unidad => <option key={unidad.id} value={unidad.id}>{unidad.nombre}</option>)}</select></Campo>
+      {reporte.id !== 'dotacion' && Object.keys(reporte.estados).length > 1 && <Campo titulo={tituloFiltroEstado(reporte)}><select name="estado" defaultValue={valores.estado} className={control}><option value="">Todos los estados</option>{Object.entries(reporte.estados).map(([clave, nombre]) => <option key={clave} value={clave}>{nombre}</option>)}</select></Campo>}
+      {['dotacion', 'contratos', 'movimientos', 'personal'].includes(reporte.id) && <Campo titulo="Ley / régimen"><select name="regimen_id" defaultValue={valores.regimen_id} className={control}><option value="">Todos los regímenes</option>{opciones.regimenes.map(item => <option key={item.id} value={item.id}>{item.codigo} · {item.nombre}</option>)}</select></Campo>}
+      {reporte.id === 'formacion' && <Campo titulo="Nivel académico"><select name="nivel" defaultValue={valores.nivel} className={control}><option value="">Todos los niveles</option>{opciones.niveles.map(item => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select></Campo>}
+      {reporte.id === 'capacitaciones' && <Campo titulo="Tipo de capacitación"><select name="modalidad" defaultValue={valores.modalidad} className={control}><option value="">Todos los tipos</option>{opciones.modalidades.map(item => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select></Campo>}
+      {['inventario', 'pendientes'].includes(reporte.id) && <Campo titulo="Sección del legajo"><select name="seccion" defaultValue={valores.seccion} className={control}><option value="">Todas las secciones permitidas</option>{opciones.secciones.map(seccion => <option key={seccion.id} value={seccion.id}>{String(seccion.id).padStart(2, '0')} · {seccion.nombre}</option>)}</select></Campo>}
+      {['vacaciones', 'evaluaciones'].includes(reporte.id) && <Campo titulo={reporte.id === 'evaluaciones' ? 'Ciclo de evaluación' : 'Año del período'}><input type="number" name="anio" min="1900" max="2200" defaultValue={valores.anio} placeholder="Todos los períodos" className={control} /></Campo>}
+      {reporte.seccion_origen && <Campo titulo="Buscar en los datos (entidad, cargo, resultado…)"><input type="search" name="contenido" defaultValue={valores.contenido} placeholder="Texto de los registros…" maxLength={120} className={control} /></Campo>}
+      {reporte.fecha && <><Campo titulo={`${reporte.fecha} · desde`}><input type="date" name="desde" defaultValue={valores.desde} className={control} /></Campo><Campo titulo="Hasta"><input type="date" name="hasta" defaultValue={valores.hasta} className={control} /></Campo></>}
+      {reporte.id === 'vencimientos' && <Campo titulo="Próximos vencimientos"><select name="dias" defaultValue={valores.dias} className={control}>{[7, 15, 30, 60, 90, 180, 365].map(dias => <option key={dias} value={dias}>{dias} días</option>)}</select></Campo>}
+    </div>
+    <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" className={boton} onClick={onCerrar}>Cerrar</button><button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"><Icon name="check" size={17} />Aplicar</button></div>
+  </form>
 }
 
 function PanelReporte({ reporte, opciones, params, setParams, institucion }) {
-  // Todos los filtros se aplican al cambiarlos y viven en la URL; los de texto, al dejar de escribir (FiltroTexto).
-  const valores = valoresIniciales(params, reporte.id)
+  // Los filtros viven en la URL. El panel se abre con «Filtros»; las etiquetas muestran lo aplicado.
+  const [abierto, setAbierto] = useState(false)
   const [revision, setRevision] = useState(0)
-  const cambiar = clave => event => setParams(conFiltro(params, reporte.id, clave, event.target.value))
-  const aplicarTexto = clave => valor => setParams(conFiltro(params, reporte.id, clave, valor), { replace: true })
+  const activos = filtrosActivos(params, reporte, opciones)
   // Página y tamaño ya normalizados: un valor editado a mano no llega al servidor. 10, 15 o 20 (la exportación no los usa).
   const { pagina, porPagina } = leerPaginacion(params)
   const enviados = conPagina(conPorPagina(params, porPagina), pagina)
   enviados.delete('tipo')
   const corregir = useCallback(numero => setParams(conPagina(params, numero), { replace: true }), [params, setParams])
   const url = `/reportes/${reporte.id}?${enviados}`
-  return <div className="space-y-5">
-    <form onSubmit={event => event.preventDefault()} className="rounded-2xl border border-slate-200 bg-white p-5">
-      <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-800"><Icon name="search" size={17} />Filtrar resultados<span className="font-normal text-xs text-slate-500">· se aplican al cambiarlos</span></div>
-      <div className="grid items-end gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Campo titulo="Persona: nombre, DNI o n.º de legajo"><FiltroTexto type="search" valor={params.get('q') || ''} onAplicar={aplicarTexto('q')} placeholder="Buscar persona…" maxLength={120} className={control} /></Campo>
-        <Campo titulo="Tipo de personal"><select value={valores.tipo_personal} onChange={cambiar('tipo_personal')} className={control}><option value="">Todo el personal</option><option value="docente">Docentes</option><option value="administrativo">Administrativos</option></select></Campo>
-        <Campo titulo={['contratos', 'movimientos', 'vacaciones'].includes(reporte.id) ? 'Unidad del vínculo' : 'Unidad orgánica actual'}><select value={valores.unidad_id} onChange={cambiar('unidad_id')} className={control}><option value="">Todas las unidades</option>{opciones.unidades.map(unidad => <option key={unidad.id} value={unidad.id}>{unidad.nombre}</option>)}</select></Campo>
-        {reporte.id !== 'dotacion' && Object.keys(reporte.estados).length > 1 && <Campo titulo={tituloFiltroEstado(reporte)}><select value={valores.estado} onChange={cambiar('estado')} className={control}><option value="">Todos los estados</option>{Object.entries(reporte.estados).map(([clave, nombre]) => <option key={clave} value={clave}>{nombre}</option>)}</select></Campo>}
-        {['dotacion', 'contratos', 'movimientos', 'personal'].includes(reporte.id) && <Campo titulo="Ley / régimen"><select value={valores.regimen_id} onChange={cambiar('regimen_id')} className={control}><option value="">Todos los regímenes</option>{opciones.regimenes.map(item => <option key={item.id} value={item.id}>{item.codigo} · {item.nombre}</option>)}</select></Campo>}
-        {reporte.id === 'formacion' && <Campo titulo="Nivel académico"><select value={valores.nivel} onChange={cambiar('nivel')} className={control}><option value="">Todos los niveles</option>{opciones.niveles.map(item => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select></Campo>}
-        {reporte.id === 'capacitaciones' && <Campo titulo="Tipo de capacitación"><select value={valores.modalidad} onChange={cambiar('modalidad')} className={control}><option value="">Todos los tipos</option>{opciones.modalidades.map(item => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select></Campo>}
-        {['inventario', 'pendientes'].includes(reporte.id) && <Campo titulo="Sección del legajo"><select value={valores.seccion} onChange={cambiar('seccion')} className={control}><option value="">Todas las secciones permitidas</option>{opciones.secciones.map(seccion => <option key={seccion.id} value={seccion.id}>{String(seccion.id).padStart(2, '0')} · {seccion.nombre}</option>)}</select></Campo>}
-        {['vacaciones', 'evaluaciones'].includes(reporte.id) && <Campo titulo={reporte.id === 'evaluaciones' ? 'Ciclo de evaluación' : 'Año del período'}><FiltroTexto type="number" min="1900" max="2200" valor={valores.anio} onAplicar={aplicarTexto('anio')} placeholder="Todos los períodos" className={control} /></Campo>}
-        {reporte.seccion_origen && <Campo titulo="Buscar en los datos (entidad, cargo, resultado…)"><FiltroTexto type="search" valor={params.get('contenido') || ''} onAplicar={aplicarTexto('contenido')} placeholder="Texto de los registros…" maxLength={120} className={control} /></Campo>}
-        {reporte.fecha && <><Campo titulo={`${reporte.fecha} · desde`}><input type="date" value={valores.desde} max={valores.hasta || undefined} onChange={cambiar('desde')} className={control} /></Campo><Campo titulo="Hasta"><input type="date" value={valores.hasta} min={valores.desde || undefined} onChange={cambiar('hasta')} className={control} /></Campo></>}
-        {reporte.id === 'vencimientos' && <Campo titulo="Próximos vencimientos"><select value={valores.dias} onChange={cambiar('dias')} className={control}>{[7, 15, 30, 60, 90, 180, 365].map(dias => <option key={dias} value={dias}>{dias} días</option>)}</select></Campo>}
-      </div>
-      <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" className={boton} onClick={() => setParams(paramsLimpios(params, reporte.id))}>Limpiar filtros</button><button type="button" onClick={() => setRevision(valor => valor + 1)} className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"><Icon name="chart" size={17} />Actualizar resultados</button></div>
-    </form>
+  return <div className="space-y-4">
+    <div className="flex flex-wrap items-center gap-2">
+      <button type="button" aria-expanded={abierto} onClick={() => setAbierto(valor => !valor)} className={`${boton} py-2`}><Icon name="search" size={16} />Filtros{activos.length > 0 && ` (${activos.length})`}</button>
+      {activos.map(filtro => <span key={filtro.clave} className="inline-flex items-center gap-1 rounded-full border border-teal-100 bg-teal-50 py-1 pl-3 pr-1 text-xs text-teal-800">{filtro.etiqueta}
+        <button type="button" aria-label={`Quitar filtro ${filtro.etiqueta}`} onClick={() => setParams(conFiltro(params, reporte.id, filtro.clave, ''))} className="grid size-5 place-items-center rounded-full hover:bg-teal-100 focus-visible:outline-2 focus-visible:outline-teal-700"><Icon name="close" size={12} /></button></span>)}
+      {activos.length > 0 && <button type="button" onClick={() => setParams(paramsLimpios(params, reporte.id))} className="px-2 text-xs font-semibold text-teal-700 hover:underline">Limpiar</button>}
+      <button type="button" onClick={() => setRevision(valor => valor + 1)} className="ml-auto px-2 text-xs font-semibold text-slate-500 hover:text-teal-700">Actualizar resultados</button>
+    </div>
+    {/* Con key: si lo aplicado cambia (etiqueta quitada, Limpiar, atrás/adelante), el formulario vuelve a partir de la URL. */}
+    {abierto && <FormularioFiltros key={params.toString()} reporte={reporte} opciones={opciones} valores={valoresIniciales(params, reporte.id)} onCerrar={() => setAbierto(false)}
+      onAplicar={campos => { setParams(conFiltros(params, reporte.id, campos)); setAbierto(false) }} />}
     <Resultados key={`${url}:${revision}`} url={url} reporte={reporte} opciones={opciones} institucion={institucion} onReintentar={() => setRevision(valor => valor + 1)} porPagina={porPagina} onPagina={numero => setParams(conPagina(params, numero))} onPorPagina={numero => setParams(conPorPagina(params, numero))} onCorregir={corregir} />
   </div>
 }

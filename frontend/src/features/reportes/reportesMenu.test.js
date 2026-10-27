@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { conFiltro, CONSULTAS_SECCION, etiquetaReporte, familiaDe, familiasDe, gruposDe, paramsLimpios, reporteElegido, tituloFiltroEstado, valoresIniciales } from './reportesMenu.js'
+import { conFiltro, conFiltros, CONSULTAS_SECCION, etiquetaReporte, familiaDe, familiasDe, filtrosActivos, gruposDe, paramsLimpios, reporteElegido, tituloFiltroEstado, valoresIniciales } from './reportesMenu.js'
 
 const reportes = [
   { id: 'dotacion', grupo: 'Personal y dotación', titulo: 'Dotación por unidad y régimen' },
@@ -56,6 +56,21 @@ test('aplicar un filtro lo escribe o lo quita, vuelve a la página 1 y conserva 
   assert.equal(conFiltro(p, 'contratos', 'unidad_id', 'u1').toString(), 'tipo=contratos&estado=abierto&por_pagina=15&unidad_id=u1')
   assert.equal(conFiltro(p, 'contratos', 'estado', '').toString(), 'tipo=contratos&por_pagina=15')
   assert.equal(conFiltro(new URLSearchParams(), 'personal', 'q', '  ana  ').toString(), 'tipo=personal&q=ana')
+})
+
+test('aplicar el formulario reemplaza solo los campos mostrados y vuelve a la página 1', () => {
+  const p = new URLSearchParams('tipo=contratos&estado=abierto&q=ana&page=3&por_pagina=15')
+  const campos = [['q', ''], ['estado', 'vencido'], ['unidad_id', 'u1'], ['otro', 'x']]
+  assert.equal(conFiltros(p, 'contratos', campos).toString(), 'tipo=contratos&estado=vencido&por_pagina=15&unidad_id=u1')
+})
+
+test('las etiquetas de los filtros activos usan el nombre de cada opción', () => {
+  const opciones = { unidades: [{ id: 7, nombre: 'Oficina de personal' }], regimenes: [{ id: 2, codigo: 'D.L. 276' }] }
+  const reporte = { id: 'contratos', estados: { vencido: 'Vencido' } }
+  const p = new URLSearchParams('tipo=contratos&q=ana&unidad_id=7&estado=vencido&regimen_id=2&desde=2026-01-31&page=2')
+  assert.deepEqual(filtrosActivos(p, reporte, opciones).map(filtro => filtro.etiqueta),
+    ['Persona: ana', 'Unidad: Oficina de personal', 'Estado: Vencido', 'Desde 31/01/2026', 'Régimen: D.L. 276'])
+  assert.deepEqual(filtrosActivos(new URLSearchParams('tipo=contratos&page=2'), reporte, opciones), [])
 })
 
 test('limpiar filtros deja solo el reporte y el tamaño de página', () => {
