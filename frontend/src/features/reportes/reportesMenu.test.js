@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { conFiltro, conFiltros, CONSULTAS_SECCION, etiquetaReporte, familiaDe, familiasDe, filtrosActivos, gruposDe, paramsLimpios, reporteElegido, tituloFiltroEstado, valoresIniciales } from './reportesMenu.js'
+import { conFiltro, conFiltros, CONSULTAS_SECCION, etiquetaReporte, filtrosActivos, paramsLimpios, reporteElegido, separarReportes, tituloFiltroEstado, valoresIniciales } from './reportesMenu.js'
 
 const reportes = [
   { id: 'dotacion', grupo: 'Personal y dotación', titulo: 'Dotación por unidad y régimen' },
@@ -10,30 +10,18 @@ const reportes = [
   { id: 'familiares', grupo: CONSULTAS_SECCION, titulo: 'Familiares y derechohabientes', seccion_origen: 1 },
 ]
 
-test('los grupos conservan el orden del backend, sin ordenarse alfabéticamente', () => {
-  assert.deepEqual(gruposDe(reportes), ['Personal y dotación', 'Contratos y plazos', CONSULTAS_SECCION])
+test('a la vista solo los clave, en su orden; lo demás va aparte y las consultas por sección también', () => {
+  const { clave, otros, secciones } = separarReportes(reportes)
+  assert.deepEqual(clave.map(reporte => reporte.id), ['personal', 'dotacion', 'contratos'])
+  assert.deepEqual(otros.map(reporte => reporte.id), ['colegiaturas'])
+  assert.deepEqual(secciones.map(reporte => reporte.id), ['familiares'])
 })
 
-test('se abre la dotación por defecto; si no está disponible, el padrón o el primero', () => {
-  assert.equal(reporteElegido(reportes, null).id, 'dotacion')
-  assert.equal(reporteElegido(reportes, 'contratos').id, 'contratos')
-  assert.equal(reporteElegido(reportes, 'no-existe').id, 'dotacion')
-  assert.equal(reporteElegido(reportes.slice(1), null).id, 'personal')
-  assert.equal(reporteElegido(reportes.slice(2), null).id, 'contratos')
-})
-
-test('las pestañas renombran los grupos en un solo mapa y dejan fuera las consultas por sección', () => {
-  assert.deepEqual(familiasDe(reportes).map(familia => familia.etiqueta), ['Personal y dotación', 'Contratos y plazos'])
-  assert.equal(familiaDe('Control documental').etiqueta, 'Control del legajo')
-  assert.equal(familiaDe('Vacaciones y licencias').etiqueta, 'Asistencia')
-  assert.equal(familiaDe('Grupo nuevo').etiqueta, 'Grupo nuevo')
-  assert.equal(familiaDe(CONSULTAS_SECCION), null)
-})
-
-test('al abrir una pestaña sin reporte elegido se muestra su primer reporte', () => {
-  assert.equal(reporteElegido(reportes, null, 'contratos').id, 'contratos')
-  assert.equal(reporteElegido(reportes, 'colegiaturas', 'personal').id, 'colegiaturas')
-  assert.equal(reporteElegido(reportes, null, 'no-existe').id, 'dotacion')
+test('se abre el padrón por defecto; si no está disponible, el primer reporte clave', () => {
+  assert.equal(reporteElegido(reportes, null).id, 'personal')
+  assert.equal(reporteElegido(reportes, 'familiares').id, 'familiares')
+  assert.equal(reporteElegido(reportes, 'no-existe').id, 'personal')
+  assert.equal(reporteElegido(reportes.filter(reporte => reporte.id !== 'personal'), null).id, 'dotacion')
 })
 
 test('solo las consultas por sección llevan el número de sección delante', () => {

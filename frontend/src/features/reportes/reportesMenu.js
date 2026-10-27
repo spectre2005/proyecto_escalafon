@@ -1,47 +1,22 @@
-// Elección del reporte: los grupos por propósito y su orden los decide el backend (ConsultaReportes::PROPOSITOS); aquí
-// no se reordenan ni se vuelven a agrupar.
+// Elección del reporte: a la vista, solo los reportes clave (en este orden); todo lo demás que el backend ofrezca para
+// el perfil y la institución va plegado en «Otros reportes». El backend decide qué reportes existen y en qué orden.
 
 export const CONSULTAS_SECCION = 'Consultas por sección del legajo'
-// Nombre que ve el usuario para esas consultas, plegadas aparte de las pestañas.
-export const MAS_REPORTES = 'Más reportes'
+export const OTROS_REPORTES = 'Otros reportes'
 
-// Al entrar sin elegir: la dotación, que resume al personal; si el perfil no la tiene, el primero disponible.
-export const POR_DEFECTO = ['dotacion', 'personal']
+// Con su nombre corto para el botón; el título completo va en la cabecera del reporte elegido.
+export const CLAVE = { personal: 'Padrón', plana_docente: 'Plana docente', dotacion: 'Dotación', contratos: 'Contratos', movimientos: 'Ingresos y ceses', pendientes: 'Pendientes' }
 
-/** Grupos en el orden en que llegan los reportes. */
-export function gruposDe(reportes) {
-  return [...new Set(reportes.map(reporte => reporte.grupo))]
+/** Los clave disponibles (en el orden de CLAVE), los demás reportes y las consultas por sección. */
+export function separarReportes(reportes) {
+  const clave = Object.keys(CLAVE).map(id => reportes.find(reporte => reporte.id === id)).filter(Boolean)
+  const resto = reportes.filter(reporte => !(reporte.id in CLAVE))
+  return { clave, otros: resto.filter(reporte => reporte.grupo !== CONSULTAS_SECCION), secciones: resto.filter(reporte => reporte.grupo === CONSULTAS_SECCION) }
 }
 
-// Pestañas: nombre que ve el usuario de cada grupo del backend. Es el único lugar donde se renombran; un grupo nuevo que
-// no esté aquí sale con su propio nombre. «Directiva» (anexos 06 a 09) es otra página, no un grupo de reportes.
-export const FAMILIAS = [
-  { id: 'personal', grupo: 'Personal y dotación', etiqueta: 'Personal y dotación' },
-  { id: 'contratos', grupo: 'Contratos y plazos', etiqueta: 'Contratos y plazos' },
-  { id: 'control', grupo: 'Control documental', etiqueta: 'Control del legajo' },
-  { id: 'formacion', grupo: 'Formación y desarrollo', etiqueta: 'Formación' },
-  { id: 'asistencia', grupo: 'Vacaciones y licencias', etiqueta: 'Asistencia' },
-]
-export const DIRECTIVA = { id: 'directiva', etiqueta: 'Directiva' }
-
-/** La pestaña de un grupo del backend; las consultas por sección no tienen pestaña («Más reportes»). */
-export function familiaDe(grupo) {
-  if (!grupo || grupo === CONSULTAS_SECCION) return null
-  return FAMILIAS.find(familia => familia.grupo === grupo) || { id: grupo, grupo, etiqueta: grupo }
-}
-
-/** Pestañas con al menos un reporte disponible, en el orden del backend. */
-export function familiasDe(reportes) {
-  return gruposDe(reportes).map(familiaDe).filter(Boolean)
-}
-
-/** El reporte pedido en la URL; si no hay, el primero de la pestaña elegida o el de inicio. */
-export function reporteElegido(reportes, tipo, familia = null) {
-  const grupo = familiasDe(reportes).find(item => item.id === familia)?.grupo
-  return reportes.find(reporte => reporte.id === tipo)
-    || (grupo && reportes.find(reporte => reporte.grupo === grupo))
-    || POR_DEFECTO.map(id => reportes.find(reporte => reporte.id === id)).find(Boolean)
-    || reportes[0]
+/** El reporte pedido en la URL o, si no, el primero de los clave disponibles. */
+export function reporteElegido(reportes, tipo) {
+  return reportes.find(reporte => reporte.id === tipo) || separarReportes(reportes).clave[0] || reportes[0]
 }
 
 /** En las consultas por sección, el número de sección delante: «03 · Colegiatura…». */
