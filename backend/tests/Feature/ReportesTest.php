@@ -14,6 +14,7 @@ use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
 use App\Support\ConfiguracionFuncionalidades;
 use App\Support\ConsultaReportes;
+use App\Support\ReportesSecciones;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -208,5 +209,34 @@ class ReportesTest extends TestCase
         $this->getJson('/api/v1/reportes/personal?desde=2026-10-20&hasta=2026-10-01')->assertUnprocessable();
         $this->getJson('/api/v1/reportes/personal?hasta=2099-01-01')->assertOk();
         $this->getJson('/api/v1/reportes/inexistente')->assertNotFound();
+    }
+
+    public function test_reports_follow_the_institution_configuration(): void
+    {
+        $this->actuarComo();
+        foreach (['s05.vacaciones', 's06.compensaciones'] as $codigo) {
+            ConfiguracionFuncionalidades::cambiar($codigo, false, 'Prueba', Usuario::query()->firstOrFail());
+        }
+        $opciones = $this->getJson('/api/v1/reportes/opciones')->assertOk()->json('data');
+        $ids = collect($opciones['reportes'])->pluck('id');
+        foreach (['vacaciones', 'beneficios', 'tiempo_servicios'] as $tipo) {
+            $this->assertNotContains($tipo, $ids, $tipo);
+        }
+        $this->assertContains('licencias', $ids);
+        $this->assertNotContains(6, collect($opciones['secciones'])->pluck('id'));
+        $this->getJson('/api/v1/reportes/vacaciones')->assertStatus(409)->assertJsonPath('message', '«Vacaciones (períodos y goces)» está desactivada en la configuración de la institución.');
+        $this->getJson('/api/v1/reportes/beneficios?exportar=1')->assertStatus(409);
+    }
+
+    public function test_every_report_names_an_existing_feature(): void
+    {
+        foreach (ConsultaReportes::FUNCIONALIDADES as $tipo => $codigo) {
+            $this->assertArrayHasKey($tipo, ConsultaReportes::catalogo(), $tipo);
+            $this->assertArrayHasKey($codigo, ConfiguracionFuncionalidades::catalogo(), $codigo);
+        }
+        // Cada consulta por sección depende de una funcionalidad de su misma sección.
+        foreach (ReportesSecciones::DEFINICIONES as $tipo => $definicion) {
+            $this->assertSame($definicion['seccion'], ConfiguracionFuncionalidades::definicion(ConsultaReportes::FUNCIONALIDADES[$tipo])['seccion'], $tipo);
+        }
     }
 }

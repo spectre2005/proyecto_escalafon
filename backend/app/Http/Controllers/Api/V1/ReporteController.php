@@ -22,6 +22,9 @@ class ReporteController extends Controller
     {
         abort_unless(array_key_exists($tipo, ConsultaReportes::catalogo()), 404);
         abort_unless(ConsultaReportes::puede($request->user(), $tipo), 403);
+        if ($nombre = ConsultaReportes::inactivo($tipo)) {
+            return response()->json(['message' => "«{$nombre}» está desactivada en la configuración de la institución."], 409);
+        }
         $estados = array_keys(ConsultaReportes::catalogo()[$tipo]['estados']);
         $filtros = $request->validate([
             'contenido' => 'nullable|string|max:120',

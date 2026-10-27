@@ -70,6 +70,29 @@ final class ConsultaReportes
         return [...self::REPORTES, ...ReportesSecciones::catalogo()];
     }
 
+    /**
+     * Funcionalidad de la configuración de la institución de la que depende cada reporte (config/funcionalidades.php).
+     * Desactivada, el reporte no se ofrece y su consulta responde 409. Sin entrada: no depende de ninguna.
+     */
+    public const FUNCIONALIDADES = [
+        'dotacion' => 's02.vinculos', 'contratos' => 's02.vinculos', 'movimientos' => 's02.vinculos',
+        'formacion' => 's03.formacion', 'capacitaciones' => 's03.formacion', 'vacaciones' => 's05.vacaciones', 'licencias' => 's05.licencias',
+        'evaluaciones' => 's07.evaluaciones',
+        'ficha_personal' => 's01.identidad', 'familiares' => 's01.familiares', 'antecedentes' => 's01.declaraciones', 'discapacidad' => 's01.discapacidad',
+        'inducciones' => 's02.inducciones', 'periodos_prueba' => 's02.periodos_prueba', 'colegiaturas' => 's03.formacion', 'experiencia' => 's04.experiencia',
+        'tiempo_servicios' => 's06.compensaciones', 'beneficios' => 's06.compensaciones', 'desplazamientos' => 's07.desplazamientos',
+        'progresiones' => 's07.progresion', 'ratificaciones' => 's07.progresion', 'reconocimientos' => 's08.reconocimientos', 'sanciones' => 's08.sanciones',
+        'controversias' => 's09.controversias', 'afiliaciones' => 's09.afiliaciones', 'sst_bienestar' => 's10.sst_bienestar', 'desvinculaciones' => 's11.desvinculaciones',
+    ];
+
+    /** Nombre de la funcionalidad desactivada de la que depende el reporte, o null si está disponible. */
+    public static function inactivo(string $tipo): ?string
+    {
+        $codigo = self::FUNCIONALIDADES[$tipo] ?? null;
+
+        return $codigo && ! ConfiguracionFuncionalidades::activa($codigo) ? ConfiguracionFuncionalidades::definicion($codigo)['nombre'] : null;
+    }
+
     public static function puede(Usuario $actor, string $tipo): bool
     {
         if (isset(ReportesSecciones::DEFINICIONES[$tipo])) {
@@ -110,11 +133,11 @@ final class ConsultaReportes
 
     public static function opciones(Usuario $actor): array
     {
-        $reportes = collect(self::catalogo())->filter(fn (array $reporte, string $tipo): bool => self::puede($actor, $tipo))
+        $reportes = collect(self::catalogo())->filter(fn (array $reporte, string $tipo): bool => self::puede($actor, $tipo) && ! self::inactivo($tipo))
             ->map(fn (array $reporte, string $tipo): array => ['id' => $tipo, 'grupo' => self::grupo($tipo)[0], ...$reporte])
             ->sortBy(fn (array $reporte): array => array_slice(self::grupo($reporte['id']), 1))->values();
         $secciones = SeccionLegajo::query()->whereBetween('id', [1, 11])->orderBy('id')->get(['id', 'nombre'])
-            ->filter(fn (SeccionLegajo $seccion): bool => self::seccionVisible($actor, $seccion->id))->values();
+            ->filter(fn (SeccionLegajo $seccion): bool => self::seccionVisible($actor, $seccion->id) && ! ConfiguracionFuncionalidades::seccionOculta($seccion->id))->values();
 
         return ['reportes' => $reportes, 'unidades' => UnidadOrganica::query()->orderBy('nombre')->get(['id', 'nombre']), 'secciones' => $secciones,
             'regimenes' => RegimenNormativo::query()->orderBy('codigo')->get(['id', 'codigo', 'nombre']),
