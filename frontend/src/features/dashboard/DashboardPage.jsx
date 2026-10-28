@@ -37,9 +37,9 @@ function BanderasSinResponder({ panel }) {
 export default function DashboardPage() {
   const { users, loading, loadError, refreshUsers } = useUsers()
   const administra = usePuede('sistema.administrar')
-  // Acceso al sistema (cuenta) y situación laboral se cuentan por separado: sin cuenta no significa sin vínculo.
-  const conAcceso = users.filter(user => user.activo).length
   const conVinculo = users.filter(user => user.situacion === 'vinculo_vigente').length
+  // Tuvieron legajo pero ya no tienen vínculo vigente (cesados); sin legajo activo no cuenta aquí.
+  const sinVinculo = users.filter(user => user.situacion === 'sin_vinculo_vigente').length
   const withEmail = users.filter(user => user.email_institucional?.trim()).length
   const ready = !loading && !loadError
   const show = value => loading ? '…' : loadError ? '—' : value.toLocaleString('es')
@@ -48,7 +48,7 @@ export default function DashboardPage() {
   const stats = [
     { label: 'Personal registrado', value: users.length, detail: 'Ver directorio completo', icon: 'users', color: 'bg-teal-50 text-teal-700', to: '/personal' },
     { label: 'Con vínculo vigente', value: conVinculo, detail: 'Consultar situación laboral', icon: 'check', color: 'bg-sky-50 text-sky-700', to: '/personal?situacion=vinculo_vigente' },
-    { label: 'Con acceso al sistema', value: conAcceso, detail: 'Cuentas que pueden iniciar sesión', icon: 'clock', color: 'bg-amber-50 text-amber-700', to: '/personal?estado=activo' },
+    { label: 'Sin vínculo vigente', value: sinVinculo, detail: 'Ver personal sin vínculo', icon: 'clock', color: 'bg-amber-50 text-amber-700', to: '/personal?situacion=sin_vinculo_vigente' },
     { label: 'Con correo registrado', value: withEmail, detail: 'Ver personal con correo', icon: 'file', color: 'bg-violet-50 text-violet-700', to: '/personal?correo=con' },
   ]
   const situacionesPersonal = Object.entries(situaciones).map(([valor, { texto }]) => ({ label: texto, count: users.filter(user => user.situacion === valor).length, to: `/personal?situacion=${valor}`,
