@@ -2,18 +2,20 @@ import { useEffect, useId, useRef, useState } from 'react'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import api from '../../axios'
 import Icon from '../ui/Icon'
+import EscanerPdf from './EscanerPdf'
 import { validatePdf } from './pdfValidation'
 
 const button = 'rounded-lg border border-slate-200 px-3 py-2 text-xs text-teal-800 focus-visible:outline-2 focus-visible:outline-teal-600 disabled:opacity-40'
 
 // onPages(n): páginas del PDF elegido (null sin archivo nuevo o si no se pudo leer), para sugerir el folio final.
-export default function PdfPreviewField({ name, id, label, help, maxMB = 2, currentUrl, currentName, required, error, onChange, onPages }) {
+export default function PdfPreviewField({ name, id, label, help, maxMB = 2, currentUrl, currentName, required, error, onChange, onPages, escaner }) {
   const generatedId = useId()
   const helpId = `${generatedId}-help`
   const input = useRef(null)
   const panel = useRef(null)
   const canvas = useRef(null)
   const [file, setFile] = useState(null)
+  const [revision, setRevision] = useState(0)
   const [validation, setValidation] = useState('')
   const [previewError, setPreviewError] = useState('')
   const [pdf, setPdf] = useState(null)
@@ -97,6 +99,7 @@ export default function PdfPreviewField({ name, id, label, help, maxMB = 2, curr
   }, [pdf, page, width])
 
   function select(event) {
+    setRevision(value => value + 1)
     const selected = event.target.files?.[0] || null
     const message = validatePdf(selected, maxMB)
     setValidation(message)
@@ -106,6 +109,7 @@ export default function PdfPreviewField({ name, id, label, help, maxMB = 2, curr
     if (message) event.target.value = ''
   }
   function remove() {
+    setRevision(value => value + 1)
     input.current.value = ''
     setFile(null)
     setHidden(true)
@@ -114,11 +118,14 @@ export default function PdfPreviewField({ name, id, label, help, maxMB = 2, curr
   }
   const message = validation || error
   return <section className="flex h-full min-w-0 flex-col gap-3">
-    <label className="grid min-w-0 gap-2 text-xs font-medium text-slate-600" htmlFor={id}>
-      <span className="flex items-center gap-2"><Icon name="paperclip" size={18} />{label}{required ? ' *' : ''}</span>
-      <input ref={input} name={name} id={id} type="file" accept="application/pdf,.pdf" required={required && !currentUrl} onChange={select} aria-describedby={helpId} aria-invalid={Boolean(message)} className="min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus-visible:outline-2 focus-visible:outline-teal-600" />
-    </label>
-    <p id={helpId} className="text-xs text-slate-500">{help}</p>
+    <div className="flex min-h-8 items-center justify-between gap-2 text-xs font-medium text-slate-600">
+      <label htmlFor={id || generatedId} className="flex items-center gap-2"><Icon name="paperclip" size={18} />{label}{required ? ' *' : ''}</label>
+      {escaner && <EscanerPdf key={`${revision}:${escaner.tipoId}`} file={file} config={escaner} />}
+    </div>
+    <div>
+      <input ref={input} name={name} id={id || generatedId} type="file" accept="application/pdf,.pdf" required={required && !currentUrl} onChange={select} aria-describedby={helpId} aria-invalid={Boolean(message)} className="min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus-visible:outline-2 focus-visible:outline-teal-600" />
+    </div>
+    <p id={helpId} className="text-xs text-slate-500">{escaner ? 'El robot lee hasta 3 páginas en el servidor local y propone datos. Revisa antes de guardar; el escaneo no incorpora el archivo al legajo.' : help}</p>
     {message && <p role="alert" className="text-xs text-rose-700">{[].concat(message).join(' ')}</p>}
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
       <div className="flex min-w-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3">

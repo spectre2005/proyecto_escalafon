@@ -130,7 +130,7 @@ export default function Documento03Form({
     >
       <FormSplit
         pdf={
-          <PdfPreviewField
+          <PdfPreviewField escaner={{ usuario, tipoId: item.id, valores: draft, poner, campos: ['nombre', 'emisor', 'fecha_emision', ...(['b', 'e'].includes(item.letra) ? ['numero_registro'] : item.letra === 'c' ? ['numero_colegiatura', 'vigente_hasta'] : ['f', 'g'].includes(item.letra) ? ['horas'] : [])] }}
             label={`Archivo PDF (máximo ${datos.tamano_maximo_kb} KB)`}
             required
             maxMB={

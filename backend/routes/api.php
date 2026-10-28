@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\V1\DesvinculacionController;
 use App\Http\Controllers\Api\V1\DocumentoUsuarioController;
 use App\Http\Controllers\Api\V1\EmisionPersonalController;
 use App\Http\Controllers\Api\V1\EquipoAccesoController;
+use App\Http\Controllers\Api\V1\EscanerSeccionesController;
 use App\Http\Controllers\Api\V1\EvaluacionDesempenoController;
 use App\Http\Controllers\Api\V1\Evaluaciones\Seccion07Controller;
 use App\Http\Controllers\Api\V1\ExperienciaLaboralController;
@@ -40,6 +41,7 @@ use App\Http\Controllers\Api\V1\Legajos\ExpedienteController;
 use App\Http\Controllers\Api\V1\Legajos\ExpedienteImprimibleController;
 use App\Http\Controllers\Api\V1\Legajos\FamiliarPersonalController;
 use App\Http\Controllers\Api\V1\Legajos\FotoPersonalController;
+use App\Http\Controllers\Api\V1\Legajos\LegajosPasivosController;
 use App\Http\Controllers\Api\V1\Legajos\Seccion01Controller;
 use App\Http\Controllers\Api\V1\Legajos\Seccion02Controller;
 use App\Http\Controllers\Api\V1\Legajos\Seccion03Controller;
@@ -106,6 +108,8 @@ Route::prefix('v1/auth')->middleware(ApiHabilitada::class)->group(function (): v
 
 // FuncionalidadActiva: con una funcionalidad desactivada, sus rutas de creación y modificación responden 409.
 Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCambioPassword::class, FuncionalidadActiva::class, LegajoSoloLectura::class])->group(function (): void {
+    Route::post('documentos/escanear', EscanerSeccionesController::class)
+        ->middleware(['can:legajo.ver', 'can:documento.subir', 'throttle:4,1']);
     Route::prefix('correo/gmail')->middleware('can:sistema.administrar')->controller(GmailCorreoController::class)->group(function (): void {
         Route::get('/', 'estado');
         Route::post('autorizar', 'autorizar')->middleware('throttle:10,1');
@@ -168,6 +172,8 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
             ->middleware('can:sistema.administrar')->whereUuid(['usuario', 'documento']);
     });
     Route::middleware('can:legajo.ver')->group(function (): void {
+        Route::get('expedientes/legajos-pasivos', [LegajosPasivosController::class, 'index']);
+        Route::get('expedientes/legajos-pasivos/resumen', [LegajosPasivosController::class, 'resumen']);
         Route::get('expedientes', [ExpedienteController::class, 'index']);
         Route::get('ubicaciones', [ExpedienteController::class, 'locations']);
         Route::get('expediente-opciones', [ExpedienteController::class, 'editOptions']);

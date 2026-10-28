@@ -10,9 +10,11 @@ use App\Models\Legajo;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
+use App\Support\Auditoria;
 use App\Support\Documentos\EstadoDocumento;
 use App\Support\Documentos\FormulariosDatos;
 use App\Support\Seccion11;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -29,7 +31,7 @@ use Illuminate\Validation\ValidationException;
  *
  * La fecha de cese de referencia es la del vínculo (sección 02, que no se modifica aquí): la desvinculación debe coincidir
  * con ella, y si el vínculo aún no tiene cese, primero se registra en la 02. Nada se elimina: se anula con motivo.
- * El legajo no pasa a pasivo automáticamente (pendiente de confirmar con el cliente).
+ * Al registrar el último cese efectivo, el legajo activo se cierra y pasa a pasivo con auditoría.
  */
 class Seccion11Controller extends Controller
 {
@@ -90,7 +92,10 @@ class Seccion11Controller extends Controller
             $this->exigirCoherencia($data);
             $registro = new Desvinculacion([...collect($data)->except('documento_id')->all(), 'usuario_id' => $usuario, 'registrado_por' => $request->user()->getAuthIdentifier()]);
 
-            return FormulariosDatos::crearEnlazado('desvinculaciones', $usuario, $data['documento_id'] ?? null, $registro);
+            $registro = FormulariosDatos::crearEnlazado('desvinculaciones', $usuario, $data['documento_id'] ?? null, $registro);
+            $this->cerrarTrasCese($request, $registro);
+
+            return $registro;
         });
 
         return (new JsonResource($this->fila($registro, self::CAMPOS)))->response()->setStatusCode(201);
@@ -105,7 +110,7 @@ class Seccion11Controller extends Controller
             return response()->json(['message' => 'La desvinculación está anulada: no se corrige. Registra una nueva.'], 409);
         }
         $data = $this->validarCambios($request, $actual, $this->reglas($usuario));
-        DB::transaction(function () use ($actual, $data): void {
+        DB::transaction(function () use ($actual, $data, $request): void {
             $this->exigirCoherencia([...$this->fila($actual, ['vinculo_laboral_id', 'motivo_cese', 'fecha_cese'])['values'], ...$data], $actual->id);
             // Con documento de término enlazado, el motivo debe seguir correspondiendo a ese documento.
             if ($actual->documento && (isset($data['motivo_cese']) || isset($data['vinculo_laboral_id']))) {
@@ -116,6 +121,7 @@ class Seccion11Controller extends Controller
                 }
             }
             $actual->update($data);
+            $this->cerrarTrasCese($request, $actual);
         });
 
         return new JsonResource($this->fila($actual->refresh(), self::CAMPOS));
@@ -135,7 +141,7 @@ class Seccion11Controller extends Controller
         return [
             'vinculo_laboral_id' => ['required', 'uuid', Rule::exists('vinculos_laborales', 'id')->where(fn ($q) => $q->where('usuario_id', $usuario)->where('anulado', false))],
             'motivo_cese' => ['required', Rule::in(Seccion11::MOTIVOS_CESE)],
-            'fecha_cese' => 'required|date_format:Y-m-d',
+            'fecha_cese' => 'required|date_format:Y-m-d|before_or_equal:'.now('America/Lima')->toDateString(),
             'numero_resolucion' => 'nullable|string|max:60',
             'fecha_entrega_cargo' => 'nullable|date_format:Y-m-d',
             'informe_gestion_presentado' => 'sometimes|boolean',
@@ -162,6 +168,24 @@ class Seccion11Controller extends Controller
         if ($duplicada) {
             throw ValidationException::withMessages(['vinculo_laboral_id' => 'Ese vínculo ya tiene una desvinculación registrada. Corrígela o anúlala.']);
         }
+    }
+
+    private function cerrarTrasCese(Request $request, Desvinculacion $registro): void
+    {
+        $hoy = now('America/Lima')->toDateString();
+        $pendientes = VinculoLaboral::query()->where('usuario_id', $registro->usuario_id)->where('anulado', false)
+            ->where(fn (Builder $query): Builder => $query->whereNull('fecha_cese')->orWhereDate('fecha_cese', '>', $hoy))->exists();
+        if ($pendientes) {
+            return;
+        }
+        $legajo = Legajo::query()->where('usuario_id', $registro->usuario_id)->where('estado_legajo', 'activo')->lockForUpdate()->first();
+        if (! $legajo) {
+            return;
+        }
+        $antes = $legajo->only(['estado_legajo', 'fecha_pasivo']);
+        $legajo->update(['estado_legajo' => 'pasivo', 'fecha_pasivo' => $hoy]);
+        Auditoria::registrar($request, 'legajo.cerrar_por_desvinculacion', 'legajos', $legajo->id, $registro->usuario_id,
+            $antes, [...$legajo->only(['estado_legajo', 'fecha_pasivo']), 'desvinculacion_id' => $registro->id]);
     }
 
     /** @param  Collection<int, DocumentoUsuario>  $documentos  del tipo, del más reciente al más antiguo */

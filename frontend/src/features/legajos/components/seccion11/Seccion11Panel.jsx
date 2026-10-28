@@ -216,7 +216,7 @@ export default function Seccion11Panel({ usuario, categoria, onNavigate }) {
 
   const enRegistros = categoria === 's11-desvinculacion'
   return <EspacioSeccion seccion={tituloSeccion('11')} subseccion={titulo} atajos={atajosDe(enRegistros ? { registros: data.desvinculaciones.length } : { tipos: data.tipos })} etiquetaResumen="Acerca de esta sección"
-    resumen={<p className="text-slate-500">Sección 11 · Desvinculación (Anexo 01, literales a a g; la aceptación de renuncia es del Anexo 05). Ningún documento es obligatorio para todos: depende del cese y del régimen. El legajo no pasa a pasivo automáticamente.</p>}>
+    resumen={<p className="text-slate-500">Sección 11 · Desvinculación (Anexo 01, literales a a g; la aceptación de renuncia es del Anexo 05). Ningún documento es obligatorio para todos: depende del cese y del régimen. Al registrar el último cese efectivo, el legajo se cierra y pasa a pasivo. Para un reingreso se abre otro legajo conservando la misma persona.</p>}>
     {error}
     {sinLegajo && <Aviso accion={<AbrirLegajo usuario={usuario} />}>{sinLegajo} Los formularios y la carga de documentos de la sección 11 están deshabilitados.</Aviso>}
     {enRegistros ? <div id={idBloque.registros} className="scroll-mt-4"><Desvinculaciones usuario={usuario} data={data} sinLegajo={sinLegajo} onNavigate={onNavigate} /></div>

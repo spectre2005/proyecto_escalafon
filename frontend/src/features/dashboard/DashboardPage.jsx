@@ -34,9 +34,19 @@ function BanderasSinResponder({ panel }) {
   </section>
 }
 
+function TarjetaPasivos() {
+  const consulta = useLiveQuery('/expedientes/legajos-pasivos/resumen')
+  return <Link to="/legajos/pasivos" className="group rounded-2xl border border-slate-200/80 bg-white p-5 transition hover:-translate-y-1 hover:border-teal-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-600">
+    <div className="flex items-center justify-between gap-3"><p className="text-xs font-medium text-slate-600">Legajos pasivos</p><span className="grid size-10 place-items-center rounded-xl bg-slate-100 text-slate-700"><Icon name="folder" /></span></div>
+    <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-800">{consulta.error ? '—' : consulta.data ? consulta.data.data.total.toLocaleString('es') : '…'}</p>
+    <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500"><span>Consultar archivo pasivo</span><Icon name="arrow" size={16} /></div>
+  </Link>
+}
+
 export default function DashboardPage() {
   const { users, loading, loadError, refreshUsers } = useUsers()
   const administra = usePuede('sistema.administrar')
+  const veLegajos = usePuede('legajo.ver')
   // Acceso al sistema (cuenta) y situación laboral se cuentan por separado: sin cuenta no significa sin vínculo.
   const conAcceso = users.filter(user => user.activo).length
   const conVinculo = users.filter(user => user.situacion === 'vinculo_vigente').length
@@ -71,11 +81,12 @@ export default function DashboardPage() {
       <div className="flex flex-wrap items-center gap-3"><span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs text-slate-500">{date}</span></div>
     </header>
     {loadError && <div role="alert" className="mb-6 rounded-xl border border-rose-100 bg-rose-50 px-5 py-4 text-sm text-rose-800">{loadError}<button type="button" disabled={loading} onClick={refreshUsers} className="ml-3 font-semibold underline">Reintentar</button></div>}
-    <section aria-label="Resumen del personal" aria-busy={loading} className="mb-6 grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 xl:grid-cols-4">
+    <section aria-label="Resumen del personal" aria-busy={loading} className="mb-6 grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 xl:grid-cols-5">
       {stats.map(stat => <Link key={stat.label} to={stat.to} className="group rounded-2xl border border-slate-200/80 bg-white p-5 transition hover:-translate-y-1 hover:border-teal-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-600">
         <div className="flex items-center justify-between gap-3"><p className="text-xs font-medium text-slate-600">{stat.label}</p><span className={`grid size-10 place-items-center rounded-xl ${stat.color}`}><Icon name={stat.icon} /></span></div>
         <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-800">{show(stat.value)}</p><div className="mt-3 flex items-center justify-between text-[11px] text-slate-500"><span>{stat.detail}</span><Icon name="arrow" size={16} /></div>
       </Link>)}
+      {veLegajos && <TarjetaPasivos />}
     </section>
     <div className="grid gap-6 lg:grid-cols-2">
       <section className={panel} aria-busy={loading}>

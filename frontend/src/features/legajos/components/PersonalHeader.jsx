@@ -32,7 +32,7 @@ export default function PersonalHeader({ data, usuario, compacto = false, onVerF
         <p className="mt-0.5 text-xs text-slate-500">{documentType ? documentType.toUpperCase() : 'Documento'} {person.numero_doc_identidad || 'no registrado'} · {personnelType || 'Tipo de personal no registrado'} · {actual.puesto || 'Sin puesto registrado'}{legajo ? ` · Legajo ${legajo.values.numero_legajo || 'sin número'} (${legajo.values.estado_legajo === 'activo' ? 'activo' : 'cerrado'})` : ' · Sin legajo'}</p>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        {!activo && <AbrirLegajo usuario={usuario} />}
+        {!activo && <AbrirLegajo nuevo={data.legajos.length > 0} usuario={usuario} />}
         {onVerFicha && <button type="button" onClick={onVerFicha} className="text-xs font-semibold text-teal-700 hover:underline">Ver ficha completa</button>}
       </div>
     </header>
@@ -59,13 +59,13 @@ export default function PersonalHeader({ data, usuario, compacto = false, onVerF
             {data.legajos.map(legajo => <li key={legajo.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-teal-100 bg-teal-50 px-3 py-2 text-xs text-teal-900">
               <div>
               <span className="font-semibold">N.º de legajo: {legajo.values.numero_legajo || 'No registrado'}</span>
-              <span className="mt-1 block text-teal-700">Estado: {legajo.values.estado_legajo === 'pasivo' ? 'Cerrado' : legajo.values.estado_legajo ? legajo.values.estado_legajo.replaceAll('_', ' ') : 'No registrado'}</span>
+              <span className="mt-1 block text-teal-700">Estado: {legajo.values.estado_legajo === 'pasivo' ? 'Pasivo (cerrado)' : legajo.values.estado_legajo ? legajo.values.estado_legajo.replaceAll('_', ' ') : 'No registrado'}</span>
               </div>
               {legajo.values.estado_legajo === 'activo' && <CerrarLegajo usuario={usuario} legajo={legajo.id} />}
               {['pasivo', 'cerrado'].includes(legajo.values.estado_legajo) && !data.legajos.some(item => item.values.estado_legajo === 'activo') && <ReabrirLegajo usuario={usuario} legajo={legajo.id} />}
             </li>)}
           </ul> : <p className="mt-2 text-sm text-slate-500">No hay legajos registrados para esta persona.</p>}
-          {!data.legajos.some(legajo => legajo.values.estado_legajo === 'activo') && <AbrirLegajo usuario={usuario} className="mt-3" />}
+          {!data.legajos.some(legajo => legajo.values.estado_legajo === 'activo') && <AbrirLegajo nuevo={data.legajos.length > 0} usuario={usuario} className="mt-3" />}
         </section>
         {data.legajos.length > 0 && <EmisionesPersonales usuario={usuario} />}
         {data.legajos.length > 0 && <DescargarExpedienteZip usuario={usuario} />}

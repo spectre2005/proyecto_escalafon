@@ -19,7 +19,7 @@ use Illuminate\Support\Str;
  * legajo activo por persona. La sección adicional de legajos pasivos (art. 3.2, "13") es optativa y no se
  * inicializa aquí, aunque exista en el catálogo: si llega a usarse, Folios::reservar crea su fila.
  * TODO pendiente de confirmar con el cliente: formato_legajo (hoy el valor por defecto del esquema, digital),
- * ubicación física y si una persona con legajo pasivo abre uno nuevo (hoy se permite).
+ * ubicación física. Un reingreso abre un nuevo legajo y conserva el anterior como pasivo.
  */
 class AperturaLegajoController extends Controller
 {
