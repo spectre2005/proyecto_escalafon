@@ -51,8 +51,8 @@ class RequerimientosManualesTest extends TestCase
         $u = $this->persona();
         $viejo = RequerimientoDocumento::factory()->create(['usuario_id' => $u->id, 'estado' => 'abierto', 'cerrado_en' => null]);
         $avisoViejo = CorreoRequerimiento::programar($viejo, 'Aviso antiguo', 'No enviar');
-        $tipos = TipoDocumento::factory()->count(2)->create(['activo' => true]);
-        $response = $this->postJson('/api/v1/solicitudes-legajo', $this->datos($u, $tipos->modelKeys()))
+        $tipos = collect(['EXP_CERTIFICADO_TRABAJO', 'EXP_RESOLUCION_FUNCIONES'])->map(fn ($codigo) => TipoDocumento::factory()->create(['activo' => true, 'seccion_legajo_id' => 4, 'codigo' => $codigo]));
+        $response = $this->postJson('/api/v1/solicitudes-legajo', $this->datos($u, $tipos->pluck('id')->all()))
             ->assertCreated()->assertJsonCount(2, 'data')->assertJsonCount(2, 'correos')->assertJsonPath('enviados', 0);
         Http::assertNothingSent();
         foreach ($response->json('correos') as $correo) {
@@ -73,10 +73,10 @@ class RequerimientosManualesTest extends TestCase
     public function test_batch_is_atomic_when_a_document_already_has_a_manual_request(): void
     {
         $u = $this->persona();
-        $tipos = TipoDocumento::factory()->count(2)->create(['activo' => true]);
+        $tipos = collect(['EXP_CERTIFICADO_TRABAJO', 'EXP_RESOLUCION_FUNCIONES'])->map(fn ($codigo) => TipoDocumento::factory()->create(['activo' => true, 'seccion_legajo_id' => 4, 'codigo' => $codigo]));
         RequerimientoDocumento::factory()->create(['usuario_id' => $u->id, 'tipo_documento_id' => $tipos[1]->id,
             'clase' => 'documentos', 'origen' => 'legajo', 'estado' => 'abierto']);
-        $this->postJson('/api/v1/solicitudes-legajo', $this->datos($u, $tipos->modelKeys()))->assertConflict();
+        $this->postJson('/api/v1/solicitudes-legajo', $this->datos($u, $tipos->pluck('id')->all()))->assertConflict();
         $this->assertDatabaseCount('requerimientos_documentos', 1);
         $this->assertDatabaseCount('notificaciones_usuario', 0);
         Http::assertNothingSent();
@@ -85,7 +85,7 @@ class RequerimientosManualesTest extends TestCase
     public function test_manual_registration_reuses_an_automatic_pending_requirement_without_losing_history(): void
     {
         $u = $this->persona();
-        $tipo = TipoDocumento::factory()->create(['activo' => true]);
+        $tipo = TipoDocumento::factory()->create(['activo' => true, 'seccion_legajo_id' => 4, 'codigo' => 'EXP_CERTIFICADO_TRABAJO']);
         $r = RequerimientoDocumento::factory()->create(['usuario_id' => $u->id, 'tipo_documento_id' => $tipo->id,
             'clase' => 'documentos', 'origen' => 'automatico', 'estado' => 'abierto',
             'seguimiento' => [['accion' => 'detección automática', 'mensaje' => 'Histórico']]]);
@@ -132,7 +132,7 @@ class RequerimientosManualesTest extends TestCase
     public function test_sensitive_and_duplicate_document_types_are_rejected_before_registration(): void
     {
         $u = $this->persona();
-        $tipo = TipoDocumento::factory()->create(['activo' => true, 'es_dato_sensible' => true]);
+        $tipo = TipoDocumento::factory()->create(['activo' => true, 'es_dato_sensible' => true, 'seccion_legajo_id' => 1, 'codigo' => 'S01_B_DOCUMENTO_IDENTIDAD']);
         $this->postJson('/api/v1/solicitudes-legajo', $this->datos($u, [$tipo->id, $tipo->id]))->assertUnprocessable();
         $this->actuarComo(codigo: 'asistente_legajo');
         $this->postJson('/api/v1/solicitudes-legajo', $this->datos($u, [$tipo->id]))->assertForbidden();

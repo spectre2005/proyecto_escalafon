@@ -50,7 +50,7 @@ class GmailCorreoController extends Controller
             'autor' => $request->user()->id, 'base' => DB::connection()->getDatabaseName(), 'expira' => now()->addMinutes(10)->timestamp, 'retorno' => $return.'/configuracion']);
         $url = 'https://accounts.google.com/o/oauth2/v2/auth?'.http_build_query([
             'client_id' => config('services.gmail.client_id'), 'redirect_uri' => $redirect, 'response_type' => 'code',
-            'scope' => 'openid email '.GmailCorreo::ALCANCE.' '.GmailCorreo::LECTURA, 'access_type' => 'offline', 'prompt' => 'consent', 'state' => $state,
+            'scope' => 'openid email '.GmailCorreo::ALCANCE.' '.GmailCorreo::LECTURA, 'access_type' => 'offline', 'prompt' => 'select_account consent', 'state' => $state,
             'code_challenge' => rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '='), 'code_challenge_method' => 'S256',
         ]);
 
