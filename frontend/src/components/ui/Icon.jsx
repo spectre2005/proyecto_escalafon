@@ -10,6 +10,7 @@ export default function Icon({ name, size = 20, ...props }) {
     shield: <><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Z" /><path d="m8 12 3 3 5-6" /></>,
     settings: <><path d="m9 3-1 3-3 1-2 4 2 3v4l4 3 3-1 3 1 4-3v-4l2-3-2-4-3-1-1-3Z" /><circle cx="12" cy="12" r="3" /></>,
     search: <><circle cx="10" cy="10" r="6" /><path d="m15 15 6 6" /></>,
+    robot: <><rect x="5" y="7" width="14" height="13" rx="4" /><path d="M12 7V4M2 12v4m20-4v4M2 14h3m14 0h3M9 16h6" /><circle cx="12" cy="3" r="1" /><circle cx="9" cy="12" r="1" /><circle cx="15" cy="12" r="1" /></>,
     building: <><path d="M4 21V5l8-2v18M12 8h8v13M2 21h20M7 8h2M7 12h2M7 16h2M15 12h2M15 16h2" /></>,
     arrow: <path d="M4 12h16m-6-6 6 6-6 6" />,
     plus: <path d="M12 5v14M5 12h14" />,

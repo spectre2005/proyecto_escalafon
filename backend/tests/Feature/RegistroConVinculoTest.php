@@ -3,17 +3,23 @@
 namespace Tests\Feature;
 
 use App\Models\AuditoriaEvento;
+use App\Models\DocumentoUsuario;
 use App\Models\Legajo;
 use App\Models\LegajoSeccion;
 use App\Models\PerfilAdministrativo;
 use App\Models\PerfilDocente;
 use App\Models\RegimenNormativo;
+use App\Models\TipoDocumento;
 use App\Models\UnidadOrganica;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
+use Database\Seeders\Seccion02CatalogoSeeder;
 use Database\Seeders\SeccionesLegajoCatalogoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
+use Tests\Concerns\SubeDocumentos;
 use Tests\TestCase;
 
 /**
@@ -23,6 +29,7 @@ use Tests\TestCase;
 class RegistroConVinculoTest extends TestCase
 {
     use RefreshDatabase;
+    use SubeDocumentos;
 
     private const URL = '/api/v1/usuarios/con-vinculo';
 
@@ -59,6 +66,71 @@ class RegistroConVinculoTest extends TestCase
         $this->assertNull(Usuario::query()->where('numero_doc_identidad', '71000001')->first());
         $this->assertSame([0, 0, 0, 0, 0], [Legajo::query()->count(), LegajoSeccion::query()->count(), VinculoLaboral::query()->count(),
             PerfilDocente::query()->count(), PerfilAdministrativo::query()->count()]);
+    }
+
+    private function datosConPdf(): array
+    {
+        $this->seed(Seccion02CatalogoSeeder::class);
+        $tipo = TipoDocumento::query()->where('codigo', 'S02_F_CONTRATO')->where('activo', true)->firstOrFail();
+
+        return [...$this->datos('administrativo'), 'documento_ingreso' => [
+            'tipo_documento_id' => $tipo->id, 'emisor' => 'Universidad de ejemplo',
+            'fecha_emision' => '2026-02-25', 'modalidad_presentacion' => 'copia_simple',
+        ]];
+    }
+
+    public function test_manual_registration_incorporates_pdf_and_links_it_to_the_first_employment(): void
+    {
+        $this->actuarComo();
+        Storage::fake(config('legajo.disco_documentos'));
+        $datos = $this->datosConPdf();
+        $r = $this->post(self::URL, ['registro' => json_encode($datos), 'documento_ingreso_pdf' => $this->pdf('contrato.pdf')],
+            ['Accept' => 'application/json'])->assertCreated();
+        $doc = DocumentoUsuario::findOrFail($r->json('data.documento_ingreso.id'));
+        $this->assertSame($r->json('data.vinculo.id'), $doc->vinculo_laboral_id);
+        $this->assertSame($r->json('data.legajo.id'), $doc->legajo_id);
+        $this->assertSame([1, 2], [$doc->folio_inicio, $doc->folio_fin]);
+        Storage::disk(config('legajo.disco_documentos'))->assertExists($doc->archivo->storage_path);
+        $this->assertDatabaseHas('auditoria_eventos', ['entidad_id' => $doc->id, 'accion' => 'documento.creado']);
+    }
+
+    public function test_invalid_or_missing_pdf_does_not_create_a_person_or_a_legajo(): void
+    {
+        $this->actuarComo();
+        Storage::fake(config('legajo.disco_documentos'));
+        $datos = $this->datosConPdf();
+        $this->postJson(self::URL, $datos)->assertUnprocessable()->assertJsonValidationErrors('documento_ingreso_pdf');
+        $this->post(self::URL, [...$datos, 'documento_ingreso_pdf' => UploadedFile::fake()->createWithContent('falso.pdf', 'no es pdf')],
+            ['Accept' => 'application/json'])->assertUnprocessable()->assertJsonValidationErrors('documento_ingreso_pdf');
+        $this->nadaCreado();
+        $this->assertDatabaseCount('archivos_documento', 0);
+    }
+
+    public function test_failure_after_writing_pdf_rolls_back_records_and_removes_file(): void
+    {
+        $this->actuarComo();
+        Storage::fake(config('legajo.disco_documentos'));
+        $datos = $this->datosConPdf();
+        DocumentoUsuario::creating(fn () => throw new RuntimeException('falla al incorporar el PDF'));
+        $this->withoutExceptionHandling();
+        try {
+            $this->post(self::URL, [...$datos, 'documento_ingreso_pdf' => $this->pdf()], ['Accept' => 'application/json']);
+            $this->fail('Debía fallar la carga.');
+        } catch (RuntimeException $error) {
+            $this->assertSame('falla al incorporar el PDF', $error->getMessage());
+        }
+        $this->nadaCreado();
+        $this->assertDatabaseCount('archivos_documento', 0);
+        $this->assertSame([], Storage::disk(config('legajo.disco_documentos'))->allFiles());
+    }
+
+    public function test_attaching_requires_upload_permission(): void
+    {
+        config(['permisos.roles.ingreso_sin_adjuntar' => ['usuarios.gestionar', 'legajo.abrir', 'legajo.editar']]);
+        $this->actuarComo(null, 'ingreso_sin_adjuntar');
+        $datos = $this->datosConPdf();
+        $this->post(self::URL, [...$datos, 'documento_ingreso_pdf' => $this->pdf()], ['Accept' => 'application/json'])->assertForbidden();
+        $this->nadaCreado();
     }
 
     public function test_a_teacher_is_registered_with_open_file_link_and_job_data(): void

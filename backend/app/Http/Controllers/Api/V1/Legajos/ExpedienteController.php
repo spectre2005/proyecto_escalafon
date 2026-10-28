@@ -59,6 +59,7 @@ use App\Models\VinculoLaboral;
 use App\Support\AplicacionDocumental;
 use App\Support\Auditoria;
 use App\Support\CambioDiscapacidad;
+use App\Support\Parametros;
 use App\Support\PerfilPendiente;
 use App\Support\PuestoActual;
 use App\Support\RegimenesLaborales;
@@ -365,6 +366,9 @@ class ExpedienteController extends Controller
     {
         return response()->json(['data' => [
             'unidades' => UnidadOrganica::query()->orderBy('nombre')->get(['id', 'nombre', 'activo']),
+            'documentos_ingreso' => TipoDocumento::query()->where('seccion_legajo_id', 2)->where('activo', true)
+                ->whereIn('codigo', ['S02_C_RESOLUCION_DESIGNACION', 'S02_E_RESOLUCION_CARRERA', 'S02_F_CONTRATO'])->orderBy('nombre')->get(['id', 'nombre', 'requiere_num_resolucion']),
+            'maximo_pdf_kb' => Parametros::entero('tamano_maximo_pdf_kb'),
             'regimenes' => RegimenNormativo::query()->orderBy('nombre')->get(['id', 'codigo', 'nombre', 'aplica_a', 'activo']),
         ]]);
     }

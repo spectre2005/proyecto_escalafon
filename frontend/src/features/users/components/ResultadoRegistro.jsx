@@ -17,9 +17,9 @@ export default function ResultadoRegistro({ registro, puedeVerFicha, onOtra, onC
         <div><dt className="text-[#7b9181]">N.º de legajo</dt><dd className="mt-1 text-base font-semibold text-[#243f43]">{legajo.numero_legajo}</dd></div>
         <div><dt className="text-[#7b9181]">DNI</dt><dd className="mt-1 text-base font-semibold text-[#243f43]">{usuario.numero_doc_identidad}</dd></div>
       </dl>
-      <p className="mt-5 text-xs text-[#7b9181]">Siguiente paso: subir la resolución o el contrato y los demás documentos de incorporación (sección 02).</p>
+      <p className="mt-5 text-xs text-[#7b9181]">{registro.documento_ingreso ? 'El PDF de ingreso ya está incorporado y vinculado. Puedes revisarlo y completar los demás documentos en la sección 02.' : 'Siguiente paso: subir la resolución o el contrato y los demás documentos de incorporación (sección 02).'}</p>
       <div className="mt-5 flex flex-wrap justify-center gap-2">
-        {puedeVerFicha && <Link to={rutaDocumentosIngreso(usuario.id)} className={`${accion} bg-[#26776d] text-white hover:bg-[#1b625a]`}><Icon name="upload" size={16} />Subir documentos de ingreso</Link>}
+        {puedeVerFicha && <Link to={rutaDocumentosIngreso(usuario.id)} className={`${accion} bg-[#26776d] text-white hover:bg-[#1b625a]`}><Icon name="upload" size={16} />{registro.documento_ingreso ? 'Ver documento de ingreso' : 'Subir documentos de ingreso'}</Link>}
         {puedeVerFicha && <Link to={rutaFicha(usuario.id)} className={`${accion} border border-[#dbe6e1] bg-white text-[#4f6d63] hover:bg-[#edf6f2]`}>Ir a la ficha</Link>}
         <button type="button" onClick={onOtra} className={`${accion} border border-[#dbe6e1] bg-white text-[#4f6d63] hover:bg-[#edf6f2]`}><Icon name="plus" size={16} />Registrar otra persona</button>
       </div>

@@ -1,3 +1,5 @@
+import { validatePdf } from '../../../components/pdf/pdfValidation'
+import AdjuntoIngreso from './AdjuntoIngreso'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Icon from '../../../components/ui/Icon'
@@ -86,6 +88,20 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   const ubicacionRef = useRef(ubicacionEstado)
   const puedeSensibles = usePuede('datos_sensibles.ver')
   const [vinculo, setVinculo] = useState(vinculoInicial)
+  const puedeSubir = usePuede('documento.subir')
+  const [archivoIngreso, setArchivoIngreso] = useState(null)
+  const [errorArchivoIngreso, setErrorArchivoIngreso] = useState('')
+  const maximoPdfKb = opciones.data?.data?.maximo_pdf_kb || 10240
+  function elegirArchivoIngreso(archivo) {
+    setErrorArchivoIngreso('')
+    const fallo = validatePdf(archivo, maximoPdfKb / 1024)
+    if (fallo) {
+      setErrorArchivoIngreso(fallo + ' El archivo anterior se conserva si lo había.')
+      return
+    }
+    setArchivoIngreso(archivo)
+  }
+
   const [puestos, setPuestos] = useState(puestosVacios)
   const [avisos, setAvisos] = useState([])
   const [errores, setErrores] = useState({})
@@ -221,7 +237,8 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
     const pendientes = erroresPersona(persona, { catalogo, usuarios, ubicacion, ubigeoId })
     if (pendientes.length) { setAvisos(pendientes); return irA(1) }
     setErrores({})
-    const resultado = await onGuardar(armarRegistro({ persona, catalogo, ubigeoId, condiciones, puedeDiscapacidad, vinculo, puestos }))
+    const payload = armarRegistro({ persona, catalogo, ubigeoId, condiciones, puedeDiscapacidad, vinculo, puestos })
+    const resultado = await onGuardar(payload)
     if (!resultado.ok) {
       setExistenteBackend(resultado.existente ? { dni: persona.numero_doc_identidad, persona: resultado.existente } : null)
       setErrores(resultado.errors || {})
@@ -340,6 +357,9 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
           </Grupo>
           <Grupo titulo="B. Documento de ingreso">
             <CamposDocumentoIngreso draft={vinculo} set={setCampoVinculo} errors={erroresDe(errores, 'vinculo')} />
+            <AdjuntoIngreso archivo={archivoIngreso} onArchivo={elegirArchivoIngreso}
+              onAplicarEscaneo={propuestas => setVinculo(prev => ({ ...prev, ...propuestas }))}
+              maximoKb={maximoPdfKb} puedeSubir={puedeSubir} errorArchivo={errorArchivoIngreso} />
           </Grupo>
         </>}
         {paso === 3 && <>

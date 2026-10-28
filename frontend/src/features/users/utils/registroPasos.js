@@ -16,6 +16,7 @@ const EN_PASO_3 = [...banderasPuesto, 'regimen_laboral']
 
 /** Paso donde está el campo de un error del backend (las condiciones del puesto se muestran en el paso 3). */
 export function pasoDeError(clave) {
+  if (clave === 'documento_ingreso' || clave === 'documento_ingreso_pdf' || clave.startsWith('documento_ingreso.')) return 2
   if (clave === 'usuarios' || clave.startsWith('usuarios.')) return 1
   if (clave === 'datos_puesto' || clave.startsWith('datos_puesto.')) return 3
   if (clave === 'vinculo' || clave.startsWith('vinculo.')) return EN_PASO_3.includes(clave.slice('vinculo.'.length)) ? 3 : 2

@@ -18,6 +18,8 @@ test('backend errors lead to the step that holds the field', () => {
   assert.equal(pasoDeError('usuarios'), 1)
   assert.equal(pasoDeError('vinculo.nombre_puesto'), 2)
   assert.equal(pasoDeError('vinculo.numero_documento_vinculo'), 2)
+  assert.equal(pasoDeError('documento_ingreso_pdf'), 2)
+  assert.equal(pasoDeError('documento_ingreso.fecha_emision'), 2)
   assert.equal(pasoDeError('vinculo.tiene_periodo_prueba'), 3)
   // El tipo de vínculo se elige en el paso 3, con los datos del puesto.
   assert.equal(pasoDeError('vinculo.regimen_laboral'), 3)

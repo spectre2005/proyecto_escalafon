@@ -6,12 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreUsuarioConVinculoRequest;
 use App\Http\Requests\StoreUsuariosRequest;
 use App\Http\Resources\UsuarioResource;
+use App\Models\DocumentoUsuario;
+use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
 use App\Support\AperturaLegajo;
 use App\Support\Auditoria;
 use App\Support\CambioDiscapacidad;
 use App\Support\ConfiguracionFuncionalidades;
+use App\Support\Documentos\AuditoriaDocumento;
+use App\Support\Documentos\CargaDocumento;
 use App\Support\RegimenesLaborales;
 use App\Support\SituacionLaboral;
 use Illuminate\Database\QueryException;
@@ -22,10 +26,12 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class UsuarioController extends Controller
 {
@@ -157,27 +163,64 @@ class UsuarioController extends Controller
             'Registrar a la persona con su vínculo requiere abrir legajos (legajo.abrir) y registrar vínculos (legajo.editar).');
         abort_unless(ConfiguracionFuncionalidades::activa('s02.vinculos'), 409,
             '«'.ConfiguracionFuncionalidades::definicion('s02.vinculos')['nombre'].'» está desactivada en la configuración de la institución.');
+        $ingreso = $request->validated('documento_ingreso');
+        $tipoIngreso = $ingreso ? TipoDocumento::query()->findOrFail($ingreso['tipo_documento_id']) : null;
+        if ($tipoIngreso) {
+            abort_unless($actor->can('documento.subir'), 403, 'No tienes permiso para adjuntar documentos al legajo.');
+            abort_if(ConfiguracionFuncionalidades::inactivaPorTipo($tipoIngreso->id), 409, 'Este tipo de documento está desactivado.');
+            if ($tipoIngreso->requiere_num_resolucion && ! filled($request->vinculo()['numero_documento_vinculo'] ?? null)) {
+                throw ValidationException::withMessages(['vinculo.numero_documento_vinculo' => 'Indica el número real de la resolución adjunta.']);
+            }
+        }
         [$registro] = $this->registros($request->validated('usuarios'), $request);
 
-        [$legajo, $vinculo] = DB::transaction(function () use ($registro, $request, $actor): array {
-            $this->insertar([$registro], $request);
-            $legajo = AperturaLegajo::abrir($registro['id']);
-            // El tipo de personal y la ley del vínculo son los de la persona; el tipo de vínculo, el que se indicó.
-            $vinculo = VinculoLaboral::query()->create([...$request->vinculo(), 'usuario_id' => $registro['id'], 'tipo_personal' => $registro['tipo_personal'],
-                'regimen_normativo_id' => $registro['regimen_normativo_id'], 'registrado_por' => $actor->getAuthIdentifier()]);
-            // Sin datos del puesto (todos opcionales en el administrativo) no se crea un perfil vacío: se registra después en 2.2.
-            $perfil = $request->datosPuesto() === [] ? null
-                : ($registro['tipo_personal'] === 'docente' ? $vinculo->perfilDocente() : $vinculo->perfilAdministrativo())->create($request->datosPuesto());
-            Auditoria::registrar($request, 'legajo.abrir', 'legajos', $legajo->id, $registro['id'], null, $legajo->getAttributes());
-            Auditoria::registrar($request, 'vinculo.registrar', 'vinculos_laborales', $vinculo->id, $registro['id'], null, [...$vinculo->getAttributes(), 'datos_puesto' => $perfil?->getAttributes()]);
+        $archivoGuardado = null;
+        $documentoIngreso = null;
+        try {
+            [$legajo, $vinculo] = DB::transaction(function () use ($registro, $request, $actor, $tipoIngreso, $ingreso, &$archivoGuardado, &$documentoIngreso): array {
+                $this->insertar([$registro], $request);
+                $legajo = AperturaLegajo::abrir($registro['id']);
+                // El tipo de personal y la ley del vínculo son los de la persona; el tipo de vínculo, el que se indicó.
+                $vinculo = VinculoLaboral::query()->create([...$request->vinculo(), 'usuario_id' => $registro['id'], 'tipo_personal' => $registro['tipo_personal'],
+                    'regimen_normativo_id' => $registro['regimen_normativo_id'], 'registrado_por' => $actor->getAuthIdentifier()]);
+                // Sin datos del puesto (todos opcionales en el administrativo) no se crea un perfil vacío: se registra después en 2.2.
+                $perfil = $request->datosPuesto() === [] ? null
+                    : ($registro['tipo_personal'] === 'docente' ? $vinculo->perfilDocente() : $vinculo->perfilAdministrativo())->create($request->datosPuesto());
+                Auditoria::registrar($request, 'legajo.abrir', 'legajos', $legajo->id, $registro['id'], null, $legajo->getAttributes());
+                Auditoria::registrar($request, 'vinculo.registrar', 'vinculos_laborales', $vinculo->id, $registro['id'], null, [...$vinculo->getAttributes(), 'datos_puesto' => $perfil?->getAttributes()]);
 
-            return [$legajo, $vinculo];
-        });
+                if ($tipoIngreso) {
+                    try {
+                        $documentoIngreso = CargaDocumento::registrar($legajo, $tipoIngreso, $request->file('documento_ingreso_pdf'), [
+                            'emisor' => $ingreso['emisor'], 'fecha_emision' => $ingreso['fecha_emision'],
+                            'fecha_incorporacion' => now('America/Lima')->toDateString(),
+                            'modalidad_presentacion' => $ingreso['modalidad_presentacion'],
+                            'titular_nombre' => mb_substr(trim($registro['nombres'].' '.$registro['apellido_paterno'].' '.($registro['apellido_materno'] ?? '')), 0, 200),
+                            'titular_documento' => $registro['numero_doc_identidad'], 'relacion_titular' => 'servidor',
+                            'num_resolucion' => $request->vinculo()['numero_documento_vinculo'] ?? null,
+                        ], $actor->getAuthIdentifier(), $request->ip(), enlaceId: $vinculo->id, foliosAutomaticos: true,
+                            completar: fn (DocumentoUsuario $doc) => AuditoriaDocumento::registrar($doc, $request, 'documento.creado'));
+                        $archivoGuardado = $documentoIngreso->archivo->only(['almacenamiento', 'storage_path']);
+                    } catch (ValidationException $error) {
+                        throw ValidationException::withMessages(['documento_ingreso_pdf' => collect($error->errors())->flatten()->all()]);
+                    }
+                }
+
+                return [$legajo, $vinculo];
+            });
+
+        } catch (Throwable $error) {
+            if ($archivoGuardado) {
+                Storage::disk($archivoGuardado['almacenamiento'])->delete($archivoGuardado['storage_path']);
+            }
+            throw $error;
+        }
 
         return response()->json(['data' => [
             'usuario' => new UsuarioResource(SituacionLaboral::cargar(Usuario::query()->with('regimenNormativo'))->findOrFail($registro['id'])),
             'legajo' => $legajo->only(['id', 'numero_legajo', 'estado_legajo']),
             'vinculo' => $vinculo->only(['id', 'regimen_laboral', 'nombre_puesto']),
+            'documento_ingreso' => $documentoIngreso?->only(['id', 'folio_inicio', 'folio_fin', 'vinculo_laboral_id', 'tipo_documento_id']),
         ]], 201);
     }
 

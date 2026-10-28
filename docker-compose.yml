@@ -74,6 +74,20 @@ services:
         condition: service_completed_successfully
     command: sh -c "pnpm install && pnpm dev --host"
 
+  ollama:
+    profiles: ["ia"]
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_NO_CLOUD: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_MAX_QUEUE: "2"
+    volumes:
+      - ollama_models:/root/.ollama
+    mem_limit: 3g
+    cpus: 2
+    restart: unless-stopped
+
   db:
     image: postgres:16-alpine
     healthcheck:
@@ -91,6 +105,7 @@ services:
       - dbdata:/var/lib/postgresql/data
 
 volumes:
+  ollama_models:
   dbdata:
   vendor:
   frontend_node_modules:

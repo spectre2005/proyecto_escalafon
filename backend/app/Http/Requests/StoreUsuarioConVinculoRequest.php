@@ -3,10 +3,14 @@
 namespace App\Http\Requests;
 
 use App\Models\Usuario;
+use App\Support\Documentos\ArchivoPdf;
+use App\Support\Parametros;
 use App\Support\ReglasVinculo;
 use Illuminate\Contracts\Validation\Validator as ValidatorContract;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\Validator as Validacion;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Validator;
 
 /**
@@ -23,6 +27,18 @@ class StoreUsuarioConVinculoRequest extends StoreUsuariosRequest
     /** @var array<string, mixed> */
     private array $datosPuesto = [];
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->exists('registro')) {
+            $datos = is_string($this->input('registro')) ? json_decode($this->input('registro'), true) : null;
+            if (! is_array($datos) || array_is_list($datos)) {
+                throw ValidationException::withMessages(['documento_ingreso' => 'No se pudo leer el formulario adjunto. Vuelve a intentarlo.']);
+            }
+            $this->request->remove('registro');
+            $this->merge($datos);
+        }
+    }
+
     public function rules(): array
     {
         return [
@@ -31,6 +47,12 @@ class StoreUsuarioConVinculoRequest extends StoreUsuariosRequest
             'vinculo' => ['required', 'array'],
             // Puede venir vacío (los datos del puesto administrativo son todos opcionales); el docente exige su condición.
             'datos_puesto' => ['present', 'array'],
+            'documento_ingreso' => ['required_with:documento_ingreso_pdf', 'array:tipo_documento_id,emisor,fecha_emision,modalidad_presentacion'],
+            'documento_ingreso_pdf' => ['required_with:documento_ingreso', 'file', 'max:'.Parametros::entero('tamano_maximo_pdf_kb')],
+            'documento_ingreso.tipo_documento_id' => ['required_with:documento_ingreso', 'uuid', Rule::exists('tipos_documento', 'id')->where(fn ($q) => $q->where('seccion_legajo_id', 2)->where('activo', true)->whereIn('codigo', ['S02_C_RESOLUCION_DESIGNACION', 'S02_E_RESOLUCION_CARRERA', 'S02_F_CONTRATO']))],
+            'documento_ingreso.emisor' => 'required_with:documento_ingreso|string|max:200',
+            'documento_ingreso.fecha_emision' => 'required_with:documento_ingreso|date_format:Y-m-d|before_or_equal:today',
+            'documento_ingreso.modalidad_presentacion' => ['required_with:documento_ingreso', Rule::in(['original', 'copia_simple', 'copia_fedateada', 'digital_firmado'])],
         ];
     }
 
@@ -38,8 +60,11 @@ class StoreUsuarioConVinculoRequest extends StoreUsuariosRequest
     {
         parent::withValidator($validator);
         $validator->after(function (Validator $validator): void {
-            foreach (array_diff(array_keys($this->all()), ['usuarios', 'vinculo', 'datos_puesto']) as $campo) {
+            foreach (array_diff(array_keys($this->all()), ['usuarios', 'vinculo', 'datos_puesto', 'documento_ingreso', 'documento_ingreso_pdf']) as $campo) {
                 $validator->errors()->add($campo, 'Campo no permitido.');
+            }
+            if ($this->hasFile('documento_ingreso_pdf') && ! ArchivoPdf::esPdf($this->file('documento_ingreso_pdf'))) {
+                $validator->errors()->add('documento_ingreso_pdf', 'El archivo debe ser un PDF válido; se comprueba su contenido.');
             }
             $this->vinculo = $this->parte($validator, 'vinculo', array_diff_key(ReglasVinculo::VINCULO, array_flip(ReglasVinculo::NO_EN_ALTA)));
             $tipo = $this->input('usuarios.0.tipo_personal');

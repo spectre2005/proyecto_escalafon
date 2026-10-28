@@ -15,7 +15,14 @@ export async function saveUsers(usuarios) {
 
 // Registro manual: una persona con su primer vínculo laboral y sus datos del puesto (abre el legajo). Todo o nada.
 export async function saveUserWithLink(payload) {
-  const { data } = await api.post('/usuarios/con-vinculo', payload)
+  let cuerpo = payload
+  if (payload.documento_ingreso?.pdf) {
+    const { pdf, ...metadatos } = payload.documento_ingreso
+    cuerpo = new FormData()
+    cuerpo.append('registro', JSON.stringify({ ...payload, documento_ingreso: metadatos }))
+    cuerpo.append('documento_ingreso_pdf', pdf)
+  }
+  const { data } = await api.post('/usuarios/con-vinculo', cuerpo)
   return data.data
 }
 
