@@ -23,7 +23,7 @@ final class SituacionLaboral
     public static function cargar(Builder $query): Builder
     {
         return $query->withExists([
-            'vinculosLaborales as tiene_vinculo_vigente' => fn (Builder $vinculos) => $vinculos->where('anulado', false)->whereNull('fecha_cese'),
+            'vinculosLaborales as tiene_vinculo_vigente' => fn (Builder $vinculos) => $vinculos->etapaActual()->where('anulado', false)->whereNull('fecha_cese'),
             'legajos as tiene_legajo_activo' => fn (Builder $legajos) => $legajos->where('estado_legajo', 'activo'),
         ]);
     }

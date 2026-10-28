@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\PerteneceALegajo;
 use Database\Factories\LicenciaPermisoFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,6 +15,7 @@ class LicenciaPermiso extends Model
     use HasFactory;
 
     use HasUuids;
+    use PerteneceALegajo;
 
     protected $table = 'licencias_permisos';
 

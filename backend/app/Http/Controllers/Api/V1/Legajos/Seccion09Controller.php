@@ -47,7 +47,7 @@ class Seccion09Controller extends Controller
         $afiliaciones = $this->afiliaciones($usuario)->where('anulado', false)->with('registradoPor')
             ->orderByDesc('fecha_inicio')->orderBy('id')->get();
         $documentos = DocumentoUsuario::query()->where('usuario_id', $usuario)->where('seccion_legajo_id', Seccion09::SECCION)
-            ->whereIn('legajo_id', Legajo::query()->where('usuario_id', $usuario)->select('id'))
+            ->where('legajo_id', Legajo::paraConsulta($usuario)?->id)
             ->with(['archivo', 'recepcionadoPor', 'createdBy'])->orderByDesc('created_at')->orderByDesc('id')->get()->groupBy('tipo_documento_id');
         $tipos = TipoDocumento::query()->where('seccion_legajo_id', Seccion09::SECCION)->where('activo', true)->orderBy('orden')->get()
             ->map(fn (TipoDocumento $tipo): array => $this->tipo($tipo, $documentos->get($tipo->id, collect())))->values();
@@ -149,13 +149,13 @@ class Seccion09Controller extends Controller
 
     private function controversias(string $usuario): Builder
     {
-        return Controversia::query()->where('usuario_id', $usuario);
+        return Controversia::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id);
     }
 
     /** Solo afiliaciones a sindicato: las de otro tipo no existen para esta sección (responden 404). */
     private function afiliaciones(string $usuario): Builder
     {
-        return Afiliacion::query()->where('usuario_id', $usuario)->where('tipo', Seccion09::AFILIACION);
+        return Afiliacion::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->where('tipo', Seccion09::AFILIACION);
     }
 
     /** @param  Collection<int, DocumentoUsuario>  $documentos  del tipo, del más reciente al más antiguo */

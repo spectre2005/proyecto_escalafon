@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Legajo;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
@@ -31,6 +32,11 @@ final class PerfilDocumental
     /** @param Collection<int, VinculoLaboral> $vinculos */
     public static function de(Usuario $usuario, Collection $vinculos): self
     {
+        $etapa = Legajo::paraConsulta($usuario->id);
+        if ($etapa) {
+            $ids = VinculoLaboral::query()->where('usuario_id', $usuario->id)->delLegajo($etapa->id)->pluck('id');
+            $vinculos = $vinculos->filter(fn (VinculoLaboral $vinculo): bool => $ids->contains($vinculo->id));
+        }
         // Los vínculos anulados no cuentan para el perfil.
         $vigentes = $vinculos->whereNull('fecha_cese')->reject(fn (VinculoLaboral $vinculo): bool => (bool) $vinculo->anulado);
         $origen = $vigentes->isEmpty() ? collect([$usuario]) : $vigentes;

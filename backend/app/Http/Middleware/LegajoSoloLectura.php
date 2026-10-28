@@ -38,7 +38,12 @@ class LegajoSoloLectura
                     'El documento pertenece a un legajo cerrado. Solo se permite visualizar y descargar.');
             }
 
-            return $next($request);
+            app()->instance('legajo.escritura', $legajos->firstWhere('estado_legajo', 'activo')?->id);
+            try {
+                return $next($request);
+            } finally {
+                app()->forgetInstance('legajo.escritura');
+            }
         });
     }
 }

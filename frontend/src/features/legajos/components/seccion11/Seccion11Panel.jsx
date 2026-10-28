@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import Aviso from '../documentos/AvisoSeccion'
 import Icon from '../../../../components/ui/Icon'
 import { useState } from 'react'
@@ -58,7 +59,7 @@ function enlazadoA(tipo, documento, data) {
 function Vinculos({ data, onNavigate }) {
   if (!data.vinculos.length) return <Aviso accion={<button onClick={() => onNavigate('s02-vinculo')} className={enlace}>Ir a 2.2</button>}>La persona no tiene vínculos laborales registrados. La desvinculación se registra sobre un vínculo de la sección 02.</Aviso>
   return <section aria-label="Vínculos laborales" className="mb-8">
-    <h3 className="mb-3 text-base font-semibold text-slate-800">Vínculos laborales</h3>
+    <h3 className="mb-3 text-base font-semibold text-slate-800">Vínculos de esta etapa</h3>
     <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white"><table className="w-full text-left text-xs">
       <thead className="bg-slate-50 text-slate-500"><tr>{['Vínculo', 'Tipo de vínculo', 'Fecha de cese (sección 02)', 'Desvinculación', 'Documentos'].map(t => <th key={t} className="px-4 py-3 font-medium">{t}</th>)}</tr></thead>
       <tbody>{data.vinculos.map(v => <tr key={v.id} className="border-t border-slate-100 text-slate-700">
@@ -115,7 +116,7 @@ function Desvinculaciones({ usuario, data, sinLegajo, onNavigate }) {
   return <>
     <Vinculos data={data} onNavigate={onNavigate} />
     {data.desvinculaciones.some(d => !d.coincide_fecha_vinculo) && <Aviso>Hay desvinculaciones cuya fecha de cese ya no coincide con la del vínculo (se corrigió en la sección 02). Corrígelas para que coincidan.</Aviso>}
-    <Registros documento={record => <DocumentoDeRegistro tipos={data.tipos} record={record} />} titulo="Desvinculaciones" agregar="Registrar desvinculación" registros={data.desvinculaciones} bloqueo={bloqueo} permisos={permisosSeccion11}
+    <Registros documento={record => <DocumentoDeRegistro tipos={data.tipos} record={record} />} titulo="Desvinculaciones de esta etapa" agregar="Registrar desvinculación" registros={data.desvinculaciones} bloqueo={bloqueo} permisos={permisosSeccion11}
       adjuntar={record => <Adjuntar usuario={usuario} data={data} record={record} sinLegajo={sinLegajo} />}
       vacio="No hay desvinculaciones registradas. No todas las personas han cesado."
       tituloRegistro={d => etiqueta(motivosCese, d.values.motivo_cese)} subtitulo={d => `${vinculoDe(data, d.values.vinculo_laboral_id) ? etiquetaVinculo11(vinculoDe(data, d.values.vinculo_laboral_id)) : 'Vínculo no encontrado'} · cese ${fecha(d.values.fecha_cese)}`}
@@ -212,13 +213,14 @@ export default function Seccion11Panel({ usuario, categoria, onNavigate }) {
   const { titulo } = categoriasSeccion11[categoria]
   const error = request.error && <p role="alert" className="mb-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{request.error.response?.status === 403 ? 'No tienes permiso para ver la sección 11.' : 'No se pudo actualizar la sección. Lo que ves puede no estar al día.'} <button onClick={request.retry} className="font-semibold underline">Reintentar</button></p>
   if (!data) return error || <p role="status" className="rounded-xl bg-slate-100 p-6 text-sm text-slate-500">Cargando…</p>
-  const sinLegajo = !data.legajo && 'La persona no tiene un legajo abierto (activo).'
+  const sinLegajo = (!data.legajo || data.legajo.estado_legajo !== 'activo') && 'Este legajo está en solo consulta. Para un reingreso, abre un nuevo legajo.'
 
   const enRegistros = categoria === 's11-desvinculacion'
   return <EspacioSeccion seccion={tituloSeccion('11')} subseccion={titulo} atajos={atajosDe(enRegistros ? { registros: data.desvinculaciones.length } : { tipos: data.tipos })} etiquetaResumen="Acerca de esta sección"
     resumen={<p className="text-slate-500">Sección 11 · Desvinculación (Anexo 01, literales a a g; la aceptación de renuncia es del Anexo 05). Ningún documento es obligatorio para todos: depende del cese y del régimen. Al registrar el último cese efectivo, el legajo se cierra y pasa a pasivo. Para un reingreso se abre otro legajo conservando la misma persona.</p>}>
     {error}
-    {sinLegajo && <Aviso accion={<AbrirLegajo usuario={usuario} />}>{sinLegajo} Los formularios y la carga de documentos de la sección 11 están deshabilitados.</Aviso>}
+    {data.historial?.length > 0 && <details className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Historial de desvinculaciones anteriores ({data.historial.length})</summary><ul className="mt-3 space-y-3">{data.historial.map(registro => <li key={registro.id} className="rounded-lg bg-white p-3 text-xs text-slate-600"><p className="font-semibold">{registro.legajo?.numero_legajo || 'Legajo anterior sin identificar'} · {registro.puesto || 'Vínculo anterior'}</p><p className="mt-1">Cese: {fecha(registro.fecha_cese)} · {motivosCese[registro.motivo_cese] || registro.motivo_cese}</p><Link to={`/legajos/${usuario}/historial/${registro.legajo?.id || 'todos'}`} className="mt-1 inline-block font-semibold text-teal-700 underline">Consultar historial</Link></li>)}</ul><p className="mt-3 text-xs text-slate-500">Estos ceses corresponden a etapas anteriores; no desvinculan a la persona de su nueva contratación.</p></details>}
+    {sinLegajo && <Aviso accion={<AbrirLegajo nuevo={Boolean(data.legajo)} usuario={usuario} />}>{sinLegajo} Los formularios y la carga de documentos de la sección 11 están deshabilitados.</Aviso>}
     {enRegistros ? <div id={idBloque.registros} className="scroll-mt-4"><Desvinculaciones usuario={usuario} data={data} sinLegajo={sinLegajo} onNavigate={onNavigate} /></div>
       : <Documentos usuario={usuario} data={data} sinLegajo={sinLegajo} />}
   </EspacioSeccion>

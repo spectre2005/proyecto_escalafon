@@ -16,6 +16,9 @@ final class VigenciaLaboral
 
     public static function consulta(Builder $query, ?string $fecha = null): Builder
     {
+        if ($fecha === null) {
+            $query->etapaActual();
+        }
         $fecha ??= self::hoy();
         $tabla = $query->getModel()->getTable();
         $fin = "COALESCE((SELECT a.fecha_fin FROM vinculo_adendas a WHERE a.vinculo_laboral_id = {$tabla}.id AND a.anulado = ? ORDER BY a.fecha_inicio DESC, a.created_at DESC, a.id DESC LIMIT 1), {$tabla}.fecha_fin_prevista)";

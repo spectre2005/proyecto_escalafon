@@ -15,14 +15,18 @@ final class RequerimientosAutomaticos
         abort_unless($actor->can('sistema.administrar'), 403);
         $creados = 0;
         foreach (ConsultaReportes::pendientesAutomaticos($actor) as $fila) {
-            $clave = hash('sha256', implode('|', [$fila['usuario_id'], $fila['id'], $fila['estado_codigo'], $fila['fecha'] ?? '']));
+            $partes = [$fila['usuario_id'], $fila['id'], $fila['estado_codigo'], $fila['fecha'] ?? ''];
+            if (Legajo::query()->where('usuario_id', $fila['usuario_id'])->count() > 1) {
+                $partes[] = $fila['legajo_id'];
+            }
+            $clave = hash('sha256', implode('|', $partes));
             $creados += DB::transaction(function () use ($actor, $fila, $clave): int {
                 Usuario::query()->whereKey($fila['usuario_id'])->lockForUpdate()->firstOrFail();
                 $activo = Legajo::query()->whereKey($fila['legajo_id'])->where('usuario_id', $fila['usuario_id'])->where('estado_legajo', 'activo')->lockForUpdate()->first();
                 if (! $activo || RequerimientoDocumento::query()->where('clave_automatica', $clave)->exists()) {
                     return 0;
                 }
-                $abierto = RequerimientoDocumento::query()->where('usuario_id', $fila['usuario_id'])->where('tipo_documento_id', $fila['tipo_documento_id'])
+                $abierto = RequerimientoDocumento::query()->etapaActual()->where('usuario_id', $fila['usuario_id'])->where('tipo_documento_id', $fila['tipo_documento_id'])
                     ->where('clase', 'documentos')->whereIn('estado', ['abierto', 'observado', 'en_revision'])->exists();
                 if ($abierto) {
                     return 0;

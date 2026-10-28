@@ -6,6 +6,7 @@ use App\Models\CertificadoDiscapacidad;
 use App\Models\Colegiatura;
 use App\Models\DocumentoUsuario;
 use App\Models\Familiar;
+use App\Models\Legajo;
 use App\Models\PeriodoPrueba;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
@@ -89,6 +90,11 @@ final class AplicacionDocumental
     /** @param Collection<int, VinculoLaboral> $vinculos */
     public static function de(Usuario $persona, Collection $vinculos): self
     {
+        $etapa = Legajo::paraConsulta($persona->id);
+        if ($etapa) {
+            $ids = VinculoLaboral::query()->where('usuario_id', $persona->id)->delLegajo($etapa->id)->pluck('id');
+            $vinculos = $vinculos->filter(fn (VinculoLaboral $vinculo): bool => $ids->contains($vinculo->id));
+        }
         $noAnulados = $vinculos->reject(fn (VinculoLaboral $vinculo): bool => (bool) $vinculo->anulado);
         $vigentes = $noAnulados->whereNull('fecha_cese');
         $origen = $noAnulados->isEmpty() ? collect([$persona]) : $noAnulados;

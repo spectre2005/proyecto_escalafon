@@ -44,11 +44,13 @@ class Seccion11Controller extends Controller
     {
         $persona = Usuario::query()->findOrFail($usuario);
         $sensibles = $request->user()->veDatosSensibles();
-        $vinculos = VinculoLaboral::query()->where('usuario_id', $usuario)->where('anulado', false)->orderByDesc('fecha_inicio')->orderBy('id')->get();
-        $desvinculaciones = Desvinculacion::query()->where('usuario_id', $usuario)->where('anulado', false)->with('registradoPor')
+        $vinculos = VinculoLaboral::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->where('anulado', false)->orderByDesc('fecha_inicio')->orderBy('id')->get();
+        $desvinculaciones = Desvinculacion::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->where('anulado', false)->with('registradoPor')
             ->orderByDesc('fecha_cese')->orderBy('id')->get();
+        $historial = Desvinculacion::query()->where('usuario_id', $usuario)->where('anulado', false)
+            ->whereNotIn('id', $desvinculaciones->modelKeys())->with(['legajo', 'vinculoLaboral'])->orderByDesc('fecha_cese')->get();
         $documentos = DocumentoUsuario::query()->where('usuario_id', $usuario)->where('seccion_legajo_id', Seccion11::SECCION)
-            ->whereIn('legajo_id', Legajo::query()->where('usuario_id', $usuario)->select('id'))
+            ->where('legajo_id', Legajo::paraConsulta($usuario)?->id)
             ->with(['archivo', 'recepcionadoPor', 'createdBy'])->orderByDesc('created_at')->orderByDesc('id')->get();
         $porTipo = $documentos->groupBy('tipo_documento_id');
         $tipos = TipoDocumento::query()->where('seccion_legajo_id', Seccion11::SECCION)->where('activo', true)->orderBy('orden')->get()
@@ -57,6 +59,11 @@ class Seccion11Controller extends Controller
         return response()->json(['data' => [
             'legajo' => Legajo::paraConsulta($usuario)?->only(['id', 'numero_legajo', 'estado_legajo']),
             'titular' => ['nombre' => trim($persona->nombres.' '.$persona->apellido_paterno.' '.$persona->apellido_materno), 'documento' => $persona->numero_doc_identidad],
+            'historial' => $historial->map(fn (Desvinculacion $registro): array => [
+                'id' => $registro->id, 'motivo_cese' => $registro->motivo_cese, 'fecha_cese' => $registro->fecha_cese?->format('Y-m-d'),
+                'puesto' => $registro->vinculoLaboral?->nombre_puesto,
+                'legajo' => $registro->legajo?->only(['id', 'numero_legajo', 'estado_legajo']),
+            ])->values(),
             'motivos_cese' => Seccion11::MOTIVOS_CESE,
             'vinculos' => $vinculos->map(fn (VinculoLaboral $v): array => [
                 ...$this->fila($v, ['tipo_personal', 'regimen_laboral', 'nombre_puesto', 'numero_documento_vinculo', 'fecha_inicio', 'fecha_fin_prevista', 'fecha_cese']),
@@ -78,7 +85,7 @@ class Seccion11Controller extends Controller
     public function anulados(string $usuario): JsonResponse
     {
         Usuario::query()->findOrFail($usuario);
-        $anuladas = Desvinculacion::query()->where('usuario_id', $usuario)->where('anulado', true)->with('registradoPor')->orderByDesc('updated_at')->orderBy('id')->get();
+        $anuladas = Desvinculacion::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->where('anulado', true)->with('registradoPor')->orderByDesc('updated_at')->orderBy('id')->get();
 
         return response()->json(['data' => ['desvinculaciones' => $this->filas($anuladas, [...self::CAMPOS, 'motivo_anulacion', 'updated_at'])]]);
     }
@@ -105,7 +112,7 @@ class Seccion11Controller extends Controller
     public function update(Request $request, string $usuario, string $registro): JsonResource|JsonResponse
     {
         $this->exigirLegajo($usuario);
-        $actual = Desvinculacion::query()->where('usuario_id', $usuario)->findOrFail($registro);
+        $actual = Desvinculacion::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->findOrFail($registro);
         if ($actual->anulado) {
             return response()->json(['message' => 'La desvinculación está anulada: no se corrige. Registra una nueva.'], 409);
         }
@@ -130,7 +137,7 @@ class Seccion11Controller extends Controller
     public function anularRegistro(Request $request, string $usuario, string $registro): JsonResource|JsonResponse
     {
         Usuario::query()->findOrFail($usuario);
-        $resultado = $this->anular($request, Desvinculacion::query()->where('usuario_id', $usuario)->findOrFail($registro));
+        $resultado = $this->anular($request, Desvinculacion::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->findOrFail($registro));
 
         return $resultado instanceof JsonResponse ? $resultado : new JsonResource($this->fila($resultado->resource, [...self::CAMPOS, 'anulado', 'motivo_anulacion']));
     }
@@ -157,6 +164,9 @@ class Seccion11Controller extends Controller
     private function exigirCoherencia(array $data, ?string $excepto = null): void
     {
         $vinculo = VinculoLaboral::query()->whereKey($data['vinculo_laboral_id'])->lockForUpdate()->firstOrFail();
+        if (! VinculoLaboral::query()->whereKey($vinculo->id)->delLegajo(Legajo::paraConsulta($vinculo->usuario_id)?->id)->exists()) {
+            throw ValidationException::withMessages(['vinculo_laboral_id' => 'Selecciona un vínculo de la etapa actual. El anterior permanece en el historial.']);
+        }
         if ($vinculo->fecha_cese === null) {
             throw ValidationException::withMessages(['vinculo_laboral_id' => 'El vínculo aún no tiene fecha de cese. Primero registra el cese en la sección 02 (Formalización del vínculo).']);
         }
@@ -173,7 +183,7 @@ class Seccion11Controller extends Controller
     private function cerrarTrasCese(Request $request, Desvinculacion $registro): void
     {
         $hoy = now('America/Lima')->toDateString();
-        $pendientes = VinculoLaboral::query()->where('usuario_id', $registro->usuario_id)->where('anulado', false)
+        $pendientes = VinculoLaboral::query()->where('usuario_id', $registro->usuario_id)->delLegajo(Legajo::paraConsulta($registro->usuario_id)?->id)->where('anulado', false)
             ->where(fn (Builder $query): Builder => $query->whereNull('fecha_cese')->orWhereDate('fecha_cese', '>', $hoy))->exists();
         if ($pendientes) {
             return;

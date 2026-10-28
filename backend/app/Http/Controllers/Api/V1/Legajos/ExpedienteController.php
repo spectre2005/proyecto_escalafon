@@ -14,6 +14,7 @@ use App\Models\Colegiatura;
 use App\Models\CompensacionBeneficio;
 use App\Models\CompromisoDocumento;
 use App\Models\CompromisoEntregaOriginal;
+use App\Models\Concerns\PerteneceALegajo;
 use App\Models\Controversia;
 use App\Models\DeclaracionVerificacion;
 use App\Models\Desplazamiento;
@@ -435,6 +436,9 @@ class ExpedienteController extends Controller
             $query->whereIn($config['field'], $ids);
         } elseif ($config['scope'] === 'persona') {
             $query->where($config['field'], $usuario);
+        }
+        if (! empty($filters['legajo_id']) && in_array(PerteneceALegajo::class, class_uses_recursive($query->getModel()), true)) {
+            $query->delLegajo($filters['legajo_id']);
         }
         if ($config['scope'] === 'legajo' && in_array('usuario_id', $query->getModel()->getFillable(), true) && $section !== 'bitacora-accesos-legajo') {
             $query->where('usuario_id', $usuario);

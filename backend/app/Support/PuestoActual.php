@@ -19,7 +19,7 @@ final class PuestoActual
     /** Restricción de carga de los vínculos abiertos (para with() en listados). */
     public static function vigentes(HasMany $vinculos): HasMany
     {
-        return $vinculos->where('anulado', false)
+        return $vinculos->etapaActual()->where('anulado', false)
             ->where(fn (Builder $q): Builder => $q->whereNull('fecha_cese')->orWhereDate('fecha_cese', '>=', VigenciaLaboral::hoy()))
             ->with(['unidadOrganica:id,nombre', 'vinculoAdendas'])->orderByDesc('fecha_inicio')->orderByDesc('id');
     }

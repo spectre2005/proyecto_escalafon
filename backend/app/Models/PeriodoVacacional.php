@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\PerteneceALegajo;
 use Database\Factories\PeriodoVacacionalFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,6 +16,7 @@ class PeriodoVacacional extends Model
     use HasFactory;
 
     use HasUuids;
+    use PerteneceALegajo;
 
     protected $table = 'periodos_vacacionales';
 

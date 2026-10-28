@@ -37,7 +37,7 @@ export default function LegajosPasivosPage() {
           <td className="px-5 py-4"><p className="font-semibold text-slate-800">{[legajo.persona?.nombres, legajo.persona?.apellido_paterno, legajo.persona?.apellido_materno].filter(Boolean).join(' ')}</p><p className="mt-1 text-xs text-slate-500">{legajo.persona?.numero_doc_identidad}</p></td>
           <td className="px-5 py-4"><p>{legajo.numero_legajo}</p><span className="text-xs text-slate-500">Pasivo · Solo consulta</span></td>
           <td className="px-5 py-4">{fecha(legajo.fecha_apertura)}</td><td className="px-5 py-4">{fecha(legajo.fecha_pasivo)}</td>
-          <td className="px-5 py-4"><div className="flex flex-col items-start gap-2"><Link to={`/legajos/${legajo.usuario_id}?categoria=documentos&legajo_id=${legajo.id}`} className="text-xs font-semibold text-teal-700 hover:underline">Consultar documentos</Link><Link to={`/legajos/${legajo.usuario_id}`} className="text-xs font-semibold text-teal-700 hover:underline">Ver ficha / reingreso</Link></div></td>
+          <td className="px-5 py-4"><div className="flex flex-col items-start gap-2"><Link to={`/legajos/${legajo.usuario_id}?categoria=documentos&legajo_id=${legajo.id}`} className="text-xs font-semibold text-teal-700 hover:underline">Consultar documentos</Link><Link to={`/legajos/${legajo.usuario_id}/historial/${legajo.id}`} className="text-xs font-semibold text-teal-700 hover:underline">Consultar etapa laboral</Link><Link to={`/legajos/${legajo.usuario_id}`} className="text-xs font-semibold text-teal-700 hover:underline">Ver ficha / reingreso</Link></div></td>
         </tr>)}</tbody>
       </table></div>
       {!data.data.length && <p className="p-6 text-sm text-slate-500">No hay legajos pasivos para esta búsqueda.</p>}

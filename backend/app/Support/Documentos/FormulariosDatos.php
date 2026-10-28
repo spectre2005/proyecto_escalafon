@@ -4,6 +4,7 @@ namespace App\Support\Documentos;
 
 use App\Models\Afiliacion;
 use App\Models\CertificadoDiscapacidad;
+use App\Models\Concerns\PerteneceALegajo;
 use App\Models\Controversia;
 use App\Models\DeclaracionVerificacion;
 use App\Models\Desplazamiento;
@@ -13,6 +14,7 @@ use App\Models\EvaluacionDesempeno;
 use App\Models\Familiar;
 use App\Models\GoceVacacional;
 use App\Models\Induccion;
+use App\Models\Legajo;
 use App\Models\LicenciaPermiso;
 use App\Models\PeriodoPrueba;
 use App\Models\ProgresionCarrera;
@@ -101,6 +103,7 @@ final class FormulariosDatos
         if (! $registro) {
             throw ValidationException::withMessages(['enlace_id' => 'Selecciona un registro de esta persona que no esté anulado y (salvo los vínculos) que aún no tenga documento.']);
         }
+        self::exigirEtapa($registro, $documento);
         // Sección 05: cada tipo de documento acredita solo ciertos tipos de movimiento (p. ej. b) solo goces).
         if (! Seccion05::admite($documento->tipoDocumento?->codigo, $registro->getAttribute('tipo'))) {
             throw ValidationException::withMessages(['enlace_id' => 'Este tipo de documento no acredita ese tipo de movimiento.']);
@@ -226,6 +229,7 @@ final class FormulariosDatos
         if (! $registro) {
             throw ValidationException::withMessages(['enlace_id' => 'Selecciona una desvinculación de esta persona que no esté anulada.']);
         }
+        self::exigirEtapa($registro, $documento);
         $codigo = $documento->tipoDocumento?->codigo;
         if ($rechazo = Seccion11::motivoRechazo($codigo, $registro->motivo_cese, $registro->vinculoLaboral?->regimen_laboral,
             'Este tipo de documento no corresponde al motivo de cese o al régimen del vínculo de esa desvinculación.')) {
@@ -266,6 +270,18 @@ final class FormulariosDatos
         }
 
         return $tipo === null || Seccion01::compatible($tipo, $registro);
+    }
+
+    private static function exigirEtapa(Model $registro, DocumentoUsuario $documento): void
+    {
+        $etapa = $registro instanceof VinculoAdenda ? $registro->vinculoLaboral : $registro;
+        if (! in_array(PerteneceALegajo::class, class_uses_recursive($etapa), true)) {
+            return;
+        }
+        if ($etapa->legajo_id !== $documento->legajo_id
+            && ($etapa->legajo_id !== null || Legajo::query()->where('usuario_id', $documento->usuario_id)->count() > 1)) {
+            throw ValidationException::withMessages(['enlace_id' => 'El registro pertenece a otra etapa. No se enlazan documentos nuevos al legajo anterior.']);
+        }
     }
 
     /** Registro sin documento enlazado (los vínculos admiten varios documentos: contrato, renovaciones). */
