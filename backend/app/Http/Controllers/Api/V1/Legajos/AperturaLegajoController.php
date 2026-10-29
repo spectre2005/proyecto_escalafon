@@ -40,25 +40,6 @@ class AperturaLegajoController extends Controller
         return response()->json(['data' => $registro->only(['id', 'estado_legajo', 'fecha_pasivo'])]);
     }
 
-    public function reabrir(Request $request, string $usuario, string $legajo): JsonResponse
-    {
-        abort_if($request->all() !== [], 422, 'La reapertura no recibe datos adicionales.');
-        $registro = DB::transaction(function () use ($usuario, $legajo, $request): Legajo {
-            Usuario::query()->whereKey($usuario)->lockForUpdate()->firstOrFail();
-            $registro = Legajo::query()->where('usuario_id', $usuario)->lockForUpdate()->findOrFail($legajo);
-            abort_unless(in_array($registro->estado_legajo, ['pasivo', 'cerrado'], true), 409, 'Solo se puede reabrir un legajo cerrado.');
-            abort_if(Legajo::query()->where('usuario_id', $usuario)->where('estado_legajo', 'activo')->exists(), 409,
-                'La persona ya tiene otro legajo activo.');
-            $antes = $registro->only(['estado_legajo', 'fecha_pasivo']);
-            $registro->update(['estado_legajo' => 'activo', 'fecha_pasivo' => null]);
-            $this->registrarCambio($request, $registro, 'legajo.reabrir', $antes);
-
-            return $registro;
-        });
-
-        return response()->json(['data' => $registro->only(['id', 'numero_legajo', 'estado_legajo', 'fecha_apertura', 'fecha_pasivo'])]);
-    }
-
     private function registrarCambio(Request $request, Legajo $legajo, string $accion, array $antes): void
     {
         $datos = [

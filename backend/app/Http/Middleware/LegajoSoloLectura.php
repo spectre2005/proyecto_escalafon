@@ -21,8 +21,7 @@ class LegajoSoloLectura
     {
         $usuario = $request->route('usuario');
         if ($request->isMethodSafe() || ! $usuario || ! $request->is('api/v1/expedientes/*')
-            || $request->is('api/v1/expedientes/*/legajo') || $request->is('api/v1/expedientes/*/legajos/*/cerrar')
-            || $request->is('api/v1/expedientes/*/legajos/*/reabrir')) {
+            || $request->is('api/v1/expedientes/*/legajo') || $request->is('api/v1/expedientes/*/legajos/*/cerrar')) {
             return $next($request);
         }
 

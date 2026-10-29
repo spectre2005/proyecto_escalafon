@@ -266,7 +266,7 @@ class ExpedienteController extends Controller
             'document_states' => DocumentoUsuario::query()->where('usuario_id', $usuario)->whereHas('legajo', fn (Builder $query): Builder => $query->where('usuario_id', $usuario))
                 ->when(! $veSensibles, fn (Builder $query): Builder => $query->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES))
                 ->distinct()->orderBy('estado')->pluck('estado'),
-            'legajos' => $person->legajos()->orderByDesc('fecha_apertura')->get()->map(fn (Model $row): array => $this->present($row)),
+            'legajos' => $person->legajos()->orderByDesc('fecha_apertura')->orderByDesc('created_at')->orderByDesc('numero_legajo')->get()->map(fn (Model $row): array => $this->present($row)),
             // Sin datos sensibles no se ofrecen sus listados (responden 403): ni siquiera su nombre.
             'sections' => collect(self::SECTIONS)->when(! $veSensibles, fn ($secciones) => $secciones->except(self::SENSIBLES))->map(fn (array $section, string $key): array => [
                 'key' => $key, 'label' => $section['label'], 'group' => $section['group'],
@@ -423,7 +423,8 @@ class ExpedienteController extends Controller
         $ids = match ($config['scope']) {
             'legajo' => (clone $legajos)->select('id'),
             'documento' => (clone $documents)->select('id'),
-            'vinculo' => VinculoLaboral::query()->where('usuario_id', $usuario)->select('id'),
+            'vinculo' => VinculoLaboral::query()->where('usuario_id', $usuario)
+                ->when(! empty($filters['legajo_id']), fn (Builder $vinculos): Builder => $vinculos->delLegajo($filters['legajo_id']))->select('id'),
             'compromiso' => CompromisoEntregaOriginal::query()->where('usuario_id', $usuario)->whereIn('legajo_id', (clone $legajos)->select('id'))->select('id'),
             'proceso' => ProcesoFiscalizacion::query()->where('usuario_id', $usuario)->whereIn('legajo_id', (clone $legajos)->select('id'))->select('id'),
             'archivo' => (clone $documents)->whereNotNull('archivo_id')->select('archivo_id')

@@ -12,6 +12,7 @@ use App\Models\RatificacionDocente;
 use App\Models\RequerimientoDocumento;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
+use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
 use Database\Seeders\Seccion01CatalogoSeeder;
 use Database\Seeders\Seccion02CatalogoSeeder;
@@ -64,6 +65,8 @@ class EtapasLegajoTest extends TestCase
         $tipo = TipoDocumento::query()->where('codigo', 'S11_C_TERMINO_VINCULO')->firstOrFail();
         DocumentoUsuario::factory()->create(['usuario_id' => $this->persona->id, 'legajo_id' => $this->anterior->id, 'tipo_documento_id' => $tipo->id, 'seccion_legajo_id' => 11]);
         $nuevo = $this->reingresar();
+        $this->getJson($this->url().'/legajos/'.$this->anterior->id)->assertOk()
+            ->assertJsonPath('data.datos_al_cierre.nombres', $this->persona->nombres);
         $this->getJson($this->url().'/seccion-02')->assertOk()->assertJsonCount(0, 'data.vinculos')->assertJsonCount(0, 'data.inducciones');
         $data = $this->getJson($this->url().'/seccion-11')->assertOk()->assertJsonCount(0, 'data.desvinculaciones')->assertJsonCount(0, 'data.vinculos')
             ->assertJsonPath('data.historial.0.legajo.id', $this->anterior->id)->json('data');
@@ -100,6 +103,15 @@ class EtapasLegajoTest extends TestCase
         $this->subir($this->persona, $this->metadatos($tipo, 1, 2, ['enlace_id' => $cese->id]))->assertUnprocessable()->assertJsonValidationErrors('enlace_id');
         $this->assertSame($this->anterior->id, $this->vinculo->fresh()->legajo_id);
         $this->assertNull($cese->fresh()->documento_id);
+    }
+
+    public function test_historial_de_adendas_no_mezcla_las_incorporaciones(): void
+    {
+        $adenda = VinculoAdenda::factory()->create(['vinculo_laboral_id' => $this->vinculo->id]);
+        $nuevo = $this->reingresar();
+        $this->getJson($this->url().'/vinculo-adendas?legajo_id='.$this->anterior->id)->assertOk()
+            ->assertJsonPath('total', 1)->assertJsonPath('data.0.id', $adenda->id);
+        $this->getJson($this->url().'/vinculo-adendas?legajo_id='.$nuevo)->assertOk()->assertJsonPath('total', 0);
     }
 
     public function test_un_vinculo_abierto_de_un_legajo_anterior_no_recibe_adendas_nuevas(): void

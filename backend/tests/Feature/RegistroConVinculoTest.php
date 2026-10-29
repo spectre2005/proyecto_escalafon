@@ -61,6 +61,30 @@ class RegistroConVinculoTest extends TestCase
             PerfilDocente::query()->count(), PerfilAdministrativo::query()->count()]);
     }
 
+    public function test_passive_person_can_be_incorporated_again_without_duplicating_identity(): void
+    {
+        $this->actuarComo();
+        $primera = $this->postJson(self::URL, $this->datos())->assertCreated()->assertJsonPath('data.numero_incorporacion', 1);
+        $persona = $primera->json('data.usuario.id');
+        $anterior = $primera->json('data.legajo.id');
+        $vinculo = $primera->json('data.vinculo.id');
+        $this->postJson('/api/v1/expedientes/'.$persona.'/legajos/'.$anterior.'/cerrar')->assertOk();
+        $this->getJson('/api/v1/usuarios')->assertOk()->assertJsonFragment([
+            'id' => $persona, 'legajos_count' => 1, 'tiene_legajo_pasivo' => true, 'tiene_legajo_activo' => false,
+        ]);
+        $segunda = $this->postJson(self::URL, $this->datos())->assertCreated()
+            ->assertJsonPath('data.usuario.id', $persona)->assertJsonPath('data.numero_incorporacion', 2);
+        $this->assertNotSame($anterior, $segunda->json('data.legajo.id'));
+        $this->assertDatabaseHas('legajos', ['id' => $anterior, 'estado_legajo' => 'pasivo']);
+        $this->assertDatabaseHas('vinculos_laborales', ['id' => $vinculo, 'legajo_id' => $anterior]);
+        $this->assertDatabaseHas('vinculos_laborales', ['id' => $segunda->json('data.vinculo.id'), 'legajo_id' => $segunda->json('data.legajo.id')]);
+        $this->assertSame(1, Usuario::query()->where('numero_doc_identidad', '71000001')->count());
+        $this->postJson(self::URL, $this->datos())->assertUnprocessable();
+        $this->assertDatabaseCount('legajos', 2);
+        $this->postJson('/api/v1/expedientes/'.$persona.'/legajos/'.$segunda->json('data.legajo.id').'/cerrar')->assertOk();
+        $this->postJson(self::URL, $this->datos())->assertCreated()->assertJsonPath('data.numero_incorporacion', 3);
+    }
+
     public function test_a_teacher_is_registered_with_open_file_link_and_job_data(): void
     {
         $actor = $this->actuarComo();

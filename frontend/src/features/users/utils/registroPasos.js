@@ -42,19 +42,19 @@ export function personaDelPaso(draft, leyElegida) {
 export function erroresPersona(persona, { catalogo, usuarios = [], ubicacion = {}, ubigeoId = '' }) {
   const errores = validateUser(persona, catalogo)
   if (Object.values(ubicacion).some(Boolean) && !ubigeoId) errores.push('Selecciona región, provincia y distrito para completar la ubicación.')
-  // El DNI repetido se informa aparte con un enlace a la ficha (personaExistente): aquí solo bloquea el avance.
-  if (personaExistente(persona, usuarios)) errores.push('Esta persona ya está registrada con ese DNI.')
-  else if (usuarios.some(item => item.email_institucional?.toLowerCase() === persona.email_institucional.toLowerCase())) {
+  // El reingreso solo está disponible sin legajo activo y con un legajo pasivo.
+  if (personaExistente(persona, usuarios) && !personaExistente(persona, usuarios).puedeIncorporar) errores.push('Esta persona ya está registrada con ese DNI.')
+  else if (usuarios.some(item => item.numero_doc_identidad !== persona.numero_doc_identidad && item.email_institucional?.toLowerCase() === persona.email_institucional.toLowerCase())) {
     errores.push('Ya existe un usuario con ese correo.')
   }
   return errores
 }
 
-/** Persona ya registrada con el mismo DNI ({ id, nombre }), o null. No se crea otra: se ofrece abrir su ficha. */
+/** Persona con el mismo DNI y disponibilidad para una nueva incorporación, o null. */
 export function personaExistente(persona, usuarios = []) {
   const dni = String(persona.numero_doc_identidad || '').trim()
   const existente = dni ? usuarios.find(item => item.numero_doc_identidad === dni) : null
-  return existente ? { id: existente.id, nombre: [existente.nombres, existente.apellido_paterno, existente.apellido_materno].filter(Boolean).join(' ') } : null
+  return existente ? { id: existente.id, puedeIncorporar: existente.tiene_legajo_pasivo === true && existente.tiene_legajo_activo === false, numeroIncorporacion: (existente.legajos_count || 0) + 1, nombre: [existente.nombres, existente.apellido_paterno, existente.apellido_materno].filter(Boolean).join(' ') } : null
 }
 
 /**

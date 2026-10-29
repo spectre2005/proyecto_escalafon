@@ -25,8 +25,16 @@ class StoreUsuarioConVinculoRequest extends StoreUsuariosRequest
 
     public function rules(): array
     {
+        $rules = parent::rules();
+        $dni = $this->input('usuarios.0.numero_doc_identidad');
+        $persona = is_string($dni) ? Usuario::query()->where('numero_doc_identidad', $dni)->first() : null;
+        if ($persona && $persona->legajos()->where('estado_legajo', 'pasivo')->exists()
+            && ! $persona->legajos()->where('estado_legajo', 'activo')->exists()) {
+            $rules['usuarios.*.numero_doc_identidad'] = ['bail', 'required', 'string', 'regex:/^[0-9]{8}$/'];
+        }
+
         return [
-            ...parent::rules(),
+            ...$rules,
             'usuarios' => ['required', 'array', 'list', 'size:1'],
             'vinculo' => ['required', 'array'],
             // Puede venir vacío (los datos del puesto administrativo son todos opcionales); el docente exige su condición.
@@ -89,7 +97,7 @@ class StoreUsuarioConVinculoRequest extends StoreUsuariosRequest
     /**
      * DNI ya registrado: además de los errores, identifica a la persona existente para ir a su ficha en vez de buscarla.
      * Solo con legajo.ver (quien no puede ver fichas no recibe nada más) y solo su id y nombre: sin otros datos personales.
-     * No se crea nada ni se ofrece registrar otro vínculo (reingreso y renovación pendientes de confirmar con el cliente).
+     * Los reingresos con legajo pasivo y sin legajo activo sí se admiten en rules().
      */
     protected function failedValidation(ValidatorContract $validator): void
     {

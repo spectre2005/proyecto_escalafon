@@ -178,7 +178,7 @@ export default function UsersPage() {
     let creado = null
     const resultado = await persist(async () => {
       creado = await saveUserWithLink(payload)
-      return { saved: [creado.usuario], text: `Persona registrada con su primer vínculo laboral. Se abrió su legajo ${creado.legajo.numero_legajo}.` }
+      return { saved: [creado.usuario], text: `Persona incorporada por ${creado.numero_incorporacion || 1}.ª vez. Se abrió su nuevo legajo ${creado.legajo.numero_legajo}.` }
     })
     if (resultado.ok) {
       setRegistroKey(key => key + 1)

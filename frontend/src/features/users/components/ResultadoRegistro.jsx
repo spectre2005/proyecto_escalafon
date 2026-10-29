@@ -12,7 +12,7 @@ export default function ResultadoRegistro({ registro, puedeVerFicha, onOtra, onC
     <div className="mx-auto max-w-xl text-center">
       <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-[#e4f2e9] text-[#2c7650]"><Icon name="check" size={24} /></span>
       <h3 id="registro-resultado-titulo" role="status" className="mt-4 text-lg font-semibold text-[#243f43]">Persona registrada</h3>
-      <p className="mt-2 text-sm text-[#557566]"><strong>{nombre}</strong> quedó registrada con su primer vínculo laboral.</p>
+      <p className="mt-2 text-sm text-[#557566]"><strong>{nombre}</strong> quedó incorporada por {registro.numero_incorporacion || 1}.ª vez, con un nuevo legajo y vínculo laboral.</p>
       <dl className="mx-auto mt-5 grid max-w-sm grid-cols-2 gap-3 rounded-xl border border-[#e0e9e4] bg-[#f8fbf9] p-4 text-left text-xs">
         <div><dt className="text-[#7b9181]">N.º de legajo</dt><dd className="mt-1 text-base font-semibold text-[#243f43]">{legajo.numero_legajo}</dd></div>
         <div><dt className="text-[#7b9181]">DNI</dt><dd className="mt-1 text-base font-semibold text-[#243f43]">{usuario.numero_doc_identidad}</dd></div>

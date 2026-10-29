@@ -177,6 +177,7 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
         Route::get('expedientes', [ExpedienteController::class, 'index']);
         Route::get('ubicaciones', [ExpedienteController::class, 'locations']);
         Route::get('expediente-opciones', [ExpedienteController::class, 'editOptions']);
+        Route::get('expedientes/{usuario}/legajos/{legajo}', [LegajosPasivosController::class, 'show'])->whereUuid(['usuario', 'legajo']);
         Route::get('expedientes/{usuario}', [ExpedienteController::class, 'show'])->whereUuid('usuario');
         Route::get('expedientes/{usuario}/foto', [FotoPersonalController::class, 'show'])->whereUuid('usuario');
         // Vista previa del expediente imprimible (fase 1, secciones 01 a 04); antes de la ruta genérica {section}.
@@ -273,8 +274,6 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
     Route::post('expedientes/{usuario}/legajo', [AperturaLegajoController::class, 'store'])->middleware('can:legajo.abrir')->whereUuid('usuario');
     Route::post('expedientes/{usuario}/legajos/{legajo}/cerrar', [AperturaLegajoController::class, 'cerrar'])
         ->middleware('can:legajo.editar')->whereUuid(['usuario', 'legajo']);
-    Route::post('expedientes/{usuario}/legajos/{legajo}/reabrir', [AperturaLegajoController::class, 'reabrir'])
-        ->middleware('can:legajo.abrir')->whereUuid(['usuario', 'legajo']);
 
     // Documentos del legajo (PDF + metadatos), común a todas las secciones. Las secciones 01, 09 y 10
     // exigen además datos_sensibles.ver (lo valida el controlador según la sección y el tipo).

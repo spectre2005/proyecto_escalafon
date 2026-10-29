@@ -26,7 +26,7 @@ export default function CerrarLegajo({ usuario, legajo }) {
 
   return <div>
     {confirmando ? <div className="flex flex-wrap items-center gap-2">
-      <p className="basis-full">Al cerrar, el legajo quedará disponible solo para visualizar y descargar.</p>
+      <p className="basis-full">Al cerrar, el legajo y su ficha se conservarán en Legajos pasivos, solo para consulta y descarga. Una reincorporación creará un legajo nuevo.</p>
       <button type="button" disabled={busy} onClick={cerrar} className="rounded-lg bg-teal-700 px-3 py-1.5 font-semibold text-white disabled:opacity-50">{busy ? 'Cerrando…' : 'Confirmar cierre'}</button>
       <button type="button" disabled={busy} onClick={() => setConfirmando(false)} className="font-semibold text-teal-800">Cancelar</button>
     </div> : <button type="button" onClick={() => { setError(''); setConfirmando(true) }} className="rounded-lg border border-teal-200 bg-white px-3 py-1.5 font-semibold text-teal-800">Cerrar legajo</button>}

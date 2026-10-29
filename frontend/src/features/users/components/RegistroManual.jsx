@@ -64,11 +64,10 @@ function Progreso({ paso, onIr, disabled }) {
   </ol>
 }
 
-// Persona ya registrada con ese DNI: no se crea otra. Con permiso para ver legajos, se ofrece abrir su ficha (el registro de
-// otro vínculo para un reingreso o una renovación sigue pendiente de confirmar con la universidad).
+// Una persona con legajo pasivo puede incorporarse con un nuevo legajo desde este formulario.
 function PersonaRegistrada({ persona, puedeVerFicha }) {
   return <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#f1d9a6] bg-[#fff8e8] px-4 py-3 text-xs leading-relaxed text-[#7a5a17]">
-    <span><strong>{persona.nombre || 'Esta persona'}</strong> ya está registrada con ese DNI. No se creará otro registro.{puedeVerFicha ? ' Revisa su ficha para continuar con su legajo.' : ''}</span>
+    <span><strong>{persona.nombre || 'Esta persona'}</strong> {persona.puedeIncorporar ? `será incorporado/a por ${persona.numeroIncorporacion}.ª vez. Se creará un legajo nuevo.` : `ya está registrada con ese DNI. No se creará otro registro.${puedeVerFicha ? ' Revisa su ficha para continuar con su legajo.' : ''}`}</span>
     {puedeVerFicha && <Link to={rutaFicha(persona.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-[#e3c47f] bg-white px-3 py-1.5 font-semibold text-[#7a5a17] hover:bg-[#fff1cf]">Ir a su ficha <Icon name="arrow" size={14} /></Link>}
   </div>
 }
@@ -242,7 +241,11 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
         onChange={event => {
           const valor = numerico ? event.target.value.replace(/\D/g, '').slice(0, largo[key]) : event.target.value
           const cambiaDni = key === 'numero_doc_identidad' && valor !== draft.numero_doc_identidad
-          const siguiente = updateUserDraft(draft, key, valor, dominioCorreo)
+          let siguiente = updateUserDraft(draft, key, valor, dominioCorreo)
+          const previa = cambiaDni && usuarios.find(item => item.numero_doc_identidad === valor)
+          if (previa) {
+            siguiente = { ...siguiente, ...Object.fromEntries(Object.keys(personaVacia).filter(campo => campo !== 'numero_doc_identidad' && previa[campo] !== undefined).map(campo => [campo, previa[campo] ?? ''])) }
+          }
           if (cambiaDni) reiniciarIdentidad(valor)
           // El domicilio que trajo la consulta del DNI anterior no pasa a la persona nueva.
           setDraft(cambiaDni ? domicilioTrasCambioDni(siguiente, identidad.origen) : siguiente)
