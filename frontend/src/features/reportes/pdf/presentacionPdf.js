@@ -1,5 +1,10 @@
 import { normalizeInstitution } from '../../../config/institution.js'
 
+/** Fecha de los PDF en dd/mm/aaaa, hora de Lima (igual a la que manda el backend en las constancias). */
+export const fechaPdf = (valor = new Date(), conHora = false) => new Date(valor).toLocaleString('es-PE', {
+  timeZone: 'America/Lima', day: '2-digit', month: '2-digit', year: 'numeric', ...(conHora ? { hour: '2-digit', minute: '2-digit', hour12: false } : {}),
+}).replace(',', '')
+
 /** Identidad y preferencias comunes a todos los PDF institucionales. */
 export function presentacionPdf(pdf, institution) {
   const branding = normalizeInstitution(institution)
@@ -27,14 +32,15 @@ export function presentacionPdf(pdf, institution) {
 
   function header({ title = branding.reportTitle, subtitle = '', emittedAt = new Date(), instruction = '' } = {}) {
     pdf.setFont('helvetica', 'bold').setFontSize(11).setTextColor(...accent)
-    const textX = margin + (logoSize ? 34 : 0)
-    const headingWidth = width - (logoSize ? 34 : 0)
+    // El nombre y el área se centran en la página (mismo eje que el título); con logo se reserva el mismo espacio a
+    // ambos lados para que el texto no lo pise.
+    const headingWidth = width - (logoSize ? 34 : 0) * 2
     const heading = pdf.splitTextToSize(branding.name, headingWidth)
     if (logoSize) pdf.addImage(branding.logo, margin, 14, logoSize.width, logoSize.height, 'institution-logo')
-    pdf.text(heading, textX + headingWidth / 2, 17, { align: 'center' })
+    pdf.text(heading, pageWidth / 2, 17, { align: 'center' })
     pdf.setFont('helvetica', 'normal').setFontSize(8).setTextColor(80)
     const area = pdf.splitTextToSize(branding.area, headingWidth)
-    pdf.text(area, textX + headingWidth / 2, 19 + heading.length * 5, { align: 'center' })
+    pdf.text(area, pageWidth / 2, 19 + heading.length * 5, { align: 'center' })
     let y = Math.max(22 + heading.length * 5 + area.length * 3, logoSize ? 39 : 0)
     pdf.setDrawColor(...accent).setLineWidth(0.6).line(margin, y, margin + width, y)
     y += 6
@@ -49,8 +55,9 @@ export function presentacionPdf(pdf, institution) {
       y += lines.length * 4 + 2
     }
     pdf.setFont('helvetica', 'normal').setFontSize(8).setTextColor(80)
-    if (instruction || branding.showEmissionDate) {
-      const lines = pdf.splitTextToSize(instruction || `Fecha de emisión: ${new Date(emittedAt).toLocaleDateString('es-PE', { timeZone: 'America/Lima' })}`, width)
+    // instruction: null omite la línea (documentos que fechan al cierre, como las constancias).
+    if (instruction !== null && (instruction || branding.showEmissionDate)) {
+      const lines = pdf.splitTextToSize(instruction || `Fecha de emisión: ${fechaPdf(emittedAt)}`, width)
       pdf.text(lines, margin, y)
       y += lines.length * 3.5 + 3.5
     } else y += 3

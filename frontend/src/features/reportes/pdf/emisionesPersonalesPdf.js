@@ -5,7 +5,8 @@ import { presentacionPdf } from './presentacionPdf.js'
 // ausente se escribe como tal («No registrado»), nunca se completa; las constancias solo se arman si el backend las da por emitibles.
 const texto = (valor, vacio = 'No registrado') => valor === null || valor === undefined || String(valor).trim() === '' ? vacio : String(valor)
 
-function documentoPdf(data, institution, subject) {
+// fechaAlCierre: la fecha va en letras antes de la firma (constancias) y no en la cabecera.
+function documentoPdf(data, institution, subject, { fechaAlCierre = false } = {}) {
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' })
   const base = presentacionPdf(pdf, typeof institution === 'string' ? { name: institution } : institution)
   const { branding, margin, width, bottom, header } = base
@@ -13,23 +14,38 @@ function documentoPdf(data, institution, subject) {
   let y = 0
   const nuevaPagina = (primera = false) => {
     if (!primera) pdf.addPage()
-    y = header({ title: data.titulo, instruction: `Fecha de emisión: ${data.emitido_en}` })
+    y = header({ title: data.titulo, instruction: fechaAlCierre ? null : `Fecha de emisión: ${data.emitido_en}` })
   }
   const espacio = alto => { if (y + alto > bottom) nuevaPagina() }
 
-  function parrafo(contenido, { negrita = false, tamano = 9, color = 35 } = {}) {
+  // justificar: reparte el espacio entre palabras en cada línea salvo la última del párrafo (texto formal de las constancias).
+  function parrafo(contenido, { negrita = false, tamano = 9, color = 35, justificar = false, alinear = 'left' } = {}) {
     pdf.setFont('helvetica', negrita ? 'bold' : 'normal').setFontSize(tamano).setTextColor(color)
     const lineas = pdf.splitTextToSize(contenido, width)
-    for (const linea of lineas) {
+    lineas.forEach((linea, i) => {
       espacio(4.6)
-      pdf.text(linea, margin, y + 3.5)
+      if (justificar && i < lineas.length - 1) lineaJustificada(linea, y + 3.5)
+      else if (alinear === 'right') pdf.text(linea, margin + width, y + 3.5, { align: 'right' })
+      else pdf.text(linea, margin, y + 3.5)
       y += 4.6
-    }
+    })
     y += 1.5
   }
 
+  function lineaJustificada(linea, altura) {
+    const palabras = linea.trim().split(/\s+/)
+    const ocupado = palabras.reduce((suma, palabra) => suma + pdf.getTextWidth(palabra), 0)
+    const hueco = palabras.length > 1 ? (width - ocupado) / (palabras.length - 1) : 0
+    // Una línea muy corta se deja alineada a la izquierda para no abrir huecos exagerados.
+    if (palabras.length < 2 || hueco > pdf.getTextWidth(' ') * 4) { pdf.text(linea, margin, altura); return }
+    let x = margin
+    for (const palabra of palabras) { pdf.text(palabra, x, altura); x += pdf.getTextWidth(palabra) + hueco }
+  }
+
+  // El título reserva su alto (7) y el arranque de lo que sigue (ficha de vínculo 24, tabla 16, rejilla ~14), para no
+  // quedar solo al pie de una página con su contenido en la siguiente.
   function titulo(contenido) {
-    espacio(14)
+    espacio(7 + 25)
     pdf.setFont('helvetica', 'bold').setFontSize(9).setTextColor(25)
     pdf.text(contenido.toUpperCase(), margin, y + 4)
     y += 7
@@ -100,6 +116,15 @@ function documentoPdf(data, institution, subject) {
     })
   }
 
+  // Fórmula de cierre y fecha en letras, antes de la firma (el lugar se agregará cuando la institución lo configure).
+  function cierre() {
+    espacio(18)
+    y += 2
+    parrafo(FORMULA_CIERRE, { justificar: true })
+    y += 2
+    parrafo(fechaEnLetras(data.emitido_en), { alinear: 'right' })
+  }
+
   function firma() {
     espacio(34)
     y += 22
@@ -118,13 +143,23 @@ function documentoPdf(data, institution, subject) {
   }
 
   nuevaPagina(true)
-  return { pdf, base, parrafo, titulo, tabla, datos, fichas, firma, identificacion, texto }
+  return { pdf, base, parrafo, titulo, tabla, datos, fichas, cierre, firma, identificacion, texto }
 }
 
 const CAMPOS_VINCULO = [['ley', 'Régimen laboral'], ['tipo_vinculo', 'Tipo de vínculo'], ['numero_oficial', 'N.º de resolución o contrato'],
   ['unidad', 'Unidad orgánica'], ['tipo_personal', 'Tipo de personal'], ['situacion', 'Situación'],
   ['inicio', 'Inicio'], ['fin_previsto', 'Fin previsto', 'Sin fecha de fin registrada'], ['cese', 'Cese', 'Sin cese registrado']]
 const encabezadoVinculo = (v, i) => `Vínculo ${i + 1}: ${texto(v.puesto, 'Puesto no registrado')}`
+
+export const FORMULA_CIERRE = 'Se expide la presente constancia para los fines que se estime conveniente.'
+
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'setiembre', 'octubre', 'noviembre', 'diciembre']
+/** «22/10/2026» → «22 de octubre de 2026»; un valor con otra forma se deja tal cual (no se inventa una fecha). */
+export function fechaEnLetras(valor) {
+  const partes = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(valor ?? '').trim())
+  const mes = partes && MESES[Number(partes[2]) - 1]
+  return mes ? `${Number(partes[1])} de ${mes} de ${partes[3]}` : texto(valor)
+}
 
 // Aclaración del estado «Aceptado» (aceptación directa: lo registra quien carga el documento).
 export const NOTA_ACEPTADO = 'El estado "Aceptado" indica que el documento fue registrado por el responsable de la carga en el sistema. No implica fiscalización ni revisión posterior.'
@@ -175,33 +210,35 @@ function exigirEmitible(data) {
 
 export function createConstanciaTrabajoPdf(data, institution) {
   exigirEmitible(data)
-  const { pdf, base, parrafo, titulo, datos, fichas, firma, identificacion, texto } = documentoPdf(data, institution, 'Constancia de trabajo')
+  const { pdf, base, parrafo, titulo, datos, fichas, cierre, firma, identificacion, texto } = documentoPdf(data, institution, 'Constancia de trabajo', { fechaAlCierre: true })
   const p = data.persona
-  parrafo(`${base.branding.name} hace constar que ${p.nombre}, con ${p.tipo_documento || 'documento de identidad'} N.º ${texto(p.numero_documento)}, registra en su legajo N.º ${texto(p.numero_legajo)} los vínculos laborales que se detallan, sustentados con documento de vinculación aceptado:`)
+  parrafo(`${base.branding.name} hace constar que ${p.nombre}, con ${p.tipo_documento || 'documento de identidad'} N.º ${texto(p.numero_documento)}, registra en su legajo N.º ${texto(p.numero_legajo)} los vínculos laborales que se detallan, sustentados con documento de vinculación aceptado:`, { justificar: true })
   titulo('Identificación')
   datos(identificacion())
   titulo('Vínculos laborales')
   fichas(CAMPOS_VINCULO, data.vinculos, encabezadoVinculo)
   parrafo(`Situación a la fecha de emisión: ${data.situacion}`, { negrita: true })
+  cierre()
+  firma()
   parrafo('Solo se consignan los vínculos sustentados con documento aceptado en el legajo. Un dato no registrado se indica como tal.', notaDiscreta)
   parrafo(NOTA_ACEPTADO, notaDiscreta)
-  firma()
   base.footer()
   return pdf
 }
 
 export function createConstanciaTiempoServiciosPdf(data, institution) {
   exigirEmitible(data)
-  const { pdf, base, parrafo, titulo, tabla, datos, firma, identificacion, texto } = documentoPdf(data, institution, 'Constancia de tiempo de servicios')
+  const { pdf, base, parrafo, titulo, tabla, datos, cierre, firma, identificacion, texto } = documentoPdf(data, institution, 'Constancia de tiempo de servicios', { fechaAlCierre: true })
   const p = data.persona
-  parrafo(`${base.branding.name} hace constar que ${p.nombre}, con ${p.tipo_documento || 'documento de identidad'} N.º ${texto(p.numero_documento)}, tiene reconocido el siguiente tiempo de servicios mediante resolución, según su legajo N.º ${texto(p.numero_legajo)}:`)
+  parrafo(`${base.branding.name} hace constar que ${p.nombre}, con ${p.tipo_documento || 'documento de identidad'} N.º ${texto(p.numero_documento)}, tiene reconocido el siguiente tiempo de servicios mediante resolución, según su legajo N.º ${texto(p.numero_legajo)}:`, { justificar: true })
   titulo('Identificación')
   datos(identificacion())
   titulo('Tiempo de servicios reconocido')
   tabla(COLUMNAS_TIEMPO, data.tiempos)
+  cierre()
+  firma()
   parrafo('Cada fila corresponde a una resolución de reconocimiento sustentada con documento aceptado en el legajo, tal como fue registrada. Esta constancia no suma resoluciones ni calcula tiempo a partir de vínculos, licencias, suspensiones o estudios.', notaDiscreta)
   parrafo(NOTA_ACEPTADO, notaDiscreta)
-  firma()
   base.footer()
   return pdf
 }

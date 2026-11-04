@@ -67,13 +67,14 @@ export async function crearPdfReporte(reporte, institucion, filtros) {
   const columnas = reporte.columnas
   const pdf = new jsPDF({ orientation: 'landscape', format: columnas.length > 9 ? 'a3' : 'a4' })
   const { branding, margin: margen, width, accent, accentText, bottom, header, footer } = presentacionPdf(pdf, institucion)
-  pdf.setProperties({ title: reporte.meta.titulo, author: branding.name, subject: branding.reportTitle, creator: branding.area })
+  pdf.setProperties({ title: reporte.meta.titulo, author: branding.name, subject: 'Reporte institucional', creator: branding.area })
   const peso = columna => ['nombre', 'detalle', 'motivo', 'por_seccion'].includes(columna.key) ? 2.3 : ['unidad', 'puesto', 'origen_puesto'].includes(columna.key) ? 1.6 : 1
   const total = columnas.reduce((suma, columna) => suma + peso(columna), 0)
   const anchos = columnas.map(columna => width * peso(columna) / total)
   let y
   function cabecera() {
-    y = header({ subtitle: reporte.meta.titulo, emittedAt: reporte.meta.generado_en })
+    // El título es el del reporte; el «Título del reporte» de la configuración es el de la ficha personal.
+    y = header({ title: reporte.meta.titulo, emittedAt: reporte.meta.generado_en })
     pdf.setFont('helvetica', 'normal').setFontSize(7.5).setTextColor(80)
     const metadata = pdf.splitTextToSize(`Responsable: ${reporte.meta.generado_por} · ${reporte.meta.total} resultados`, width)
     pdf.text(metadata, margen, y)

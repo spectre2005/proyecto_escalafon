@@ -9,6 +9,7 @@ use App\Models\Legajo;
 use App\Models\ReferenciaLegajoPasivo;
 use App\Models\RegimenNormativo;
 use App\Models\TipoDocumento;
+use App\Models\UnidadOrganica;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
 use Database\Seeders\SeccionesLegajoCatalogoSeeder;
@@ -78,6 +79,18 @@ class FormatosDirectivaTest extends TestCase
         $this->getJson(self::URL.'/caratula')->assertUnprocessable();
         $this->getJson(self::URL.'/caratula?legajo_id='.$legajo->id)->assertOk()->assertJsonPath('data.0.numero_legajo', 'OTRO-001')
             ->assertJsonPath('data.0.documento_identidad', '00123456')->assertJsonPath('data.0.cese', '31/01/2026');
+    }
+
+    public function test_cover_shows_the_organic_unit_of_the_current_link_as_annex_09(): void
+    {
+        $this->actuarComo();
+        $persona = Usuario::factory()->create();
+        $legajo = Legajo::factory()->create(['usuario_id' => $persona->id, 'estado_legajo' => 'activo']);
+        VinculoLaboral::factory()->create(['usuario_id' => $persona->id, 'nombre_puesto' => 'ESPECIALISTA', 'fecha_inicio' => now()->subYear(), 'fecha_cese' => null,
+            'unidad_organica_id' => UnidadOrganica::factory()->create(['nombre' => 'UNIDAD DE PRUEBA'])->id]);
+
+        $this->getJson(self::URL.'/caratula?legajo_id='.$legajo->id)->assertOk()->assertJsonPath('columnas.unidad', 'Órgano/Unidad')
+            ->assertJsonPath('data.0.unidad', 'UNIDAD DE PRUEBA');
     }
 
     public function test_incorporation_control_names_the_section_and_honors_dates_and_visibility(): void

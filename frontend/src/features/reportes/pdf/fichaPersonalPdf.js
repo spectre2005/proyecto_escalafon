@@ -2,6 +2,9 @@ import { jsPDF } from 'jspdf'
 import { personalGroups, familyFields, reportValue } from '../config/fichaPersonal.js'
 import { presentacionPdf } from './presentacionPdf.js'
 
+// Recuadros de familiares en la ficha en blanco (quien tenga más puede usar otra hoja).
+export const FAMILIARES_EN_BLANCO = 3
+
 export function createPersonalPdf({ values = {}, families = [], blank = false, institution = 'Ficha del personal' } = {}) {
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' })
   const { branding, margin, width, bottom, header, footer } = presentacionPdf(pdf, typeof institution === 'string' ? { name: institution } : institution)
@@ -61,7 +64,9 @@ export function createPersonalPdf({ values = {}, families = [], blank = false, i
       // Split unusually long values across pages without dropping text.
       for (let offset = 0; offset < count; offset += 35) {
         const rows = Math.min(35, count - offset)
-        const valueHeight = Math.max(blank ? 8 : 6, 3 + rows * 3.8)
+        // En blanco, la fila de firma deja espacio para firmar a mano.
+        const minimo = blank ? (row.some(([key]) => key === 'firma') ? 20 : 8) : 6
+        const valueHeight = Math.max(minimo, 3 + rows * 3.8)
         const height = labelHeight + valueHeight
         if (y + height > bottom) { newPage(); heading(`${name} (continuación)`) }
         cells.forEach((cell, index) => {
@@ -87,7 +92,10 @@ export function createPersonalPdf({ values = {}, families = [], blank = false, i
   }
   newPage(true)
   personalGroups.forEach(([name, fields], index) => group(`${index + 1}. ${name}`, fields, values))
-  if (blank) group('Información familiar', familyFields.filter(([key]) => !['anulado', 'motivo_anulacion'].includes(key)), {})
+  if (blank) {
+    const camposFamiliar = familyFields.filter(([key]) => !['anulado', 'motivo_anulacion'].includes(key))
+    for (let i = 1; i <= FAMILIARES_EN_BLANCO; i++) group(`Información familiar · Familiar ${i}`, camposFamiliar, {})
+  }
   else if (families.length) families.forEach((family, index) => group(`Información familiar · Familiar ${index + 1}`, familyFields, family.values))
   else group('Información familiar', [['familiares', 'Familiares registrados']], { familiares: 'Sin familiares registrados' })
   if (blank) group('Conformidad', [['fecha', 'Fecha'], ['firma', 'Firma del personal']], {})

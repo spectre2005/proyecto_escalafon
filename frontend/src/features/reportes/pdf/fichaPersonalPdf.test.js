@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createPersonalPdf } from './fichaPersonalPdf.js'
+import { createPersonalPdf, FAMILIARES_EN_BLANCO } from './fichaPersonalPdf.js'
+import { fechaPdf } from './presentacionPdf.js'
 import { personalGroups, reportValue } from '../config/fichaPersonal.js'
 
 test('includes institutional logo, identity and contact information on a multipage report', () => {
@@ -65,4 +66,20 @@ test('paginates families and long content without dropping the last record', () 
   const pdf = createPersonalPdf({ families })
   assert.ok(pdf.getNumberOfPages() > 5)
   assert.ok(pdf.output().includes('FINAL_29'))
+})
+
+test('blank sheet offers several family boxes and room to sign', () => {
+  const pdf = createPersonalPdf({ blank: true })
+  const output = pdf.output()
+  for (let i = 1; i <= FAMILIARES_EN_BLANCO; i++) assert.ok(output.includes(`FAMILIAR ${i}`))
+  assert.ok(!output.includes(`FAMILIAR ${FAMILIARES_EN_BLANCO + 1}`))
+  // La última casilla dibujada es la de firma: etiqueta más al menos 20 mm para firmar («x y w h re», en puntos).
+  const casillas = [...pdf.internal.pages[pdf.getNumberOfPages()].join('\n').matchAll(/[\d.]+ [\d.]+ [\d.]+ (-?[\d.]+) re/g)]
+  assert.ok(Math.abs(Number(casillas.at(-1)[1])) * 25.4 / 72 >= 20)
+})
+
+test('the emission date is always written as dd/mm/aaaa', () => {
+  assert.equal(fechaPdf('2026-01-05T15:00:00Z'), '05/01/2026')
+  assert.equal(fechaPdf('2026-01-05T15:07:00Z', true), '05/01/2026 10:07')
+  assert.match(createPersonalPdf({}).output(), /Fecha de emisi.n: \d{2}\/\d{2}\/\d{4}/)
 })

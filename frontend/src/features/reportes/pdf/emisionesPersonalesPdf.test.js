@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createConstanciaTiempoServiciosPdf, createConstanciaTrabajoPdf, createInformeEscalafonarioPdf } from './emisionesPersonalesPdf.js'
+import { FORMULA_CIERRE, createConstanciaTiempoServiciosPdf, createConstanciaTrabajoPdf, createInformeEscalafonarioPdf, fechaEnLetras } from './emisionesPersonalesPdf.js'
 
 const institution = { name: 'Institucion prueba', area: 'Oficina de personal', reportFooter: 'Uso interno' }
 const persona = { nombre: 'FICTICIA EJEMPLO, ANA PRUEBA', tipo_documento: 'DNI', numero_documento: '00112233', tipo_personal: 'Administrativo',
@@ -101,4 +101,53 @@ test('the note on the "Aceptado" state appears in both certificates and in the r
   assert.ok(informe('Documento aceptado').includes(nota))
   assert.ok(!informe('Sin documento de sustento').includes(nota))
   assert.ok(!informe('Documento no aceptado (Observado)').includes(nota))
+})
+
+// Textos de una página con su altura en mm desde arriba (jsPDF escribe «x y Td (texto) Tj» en puntos desde abajo).
+const textosConAltura = (pdf, pagina) => {
+  const alto = pdf.internal.pageSize.getHeight()
+  return [...pdf.internal.pages[pagina].join('\n').matchAll(/[\d.]+ ([\d.]+) Td\n\(((?:\\.|[^\\)])*)\) Tj/g)]
+    .map(m => ({ y: alto - Number(m[1]) * 25.4 / 72, texto: m[2].replace(/\\(.)/g, '$1') }))
+}
+
+test('a section title never stays alone at the foot of a page', () => {
+  for (let vinculos = 1; vinculos <= 4; vinculos++) {
+    for (let filas = 0; filas <= 12; filas++) {
+      const pdf = createInformeEscalafonarioPdf({ titulo: 'Informe escalafonario', emitido_en: '22/10/2026', persona, ...vacio,
+        vinculos: Array.from({ length: vinculos }, () => vinculo), tiempos_reconocidos: Array.from({ length: filas }, () => tiempo),
+        formacion: [{ nivel: 'Doctorado', denominacion: 'DOCTOR FICTICIO', institucion: 'INSTITUCION DE PRUEBA', fecha_obtencion: '01/12/2019' }] }, institution)
+      for (let pagina = 1; pagina <= pdf.getNumberOfPages(); pagina++) {
+        // El pie («Uso interno», paginación) queda por debajo de 280 mm en A4 con este pie de una línea.
+        const contenido = textosConAltura(pdf, pagina).filter(t => t.y < 280)
+        for (const t of contenido.filter(t => /^(\d\. [A-Z]|IDENTIFICACI)/.test(t.texto))) {
+          assert.ok(contenido.some(o => o.y > t.y + 1), `«${t.texto}» sin contenido debajo (${vinculos} vínculos, ${filas} filas, página ${pagina})`)
+        }
+      }
+    }
+  }
+})
+
+test('certificates close with the formula and the date in words before the signature, not in the header', () => {
+  const pdfs = [
+    createConstanciaTrabajoPdf({ titulo: 'Constancia de trabajo', emitido_en: '22/10/2026', persona, emitible: true, vinculos: [vinculo], situacion: 'Vigente', no_incluidos: [] }, institution),
+    createConstanciaTiempoServiciosPdf({ titulo: 'Constancia de tiempo de servicios', emitido_en: '22/10/2026', persona, emitible: true, tiempos: [tiempo], no_incluidos: [] }, institution),
+  ]
+  for (const pdf of pdfs) {
+    const texto = textoPdf(pdf)
+    assert.ok(texto.includes(FORMULA_CIERRE))
+    assert.ok(!texto.includes('Fecha de emisión'))
+    const fecha = texto.indexOf('22 de octubre de 2026')
+    assert.ok(fecha > texto.indexOf(FORMULA_CIERRE) && fecha < texto.indexOf('Firma y sello del responsable'))
+  }
+  // El informe no es una constancia: conserva la fecha de emisión en la cabecera y no lleva fórmula de cierre.
+  const informe = textoPdf(createInformeEscalafonarioPdf({ titulo: 'Informe escalafonario', emitido_en: '22/10/2026', persona, ...vacio, vinculos: [], tiempos_reconocidos: [] }, institution))
+  assert.ok(informe.includes('Fecha de emisión: 22/10/2026') && !informe.includes(FORMULA_CIERRE))
+})
+
+test('the date in words never invents a date', () => {
+  assert.equal(fechaEnLetras('04/11/2026'), '4 de noviembre de 2026')
+  assert.equal(fechaEnLetras('01/09/2026'), '1 de setiembre de 2026')
+  assert.equal(fechaEnLetras('2026-11-04'), '2026-11-04')
+  assert.equal(fechaEnLetras('31/13/2026'), '31/13/2026')
+  assert.equal(fechaEnLetras(null), 'No registrado')
 })

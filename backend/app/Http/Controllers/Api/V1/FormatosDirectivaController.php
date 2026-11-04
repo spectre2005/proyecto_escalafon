@@ -104,7 +104,7 @@ class FormatosDirectivaController extends Controller
             'referencias' => [...$comunes, 'seccion' => 'Sección', 'puesto' => 'Cargo ocupado', 'regimen' => 'Régimen de vinculación', 'cese' => 'Fecha de cese', 'documento' => 'Tipo de documento registrado en legajo pasivo',
                 'folios' => 'Folios en los que se ubica el documento a referenciar', 'fedateado' => 'Documento fedateado (SÍ/NO)', 'fecha_fedateo' => 'Fecha de fedateo', 'fiscalizado' => 'Documento fiscalizado (SÍ/NO)',
                 'fecha_fiscalizacion' => 'Fecha de fiscalización', 'responsable' => 'Responsable de legajo', 'dni_responsable' => 'N.º de DNI del responsable', 'firma' => 'Firma del responsable'],
-            'caratula' => [...$comunes, 'puesto' => 'Nombre del puesto', 'ingreso' => 'Fecha de ingreso', 'cese' => 'Fecha de cese', 'documento_identidad' => 'N.º de DNI'],
+            'caratula' => [...$comunes, 'puesto' => 'Nombre del puesto', 'ingreso' => 'Fecha de ingreso', 'cese' => 'Fecha de cese', 'documento_identidad' => 'N.º de DNI', 'unidad' => 'Órgano/Unidad'],
             default => [...$comunes, 'tipo_documento_identidad' => 'Tipo de documento de identidad', 'documento_identidad' => 'N.º de documento de identidad', 'puesto' => 'Nombre del puesto',
                 'apertura' => 'Fecha de apertura del legajo', 'regimen' => 'Régimen laboral', 'unidad' => 'Órgano o unidad orgánica', 'estado' => 'Estado del legajo', 'ubicacion' => 'Ubicación del legajo'],
         };
@@ -131,11 +131,13 @@ class FormatosDirectivaController extends Controller
         // Activo: el vínculo vigente hoy; pasivo: el último iniciado antes del pase a pasivo.
         $v = $p->vinculosLaborales->first(fn ($v) => $l->estado_legajo === 'activo' ? VigenciaLaboral::vigente($v) : ! $v->anulado && $v->fecha_inicio->format('Y-m-d') <= ($l->fecha_pasivo?->format('Y-m-d') ?? VigenciaLaboral::hoy()));
         $puesto = $v?->nombre_puesto ?? $p->nombre_puesto;
+        $unidad = $v?->unidadOrganica?->nombre ?? $p->unidadOrganica?->nombre;
 
         return $tipo === 'caratula'
-            ? [...$comunes, 'puesto' => $puesto, 'ingreso' => $v?->fecha_inicio?->format('d/m/Y'), 'cese' => $v?->fecha_cese?->format('d/m/Y') ?? $l->fecha_pasivo?->format('d/m/Y'), 'documento_identidad' => $p->numero_doc_identidad]
+            ? [...$comunes, 'puesto' => $puesto, 'ingreso' => $v?->fecha_inicio?->format('d/m/Y'), 'cese' => $v?->fecha_cese?->format('d/m/Y') ?? $l->fecha_pasivo?->format('d/m/Y'),
+                'documento_identidad' => $p->numero_doc_identidad, 'unidad' => $unidad]
             : [...$comunes, 'tipo_documento_identidad' => self::TIPOS_DOC_IDENTIDAD[$p->tipo_doc_identidad] ?? $p->tipo_doc_identidad, 'documento_identidad' => $p->numero_doc_identidad, 'puesto' => $puesto,
-                'apertura' => $l->fecha_apertura?->format('d/m/Y'), 'regimen' => $this->regimen($v) ?? $p->regimenNormativo?->nombre, 'unidad' => $v?->unidadOrganica?->nombre ?? $p->unidadOrganica?->nombre,
+                'apertura' => $l->fecha_apertura?->format('d/m/Y'), 'regimen' => $this->regimen($v) ?? $p->regimenNormativo?->nombre, 'unidad' => $unidad,
                 'estado' => $l->estado_legajo === 'activo' ? 'Activo' : 'Pasivo', 'ubicacion' => $l->ubicacion];
     }
 

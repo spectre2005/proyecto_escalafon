@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import ExcelJS from 'exceljs'
+import { jsPDF } from 'jspdf'
+import { presentacionPdf } from './pdf/presentacionPdf.js'
 import { crearExcelReporte, crearPdfReporte, describirFiltros } from './exportarReporte.js'
 
 const institucion = { name: 'Institución de prueba', reportFooter: 'Uso institucional' }
@@ -46,8 +48,21 @@ test('all table report pages use the configured institutional presentation', asy
   assert.ok(pdf.getNumberOfPages() > 1)
   for (let page = 1; page <= pdf.getNumberOfPages(); page++) {
     const text = pdf.internal.pages[page].join('\n')
-    for (const expected of ['REPORTE OFICIAL', 'Equipo de escalafon', 'Personal', 'Uso institucional', 'Direccion de prueba', '12345678901', 'equipo@example.test']) assert.ok(text.includes(expected), `${expected} on page ${page}`)
+    for (const expected of ['PERSONAL', 'Equipo de escalafon', 'Uso institucional', 'Direccion de prueba', '12345678901', 'equipo@example.test']) assert.ok(text.includes(expected), `${expected} on page ${page}`)
+    // El título configurado es el de la ficha personal: no encabeza los reportes tabulares.
+    assert.ok(!text.includes('REPORTE OFICIAL'), `reportTitle on page ${page}`)
   }
+})
+
+test('with a logo, institution name, area and title share the page centre', () => {
+  const logo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAFklEQVQImWPkL8tjYGBgYmBgYGBgAAALLwD3dKaQQgAAAABJRU5ErkJggg=='
+  const pdf = new jsPDF({ unit: 'mm', format: 'a4' })
+  const centros = []
+  const original = pdf.text.bind(pdf)
+  pdf.text = (texto, x, y, opciones) => { if (opciones?.align === 'center') centros.push(x); return original(texto, x, y, opciones) }
+  presentacionPdf(pdf, { ...institucion, area: 'Equipo de escalafon', logo }).header({ title: 'Personal' })
+  const mitad = pdf.internal.pageSize.getWidth() / 2
+  assert.deepEqual(centros, [mitad, mitad, mitad])
 })
 
 test('table reports respect hidden logo, emission date and page numbers', async () => {
