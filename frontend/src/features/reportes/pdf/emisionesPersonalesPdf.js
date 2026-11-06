@@ -1,3 +1,4 @@
+import { disenoDocumento } from './disenoDocumento.js'
 import { jsPDF } from 'jspdf'
 import { presentacionPdf } from './presentacionPdf.js'
 
@@ -8,107 +9,58 @@ const texto = (valor, vacio = 'No registrado') => valor === null || valor === un
 function documentoPdf(data, institution, subject) {
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' })
   const base = presentacionPdf(pdf, typeof institution === 'string' ? { name: institution } : institution)
-  const { branding, margin, width, bottom, header } = base
+  const { branding } = base
   pdf.setProperties({ title: data.titulo, author: branding.name, subject, creator: branding.area })
-  let y = 0
-  const nuevaPagina = (primera = false) => {
-    if (!primera) pdf.addPage()
-    y = header({ title: data.titulo, instruction: `Fecha de emisión: ${data.emitido_en}` })
+  const informe = subject === 'Informe escalafonario del legajo'
+  const doc = disenoDocumento(pdf, base, { layout: informe ? 'informe' : undefined, title: data.titulo, subtitle: informe ? 'Información registrada en el legajo' : '', instruction: `Fecha de emisión: ${data.emitido_en}` })
+  function parrafo(contenido, { negrita = false, tamano = 9, color = 65 } = {}) {
+    doc.paragraph(contenido, { bold: negrita, size: tamano, color })
   }
-  const espacio = alto => { if (y + alto > bottom) nuevaPagina() }
-
-  function parrafo(contenido, { negrita = false, tamano = 9, color = 35 } = {}) {
-    pdf.setFont('helvetica', negrita ? 'bold' : 'normal').setFontSize(tamano).setTextColor(color)
-    const lineas = pdf.splitTextToSize(contenido, width)
-    for (const linea of lineas) {
-      espacio(4.6)
-      pdf.text(linea, margin, y + 3.5)
-      y += 4.6
-    }
-    y += 1.5
-  }
-
-  function titulo(contenido) {
-    espacio(14)
-    pdf.setFont('helvetica', 'bold').setFontSize(9).setTextColor(25)
-    pdf.text(contenido.toUpperCase(), margin, y + 4)
-    y += 7
-  }
-
-  // columnas: [clave, etiqueta, ancho relativo, texto si falta]
-  function tabla(columnas, filas) {
-    const total = columnas.reduce((suma, [, , ancho]) => suma + ancho, 0)
-    const anchos = columnas.map(([, , ancho]) => width * ancho / total)
-    const celdas = valores => valores.map((valor, i) => pdf.splitTextToSize(valor, anchos[i] - 2.5))
-    function fila(lineas, encabezado) {
-      pdf.setFont('helvetica', encabezado ? 'bold' : 'normal').setFontSize(encabezado ? 7 : 7.8).setTextColor(encabezado ? 25 : 35)
-      const alto = Math.max(...lineas.map(l => l.length)) * 3.3 + 2.4
-      let x = margin
-      lineas.forEach((contenido, i) => {
-        if (encabezado) pdf.setFillColor(242, 245, 244).rect(x, y, anchos[i], alto, 'F')
-        pdf.setDrawColor(150).setLineWidth(0.15).rect(x, y, anchos[i], alto)
-        pdf.text(contenido, x + 1.25, y + 3.4, { lineHeightFactor: 1.2 })
-        x += anchos[i]
-      })
-      y += alto
-    }
-    pdf.setFont('helvetica', 'bold').setFontSize(7)
-    const cabecera = celdas(columnas.map(([, etiqueta]) => etiqueta.toUpperCase()))
-    espacio(16)
-    fila(cabecera, true)
-    for (const registro of filas) {
-      pdf.setFont('helvetica', 'normal').setFontSize(7.8)
-      const lineas = celdas(columnas.map(([clave, , , vacio]) => texto(registro[clave], vacio)))
-      if (y + Math.max(...lineas.map(l => l.length)) * 3.3 + 2.4 > bottom) {
-        nuevaPagina()
-        fila(cabecera, true)
-      }
-      fila(lineas, false)
-    }
-    y += 4
-  }
-
-  // Pares etiqueta-valor en una rejilla; un valor largo ocupa las líneas que necesite (no se corta).
+  const titulo = doc.heading
+  const firma = doc.signature
   function datos(pares, columnas = 2) {
-    const ancho = width / columnas
-    for (let i = 0; i < pares.length; i += columnas) {
-      pdf.setFont('helvetica', 'normal').setFontSize(9)
-      const fila = pares.slice(i, i + columnas).map(([etiqueta, valor, vacio]) => [etiqueta, pdf.splitTextToSize(texto(valor, vacio), ancho - 4)])
-      const alto = 5 + Math.max(...fila.map(([, lineas]) => lineas.length)) * 4
-      espacio(alto + 1)
-      fila.forEach(([etiqueta, lineas], j) => {
-        const x = margin + j * ancho
-        pdf.setFont('helvetica', 'bold').setFontSize(7).setTextColor(90)
-        pdf.text(etiqueta.toUpperCase(), x, y + 3)
-        pdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(25)
-        pdf.text(lineas, x, y + 7.5, { lineHeightFactor: 1.25 })
-      })
-      y += alto + 1
+    const first = pares[0]
+    if (first?.[0] === 'Apellidos y nombres') {
+      doc.fields([[first[0], texto(first[1], first[2])]], 1)
+      pares = pares.slice(1)
     }
-    y += 2
+    doc.fields(pares.map(([etiqueta, valor, vacio]) => [etiqueta, texto(valor, vacio)]), columnas)
   }
-
-  // Un registro por bloque (los vínculos tienen demasiados datos para una tabla legible en A4 vertical).
-  function fichas(campos, registros, encabezado) {
-    registros.forEach((registro, i) => {
-      espacio(24)
-      pdf.setFont('helvetica', 'bold').setFontSize(8.5).setTextColor(25)
-      pdf.text(pdf.splitTextToSize(encabezado(registro, i), width)[0], margin, y + 3.5)
-      pdf.setDrawColor(200).setLineWidth(0.15).line(margin, y + 5, margin + width, y + 5)
-      y += 7
-      datos(campos.map(([clave, etiqueta, vacio]) => [etiqueta, registro[clave], vacio]), 3)
+  function tabla(columnas, filas) {
+    filas.forEach((registro, index) => {
+      if (informe) {
+        const principal = columnas.find(([key]) => ['denominacion', 'nombre', 'motivo', 'numero_resolucion'].includes(key)) || columnas[0]
+        doc.record(`${principal[1].toUpperCase()}: ${texto(registro[principal[0]], `Registro ${index + 1}`)}`, columnas.filter(col => col !== principal).map(([key, label, , vacio]) => [label, texto(registro[key], vacio)]))
+        return
+      }
+      doc.paragraph(`Registro ${index + 1}`, { bold: true })
+      for (let i = 0; i < columnas.length; i++) {
+        const [clave, etiqueta, peso, vacio] = columnas[i]
+        const next = columnas[i + 1]
+        if (peso < 2 && next && next[2] < 2) {
+          datos([[etiqueta, registro[clave], vacio], [next[1], registro[next[0]], next[3]]])
+          i++
+        } else datos([[etiqueta, registro[clave], vacio]], 1)
+      }
     })
   }
-
-  function firma() {
-    espacio(34)
-    y += 22
-    const x = margin + width / 2
-    pdf.setDrawColor(60).setLineWidth(0.2).line(x - 38, y, x + 38, y)
-    pdf.setFont('helvetica', 'normal').setFontSize(8).setTextColor(35)
-    pdf.text('Firma y sello del responsable', x, y + 4, { align: 'center' })
-    pdf.text(branding.area, x, y + 8, { align: 'center' })
-    y += 12
+  function fichas(campos, registros, encabezado) {
+    registros.forEach((registro, index) => {
+      if (informe) {
+        doc.record(encabezado(registro, index), campos.map(([key, label, vacio]) => [label, texto(registro[key], vacio)]))
+        return
+      }
+      titulo(encabezado(registro, index))
+      for (let i = 0; i < campos.length; i++) {
+        const [clave, etiqueta, vacio] = campos[i]
+        const full = ['unidad', 'numero_oficial', 'sustento', 'situacion'].includes(clave)
+        const next = campos[i + 1]
+        if (!full && next && !['unidad', 'numero_oficial', 'sustento', 'situacion'].includes(next[0])) {
+          datos([[etiqueta, registro[clave], vacio], [next[1], registro[next[0]], next[2]]])
+          i++
+        } else datos([[etiqueta, registro[clave], vacio]], 1)
+      }
+    })
   }
 
   function identificacion() {
@@ -117,7 +69,6 @@ function documentoPdf(data, institution, subject) {
       ['N.º de legajo', p.numero_legajo], ['Estado del legajo', p.estado_legajo]]
   }
 
-  nuevaPagina(true)
   return { pdf, base, parrafo, titulo, tabla, datos, fichas, firma, identificacion, texto }
 }
 
@@ -150,9 +101,6 @@ const SECCIONES_INFORME = [
 
 export function createInformeEscalafonarioPdf(data, institution) {
   const { pdf, base, parrafo, titulo, tabla, datos, fichas, identificacion } = documentoPdf(data, institution, 'Informe escalafonario del legajo')
-  parrafo('Informe del expediente: reproduce los datos registrados en el legajo a la fecha de emisión, con el estado del documento que sustenta cada uno. No constituye una certificación de los datos.', { tamano: 8, color: 80 })
-  const muestraAceptado = SECCIONES_INFORME.some(([clave]) => (data[clave] || []).some(fila => /^Documento (de vinculación )?aceptado$/.test(fila.sustento || '')))
-  if (muestraAceptado) parrafo(NOTA_ACEPTADO, notaDiscreta)
   titulo('Identificación')
   datos([...identificacion(), ['Tipo de personal', data.persona.tipo_personal], ['Apertura del legajo', data.persona.fecha_apertura]])
   for (const [clave, nombre, columnas] of SECCIONES_INFORME) {
@@ -163,6 +111,10 @@ export function createInformeEscalafonarioPdf(data, institution) {
     else parrafo('Sin registros en el legajo.', { color: 90 })
     if (clave === 'tiempos_reconocidos' && data[clave].length) parrafo('Cada fila es una resolución de reconocimiento tal como se registró; el informe no suma resoluciones ni calcula tiempo a partir de vínculos, licencias o estudios.', { tamano: 7.5, color: 90 })
   }
+  titulo('Alcance del informe')
+  parrafo('Informe del expediente: reproduce los datos registrados en el legajo a la fecha de emisión, con el estado del documento que sustenta cada uno. No constituye una certificación de los datos.', { tamano: 8, color: 80 })
+  const muestraAceptado = SECCIONES_INFORME.some(([clave]) => (data[clave] || []).some(fila => /^Documento (de vinculación )?aceptado$/.test(fila.sustento || '')))
+  if (muestraAceptado) parrafo(NOTA_ACEPTADO, notaDiscreta)
   if (data.omitidas?.length) parrafo(`No incluido por los permisos de quien emite: ${data.omitidas.join(', ')}.`, { tamano: 7.5, color: 90 })
   parrafo('No incluye descansos médicos ni otros datos de salud.', { tamano: 7.5, color: 90 })
   base.footer()
@@ -175,12 +127,10 @@ function exigirEmitible(data) {
 
 export function createConstanciaTrabajoPdf(data, institution) {
   exigirEmitible(data)
-  const { pdf, base, parrafo, titulo, datos, fichas, firma, identificacion, texto } = documentoPdf(data, institution, 'Constancia de trabajo')
+  const { pdf, base, parrafo, fichas, firma, texto } = documentoPdf(data, institution, 'Constancia de trabajo')
   const p = data.persona
   parrafo(`${base.branding.name} hace constar que ${p.nombre}, con ${p.tipo_documento || 'documento de identidad'} N.º ${texto(p.numero_documento)}, registra en su legajo N.º ${texto(p.numero_legajo)} los vínculos laborales que se detallan, sustentados con documento de vinculación aceptado:`)
-  titulo('Identificación')
-  datos(identificacion())
-  titulo('Vínculos laborales')
+  parrafo(`Estado del legajo: ${texto(p.estado_legajo)}`, notaDiscreta)
   fichas(CAMPOS_VINCULO, data.vinculos, encabezadoVinculo)
   parrafo(`Situación a la fecha de emisión: ${data.situacion}`, { negrita: true })
   parrafo('Solo se consignan los vínculos sustentados con documento aceptado en el legajo. Un dato no registrado se indica como tal.', notaDiscreta)

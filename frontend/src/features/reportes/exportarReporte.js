@@ -1,3 +1,4 @@
+import { disenoDocumento } from './pdf/disenoDocumento.js'
 import { presentacionPdf } from './pdf/presentacionPdf.js'
 
 const fecha = valor => valor && /^\d{4}-\d{2}-\d{2}$/.test(valor) ? valor.split('-').reverse().join('/') : valor
@@ -64,61 +65,21 @@ export async function crearExcelReporte(reporte, institucion, filtros) {
 
 export async function crearPdfReporte(reporte, institucion, filtros) {
   const { jsPDF } = await import('jspdf')
-  const columnas = reporte.columnas
-  const pdf = new jsPDF({ orientation: 'landscape', format: columnas.length > 9 ? 'a3' : 'a4' })
-  const { branding, margin: margen, width, accent, accentText, bottom, header, footer } = presentacionPdf(pdf, institucion)
-  pdf.setProperties({ title: reporte.meta.titulo, author: branding.name, subject: branding.reportTitle, creator: branding.area })
-  const peso = columna => ['nombre', 'detalle', 'motivo', 'por_seccion'].includes(columna.key) ? 2.3 : ['unidad', 'puesto', 'origen_puesto'].includes(columna.key) ? 1.6 : 1
-  const total = columnas.reduce((suma, columna) => suma + peso(columna), 0)
-  const anchos = columnas.map(columna => width * peso(columna) / total)
-  let y
-  function cabecera() {
-    y = header({ subtitle: reporte.meta.titulo, emittedAt: reporte.meta.generado_en })
-    pdf.setFont('helvetica', 'normal').setFontSize(7.5).setTextColor(80)
-    const metadata = pdf.splitTextToSize(`Responsable: ${reporte.meta.generado_por} · ${reporte.meta.total} resultados`, width)
-    pdf.text(metadata, margen, y)
-    y += metadata.length * 3.5 + 2
-    const lineas = pdf.splitTextToSize(filtros, width)
-    pdf.text(lineas, margen, y)
-    y += lineas.length * 3.5 + 3
-    pdf.setFont('helvetica', 'bold')
-    const altoCabecera = Math.max(...columnas.map((columna, i) => pdf.splitTextToSize(columna.label, anchos[i] - 4).length)) * 3.5 + 5
-    pdf.setFillColor(...accent).rect(margen, y, width, altoCabecera, 'F')
-    let x = margen
-    pdf.setFont('helvetica', 'bold').setTextColor(...accentText)
-    columnas.forEach((columna, i) => { pdf.text(pdf.splitTextToSize(columna.label, anchos[i] - 4), x + 2, y + 4); x += anchos[i] })
-    y += altoCabecera
-  }
-  cabecera()
-  reporte.data.forEach((fila, indice) => {
-    pdf.setFont('helvetica', 'normal').setFontSize(7.5)
-    const celdas = columnas.map((columna, i) => pdf.splitTextToSize(String(valorReporte(fila, columna)), anchos[i] - 4))
-    const cantidadLineas = Math.max(...celdas.map(lineas => lineas.length))
-    if (y + cantidadLineas * 3.5 + 5 > bottom) { pdf.addPage(); cabecera() }
-    let offset = 0
-    while (offset < cantidadLineas) {
-      const disponibles = Math.max(1, Math.floor((bottom - y - 5) / 3.5))
-      const cantidad = Math.min(disponibles, cantidadLineas - offset)
-      const altura = cantidad * 3.5 + 5
-      if (indice % 2 === 0) pdf.setFillColor(248, 250, 252).rect(margen, y, width, altura, 'F')
-      pdf.setFont('helvetica', 'normal').setFontSize(7.5).setTextColor(51, 65, 85)
-      let x = margen
-      celdas.forEach((lineas, i) => {
-        const parte = lineas.slice(offset, offset + cantidad)
-        if (parte.length) pdf.text(parte, x + 2, y + 4)
-        x += anchos[i]
-      })
-      y += altura
-      offset += cantidad
-      if (offset < cantidadLineas) { pdf.addPage(); cabecera() }
-    }
+  const pdf = new jsPDF({ orientation: 'portrait', format: 'a4' })
+  const base = presentacionPdf(pdf, institucion)
+  const doc = disenoDocumento(pdf, base, { subtitle: reporte.meta.titulo, emittedAt: reporte.meta.generado_en })
+  pdf.setProperties({ title: reporte.meta.titulo, author: base.branding.name, creator: base.branding.area })
+  doc.paragraph(`${reporte.meta.total} resultados · Responsable: ${reporte.meta.generado_por}`)
+  doc.paragraph(filtros)
+  if (reporte.data.length) doc.heading('Resultados del reporte')
+  reporte.data.forEach((fila, index) => {
+    const nombre = fila.nombre || reporte.meta.titulo
+    doc.record(`${String(index + 1).padStart(2, '0')}. ${nombre}`,
+      reporte.columnas.map(columna => [columna.label, valorReporte(fila, columna)]))
   })
-  if (reporte.meta.alcance) {
-    const lineas = pdf.splitTextToSize(`Alcance: ${reporte.meta.alcance}`, width)
-    if (y + lineas.length * 3.5 + 12 > bottom) { pdf.addPage(); cabecera() }
-    pdf.setFont('helvetica', 'normal').setFontSize(7.5).setTextColor(100, 116, 139).text(lineas, margen, y + 8)
-  }
-  footer()
+  if (!reporte.data.length) doc.paragraph('Sin registros para los filtros seleccionados.')
+  if (reporte.meta.alcance) { doc.heading('Alcance del reporte'); doc.paragraph(reporte.meta.alcance) }
+  base.footer()
   return pdf
 }
 

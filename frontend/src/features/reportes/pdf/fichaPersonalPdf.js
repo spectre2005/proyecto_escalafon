@@ -1,91 +1,28 @@
+import { disenoDocumento } from './disenoDocumento.js'
 import { jsPDF } from 'jspdf'
 import { personalGroups, familyFields, reportValue } from '../config/fichaPersonal.js'
 import { presentacionPdf } from './presentacionPdf.js'
 
 export function createPersonalPdf({ values = {}, families = [], blank = false, institution = 'Ficha del personal' } = {}) {
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' })
-  const { branding, margin, width, bottom, header, footer } = presentacionPdf(pdf, typeof institution === 'string' ? { name: institution } : institution)
+  const base = presentacionPdf(pdf, typeof institution === 'string' ? { name: institution } : institution)
+  const { branding, footer } = base
   pdf.setProperties({ title: branding.reportTitle, author: branding.name, subject: 'Ficha institucional del personal', creator: branding.area })
-  let y
-  const title = blank ? `${branding.reportTitle} - Formato en blanco` : branding.reportTitle
-  function newPage(first = false) {
-    if (!first) pdf.addPage()
-    y = header({ title, instruction: blank ? 'Complete los cuadros con letra clara. En las condiciones, indique Sí o No.' : '' })
-  }
-  function heading(text) {
-    pdf.setFont('helvetica', 'bold')
-    pdf.setFontSize(9)
-    pdf.setTextColor(25)
-    pdf.text(text.toUpperCase(), margin, y + 4)
-    y += 7
-  }
+  const doc = disenoDocumento(pdf, base, { title: blank ? `${branding.reportTitle} - Formato en blanco` : branding.reportTitle,
+    instruction: blank ? 'Complete los cuadros con letra clara. En las condiciones, indique Sí o No.' : '' })
   function group(name, fields, data) {
-    if (y + 25 > bottom) newPage()
-    heading(name)
-    const layouts = [
-      ['apellidos_nombres', 'parentesco'],
-      ['nombres', 'apellido_paterno', 'apellido_materno'],
-      ['tipo_doc_identidad', 'numero_doc_identidad', 'fecha_nacimiento'],
-      ['nacionalidad', 'estado_civil'],
-      ['email_institucional', 'telefono'],
-      ['region', 'provincia', 'distrito'],
-      ['domicilio'],
-      ['tipo_personal', 'nombre_puesto', 'unidad_organica_id'],
-      ['ley', 'tipo_vinculo', 'activo'],
-      ['con_discapacidad', 'tiene_derechohabientes', 'exige_colegiatura'],
-      ['obligado_djbr', 'exige_estudios_basicos', 'tiene_periodo_prueba'],
-      ['es_derechohabiente', 'anulado'],
-      ['motivo_anulacion'],
-      ['familiares'],
-      ['fecha', 'firma'],
-    ]
-    const remaining = new Map(fields)
-    const rows = layouts.map(keys => keys.filter(key => remaining.has(key)).map(key => {
-      const field = [key, remaining.get(key)]
-      remaining.delete(key)
-      return field
-    })).filter(row => row.length)
-    for (const field of remaining) rows.push([field])
-    for (const row of rows) {
-      const cellWidth = width / row.length
-      const cells = row.map(([key, label]) => {
-        pdf.setFont('helvetica', 'bold')
-        pdf.setFontSize(7)
-        const labels = pdf.splitTextToSize(label.toUpperCase(), cellWidth - 4)
-        pdf.setFont('helvetica', 'normal')
-        pdf.setFontSize(8.5)
-        return { labels, lines: pdf.splitTextToSize(reportValue(data[key], blank, key), cellWidth - 4) }
-      })
-      const labelHeight = Math.max(...cells.map(cell => cell.labels.length)) * 3 + 2
-      const count = Math.max(1, ...cells.map(cell => cell.lines.length))
-      // Split unusually long values across pages without dropping text.
-      for (let offset = 0; offset < count; offset += 35) {
-        const rows = Math.min(35, count - offset)
-        const valueHeight = Math.max(blank ? 8 : 6, 3 + rows * 3.8)
-        const height = labelHeight + valueHeight
-        if (y + height > bottom) { newPage(); heading(`${name} (continuación)`) }
-        cells.forEach((cell, index) => {
-          const x = margin + index * cellWidth
-          pdf.setDrawColor(65)
-          pdf.setLineWidth(0.2)
-          pdf.rect(x, y, cellWidth, height)
-          pdf.line(x, y + labelHeight, x + cellWidth, y + labelHeight)
-          pdf.setFont('helvetica', 'bold')
-          pdf.setFontSize(7)
-          pdf.setTextColor(25)
-          pdf.text(cell.labels, x + cellWidth / 2, y + 3.5, { align: 'center', lineHeightFactor: 1.2 })
-          pdf.setFont('helvetica', 'normal')
-          pdf.setFontSize(8.5)
-          pdf.setTextColor(35)
-          const lines = cell.lines.slice(offset, offset + 35)
-          if (lines.length) pdf.text(lines, x + cellWidth / 2, y + labelHeight + 4.3, { align: 'center', lineHeightFactor: 1.25 })
-        })
-        y += height + 3
-      }
+    doc.heading(name)
+    for (let i = 0; i < fields.length; i++) {
+      const [key, label] = fields[i]
+      const full = ['apellidos_nombres', 'domicilio', 'nombre_puesto', 'unidad_organica_id', 'email_institucional', 'motivo_anulacion'].includes(key)
+      const next = fields[i + 1]
+      const pair = [label, blank ? ' ' : reportValue(data[key], false, key)]
+      if (!full && next && !['apellidos_nombres', 'domicilio', 'nombre_puesto', 'unidad_organica_id', 'email_institucional', 'motivo_anulacion'].includes(next[0])) {
+        doc.fields([pair, [next[1], blank ? ' ' : reportValue(data[next[0]], false, next[0])]])
+        i++
+      } else doc.fields([pair], 1)
     }
-    y += 1
   }
-  newPage(true)
   personalGroups.forEach(([name, fields], index) => group(`${index + 1}. ${name}`, fields, values))
   if (blank) group('Información familiar', familyFields.filter(([key]) => !['anulado', 'motivo_anulacion'].includes(key)), {})
   else if (families.length) families.forEach((family, index) => group(`Información familiar · Familiar ${index + 1}`, familyFields, family.values))

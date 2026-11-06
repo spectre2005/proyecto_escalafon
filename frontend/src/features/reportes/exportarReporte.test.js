@@ -67,3 +67,12 @@ test('long cells continue on branded pages without dropping the last text', asyn
   assert.ok(pdf.output().includes('FIN_LARGO'))
   for (let page = 1; page <= pdf.getNumberOfPages(); page++) assert.ok(pdf.internal.pages[page].join('\n').includes('Uso institucional'))
 })
+
+test('contracts use portrait A4 and retain every supplied field including amendments and termination', async () => {
+  const columnas = ['nombre', 'documento', 'unidad', 'puesto', 'ley', 'tipo_vinculo', 'numero', 'fecha', 'fecha_fin', 'adendas', 'fecha_cese', 'estado'].map(key => ({ key, label: key, type: 'text' }))
+  const fila = Object.fromEntries(columnas.map(({ key }) => [key, `VALOR_${key}`]))
+  const pdf = await crearPdfReporte({ ...reporte, columnas, data: [fila], meta: { ...reporte.meta, titulo: 'Contratos y adendas', total: 1 } }, institucion, 'Sin filtros')
+  assert.ok(pdf.internal.pageSize.getWidth() < pdf.internal.pageSize.getHeight())
+  assert.ok(Math.abs(pdf.internal.pageSize.getWidth() - 210) < 1)
+  for (const valor of Object.values(fila)) assert.ok(pdf.output().includes(valor), valor)
+})

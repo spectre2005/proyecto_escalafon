@@ -41,9 +41,9 @@ test('the report shows identification, each section and what is missing without 
 test('sections hidden by permissions are left out and declared', () => {
   const texto = textoPdf(createInformeEscalafonarioPdf({ titulo: 'Informe escalafonario', emitido_en: '22/10/2026', persona, ...vacio, vinculos: [], tiempos_reconocidos: [],
     sanciones: null, evaluaciones: null, omitidas: ['Sanciones disciplinarias', 'Evaluaciones de desempeño'] }, institution))
-  assert.ok(!texto.includes('6. SANCIONES'))
+  assert.ok(!texto.includes('SANCIONES'))
   assert.ok(texto.includes('Sanciones disciplinarias'))
-  assert.ok(texto.includes('5. RECONOCIMIENTOS'))
+  assert.ok(texto.includes('RECONOCIMIENTOS'))
 })
 
 test('the work certificate needs supported links and states the situation given by the backend', () => {
@@ -101,4 +101,21 @@ test('the note on the "Aceptado" state appears in both certificates and in the r
   assert.ok(informe('Documento aceptado').includes(nota))
   assert.ok(!informe('Sin documento de sustento').includes(nota))
   assert.ok(!informe('Documento no aceptado (Observado)').includes(nota))
+})
+
+test('a brief work certificate fits on one page including its signature and notices', () => {
+  const pdf = createConstanciaTrabajoPdf({ titulo: 'Constancia de trabajo', emitido_en: '06/11/2026', persona, emitible: true,
+    vinculos: [vinculo], situacion: 'Mantiene un vínculo vigente.' }, institution)
+  assert.equal(pdf.getNumberOfPages(), 1)
+  const text = textoPdf(pdf)
+  assert.ok(text.includes('Firma y sello del responsable'))
+  assert.ok(text.includes('No implica fiscalizaci'))
+})
+
+test('extremely long link values continue without losing content or the institutional footer', () => {
+  const pdf = createConstanciaTrabajoPdf({ titulo: 'Constancia de trabajo', emitido_en: '06/11/2026', persona, emitible: true,
+    vinculos: [{ ...vinculo, unidad: 'Unidad extensa '.repeat(1500) + 'FIN_UNIDAD' }], situacion: 'Situación registrada.' }, institution)
+  assert.ok(pdf.getNumberOfPages() > 2)
+  assert.ok(textoPdf(pdf).includes('FIN_UNIDAD'))
+  for (let page = 1; page <= pdf.getNumberOfPages(); page++) assert.ok(textoPagina(pdf, page).includes('Uso interno'))
 })

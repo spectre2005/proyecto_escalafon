@@ -45,7 +45,8 @@ use Throwable;
 class CompletarLegajosDemo extends Command
 {
     protected $signature = 'demo:completar-legajos {--institucion= : Identificador de la institución (modo subdominio)}
-        {--dejar=3 : Personas con legajo activo que se dejan sin completar} {--aplicar : Escribe; sin esta opción solo muestra el plan}';
+        {--dejar=3 : Personas con legajo activo que se dejan sin completar} {--solo-demo-integral : Limita la carga a las personas del generador integral}
+        {--aplicar : Escribe; sin esta opción solo muestra el plan}';
 
     protected $description = 'Completa con datos ficticios las secciones 01-04 de los legajos (solo local, para demostración)';
 
@@ -99,6 +100,7 @@ class CompletarLegajosDemo extends Command
         $this->admin = $admin;
         Auth::setUser($admin);
         $personas = Usuario::query()->whereHas('legajos', fn ($query) => $query->where('estado_legajo', 'activo'))
+            ->when($this->option('solo-demo-integral'), fn ($query) => $query->where('email_institucional', 'like', 'integral.%@example.test')->whereBetween('numero_doc_identidad', ['99880001', '99880008']))
             ->whereKeyNot($admin->id)->orderBy('apellido_paterno')->orderBy('nombres')->get();
         // Siempre las mismas (orden fijo por un hash del id), para que el plan y la ejecución coincidan.
         $dejar = $personas->sortBy(fn (Usuario $u): string => md5('demo'.$u->id))->take(max(0, (int) $this->option('dejar')));

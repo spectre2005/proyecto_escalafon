@@ -3,7 +3,7 @@ import { normalizeInstitution } from '../../../config/institution.js'
 /** Identidad y preferencias comunes a todos los PDF institucionales. */
 export function presentacionPdf(pdf, institution) {
   const branding = normalizeInstitution(institution)
-  const margin = 14
+  const margin = 18
   const pageWidth = pdf.internal.pageSize.getWidth()
   const pageHeight = pdf.internal.pageSize.getHeight()
   const width = pageWidth - margin * 2
@@ -31,21 +31,21 @@ export function presentacionPdf(pdf, institution) {
     const headingWidth = width - (logoSize ? 34 : 0)
     const heading = pdf.splitTextToSize(branding.name, headingWidth)
     if (logoSize) pdf.addImage(branding.logo, margin, 14, logoSize.width, logoSize.height, 'institution-logo')
-    pdf.text(heading, textX + headingWidth / 2, 17, { align: 'center' })
+    pdf.text(heading, textX, 17, { align: 'left' })
     pdf.setFont('helvetica', 'normal').setFontSize(8).setTextColor(80)
     const area = pdf.splitTextToSize(branding.area, headingWidth)
-    pdf.text(area, textX + headingWidth / 2, 19 + heading.length * 5, { align: 'center' })
+    pdf.text(area, textX, 19 + heading.length * 5, { align: 'left' })
     let y = Math.max(22 + heading.length * 5 + area.length * 3, logoSize ? 39 : 0)
     pdf.setDrawColor(...accent).setLineWidth(0.6).line(margin, y, margin + width, y)
     y += 6
-    pdf.setFont('helvetica', 'bold').setTextColor(25).setFontSize(10)
+    pdf.setFont('helvetica', 'bold').setTextColor(...accent).setFontSize(16)
     const titles = pdf.splitTextToSize(title.toUpperCase(), width)
-    pdf.text(titles, pageWidth / 2, y, { align: 'center' })
-    y += titles.length * 4.5 + 1.5
+    pdf.text(titles, margin, y, { align: 'left' })
+    y += titles.length * 6.5 + 2
     if (subtitle && subtitle !== title) {
       pdf.setFontSize(9)
       const lines = pdf.splitTextToSize(subtitle, width)
-      pdf.text(lines, pageWidth / 2, y, { align: 'center' })
+      pdf.text(lines, margin, y, { align: 'left' })
       y += lines.length * 4 + 2
     }
     pdf.setFont('helvetica', 'normal').setFontSize(8).setTextColor(80)
