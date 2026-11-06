@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import api, { apiErrorMessage } from '../../axios'
 import Icon from '../ui/Icon'
-import { camposEscaner, datosAplicables } from './escanerCampos'
+import { camposEscaner, datosAplicables, motivosDescarte } from './escanerCampos'
 
 export default function EscanerPdf({ file, config }) {
   const [busy, setBusy] = useState(false)
@@ -31,7 +31,7 @@ export default function EscanerPdf({ file, config }) {
       const campos = respuesta.data.data.campos
       const aplicar = datosAplicables(campos, inicial, actual.current.valores, permitidos.filter(key => actual.current.campos.includes(key)))
       Object.entries(aplicar).forEach(([key, value]) => actual.current.poner(key)(value))
-      setAviso({ texto: Object.keys(aplicar).length ? `${Object.keys(aplicar).length} campos completados. Revisa los datos antes de guardar.` : 'No se detectaron datos seguros para completar. Puedes rellenarlos manualmente.', campos: Object.fromEntries(Object.entries(campos).filter(([key]) => key in aplicar)) })
+      setAviso({ texto: Object.keys(aplicar).length ? `${Object.keys(aplicar).length} campos completados. Revisa los datos antes de guardar.` : 'No se detectaron datos seguros para completar. Puedes rellenarlos manualmente.', campos: Object.fromEntries(Object.entries(campos).filter(([key]) => key in aplicar)), descartados: motivosDescarte(respuesta.data.data.descartados, permitidos), dudosa: respuesta.data.data.lectura_dudosa })
     } catch (error) {
       if (!controller.signal.aborted) setAviso({ texto: error.response?.data?.message || apiErrorMessage(error) })
     } finally {
@@ -49,6 +49,8 @@ export default function EscanerPdf({ file, config }) {
       <button type="button" onClick={() => setAviso(null)} className="float-right ml-2 text-teal-800" aria-label="Cerrar resultado"><Icon name="close" size={16} /></button>
       <p>{aviso.texto}</p>
       {aviso.campos && Object.entries(aviso.campos).map(([key, dato]) => <details key={key} className="mt-2"><summary className="cursor-pointer text-teal-800">{key.replaceAll('_', ' ')}: {dato.valor}</summary><p className="mt-1 break-words">Fuente: «{dato.evidencia}»</p></details>)}
+      {aviso.dudosa && <p className="mt-2 text-amber-700">El escaneo se leyó con dificultad: revisa los datos con más cuidado o prueba con una copia más nítida.</p>}
+      {aviso.descartados?.length > 0 && <div className="mt-2"><p className="text-slate-500">Sin completar:</p><ul className="mt-1 list-disc pl-4">{aviso.descartados.map(({ campo, motivo }) => <li key={campo}>{campo.replaceAll('_', ' ')}: {motivo}</li>)}</ul></div>}
       <p className="mt-2 text-slate-500">Hasta 3 páginas. Lectura local; no guarda ni verifica autenticidad.</p>
     </div>}
   </div>
