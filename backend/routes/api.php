@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\V1\DesvinculacionController;
 use App\Http\Controllers\Api\V1\DocumentoUsuarioController;
 use App\Http\Controllers\Api\V1\EmisionPersonalController;
 use App\Http\Controllers\Api\V1\EquipoAccesoController;
+use App\Http\Controllers\Api\V1\EscanerSeccionesController;
 use App\Http\Controllers\Api\V1\EvaluacionDesempenoController;
 use App\Http\Controllers\Api\V1\Evaluaciones\Seccion07Controller;
 use App\Http\Controllers\Api\V1\ExperienciaLaboralController;
@@ -106,6 +107,8 @@ Route::prefix('v1/auth')->middleware(ApiHabilitada::class)->group(function (): v
 
 // FuncionalidadActiva: con una funcionalidad desactivada, sus rutas de creación y modificación responden 409.
 Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCambioPassword::class, FuncionalidadActiva::class, LegajoSoloLectura::class])->group(function (): void {
+    Route::post('documentos/escanear', EscanerSeccionesController::class)
+        ->middleware(['can:legajo.ver', 'can:documento.subir', 'throttle:4,1']);
     Route::prefix('correo/gmail')->middleware('can:sistema.administrar')->controller(GmailCorreoController::class)->group(function (): void {
         Route::get('/', 'estado');
         Route::post('autorizar', 'autorizar')->middleware('throttle:10,1');

@@ -10,7 +10,7 @@ COPY backend/ ./
 RUN composer dump-autoload --no-dev --optimize --classmap-authoritative --no-scripts
 
 FROM php:8.4-fpm AS app
-RUN apt-get update && apt-get install -y --no-install-recommends libzip-dev libpng-dev libjpeg62-turbo-dev libwebp-dev libpq-dev \
+RUN apt-get update && apt-get install -y --no-install-recommends libzip-dev libpng-dev libjpeg62-turbo-dev libwebp-dev libpq-dev poppler-utils tesseract-ocr tesseract-ocr-spa tesseract-ocr-eng \
  && docker-php-ext-configure gd --with-jpeg --with-webp \
  && docker-php-ext-install pdo_pgsql pgsql zip gd bcmath opcache pcntl \
  && apt-get purge -y --auto-remove && rm -rf /var/lib/apt/lists/*

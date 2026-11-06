@@ -1,5 +1,6 @@
 export default function Icon({ name, size = 20, ...props }) {
   const paths = {
+    robot: <><path d="M12 3v3M9 3h6M4 11H2v5h2m16-5h2v5h-2" /><rect x="4" y="6" width="16" height="14" rx="4" /><path d="M8 11v2m8-2v2m-7 3h6" /></>,
     info: <><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7h.01" /></>,
     home: <><path d="m3 10 9-7 9 7v10H3Z" /><path d="M9 20v-7h6v7" /></>,
     users: <><circle cx="9" cy="8" r="3" /><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 5" /></>,

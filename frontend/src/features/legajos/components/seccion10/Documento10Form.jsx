@@ -18,7 +18,7 @@ export default function Documento10Form({ usuario, item, datos, documento, modo,
   const [errorPdf, setErrorPdf] = useState('')
   const pendiente = !editar && !pdf
   const requierePdf = !editar && !!documento?.archivo
-  const [draft, set] = useBorrador({
+  const [draft, set, poner] = useBorrador({
     nombre: documento?.nombre || '', emisor: documento?.emisor || '', fecha_emision: documento?.fecha_emision || '',
     numero_documento: documento?.numero_documento || '', descripcion: documento?.descripcion || '',
     modalidad_presentacion: documento?.modalidad_presentacion || '', numero_folios: 1,
@@ -88,7 +88,7 @@ export default function Documento10Form({ usuario, item, datos, documento, modo,
     guardar={editar ? 'Guardar cambios' : 'Guardar documento'} busy={busy} error={error} onCancel={onCancel}
     onSubmit={() => { if (!errorPdf && (!requierePdf || pdf)) guardar(draft) }}
     nota={editar ? 'Solo se pueden editar metadatos antes de la recepción o validación. Cada cambio queda en la auditoría.' : requierePdf ? 'Adjunta la nueva evidencia para subsanar el documento anterior.' : pendiente ? 'Si guardas sin PDF, el registro quedará Pendiente y no sumará folios.' : 'El PDF se envía al guardar y los folios se recalculan automáticamente.'}>
-    {editar ? campos : <FormSplit pdf={<PdfPreviewField required={requierePdf} label={`Archivo PDF (máximo ${datos.tamano_maximo_kb} KB)`} maxMB={datos.tamano_maximo_kb / 1024}
+    {editar ? campos : <FormSplit pdf={<PdfPreviewField escaner={{ usuario, tipoId: tipo.id, valores: draft, poner: key => value => { if (key === 'emisor') setOtroEmisor(!opcionesEmisor.includes(value)); poner(key)(value) }, campos: ['nombre', 'emisor', 'fecha_emision', 'numero_documento', ...(tipo.periodo ? ['fecha_inicio', 'fecha_fin'] : []), ...(tipo.vigencia ? ['fecha_vencimiento'] : []), ...(tipo.entidad_eps ? ['entidad'] : [])] }} required={requierePdf} label={`Archivo PDF (máximo ${datos.tamano_maximo_kb} KB)`} maxMB={datos.tamano_maximo_kb / 1024}
       help="Comprueba la evidencia antes de guardarla." error={errorPdf || errors.pdf} onChange={(file, message) => { setPdf(file); setErrorPdf(message) }} />}>{campos}</FormSplit>}
   </Formulario>
 }
