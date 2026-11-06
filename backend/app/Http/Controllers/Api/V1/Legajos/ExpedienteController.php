@@ -205,6 +205,8 @@ class ExpedienteController extends Controller
                 // Sin datos_sensibles.ver no se cuentan los documentos de las secciones 01, 09 y 10.
                 'documentosUsuarioPorUsuario' => fn (Builder $query): Builder => $veSensibles ? $query : $query->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES),
             ]);
+        // Las personas con legajos pasivos se consultan únicamente desde su archivo dedicado.
+        $query->whereDoesntHave('legajos', fn (Builder $legajos): Builder => $legajos->where('estado_legajo', 'pasivo'));
         if (! empty($filters['q'])) {
             $search = '%'.mb_strtolower(trim($filters['q'])).'%';
             $query->where(function (Builder $query) use ($search): void {

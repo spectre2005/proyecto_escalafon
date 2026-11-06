@@ -27,14 +27,15 @@ export function presentacionPdf(pdf, institution) {
 
   function header({ title = branding.reportTitle, subtitle = '', emittedAt = new Date(), instruction = '' } = {}) {
     pdf.setFont('helvetica', 'bold').setFontSize(11).setTextColor(...accent)
-    const textX = margin + (logoSize ? 34 : 0)
-    const headingWidth = width - (logoSize ? 34 : 0)
+    // El logo ocupa el margen izquierdo, pero no debe desplazar el eje visual
+    // del nombre institucional. Centrar el encabezado respecto de la página.
+    const headingWidth = width
     const heading = pdf.splitTextToSize(branding.name, headingWidth)
     if (logoSize) pdf.addImage(branding.logo, margin, 14, logoSize.width, logoSize.height, 'institution-logo')
-    pdf.text(heading, textX + headingWidth / 2, 17, { align: 'center' })
+    pdf.text(heading, pageWidth / 2, 17, { align: 'center' })
     pdf.setFont('helvetica', 'normal').setFontSize(8).setTextColor(80)
     const area = pdf.splitTextToSize(branding.area, headingWidth)
-    pdf.text(area, textX + headingWidth / 2, 19 + heading.length * 5, { align: 'center' })
+    pdf.text(area, pageWidth / 2, 19 + heading.length * 5, { align: 'center' })
     let y = Math.max(22 + heading.length * 5 + area.length * 3, logoSize ? 39 : 0)
     pdf.setDrawColor(...accent).setLineWidth(0.6).line(margin, y, margin + width, y)
     y += 6

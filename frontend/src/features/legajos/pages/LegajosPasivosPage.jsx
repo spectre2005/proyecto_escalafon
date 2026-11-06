@@ -37,7 +37,14 @@ export default function LegajosPasivosPage() {
           <td className="px-5 py-4"><p className="font-semibold text-slate-800">{[legajo.persona?.nombres, legajo.persona?.apellido_paterno, legajo.persona?.apellido_materno].filter(Boolean).join(' ')}</p><p className="mt-1 text-xs text-slate-500">{legajo.persona?.numero_doc_identidad}</p></td>
           <td className="px-5 py-4"><p>{legajo.numero_legajo}</p><span className="text-xs text-slate-500">Pasivo · Solo consulta</span></td>
           <td className="px-5 py-4">{fecha(legajo.fecha_apertura)}</td><td className="px-5 py-4">{fecha(legajo.fecha_pasivo)}</td>
-          <td className="px-5 py-4"><div className="flex flex-col items-start gap-2"><Link to={`/legajos/${legajo.usuario_id}?categoria=documentos&legajo_id=${legajo.id}`} className="text-xs font-semibold text-teal-700 hover:underline">Consultar documentos</Link><Link to={`/legajos/${legajo.usuario_id}/historial/${legajo.id}`} className="text-xs font-semibold text-teal-700 hover:underline">Consultar ficha e historial</Link><Link to={`/legajos/${legajo.usuario_id}`} className="text-xs font-semibold text-teal-700 hover:underline">Ver ficha actual de la persona</Link></div></td>
+          <td className="px-5 py-4"><div className="grid min-w-48 gap-2">
+            <Link to={`/legajos/${legajo.usuario_id}/historial/${legajo.id}`} className="rounded-xl border border-teal-200 bg-teal-50 px-3 py-2.5 transition-colors hover:border-teal-400 hover:bg-teal-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700">
+              <span className="block text-xs font-semibold text-teal-900">Ficha e historial</span><span className="mt-0.5 block text-[11px] text-teal-800">Ver los datos conservados al cierre</span>
+            </Link>
+            <Link to={`/legajos/${legajo.usuario_id}?categoria=documentos&legajo_id=${legajo.id}`} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700">
+              <span className="block text-xs font-semibold text-slate-700">Documentos</span><span className="mt-0.5 block text-[11px] text-slate-500">Consultar archivos de este legajo</span>
+            </Link>
+          </div></td>
         </tr>)}</tbody>
       </table></div>
       {!data.data.length && <p className="p-6 text-sm text-slate-500">No hay legajos pasivos para esta búsqueda.</p>}

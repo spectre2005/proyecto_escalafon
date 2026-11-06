@@ -175,7 +175,7 @@ function exigirEmitible(data) {
 
 export function createConstanciaTrabajoPdf(data, institution) {
   exigirEmitible(data)
-  const { pdf, base, parrafo, titulo, datos, fichas, firma, identificacion, texto } = documentoPdf(data, institution, 'Constancia de trabajo')
+  const { pdf, base, parrafo, titulo, datos, fichas, identificacion, texto } = documentoPdf(data, institution, 'Constancia de trabajo')
   const p = data.persona
   parrafo(`${base.branding.name} hace constar que ${p.nombre}, con ${p.tipo_documento || 'documento de identidad'} N.º ${texto(p.numero_documento)}, registra en su legajo N.º ${texto(p.numero_legajo)} los vínculos laborales que se detallan, sustentados con documento de vinculación aceptado:`)
   titulo('Identificación')
@@ -185,7 +185,6 @@ export function createConstanciaTrabajoPdf(data, institution) {
   parrafo(`Situación a la fecha de emisión: ${data.situacion}`, { negrita: true })
   parrafo('Solo se consignan los vínculos sustentados con documento aceptado en el legajo. Un dato no registrado se indica como tal.', notaDiscreta)
   parrafo(NOTA_ACEPTADO, notaDiscreta)
-  firma()
   base.footer()
   return pdf
 }
