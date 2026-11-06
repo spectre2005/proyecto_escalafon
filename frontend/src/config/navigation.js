@@ -8,7 +8,6 @@ export const navigation = [
   { label: 'Reportes', to: '/reportes', icon: 'chart', group: 'Principal', permiso: ['personal.ver', 'legajo.ver'] },
   { label: 'Requerimientos', to: '/requerimientos', icon: 'clock', group: 'Principal', permiso: 'requerimientos.gestionar' },
   { label: 'Vencimientos', to: '/vencimientos', icon: 'clock', group: 'Principal', permiso: 'legajo.ver' },
-  { label: 'Fiscalización', icon: 'search', group: 'Administración', permiso: 'sistema.administrar' },
   { label: 'Accesos y custodia', to: '/accesos-y-custodia', icon: 'shield', group: 'Administración', permiso: ['sistema.administrar', 'configuracion.modulos'] },
   // La identidad institucional y las funcionalidades conservan sus permisos independientes.
   { label: 'Configuración', to: '/configuracion', icon: 'settings', group: 'Administración', permiso: 'sistema.administrar' },

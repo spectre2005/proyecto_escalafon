@@ -153,7 +153,9 @@ Revisión con una sola persona y validación con SUNEDU (analizado el 19/10/2026
     cómo funcionan hoy la consulta pública y el acceso por PIDE. Preguntas: (a) ¿la universidad es pública y tiene o
     puede pedir acceso a PIDE?; (b) ¿se validan solo los títulos que acreditan el perfil del puesto o todos?;
     (c) ¿qué se hace con títulos técnicos y extranjeros?
-32. Fiscalización posterior (art. 7, Anexos 03 y 04; analizado el 19/10/2026). El ítem del menú no tiene pantalla.
+32. Fiscalización posterior (art. 7, Anexos 03 y 04; analizado el 19/10/2026). El ítem del menú, que no tenía pantalla, se
+    quitó el 06/11/2026; el esquema y el backend siguen intactos. **Pendiente de confirmar con el cliente:** si la ORH
+    fiscaliza fuera del sistema y dónde conserva la evidencia (art. 7.6).
     El art. 7 obliga a la ORH a fiscalizar, pero no a hacerlo dentro del sistema; el 7.6 sí pide conservar las
     respuestas y el informe. Con la aceptación directa (pend. 30) el documento ya sale aprobado, pero no se distingue
     uno validado de uno solo registrado: `documentos_usuario.fiscalizado`, `fecha_fiscalizacion` y `fiscalizado_por`
