@@ -19,7 +19,7 @@ class EscanerSecciones
     // Sin esta explicación el modelo confunde campos cercanos, como el título del documento y su emisor.
     private const GLOSARIO = [
         'nombre' => 'título del documento, tal como aparece en el encabezado',
-        'emisor' => 'entidad que emite el documento',
+        'emisor' => 'entidad u órgano que emite el documento; nunca su título, su número ni quien firma',
         'fecha_emision' => 'fecha en que se emitió',
         'num_resolucion' => 'número de la resolución principal',
         'numero_documento' => 'número del documento',
@@ -55,8 +55,14 @@ class EscanerSecciones
 
     private const SEGUNDOS_OCR = 45;
 
+    // «Resolución Rectoral» dice quién la emite solo con un adjetivo.
+    private const ORGANOS_POR_ADJETIVO = ['rectoral' => 'RECTORADO', 'decanal' => 'DECANATO', 'directoral' => 'DIRECCIÓN', 'jefatural' => 'JEFATURA', 'gerencial' => 'GERENCIA'];
+
     /** Motivo por el que se descartó cada campo, sin su valor: se muestra a quien escanea y va a la auditoría. */
     public array $descartados = [];
+
+    /** Lo que el modelo encontró pero no se pudo comprobar: se ofrece para decidir, nunca se rellena solo. */
+    public array $sugerencias = [];
 
     /** @var list<array{pagina: int, metodo: string, confianza: ?float}> Cómo se leyó cada página. */
     public array $paginas = [];
@@ -105,6 +111,7 @@ class EscanerSecciones
     public function interpretar(string $texto, string $tipo, array $campos, ?string $titular = null): array
     {
         $this->descartados = [];
+        $this->sugerencias = [];
         $explicitos = $this->extraerExplicitos($texto, $campos);
         $campos = array_values(array_diff($campos, array_keys($explicitos)));
         if ($campos === []) {
@@ -139,7 +146,7 @@ class EscanerSecciones
         $extraido = is_string($contenido) ? json_decode($contenido, true) : null;
         abort_unless(is_array($extraido), 502, 'La IA devolvió una lectura inválida. Puedes completar los campos manualmente.');
 
-        return $explicitos + $this->validar($extraido, $texto, $campos, $titular);
+        return $this->completarEmisor($explicitos + $this->validar($extraido, $texto, $campos, $titular), $texto, $campos);
     }
 
     public function extraerExplicitos(string $texto, array $campos): array
@@ -174,7 +181,7 @@ class EscanerSecciones
     public function validar(array $extraido, string $texto, array $campos, ?string $titular = null): array
     {
         $datos = [];
-        $textoNormal = $this->normalizar($texto);
+        $textoCompacto = $this->compacto($texto);
         foreach (array_intersect($campos, self::CAMPOS) as $campo) {
             $dato = $extraido[$campo] ?? null;
             // Sin valor el modelo dice que el dato no consta: no es un descarte.
@@ -184,7 +191,7 @@ class EscanerSecciones
             $motivo = null;
             $valor = trim($dato['valor']);
             $evidencia = trim((string) ($dato['evidencia'] ?? ''));
-            if (mb_strlen($valor) > 200 || mb_strlen($evidencia) < 3 || ! str_contains($textoNormal, $this->normalizar($evidencia))) {
+            if (mb_strlen($valor) > 200 || mb_strlen($evidencia) < 3 || ! $this->citaEnTexto($textoCompacto, $this->compacto($evidencia))) {
                 $motivo = 'cita_no_encontrada';
             } elseif (str_starts_with($campo, 'fecha') || $campo === 'vigente_hasta') {
                 $fecha = \DateTimeImmutable::createFromFormat('!Y-m-d', $valor);
@@ -200,12 +207,14 @@ class EscanerSecciones
                 if (! ctype_digit($valor) || (float) $valor > 2147483647 || ! preg_match('/(?<!\d)'.preg_quote($valor, '/').'\s*'.self::CANTIDADES[$campo].'\b/iu', $evidencia)) {
                     $motivo = 'cantidad_no_coincide';
                 }
-            } elseif (! str_contains($this->normalizar($evidencia), $this->normalizar($valor))) {
+            } elseif (! str_contains($this->compacto($evidencia), $this->compacto($valor))) {
                 $motivo = 'valor_fuera_de_cita';
             } elseif (in_array($campo, self::NUMEROS, true) && ! preg_match('/\d/', $valor)) {
                 $motivo = 'numero_sin_digitos';
             } elseif ($this->esLaPersona($campo, $valor, $titular)) {
                 $motivo = 'es_el_titular';
+            } elseif (in_array($campo, ['emisor', 'entidad'], true)) {
+                $motivo = $this->problemaDelEmisor($valor);
             }
             $limite = in_array($campo, self::NUMEROS, true) ? 60 : ($campo === 'cargo' ? 150 : 200);
             if ($motivo === null && mb_strlen($valor) > $limite) {
@@ -213,6 +222,13 @@ class EscanerSecciones
             }
             if ($motivo !== null) {
                 $this->descartados[$campo] = $motivo;
+                if ($this->sePuedeSugerir($campo, $motivo, $evidencia)) {
+                    // El modelo puede leer mal la cita: «l2 de agosto» no es el día 2. Si la cita trae una sola fecha, manda ella.
+                    $sugerido = $motivo === 'fecha_no_coincide' ? ($this->fechaDeLaCita($evidencia) ?? $valor) : $valor;
+                    if ($campo !== 'fecha_emision' || $sugerido <= now('America/Lima')->toDateString()) {
+                        $this->sugerencias[$campo] = ['valor' => $sugerido, 'evidencia' => $evidencia];
+                    }
+                }
 
                 continue;
             }
@@ -220,6 +236,89 @@ class EscanerSecciones
         }
 
         return $datos;
+    }
+
+    /** Un título o un firmante también están en el documento, pero no son quien lo emite. */
+    private function problemaDelEmisor(string $valor): ?string
+    {
+        $normal = $this->normalizar($valor);
+        if (preg_match('/^(resolucion|contrato|constancia|certificado|oficio|memorando|memorandum|informe|acta|carta|declaracion|diploma|titulo|expediente)\b/u', $normal)
+            || preg_match('/\bn\s*[.°º?]\s*\d/iu', $valor) || preg_match('/\d{2,}\s*-\s*\d{2,}/', $valor)) {
+            return 'es_el_titulo';
+        }
+
+        return preg_match('/^(ing|dr|dra|lic|abg|abog|mg|mag|prof|cpc|econ)\b\.?\s/u', $normal) ? 'es_el_firmante' : null;
+    }
+
+    /**
+     * El título suele decir quién emite: «RESOLUCIÓN DE GERENCIA GENERAL N° 0412-2026-GG/MDQ». Con una entidad comprobada se
+     * unen; sin ella, el órgano solo se sugiere, porque sale del título y no de una cita del modelo.
+     */
+    private function completarEmisor(array $datos, string $texto, array $campos): array
+    {
+        if (! in_array('emisor', $campos, true) || ($titulo = $this->organoDelTitulo($texto)) === null) {
+            return $datos;
+        }
+        $actual = $datos['emisor']['valor'] ?? null;
+        if ($actual !== null && str_contains($this->compacto($actual), $this->compacto($titulo['organo']))) {
+            return $datos;
+        }
+        if ($actual !== null && preg_match('/^(universidad|instituto|municipalidad|ministerio|gobierno|superintendencia|escuela|autoridad|unidad de gestion|ugel)\b/u', $this->normalizar($actual))) {
+            $unido = $actual.' - '.$titulo['organo'];
+            if (mb_strlen($unido) <= 200) {
+                $datos['emisor'] = ['valor' => $unido, 'evidencia' => $datos['emisor']['evidencia'].' / '.$titulo['cita']];
+            }
+
+            return $datos;
+        }
+        // El modelo eligió otra oficina mencionada: manda lo que dice el título, y la persona decide.
+        if ($actual !== null) {
+            unset($datos['emisor']);
+            $this->descartados['emisor'] = 'no_es_el_emisor';
+        }
+        $this->sugerencias['emisor'] = ['valor' => $titulo['organo'].($titulo['siglas'] ? ' - '.$titulo['siglas'] : ''), 'evidencia' => $titulo['cita']];
+
+        return $datos;
+    }
+
+    /** @return array{organo: string, siglas: ?string, cita: string}|null */
+    private function organoDelTitulo(string $texto): ?array
+    {
+        // Solo en el encabezado: más abajo los «VISTOS» citan resoluciones de otros órganos.
+        if (! preg_match('/^\h*RESOLUCI[ÓO]N\h+(?:(DEL?)\h+)?(\p{L}[\p{L}\h]{2,80}?)\h+N[.°ºo?\h]*[0-9][^\n]*$/miu', mb_substr($texto, 0, 600), $titulo)) {
+            return null;
+        }
+        $nombre = trim($titulo[2]);
+        $organo = $titulo[1] !== '' ? mb_strtoupper($nombre) : (self::ORGANOS_POR_ADJETIVO[$this->normalizar($nombre)] ?? null);
+        if ($organo === null) {
+            return null;
+        }
+
+        return ['organo' => $organo, 'siglas' => preg_match('/\/\h*(\p{Lu}{2,10})\h*$/u', trim($titulo[0]), $siglas) ? $siglas[1] : null, 'cita' => trim($titulo[0])];
+    }
+
+    /**
+     * La cita existe en el documento, pero no confirma el valor: quizá sea un formato no previsto. Si la cita no tiene
+     * ni un dígito, una fecha o cantidad sería inventada y no se ofrece. Un número fuera de su cita tampoco.
+     */
+    private function sePuedeSugerir(string $campo, string $motivo, string $evidencia): bool
+    {
+        return match ($motivo) {
+            'fecha_no_coincide', 'cantidad_no_coincide' => preg_match('/\d/', $this->corregirDigitos($evidencia)) === 1 || $this->tieneNumeroEscrito($evidencia),
+            'valor_fuera_de_cita' => ! in_array($campo, self::NUMEROS, true),
+            default => false,
+        };
+    }
+
+    private function tieneNumeroEscrito(string $evidencia): bool
+    {
+        foreach (preg_split('/[^\p{L}]+/u', $this->normalizar($evidencia), flags: PREG_SPLIT_NO_EMPTY) ?: [] as $palabra) {
+            if ($palabra !== 'y' && $palabra !== 'un' && $this->numeroEscrito([$palabra]) !== null) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** La cita literal no basta: el nombre de la persona aparece en el documento, pero no es su cargo ni quien lo emite. */
@@ -241,20 +340,130 @@ class EscanerSecciones
     private function fechaEnEvidencia(string $valor, string $evidencia): bool
     {
         [$anio, $mes, $dia] = array_map('intval', explode('-', $valor));
-        $evidencia = $this->corregirDigitos($evidencia);
+        $normal = $this->normalizar($this->corregirDigitos($evidencia));
         $corto = substr((string) $anio, -2);
-        $numerica = '/(?<!\d)(?:'.preg_quote($valor, '/').'|0?'.$dia.'[\/.-]0?'.$mes.'[\/.-](?:'.$anio.'|'.$corto.'))(?!\d)/u';
-        if (preg_match($numerica, $evidencia) === 1) {
+        $numerica = '/(?<!\d)(?:'.$anio.'\s*[\/.-]\s*0?'.$mes.'\s*[\/.-]\s*0?'.$dia.'|0?'.$dia.'\s*[\/.-]\s*0?'.$mes.'\s*[\/.-]\s*(?:'.$anio.'|'.$corto.'))(?!\d)/u';
+        if (preg_match($numerica, $normal) === 1) {
             return true;
         }
-        preg_match_all('/(?<!\d)(\d{1,2})\s+(?:de\s+)?(\p{L}{3,})\.?\s+(?:del?\s+)?(\d{4}|\d{2})(?!\d)/iu', $evidencia, $fechas, PREG_SET_ORDER);
-        foreach ($fechas as [, $d, $m, $a]) {
-            if ((int) $d === $dia && $this->mes($m) === $mes && in_array($a, [(string) $anio, $corto], true)) {
+        $palabras = preg_split('/[^\p{L}\p{N}]+/u', $normal, flags: PREG_SPLIT_NO_EMPTY) ?: [];
+        foreach ($palabras as $indice => $palabra) {
+            if (! preg_match('/^\p{L}{3,}$/u', $palabra) || $this->mes($palabra) !== $mes) {
+                continue;
+            }
+            [$diaAntes] = $this->numeroHaciaAtras($palabras, $indice - 1);
+            [$siguiente, $posicion] = $this->numeroHaciaAdelante($palabras, $indice + 1);
+            // «12 de agosto de 2024», «a los doce días del mes de agosto del año dos mil veinticuatro».
+            if ($diaAntes === $dia && $this->mismoAnio($siguiente, $anio)) {
+                return true;
+            }
+            // «Agosto 12, 2024».
+            [$anioDespues] = $this->numeroHaciaAdelante($palabras, $posicion);
+            if ($siguiente === $dia && $this->mismoAnio($anioDespues, $anio)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /** Fecha AAAA-MM-DD escrita en la cita; null si no hay ninguna legible o hay más de una. */
+    private function fechaDeLaCita(string $evidencia): ?string
+    {
+        $normal = $this->normalizar($this->corregirDigitos($evidencia));
+        $fechas = [];
+        $agregar = function (?int $dia, ?int $mes, ?int $anio) use (&$fechas): void {
+            if ($dia === null || $mes === null || $anio === null) {
+                return;
+            }
+            $anio = $anio < 100 ? 2000 + $anio : $anio;
+            if (checkdate($mes, $dia, $anio)) {
+                $fechas[sprintf('%04d-%02d-%02d', $anio, $mes, $dia)] = true;
+            }
+        };
+        preg_match_all('/(?<!\d)(\d{1,2})\s*[\/.-]\s*(\d{1,2})\s*[\/.-]\s*(\d{4}|\d{2})(?!\d)/u', $normal, $numericas, PREG_SET_ORDER);
+        foreach ($numericas as [, $dia, $mes, $anio]) {
+            $agregar((int) $dia, (int) $mes, (int) $anio);
+        }
+        $palabras = preg_split('/[^\p{L}\p{N}]+/u', $normal, flags: PREG_SPLIT_NO_EMPTY) ?: [];
+        foreach ($palabras as $indice => $palabra) {
+            if (preg_match('/^\p{L}{3,}$/u', $palabra) && ($mes = $this->mes($palabra)) !== null) {
+                $agregar($this->numeroHaciaAtras($palabras, $indice - 1)[0], $mes, $this->numeroHaciaAdelante($palabras, $indice + 1)[0]);
+            }
+        }
+
+        return count($fechas) === 1 ? array_key_first($fechas) : null;
+    }
+
+    private function mismoAnio(?int $leido, int $anio): bool
+    {
+        return $leido === $anio || ($leido !== null && $leido < 100 && $leido === $anio % 100);
+    }
+
+    /** @return array{0: ?int, 1: int} número que termina antes de la posición y dónde empieza */
+    private function numeroHaciaAtras(array $palabras, int $posicion): array
+    {
+        while ($posicion >= 0 && in_array($palabras[$posicion], ['de', 'del', 'mes', 'dia', 'dias', 'día', 'días', 'el'], true)) {
+            $posicion--;
+        }
+        if ($posicion >= 0 && ctype_digit($palabras[$posicion])) {
+            return [(int) $palabras[$posicion], $posicion];
+        }
+        $inicio = $posicion;
+        while ($inicio >= 0 && $this->numeroEscrito([$palabras[$inicio]]) !== null) {
+            $inicio--;
+        }
+
+        return [$this->numeroEscrito(array_slice($palabras, $inicio + 1, $posicion - $inicio)), $inicio + 1];
+    }
+
+    /** @return array{0: ?int, 1: int} número que empieza en la posición y dónde sigue el texto */
+    private function numeroHaciaAdelante(array $palabras, int $posicion): array
+    {
+        $total = count($palabras);
+        while ($posicion < $total && in_array($palabras[$posicion], ['de', 'del', 'año', 'ano', 'el'], true)) {
+            $posicion++;
+        }
+        if ($posicion < $total && ctype_digit($palabras[$posicion])) {
+            // «2,024» o «2.024» llegan partidos en dos grupos.
+            if (strlen($palabras[$posicion]) === 1 && strlen($palabras[$posicion + 1] ?? '') === 3 && ctype_digit($palabras[$posicion + 1])) {
+                return [(int) ($palabras[$posicion].$palabras[$posicion + 1]), $posicion + 2];
+            }
+
+            return [(int) $palabras[$posicion], $posicion + 1];
+        }
+        $fin = $posicion;
+        while ($fin < $total && $this->numeroEscrito([$palabras[$fin]]) !== null) {
+            $fin++;
+        }
+
+        return [$this->numeroEscrito(array_slice($palabras, $posicion, $fin - $posicion)), $fin];
+    }
+
+    /** Número escrito en letras, como «doce» o «dos mil veinticuatro»; null si alguna palabra no es un número. */
+    private function numeroEscrito(array $palabras): ?int
+    {
+        if ($palabras === []) {
+            return null;
+        }
+        $valores = ['un' => 1, 'uno' => 1, 'primero' => 1, 'primer' => 1, 'dos' => 2, 'tres' => 3, 'cuatro' => 4, 'cinco' => 5, 'seis' => 6, 'siete' => 7, 'ocho' => 8, 'nueve' => 9, 'diez' => 10, 'once' => 11, 'doce' => 12, 'trece' => 13, 'catorce' => 14, 'quince' => 15, 'dieciseis' => 16, 'diecisiete' => 17, 'dieciocho' => 18, 'diecinueve' => 19, 'veinte' => 20, 'veintiun' => 21, 'veintiuno' => 21, 'veintidos' => 22, 'veintitres' => 23, 'veinticuatro' => 24, 'veinticinco' => 25, 'veintiseis' => 26, 'veintisiete' => 27, 'veintiocho' => 28, 'veintinueve' => 29, 'treinta' => 30, 'cuarenta' => 40, 'cincuenta' => 50, 'sesenta' => 60, 'setenta' => 70, 'ochenta' => 80, 'noventa' => 90, 'cien' => 100, 'ciento' => 100, 'novecientos' => 900];
+        $total = 0;
+        $actual = 0;
+        foreach ($palabras as $palabra) {
+            if ($palabra === 'y') {
+                continue;
+            }
+            if ($palabra === 'mil') {
+                $total += max($actual, 1) * 1000;
+                $actual = 0;
+            } elseif (isset($valores[$palabra])) {
+                $actual += $valores[$palabra];
+            } else {
+                return null;
+            }
+        }
+
+        return $total + $actual;
     }
 
     /** Solo en grupos que ya tienen un dígito: «2O24» es un año, «OCTUBRE» sigue siendo un mes. */
@@ -289,6 +498,24 @@ class EscanerSecciones
         $texto = strtr(mb_strtolower($texto), ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', '°' => '', 'º' => '', '?' => '']);
 
         return trim(preg_replace('/\s+/u', ' ', $texto) ?? $texto);
+    }
+
+    /** La cita no puede cortar un número: «2 de agosto» no está en «12 de agosto». */
+    private function citaEnTexto(string $textoCompacto, string $cita): bool
+    {
+        if ($cita === '') {
+            return false;
+        }
+        $inicio = ctype_digit($cita[0]) ? '(?<!\d)' : '';
+        $fin = ctype_digit($cita[strlen($cita) - 1]) ? '(?!\d)' : '';
+
+        return preg_match('/'.$inicio.preg_quote($cita, '/').$fin.'/u', $textoCompacto) === 1;
+    }
+
+    /** Solo letras y números: el OCR altera espacios y signos, y una cita copiada igual debe encontrarse. */
+    private function compacto(string $texto): string
+    {
+        return preg_replace('/[^\p{L}\p{N}]+/u', '', $this->normalizar($this->corregirDigitos($texto))) ?? $texto;
     }
 
     /**

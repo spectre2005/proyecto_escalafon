@@ -9,12 +9,32 @@ const MOTIVOS = {
   valor_fuera_de_cita: 'el dato no está en la cita',
   numero_sin_digitos: 'el número no tiene dígitos',
   es_el_titular: 'es el nombre de la persona',
+  es_el_titulo: 'es el título del documento',
+  es_el_firmante: 'es quien firma el documento',
+  no_es_el_emisor: 'el título indica otro emisor',
   demasiado_largo: 'el texto es demasiado largo',
 }
 
-export function motivosDescarte(descartados, permitidos) {
+export function etiquetaCampo(campo) {
+  return campo.replaceAll('_', ' ')
+}
+
+// Las fechas llegan como AAAA-MM-DD: para decidir, se muestran como se leen en un documento.
+export function valorLegible(valor) {
+  const fecha = /^(\d{4})-(\d{2})-(\d{2})$/.exec(valor)
+  return fecha ? `${fecha[3]}/${fecha[2]}/${fecha[1]}` : valor
+}
+
+// Solo se ofrece lo que sigue vacío: una sugerencia sin comprobar nunca reemplaza lo que ya se escribió.
+export function sugerenciasAplicables(sugerencias, actual, permitidos) {
+  return Object.fromEntries(Object.entries(sugerencias || {}).filter(([campo, dato]) =>
+    camposEscaner.includes(campo) && permitidos.includes(campo) && !actual[campo] && typeof dato?.valor === 'string' && dato.valor.trim(),
+  ))
+}
+
+export function motivosDescarte(descartados, permitidos, sugeridos = {}) {
   return Object.entries(descartados || {})
-    .filter(([campo]) => permitidos.includes(campo))
+    .filter(([campo]) => permitidos.includes(campo) && !(campo in sugeridos))
     .map(([campo, motivo]) => ({ campo, motivo: MOTIVOS[motivo] || 'no se pudo comprobar' }))
 }
 

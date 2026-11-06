@@ -55,6 +55,7 @@ class EscanerSeccionesController extends Controller
             return response()->json(['data' => [
                 'campos' => $campos,
                 'descartados' => $escaner->descartados,
+                'sugerencias' => $escaner->sugerencias,
                 'lectura_dudosa' => $confianzas !== [] && min($confianzas) < 70,
                 'aviso' => 'Se leyeron hasta 3 páginas. Revisa los datos contra el PDF antes de guardar. La lectura no acredita autenticidad.',
             ]])->header('Cache-Control', 'private, no-store');
@@ -66,7 +67,7 @@ class EscanerSeccionesController extends Controller
             Auditoria::registrar($request, 'documento.lectura_ia', 'usuarios', $persona->id, $persona->id, null, [
                 'tipo_documento_id' => $tipo->id, 'resultado' => $resultado, 'modelo' => (string) config('escaner.modelo'),
                 'segundos' => round(microtime(true) - $inicio, 1), 'paginas' => $escaner->paginas,
-                'campos_pedidos' => $datos['campos'], 'campos_propuestos' => array_keys($campos), 'descartados' => $escaner->descartados,
+                'campos_pedidos' => $datos['campos'], 'campos_propuestos' => array_keys($campos), 'campos_sugeridos' => array_keys($escaner->sugerencias), 'descartados' => $escaner->descartados,
             ]);
         }
     }
