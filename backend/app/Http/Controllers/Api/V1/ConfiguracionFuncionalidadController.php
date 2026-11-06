@@ -19,7 +19,7 @@ class ConfiguracionFuncionalidadController extends Controller
     /** Para cualquier sesión: entradas de menú y secciones que se ocultan, y tipos de documento que no se ofrecen. */
     public function publico(): JsonResponse
     {
-        return response()->json(['data' => [...ConfiguracionFuncionalidades::estadoPublico(), 'modulos_sistema' => collect(ModulosSistema::estados())->pluck('activa', 'codigo')]])->header('Cache-Control', 'private, no-store');
+        return response()->json(['data' => [...ConfiguracionFuncionalidades::estadoPublico(), 'lector_ia' => (bool) config('escaner.activo'), 'modulos_sistema' => collect(ModulosSistema::estados())->pluck('activa', 'codigo')]])->header('Cache-Control', 'private, no-store');
     }
 
     public function index(): JsonResponse

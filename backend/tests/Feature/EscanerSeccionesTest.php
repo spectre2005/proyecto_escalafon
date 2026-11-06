@@ -20,6 +20,27 @@ class EscanerSeccionesTest extends TestCase
     use RefreshDatabase;
     use SubeDocumentos;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config(['escaner.activo' => true]);
+    }
+
+    public function test_apagado_no_se_ofrece_ni_lee_el_documento(): void
+    {
+        $this->actuarComo();
+        $this->seed(Seccion06CatalogoSeeder::class);
+        $legajo = Legajo::factory()->create();
+        $tipo = TipoDocumento::query()->where('codigo', 'COMP_RECONOCIMIENTO_TIEMPO')->firstOrFail();
+        $this->getJson('/api/v1/funcionalidades')->assertOk()->assertJsonPath('data.lector_ia', true);
+        config(['escaner.activo' => false]);
+        $this->getJson('/api/v1/funcionalidades')->assertOk()->assertJsonPath('data.lector_ia', false);
+        $this->mock(EscanerSecciones::class, fn ($mock) => $mock->shouldNotReceive('leer'));
+        $this->post('/api/v1/documentos/escanear', [
+            'usuario_id' => $legajo->usuario_id, 'tipo_documento_id' => $tipo->id, 'campos' => ['emisor'], 'pdf' => $this->pdf(),
+        ], ['Accept' => 'application/json'])->assertStatus(409);
+    }
+
     public function test_lectura_real_de_un_pdf_de_compensaciones_con_ollama_local(): void
     {
         if (getenv('ESCANER_PRUEBA_REAL') !== '1') {
@@ -215,17 +236,20 @@ class EscanerSeccionesTest extends TestCase
         if (! is_executable('/usr/bin/tesseract') || ! is_executable('/usr/bin/convert')) {
             $this->markTestSkipped('Requiere las herramientas OCR de la imagen Docker.');
         }
-        $imagen = imagecreatetruecolor(1400, 900);
+        $imagen = imagecreatetruecolor(700, 300);
         imagefill($imagen, 0, 0, imagecolorallocate($imagen, 255, 255, 255));
         $lineas = ['UNIVERSIDAD DE EJEMPLO PARA PRUEBAS', 'RESOLUCION RECTORAL N. 001-2026', 'Se designa en el cargo de docente auxiliar', 'a tiempo completo del departamento academico', 'desde el primero de enero de dos mil veintiseis', 'Registrese comuniquese y archivese'];
         foreach ($lineas as $indice => $linea) {
-            imagestring($imagen, 5, 40, 40 + $indice * 40, $linea, imagecolorallocate($imagen, 0, 0, 0));
+            imagestring($imagen, 5, 20, 20 + $indice * 40, $linea, imagecolorallocate($imagen, 0, 0, 0));
         }
-        $girada = imagerotate(imagescale($imagen, 2800), 90, 0);
+        // Tamaño justo para el OCR: la suite completa corre con 128 MB.
+        $grande = imagescale($imagen, 1400);
+        $girada = imagerotate($grande, 90, 0);
         ob_start();
-        imagejpeg($girada, null, 92);
+        imagejpeg($girada, null, 85);
         $jpg = ob_get_clean();
         [$ancho, $alto] = [imagesx($girada), imagesy($girada)];
+        unset($imagen, $grande, $girada);
         $stream = "q {$ancho} 0 0 {$alto} 0 0 cm /Im1 Do Q";
         $objetos = ['<</Type /Catalog /Pages 2 0 R>>', '<</Type /Pages /Kids [3 0 R] /Count 1>>', "<</Type /Page /Parent 2 0 R /MediaBox [0 0 {$ancho} {$alto}] /Resources <</XObject <</Im1 4 0 R>>>> /Contents 5 0 R>>", "<</Type /XObject /Subtype /Image /Width {$ancho} /Height {$alto} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ".strlen($jpg).">>\nstream\n".$jpg."\nendstream", '<</Length '.strlen($stream).">>\nstream\n".$stream."\nendstream"];
         $contenido = "%PDF-1.4\n";

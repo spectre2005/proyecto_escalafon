@@ -3,6 +3,7 @@ import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import api from '../../axios'
 import Icon from '../ui/Icon'
 import EscanerPdf from './EscanerPdf'
+import { useFuncionalidades } from '../../shared/useFuncionalidades'
 import { validatePdf } from './pdfValidation'
 
 const button = 'rounded-lg border border-slate-200 px-3 py-2 text-xs text-teal-800 focus-visible:outline-2 focus-visible:outline-teal-600 disabled:opacity-40'
@@ -10,6 +11,7 @@ const button = 'rounded-lg border border-slate-200 px-3 py-2 text-xs text-teal-8
 // onPages(n): páginas del PDF elegido (null sin archivo nuevo o si no se pudo leer), para sugerir el folio final.
 export default function PdfPreviewField({ name, id, label, help, maxMB = 2, currentUrl, currentName, required, error, onChange, onPages, escaner }) {
   const generatedId = useId()
+  const conLector = useFuncionalidades().lector_ia === true && Boolean(escaner)
   const helpId = `${generatedId}-help`
   const input = useRef(null)
   const panel = useRef(null)
@@ -120,12 +122,12 @@ export default function PdfPreviewField({ name, id, label, help, maxMB = 2, curr
   return <section className="flex h-full min-w-0 flex-col gap-3">
     <div className="flex min-h-8 items-center justify-between gap-2 text-xs font-medium text-slate-600">
       <label htmlFor={id || generatedId} className="flex items-center gap-2"><Icon name="paperclip" size={18} />{label}{required ? ' *' : ''}</label>
-      {escaner && <EscanerPdf key={`${revision}:${escaner.tipoId}`} file={file} config={escaner} />}
+      {conLector && <EscanerPdf key={`${revision}:${escaner.tipoId}`} file={file} config={escaner} />}
     </div>
     <div>
       <input ref={input} name={name} id={id || generatedId} type="file" accept="application/pdf,.pdf" required={required && !currentUrl} onChange={select} aria-describedby={helpId} aria-invalid={Boolean(message)} className="min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus-visible:outline-2 focus-visible:outline-teal-600" />
     </div>
-    <p id={helpId} className="text-xs text-slate-500">{escaner ? 'El robot lee hasta 3 páginas en el servidor local y propone datos. Revisa antes de guardar; el escaneo no incorpora el archivo al legajo.' : help}</p>
+    <p id={helpId} className="text-xs text-slate-500">{conLector ? 'El robot lee hasta 3 páginas en el servidor local y propone datos. Revisa antes de guardar; el escaneo no incorpora el archivo al legajo.' : help}</p>
     {message && <p role="alert" className="text-xs text-rose-700">{[].concat(message).join(' ')}</p>}
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
       <div className="flex min-w-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3">

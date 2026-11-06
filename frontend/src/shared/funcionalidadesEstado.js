@@ -1,6 +1,6 @@
 // Configuración de funcionalidades de la institución (backend: GET /funcionalidades). Solo decide qué se muestra; el
 // backend rechaza las escrituras de lo desactivado. Sin respuesta del backend no se oculta nada.
-export const estadoVacio = { activas: {}, menu_oculto: [], secciones_ocultas: [], tipos_inactivos: [] }
+export const estadoVacio = { activas: {}, menu_oculto: [], secciones_ocultas: [], tipos_inactivos: [], lector_ia: false }
 
 // Una funcionalidad que el backend no informa se considera activa.
 export function activa(estado, codigo) {

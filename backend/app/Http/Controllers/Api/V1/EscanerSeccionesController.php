@@ -22,6 +22,7 @@ class EscanerSeccionesController extends Controller
 {
     public function __invoke(Request $request, EscanerSecciones $escaner): JsonResponse
     {
+        abort_unless((bool) config('escaner.activo'), 409, 'La lectura de documentos con IA no está activa en este servidor.');
         $datos = $request->validate([
             'usuario_id' => 'required|uuid|exists:usuarios,id',
             'tipo_documento_id' => 'required|uuid|exists:tipos_documento,id',
