@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\V1\FormacionAcademicaController;
 use App\Http\Controllers\Api\V1\FormatosDirectivaController;
 use App\Http\Controllers\Api\V1\GmailCorreoController;
 use App\Http\Controllers\Api\V1\GoceVacacionalController;
+use App\Http\Controllers\Api\V1\GuiaController;
 use App\Http\Controllers\Api\V1\HistorialEstadoDocumentoController;
 use App\Http\Controllers\Api\V1\InduccionController;
 use App\Http\Controllers\Api\V1\InstitutionSettingsController;
@@ -107,8 +108,12 @@ Route::prefix('v1/auth')->middleware(ApiHabilitada::class)->group(function (): v
 
 // FuncionalidadActiva: con una funcionalidad desactivada, sus rutas de creación y modificación responden 409.
 Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCambioPassword::class, FuncionalidadActiva::class, LegajoSoloLectura::class])->group(function (): void {
+    Route::middleware('can:guia.ver')->group(function (): void {
+        Route::get('guia', [GuiaController::class, 'index']);
+        Route::post('guia/preguntar', [GuiaController::class, 'preguntar'])->middleware('throttle:15,1,guia');
+    });
     Route::post('documentos/escanear', EscanerSeccionesController::class)
-        ->middleware(['can:legajo.ver', 'can:documento.subir', 'throttle:4,1']);
+        ->middleware(['can:legajo.ver', 'can:documento.subir', 'throttle:4,1,lector']);
     Route::prefix('correo/gmail')->middleware('can:sistema.administrar')->controller(GmailCorreoController::class)->group(function (): void {
         Route::get('/', 'estado');
         Route::post('autorizar', 'autorizar')->middleware('throttle:10,1');

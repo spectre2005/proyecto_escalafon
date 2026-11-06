@@ -15,6 +15,7 @@ return [
 
     // Catálogo cerrado: un permiso que no esté aquí no existe.
     'catalogo' => [
+        'guia.ver' => 'Usar el chat de ayuda sobre cómo usar el sistema.',
         'requerimientos.gestionar' => 'Gestionar requerimientos y registrar entregas recibidas por correo.',
         'personal.ver' => 'Ver la lista del personal.',
         'usuarios.gestionar' => 'Crear, editar y desactivar personal y cuentas.',
@@ -73,6 +74,7 @@ return [
 
         // Perfiles fijos del equipo institucional; se crean al otorgar su primer acceso.
         'asistente_legajo' => [
+            'guia.ver',
             'requerimientos.gestionar',
             'personal.ver',
             'legajo.ver',
@@ -82,6 +84,7 @@ return [
             'seccion07.ver',
         ],
         'suplente_legajo' => [
+            'guia.ver',
             'requerimientos.gestionar',
             'personal.ver', 'legajo.ver', 'legajo.editar', 'legajo.abrir',
             'documento.subir', 'documento.recepcionar', 'documento.revisar',

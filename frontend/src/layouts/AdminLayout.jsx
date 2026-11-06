@@ -5,6 +5,7 @@ import { cacheInstitution, normalizeInstitution, readInstitution } from '../conf
 import { fetchInstitution, saveInstitution } from '../features/settings/institutionApi'
 import { navigation } from '../config/navigation'
 import { activarMayusculas } from '../shared/forms/mayusculas'
+import GuiaFlotante from '../features/guia/GuiaFlotante'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 
@@ -85,5 +86,6 @@ export default function AdminLayout({ user, avisoServicio = null }) {
     <a href="#contenido" className="sr-only z-50 rounded-lg bg-white p-3 focus:not-sr-only focus:fixed focus:top-3 focus:left-3">Saltar al contenido</a>
     <Sidebar institution={institution} drawerRef={drawerRef} />
     <div className="lg:pl-64"><Topbar user={user} institution={institution} title={title} onOpenMenu={() => drawerRef.current.showModal()} /><AvisoServicio aviso={avisoServicio} /><main id="contenido" ref={mainRef} tabIndex={-1} className="mx-auto max-w-7xl px-4 py-7 outline-none! sm:px-8 sm:py-9"><Outlet context={{ institution, updateInstitution, institutionLoading, institutionError, institutionUpdatedAt, reloadInstitution }} /></main><footer className="mx-auto flex max-w-7xl flex-wrap justify-between gap-2 px-4 pb-6 text-[11px] text-slate-500 sm:px-8"><span>{institution.name} · Gestión institucional</span><span>Información organizada, personas conectadas.</span></footer></div>
+    <GuiaFlotante />
   </div>
 }
