@@ -15,7 +15,7 @@ return [
     'temas' => [
         ['id' => 'agregar-personal', 'titulo' => 'Registrar a una persona', 'ruta' => '/personal', 'permiso' => ['usuarios.gestionar'],
             'palabras' => ['registrar', 'agregar', 'nuevo', 'nueva', 'crear', 'alta', 'persona', 'personal', 'trabajador', 'docente', 'vinculo'],
-            'pasos' => ['Entra a Personal en el menú.', 'Pulsa «Agregar personal».', 'Completa los tres pasos del registro manual; incluye el primer vínculo laboral de la persona.', 'Al terminar puedes usar «Ir a la ficha» o «Registrar otra persona».']],
+            'pasos' => ['Entra a Personal en el menú.', 'Pulsa «Agregar personal».', 'Completa los cuatro pasos del registro manual: datos de la persona, puesto y cargo, vínculo laboral y revisión. Al registrar se abre su legajo con su número.', 'Al terminar puedes usar «Ir a la ficha» o «Registrar otra persona».']],
         ['id' => 'importar-personal', 'titulo' => 'Importar personal desde Excel o CSV', 'ruta' => '/personal', 'permiso' => ['usuarios.gestionar'],
             'palabras' => ['importar', 'importo', 'excel', 'csv', 'archivo', 'masivo', 'varios', 'muchos', 'trabajadores', 'docentes', 'plantilla', 'carga'],
             'pasos' => ['Entra a Personal en el menú.', 'Pulsa «Agregar personal».', 'En «Método de carga» elige la importación por archivo.', 'Sube un archivo Excel (.xlsx) o CSV (.csv) y revisa el resultado antes de confirmar.']],

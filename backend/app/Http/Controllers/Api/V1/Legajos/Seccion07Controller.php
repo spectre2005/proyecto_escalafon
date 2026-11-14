@@ -143,7 +143,7 @@ class Seccion07Controller extends Controller
     {
         [$modelo] = self::TIPOS[$tipo] ?? abort(404);
         $persona = $this->exigirLegajo($usuario);
-        $actual = $modelo::query()->where('usuario_id', $usuario)->findOrFail($registro);
+        $actual = $modelo::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->findOrFail($registro);
         if ($actual->anulado) {
             return response()->json(['message' => 'El registro está anulado: no se corrige. Registra uno nuevo.'], 409);
         }
@@ -162,7 +162,7 @@ class Seccion07Controller extends Controller
     {
         [$modelo] = self::TIPOS[$tipo] ?? abort(404);
         Usuario::query()->findOrFail($usuario);
-        $resultado = $this->anular($request, $modelo::query()->where('usuario_id', $usuario)->findOrFail($registro));
+        $resultado = $this->anular($request, $modelo::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->findOrFail($registro));
 
         return $resultado instanceof JsonResponse ? $resultado : new JsonResource($this->presentar($tipo, $resultado->resource, $request));
     }
@@ -175,7 +175,7 @@ class Seccion07Controller extends Controller
     private function datos(Usuario $persona): array
     {
         $usuario = $persona->id;
-        $vinculos = VinculoLaboral::query()->where('usuario_id', $usuario)->where('anulado', false)->with('perfilDocente')->orderByDesc('fecha_inicio')->orderBy('id')->get();
+        $vinculos = VinculoLaboral::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->where('anulado', false)->with('perfilDocente')->orderByDesc('fecha_inicio')->orderBy('id')->get();
         $perfil = PerfilDocumental::de($persona, $vinculos);
         $carrera = in_array('carrera', $perfil->regimenesClasificados(), true);
         $vinculosCarrera = $vinculos->where('tipo_personal', 'administrativo')->where('regimen_laboral', 'carrera')->values();
@@ -184,7 +184,7 @@ class Seccion07Controller extends Controller
         $registros = [];
         foreach (self::TIPOS as $tipo => [$modelo]) {
             $orden = ['evaluaciones-desempeno' => 'ciclo_anio', 'progresiones-carrera' => 'fecha_efectiva', 'ratificaciones-docentes' => 'fecha_resolucion', 'desplazamientos' => 'fecha_inicio'][$tipo];
-            $registros[$tipo] = collect($this->filas($modelo::query()->where('usuario_id', $usuario)->where('anulado', false)->with('registradoPor')
+            $registros[$tipo] = collect($this->filas($modelo::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->where('anulado', false)->with('registradoPor')
                 ->orderByDesc($orden)->orderBy('id')->get(), self::CAMPOS[$tipo]));
         }
         $evaluadores = Usuario::query()->whereIn('id', $registros['evaluaciones-desempeno']->pluck('values.evaluador_id')->filter()->unique())->get()->keyBy('id');
@@ -195,7 +195,7 @@ class Seccion07Controller extends Controller
         });
 
         $documentos = DocumentoUsuario::query()->where('usuario_id', $usuario)->where('seccion_legajo_id', Seccion07::SECCION)
-            ->whereIn('legajo_id', Legajo::query()->where('usuario_id', $usuario)->select('id'))
+            ->where('legajo_id', Legajo::paraConsulta($usuario)?->id)
             ->with(['archivo', 'recepcionadoPor', 'createdBy'])->orderByDesc('created_at')->orderByDesc('id')->get()->groupBy('tipo_documento_id');
         $nivel = fn (Collection $filas): string => $filas->isNotEmpty() ? 'completo' : 'ninguno';
         $niveles = [

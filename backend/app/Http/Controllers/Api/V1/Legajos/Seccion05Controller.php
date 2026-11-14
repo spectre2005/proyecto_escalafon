@@ -54,15 +54,15 @@ class Seccion05Controller extends Controller
         $legajo = Legajo::paraConsulta($usuario);
         $licencias = $this->licencias($usuario, $salud)->where('anulado', false)->with('registradoPor')
             ->orderByDesc('fecha_inicio')->orderBy('id')->get();
-        $periodos = PeriodoVacacional::query()->where('usuario_id', $usuario)->where('anulado', false)->with('registradoPor')
+        $periodos = PeriodoVacacional::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->where('anulado', false)->with('registradoPor')
             ->orderByDesc('periodo_anio')->orderBy('id')->get();
-        $goces = GoceVacacional::query()->where('usuario_id', $usuario)->where('anulado', false)->with('registradoPor')
+        $goces = GoceVacacional::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->where('anulado', false)->with('registradoPor')
             ->orderByDesc('fecha_inicio')->orderBy('id')->get();
-        $vinculos = VinculoLaboral::query()->where('usuario_id', $usuario)->where('anulado', false)
+        $vinculos = VinculoLaboral::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->where('anulado', false)
             ->orderByDesc('fecha_inicio')->orderBy('id')->get(['id', 'nombre_puesto', 'numero_documento_vinculo', 'fecha_inicio', 'fecha_cese']);
 
         $documentos = DocumentoUsuario::query()->where('usuario_id', $usuario)->where('seccion_legajo_id', Seccion05::SECCION)
-            ->whereIn('legajo_id', Legajo::query()->where('usuario_id', $usuario)->select('id'))
+            ->where('legajo_id', Legajo::paraConsulta($usuario)?->id)
             ->with(['archivo', 'recepcionadoPor', 'createdBy'])->orderByDesc('created_at')->orderByDesc('id')->get()->groupBy('tipo_documento_id');
         $tipos = TipoDocumento::query()->where('seccion_legajo_id', Seccion05::SECCION)->where('activo', true)->orderBy('orden')->get()
             ->map(fn (TipoDocumento $tipo): array => $this->tipo($tipo, $documentos->get($tipo->id, collect()), $salud))->values();
@@ -163,7 +163,7 @@ class Seccion05Controller extends Controller
     public function anularRegistro(Request $request, string $usuario, string $tipo, string $registro): JsonResource|JsonResponse
     {
         $modelo = self::ANULABLES[$tipo] ?? abort(404);
-        $query = $modelo === LicenciaPermiso::class ? $this->licencias($usuario, $request->user()->veDatosSensibles()) : $modelo::query()->where('usuario_id', $usuario);
+        $query = $modelo === LicenciaPermiso::class ? $this->licencias($usuario, $request->user()->veDatosSensibles()) : $modelo::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id);
         $encontrado = $query->findOrFail($registro);
         // Un período con goces vigentes no se anula: primero se anulan sus goces.
         if ($encontrado instanceof PeriodoVacacional && ! $encontrado->anulado && $encontrado->gocesVacacionales()->where('anulado', false)->exists()) {
@@ -176,7 +176,7 @@ class Seccion05Controller extends Controller
     /** Licencias de la persona; sin datos_sensibles.ver se excluyen las que son datos de salud. */
     private function licencias(string $usuario, bool $salud): Builder
     {
-        $query = LicenciaPermiso::query()->where('usuario_id', $usuario);
+        $query = LicenciaPermiso::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id);
 
         return $salud ? $query : $query->whereNotIn('tipo', Seccion05::DATOS_SALUD);
     }

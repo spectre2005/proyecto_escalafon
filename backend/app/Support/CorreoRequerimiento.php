@@ -51,7 +51,7 @@ final class CorreoRequerimiento
                             return 0;
                         }
                         $r = $n->requerimiento;
-                        if (! $r || $r->cerrado_en || ! in_array($r->estado, ['abierto', 'observado'], true) || $r->usuario()->whereHas('legajos', fn ($q) => $q->where('estado_legajo', 'activo'))->doesntExist()) {
+                        if (! $r || ! RequerimientoDocumento::query()->etapaActual()->whereKey($r->id)->exists() || $r->cerrado_en || ! in_array($r->estado, ['abierto', 'observado'], true) || $r->usuario()->whereHas('legajos', fn ($q) => $q->where('estado_legajo', 'activo'))->doesntExist()) {
                             $n->update(['correo_estado' => 'cancelado', 'correo_error' => 'El requerimiento o el legajo están cerrados.']);
 
                             return 0;

@@ -3,6 +3,7 @@ import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { saveDatosPuesto, saveSeccion02 } from '../../api/seccion02Api'
 import { etiquetaVinculo, regimenesLaborales, resultadosPeriodo, tiposInduccion, tiposPersonal } from '../../config/seccion02'
 import { CamposDatosPuesto, CamposVinculo, OpcionesCatalogo } from './CamposVinculo'
+import { CampoProcesoSeleccion } from './CamposCatalogoVinculo'
 import { datosPuestoInicial, limpiarDatosPuesto, vinculoInicial, vinculoParaGuardar } from './borradoresVinculo'
 import Campo, { Formulario, Opciones } from '../seccion01/Campo'
 import { hoy, useBorrador, useGuardar } from '../seccion01/useGuardar'
@@ -57,7 +58,7 @@ export function VinculoForm({ usuario, record, documentoId, onSaved, onCancel })
     </div>}
     <Campo label="Tipo de personal" required error={errors.tipo_personal}><select required value={draft.tipo_personal} onChange={cambiarTipoPersonal} disabled={tipoFijo}><Opciones lista={tiposPersonal} actual={draft.tipo_personal} vacio="Selecciona" /></select></Campo>
     {tipoFijo && <p className="self-end text-[11px] text-slate-500">El tipo de personal no se cambia: el vínculo ya tiene datos del puesto. Si es otro, anula el vínculo y registra el correcto.</p>}
-    <CamposVinculo draft={draft} set={set} poner={poner} errors={errors} opciones={opciones} tipoPersonal={draft.tipo_personal} conCese={!!record || historico} ceseObligatorio={!record && historico}>
+    <CamposVinculo draft={draft} poner={poner} errors={errors} opciones={opciones} tipoPersonal={draft.tipo_personal} nuevo={!record} numeroLegajo={(persona?.legajos || []).map(legajo => legajo.values || legajo).find(legajo => legajo.estado_legajo === 'activo')?.numero_legajo || ''} conCese={!!record || historico} ceseObligatorio={!record && historico}>
       <Campo label="Ley / régimen normativo" required error={errors.regimen_normativo_id}><select required value={draft.regimen_normativo_id} onChange={set('regimen_normativo_id')} disabled={!opciones}><OpcionesCatalogo lista={(opciones?.regimenes || []).filter(ley => !draft.tipo_personal || ley.aplica_a === draft.tipo_personal || ley.id === draft.regimen_normativo_id)} actual={draft.regimen_normativo_id} /></select></Campo>
       {sugerencia && <div role="note" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 sm:col-span-2">
         <span>Tipo de vínculo sin definir. {sugerencia.valor ? <>Sugerencia: <strong>{regimenesLaborales[sugerencia.valor]}</strong> ({sugerencia.motivo}) Revísala antes de guardar.</> : sugerencia.motivo}</span>
@@ -67,14 +68,18 @@ export function VinculoForm({ usuario, record, documentoId, onSaved, onCancel })
   </Formulario>
 }
 
-// 2.1: datos del proceso de selección, que se guardan en el vínculo laboral.
+// 2.1: datos del proceso de selección, que se guardan en el vínculo laboral. El proceso se elige del catálogo; solo se
+// envían el proceso y la fecha del resultado. Un designado no pasa por proceso de selección.
 export function SeleccionForm({ usuario, record, onSaved, onCancel }) {
-  const [draft, set] = useBorrador({ proceso_seleccion: record.values.proceso_seleccion || '', fecha_resultado_seleccion: record.values.fecha_resultado_seleccion || '' })
-  const { busy, error, errors, guardar } = useGuardar(data => saveSeccion02(usuario, 'vinculos-laborales', record.id, data), onSaved)
+  const opciones = useLiveQuery('/expediente-opciones').data?.data
+  const [draft, , poner] = useBorrador(vinculoInicial(record.values))
+  const { busy, error, errors, guardar } = useGuardar(data => saveSeccion02(usuario, 'vinculos-laborales', record.id,
+    { tipo_proceso_seleccion_id: data.tipo_proceso_seleccion_id, fecha_resultado_seleccion: data.fecha_resultado_seleccion }), onSaved)
   return <Formulario titulo={`Proceso de selección: ${record.values.nombre_puesto}`} guardar="Guardar" busy={busy} error={error} onSubmit={() => guardar(draft)} onCancel={onCancel}
     nota="Se guarda en el vínculo laboral. Solo se corrige mientras el vínculo no tenga fecha de cese.">
-    <Campo label="Proceso de selección" error={errors.proceso_seleccion}><input maxLength={100} value={draft.proceso_seleccion} onChange={set('proceso_seleccion')} /></Campo>
-    <Campo label="Fecha del resultado" error={errors.fecha_resultado_seleccion}><input type="date" max={hoy()} value={draft.fecha_resultado_seleccion} onChange={set('fecha_resultado_seleccion')} /></Campo>
+    {record.values.regimen_laboral === 'designado'
+      ? <p className="rounded-lg bg-sky-50 p-3 text-xs text-sky-900 sm:col-span-2">Un vínculo designado no pasa por proceso de selección.</p>
+      : <CampoProcesoSeleccion draft={draft} poner={poner} errors={errors} opciones={opciones} />}
   </Formulario>
 }
 

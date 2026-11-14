@@ -97,6 +97,10 @@ function registroDe(formulario, data, id) {
   return lista.find(record => record.id === id)
 }
 
+// Vínculo actual: vigente o que aún no empieza (por iniciar). Uno por iniciar no es historial: es el vínculo con el que la
+// persona ingresa; no se invita a registrar otro.
+const esActual = v => v.vigente || (!v.cerrado && !v.values?.anulado && v.vencimiento?.estado === 'por_iniciar')
+
 // N.º de la resolución o contrato ya guardado en el registro elegido (no en la renovación, que puede tener otro), editable.
 function precargaDe(tipo, data, id) {
   return precargaDesdeRegistro(tipo, registroDe(tipo.formulario_datos, data, id)?.values)
@@ -105,7 +109,7 @@ function precargaDe(tipo, data, id) {
 // Vínculo propuesto para los documentos del vínculo (C a F): el único vigente según la sección 02. Con varios, se elige.
 function vinculoPropuesto(tipo, data) {
   if (tipo.formulario_datos !== 'vinculos_laborales') return ''
-  const vigentes = data.vinculos.filter(v => v.vigente)
+  const vigentes = data.vinculos.filter(esActual)
   return vigentes.length === 1 ? vigentes[0].id : ''
 }
 
@@ -163,7 +167,7 @@ function Documentos({ usuario, data, subseccion, sinLegajo, aplica = true }) {
   const [aviso, setAviso] = useState('')
   if (!subseccion) return <Aviso>El catálogo de documentos de esta subsección no está cargado en la base de datos (Seccion02CatalogoSeeder).</Aviso>
   const ocupado = !!subiendo || !!enlazando || !!subsanando || !!recuperando
-  const vigentes = data.vinculos.filter(v => v.vigente)
+  const vigentes = data.vinculos.filter(esActual)
   function subido(tipo, documento) {
     setSubiendo(null)
     setSubsanando(null)
@@ -339,13 +343,13 @@ function VinculoCard({ vinculo, aviso, destacado, completar, adjuntar, adjuntarA
   const tienePuesto = vinculo.datos_puesto.length > 0
   return <article id={`registro-${vinculo.id}`} tabIndex={-1} className={`rounded-2xl border bg-white p-5 ${destacado ? 'border-teal-300 ring-1 ring-teal-100' : 'border-slate-200'}`}>
     <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h4 className="font-semibold text-slate-800">{v.nombre_puesto}</h4>
-      <p className="mt-1 text-xs text-slate-500">{etiqueta(tiposPersonal, v.tipo_personal)} · {tipoVinculo(v.regimen_laboral)} · {v.numero_documento_vinculo || 'sin N.º de resolución o contrato'}</p>
+      <p className="mt-1 text-xs text-slate-500">{etiqueta(tiposPersonal, v.tipo_personal)} · {[tipoVinculo(v.regimen_laboral), vinculo.modalidad, v.numero_documento_vinculo].filter(Boolean).join(' · ')}</p>
       <p className="mt-1 text-xs text-slate-600">{fecha(v.fecha_inicio)} – {finEfectivo} · {vinculo.unidad_organica || 'Unidad orgánica no registrada'}</p></div>
       <Etiqueta clase={estadoClase}>{estadoTexto}</Etiqueta></div>
     <div className="mt-4"><AvisoSinDefinir vinculo={vinculo} />{completar}<AvisoVencimiento vinculo={vinculo} aviso={aviso} /></div>
 
     <ul className="divide-y divide-slate-100 border-y border-slate-100">
-      <Paso estado="completo" titulo="Datos del vínculo" detalle={`${tipoVinculo(v.regimen_laboral)} · ${vinculo.regimen_normativo || 'Ley / régimen sin definir'}`} acciones={corregir} />
+      <Paso estado="completo" titulo="Datos del vínculo" detalle={[tipoVinculo(v.regimen_laboral), vinculo.modalidad, vinculo.regimen_normativo || 'Ley / régimen sin definir'].filter(Boolean).join(' · ')} acciones={corregir} />
       <Paso estado={documentos.length ? 'completo' : 'falta'} titulo="Documento del vínculo (resolución o contrato)"
         detalle={documentos.length ? documentos.map(({ tipo, documento }) => `${tipo.nombre} · folios ${folios(documento.values.folio_inicio, documento.values.folio_fin)}`).join(' · ') : 'Todavía no se subió.'}
         acciones={<>{documentos.length === 1 ? <DocumentoDelRegistro compacto encontrado={documentos[0]} /> : documentos.length > 1 && ver('documentos')}{adjuntar}</>}>
@@ -390,8 +394,8 @@ function Formalizacion({ usuario, data, sinLegajo }) {
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState('')
   const [confirmandoOtro, setConfirmandoOtro] = useState(false)
-  const vigentes = data.vinculos.filter(v => v.vigente)
-  const historial = data.vinculos.filter(v => !v.vigente)
+  const vigentes = data.vinculos.filter(esActual)
+  const historial = data.vinculos.filter(v => !esActual(v))
   const cerrar = guardado => { setForm(null); setAviso(guardado ? 'Registro guardado.' : '') }
   const ocupado = !!form || !!anulando
   const empezar = accion => { setAviso(''); setError(''); accion() }
@@ -452,7 +456,7 @@ function Formalizacion({ usuario, data, sinLegajo }) {
     {data.vinculos.length === 0 && <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">No hay vínculos laborales registrados. {sinLegajo ? 'Primero se debe abrir el legajo.' : 'Registra el vínculo (resolución o contrato) para habilitar adendas, inducciones y período de prueba.'}</p>}
     {data.vinculos.length > 0 && vigentes.length === 0 && <div role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
       <p className="font-semibold">La persona no tiene un vínculo vigente.</p>
-      <p className="mt-1">Los vínculos del historial están cesados, vencidos o aún no inician. Esto no impide registrar un vínculo nuevo; los anteriores se conservan.</p>
+      <p className="mt-1">Los vínculos del historial están cesados o vencidos. Para una nueva incorporación registra un vínculo nuevo; los anteriores se conservan.</p>
       {sinLegajo ? <p className="mt-2">Primero se debe abrir el legajo.</p> : !puedeRegistrar && <p className="mt-2">Tu cuenta no tiene permiso para registrar vínculos.</p>}
     </div>}
     <div className="space-y-4">{vigentes.map(v => tarjeta(v, true))}</div>
@@ -460,7 +464,7 @@ function Formalizacion({ usuario, data, sinLegajo }) {
       <div className="mt-4 space-y-4">{historial.map(v => tarjeta(v, false))}</div>
     </details>}
     <div className="mt-6 flex flex-wrap gap-x-6">
-      <Anulados usuario={usuario} clave="vinculos_laborales" etiqueta="vínculos anulados" titulo={v => v.nombre_puesto} campos={[['Tipo de personal', v => etiqueta(tiposPersonal, v.tipo_personal)], ['Tipo de vínculo', v => tipoVinculo(v.regimen_laboral)], ['N.º de resolución o contrato', v => texto(v.numero_documento_vinculo)], ['Inicio', v => fecha(v.fecha_inicio)]]} />
+      <Anulados usuario={usuario} clave="vinculos_laborales" etiqueta="vínculos anulados" titulo={v => v.nombre_puesto} campos={[['Tipo de personal', v => etiqueta(tiposPersonal, v.tipo_personal)], ['Tipo de vínculo', v => tipoVinculo(v.regimen_laboral)], ['N.º de documento (vínculos anteriores)', v => texto(v.numero_documento_vinculo)], ['Inicio', v => fecha(v.fecha_inicio)]]} />
       <Anulados usuario={usuario} clave="vinculo_adendas" etiqueta="adendas anuladas" titulo={v => `Adenda ${v.numero || 'sin número'}`} campos={[['Motivo de la adenda', v => texto(v.motivo)], ['Vigencia', v => `${fecha(v.fecha_inicio)} – ${fecha(v.fecha_fin)}`], ['Vínculo', v => etiquetaVinculo(data.vinculos.find(item => item.id === v.vinculo_laboral_id) || { values: { nombre_puesto: 'Vínculo anulado o no encontrado' } })]]} />
     </div>
   </section>
@@ -470,7 +474,7 @@ function Formalizacion({ usuario, data, sinLegajo }) {
 const documentoDe = data => record => <DocumentoDelRegistro encontrado={buscarDocumento(data.subsecciones.flatMap(sub => sub.tipos), record.values.documento_id)} enlazado={!!record.values.documento_id} />
 
 function Seleccion({ usuario, data, sinLegajo }) {
-  const vinculos = data.vinculos.filter(v => v.vigente)
+  const vinculos = data.vinculos.filter(esActual)
   const principales = vinculos.length ? vinculos : data.vinculos.slice(0, 1)
   return <>
     {!vinculos.length && data.vinculos.length > 0 && <Aviso>No hay un vínculo vigente: se muestra el más reciente.</Aviso>}

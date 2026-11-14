@@ -8,6 +8,9 @@ export function vinculoInicial(v = {}) {
     regimen_laboral: v.regimen_laboral || '', unidad_organica_id: v.unidad_organica_id || '', nombre_puesto: v.nombre_puesto || '',
     numero_documento_vinculo: v.numero_documento_vinculo || '', fecha_inicio: v.fecha_inicio || '', fecha_fin_prevista: v.fecha_fin_prevista || '',
     proceso_seleccion: v.proceso_seleccion || '', fecha_resultado_seleccion: v.fecha_resultado_seleccion || '',
+    // Catálogos del vínculo y fecha de emisión (CamposCatalogoVinculo). El número lo asigna el sistema.
+    modalidad_vinculo_id: v.modalidad_vinculo_id || '', puesto_id: v.puesto_id || '', tipo_proceso_seleccion_id: v.tipo_proceso_seleccion_id || '',
+    documento_vinculo_fecha: v.documento_vinculo_fecha || '',
     obligado_djbr: valorBandera(v.obligado_djbr), exige_colegiatura: valorBandera(v.exige_colegiatura), exige_estudios_basicos: valorBandera(v.exige_estudios_basicos), tiene_periodo_prueba: valorBandera(v.tiene_periodo_prueba),
   }
 }

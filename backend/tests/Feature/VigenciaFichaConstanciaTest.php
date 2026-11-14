@@ -68,7 +68,9 @@ class VigenciaFichaConstanciaTest extends TestCase
         $this->assertSame(['PUESTO FUTURO', 0, 'programado', 'Inicio previsto el 04/01/2027'],
             [$ficha['puesto_actual']['nombre_puesto'], $ficha['puesto_actual']['vinculos_vigentes'], $ficha['puesto_actual']['situacion']['codigo'], $ficha['puesto_actual']['situacion']['texto']]);
         $this->assertSame([], $ficha['regimen']['tipos_vinculo']);
-        $this->assertSame(RegimenesLaborales::SIN_VIGENTE_DETERMINADO, $ficha['regimen']['mensaje']);
+        // El tipo de vínculo dice lo mismo que el puesto actual: aún no empieza.
+        $this->assertStringStartsWith('Por iniciar: ', $ficha['regimen']['mensaje']);
+        $this->assertStringEndsWith(' desde el 04/01/2027.', $ficha['regimen']['mensaje']);
 
         $constancia = $this->constancia($persona);
         $this->assertSame('programado', $constancia['vinculos'][0]['situacion_codigo']);
@@ -85,7 +87,8 @@ class VigenciaFichaConstanciaTest extends TestCase
         $this->assertSame('No determinada: el plazo terminó el 31/12/2025 y no hay cese registrado', $ficha['puesto_actual']['situacion']['texto']);
         $this->assertSame(0, $ficha['puesto_actual']['vinculos_vigentes']);
         $this->assertSame([], $ficha['regimen']['tipos_vinculo']);
-        $this->assertSame(RegimenesLaborales::SIN_VIGENTE_DETERMINADO, $ficha['regimen']['mensaje']);
+        $this->assertSame('No determinada: el plazo terminó el 31/12/2025 y no hay cese registrado. Registra su renovación (adenda) o su cese en la sección 02.',
+            $ficha['regimen']['mensaje']);
 
         $constancia = $this->constancia($persona);
         $this->assertSame('no_determinada', $constancia['vinculos'][0]['situacion_codigo']);

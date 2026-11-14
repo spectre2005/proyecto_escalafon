@@ -15,6 +15,7 @@ use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
 use App\Support\AplicacionDocumental;
 use App\Support\Auditoria;
+use App\Support\CatalogosVinculo;
 use App\Support\Documentos\EstadoDocumento;
 use App\Support\Documentos\FormulariosDatos;
 use App\Support\Parametros;
@@ -66,13 +67,13 @@ class Seccion02Controller extends Controller
     {
         $persona = Usuario::query()->findOrFail($usuario);
         $legajo = Legajo::paraConsulta($usuario);
-        $vinculos = VinculoLaboral::query()->where('usuario_id', $usuario)->where('anulado', false)
+        $vinculos = VinculoLaboral::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->where('anulado', false)
             ->with(['regimenNormativo:id,codigo,nombre', 'unidadOrganica:id,nombre', 'perfilDocente', 'perfilAdministrativo', 'registradoPor',
                 'vinculoAdendas' => fn ($query) => $query->where('anulado', false)->with('registradoPor')->orderBy('fecha_inicio')->orderBy('created_at')->orderBy('id')])
             ->orderByDesc('fecha_inicio')->orderBy('id')->get();
         $perfil = PerfilDocumental::de($persona, $vinculos);
-        $inducciones = Induccion::query()->where('usuario_id', $usuario)->where('anulado', false)->with('registradoPor')->orderByDesc('fecha')->orderBy('id')->get();
-        $periodos = PeriodoPrueba::query()->where('usuario_id', $usuario)->where('anulado', false)->with('registradoPor')->orderByDesc('fecha_inicio')->orderBy('id')->get();
+        $inducciones = Induccion::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->where('anulado', false)->with('registradoPor')->orderByDesc('fecha')->orderBy('id')->get();
+        $periodos = PeriodoPrueba::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->where('anulado', false)->with('registradoPor')->orderByDesc('fecha_inicio')->orderBy('id')->get();
         $aviso = Parametros::entero('dias_aviso_vencimiento_vinculo');
         // Vigentes primero; dentro de cada grupo, del más reciente al más antiguo.
         $filasVinculos = $vinculos->map(fn (VinculoLaboral $vinculo): array => $this->vinculo($vinculo, $aviso, $inducciones))
@@ -80,7 +81,7 @@ class Seccion02Controller extends Controller
         $vigentes = $filasVinculos->where('vigente', true);
 
         $documentos = DocumentoUsuario::query()->where('usuario_id', $usuario)->where('seccion_legajo_id', Seccion02CatalogoSeeder::SECCION)
-            ->whereIn('legajo_id', Legajo::query()->where('usuario_id', $usuario)->select('id'))
+            ->where('legajo_id', Legajo::paraConsulta($usuario)?->id)
             ->with(['archivo', 'recepcionadoPor', 'createdBy'])->orderByDesc('created_at')->orderByDesc('id')->get()->groupBy('tipo_documento_id');
         $datos = [
             '2.1' => $this->nivel($vigentes->contains(fn (array $v): bool => $v['values']['proceso_seleccion'] && $v['values']['fecha_resultado_seleccion']),
@@ -125,11 +126,11 @@ class Seccion02Controller extends Controller
     public function anulados(string $usuario): JsonResponse
     {
         Usuario::query()->findOrFail($usuario);
-        $anulados = fn (string $modelo, array $campos): array => $this->filas($modelo::query()->where('usuario_id', $usuario)->where('anulado', true)
+        $anulados = fn (string $modelo, array $campos): array => $this->filas($modelo::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->where('anulado', true)
             ->with('registradoPor')->orderByDesc('updated_at')->orderBy('id')->get(), [...$campos, 'motivo_anulacion', 'created_at', 'updated_at']);
 
         // Las adendas no tienen usuario_id ni updated_at: se buscan por el vínculo de la persona.
-        $adendas = VinculoAdenda::query()->where('anulado', true)->whereHas('vinculoLaboral', fn ($query) => $query->where('usuario_id', $usuario))
+        $adendas = VinculoAdenda::query()->where('anulado', true)->whereHas('vinculoLaboral', fn ($query) => $query->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id))
             ->with('registradoPor')->orderByDesc('created_at')->orderBy('id')->get();
 
         return response()->json(['data' => [
@@ -149,6 +150,7 @@ class Seccion02Controller extends Controller
         $request->mergeIfMissing(array_filter(['tipo_personal' => $persona->tipo_personal, 'regimen_normativo_id' => $persona->regimen_normativo_id]));
         $data = $this->validar($request, [...self::REGLAS_VINCULO, 'documento_id' => 'nullable|uuid']);
         $this->exigirLeyDelTipo($data);
+        $data = CatalogosVinculo::aplicar($data, $data['tipo_personal'] ?? null);
         $documento = $this->documento($usuario, $data, 'vinculos_laborales');
 
         // vinculos_laborales no tiene documento_id: el documento (c a f) apunta al vínculo.
@@ -167,12 +169,13 @@ class Seccion02Controller extends Controller
     public function updateVinculo(Request $request, string $usuario, string $vinculo): JsonResource|JsonResponse
     {
         $this->exigirLegajo($usuario);
-        $registro = VinculoLaboral::query()->where('usuario_id', $usuario)->findOrFail($vinculo);
+        $registro = VinculoLaboral::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->findOrFail($vinculo);
         if ($registro->anulado || $registro->fecha_cese !== null) {
             return response()->json(['message' => $registro->anulado ? 'El vínculo está anulado: no se corrige.' : 'El vínculo tiene fecha de cese: es un registro cerrado y no se corrige.'], 409);
         }
         $cambios = $this->validarCambios($request, $registro, self::REGLAS_VINCULO);
         $this->exigirLeyDelTipo($cambios, $registro);
+        $cambios = CatalogosVinculo::aplicar($cambios, $cambios['tipo_personal'] ?? $registro->tipo_personal, $registro);
         DB::transaction(function () use ($registro, $cambios, $request, $usuario): void {
             // Bloqueo del vínculo: los datos del puesto no se registran a la vez que se cambia su tipo de personal.
             $actual = VinculoLaboral::query()->whereKey($registro->id)->lockForUpdate()->firstOrFail();
@@ -230,7 +233,7 @@ class Seccion02Controller extends Controller
     public function guardarDatosPuesto(Request $request, string $usuario, string $vinculo): JsonResource|JsonResponse
     {
         $this->exigirLegajo($usuario);
-        $registro = VinculoLaboral::query()->where('usuario_id', $usuario)->findOrFail($vinculo);
+        $registro = VinculoLaboral::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->findOrFail($vinculo);
         if ($registro->anulado || $registro->fecha_cese !== null) {
             return response()->json(['message' => 'El vínculo está cerrado (con fecha de cese) o anulado: sus datos del puesto no se corrigen.'], 409);
         }
@@ -301,7 +304,7 @@ class Seccion02Controller extends Controller
     public function updatePeriodo(Request $request, string $usuario, string $periodo): JsonResource|JsonResponse
     {
         $this->exigirLegajo($usuario);
-        $registro = PeriodoPrueba::query()->where('usuario_id', $usuario)->findOrFail($periodo);
+        $registro = PeriodoPrueba::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->findOrFail($periodo);
         if ($registro->anulado || $registro->resultado !== 'pendiente') {
             return response()->json(['message' => 'El período de prueba ya tiene resultado o está anulado: es un registro cerrado. Para corregirlo, anúlalo y regístralo de nuevo.'], 409);
         }
@@ -328,8 +331,8 @@ class Seccion02Controller extends Controller
     {
         $modelo = self::ANULABLES[$tipo] ?? abort(404);
         $query = $modelo === VinculoAdenda::class
-            ? VinculoAdenda::query()->whereHas('vinculoLaboral', fn ($q) => $q->where('usuario_id', $usuario))
-            : $modelo::query()->where('usuario_id', $usuario);
+            ? VinculoAdenda::query()->whereHas('vinculoLaboral', fn ($q) => $q->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id))
+            : $modelo::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id);
 
         // TODO pendiente de confirmar con el cliente: anular un vínculo no anula sus adendas, inducciones ni
         // períodos de prueba (quedan registrados; el vínculo ya no recibe registros nuevos).
@@ -365,8 +368,10 @@ class Seccion02Controller extends Controller
         $tiposInduccion = $inducciones->where('vinculo_laboral_id', $vinculo->id)->pluck('tipo')->all();
 
         return [
-            ...$this->fila($vinculo, ['tipo_personal', 'regimen_laboral', 'regimen_normativo_id', 'unidad_organica_id', 'nombre_puesto', 'obligado_djbr', 'exige_colegiatura', 'exige_estudios_basicos', 'tiene_periodo_prueba', 'proceso_seleccion', 'fecha_resultado_seleccion', 'numero_documento_vinculo', 'fecha_inicio', 'fecha_fin_prevista', 'fecha_cese']),
+            ...$this->fila($vinculo, ['tipo_personal', 'regimen_laboral', 'regimen_normativo_id', 'unidad_organica_id', 'nombre_puesto', 'obligado_djbr', 'exige_colegiatura', 'exige_estudios_basicos', 'tiene_periodo_prueba', 'proceso_seleccion', 'fecha_resultado_seleccion', 'numero_documento_vinculo', 'fecha_inicio', 'fecha_fin_prevista', 'fecha_cese',
+                'modalidad_vinculo_id', 'puesto_id', 'tipo_proceso_seleccion_id', 'documento_vinculo_fecha']),
             'regimen_normativo' => $vinculo->regimenNormativo?->nombre,
+            'modalidad' => $vinculo->modalidadVinculo?->nombre,
             // Vínculo anterior con el tipo Sin definir: sugerencia para confirmar al corregirlo (no se guarda sola).
             'tipo_sugerido' => RegimenesLaborales::sugerencia($vinculo),
             'registrado_por' => $this->nombre($vinculo->registradoPor),
@@ -446,7 +451,7 @@ class Seccion02Controller extends Controller
     private function exigirPeriodoPrueba(string $usuario): void
     {
         $persona = Usuario::query()->findOrFail($usuario);
-        $vinculos = VinculoLaboral::query()->where('usuario_id', $usuario)->where('anulado', false)->get();
+        $vinculos = VinculoLaboral::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->where('anulado', false)->get();
         // Solo se rechaza con la bandera en No; sin responder se permite (AplicacionDocumental).
         if (AplicacionDocumental::de($persona, $vinculos)->bandera('tiene_periodo_prueba', paraOfrecer: true) === false) {
             throw ValidationException::withMessages(['vinculo_laboral_id' => 'No se puede registrar: «Tiene período de prueba» está en No en el vínculo laboral. '
@@ -457,7 +462,7 @@ class Seccion02Controller extends Controller
     /** Solo un vínculo laboral abierto (sin fecha de cese) de esta misma persona: uno cerrado no recibe registros. */
     private function reglaVinculo(string $usuario): array
     {
-        return ['required', 'uuid', Rule::exists('vinculos_laborales', 'id')->where(fn ($query) => $query->where('usuario_id', $usuario)->whereNull('fecha_cese')->where('anulado', false))];
+        return ['required', 'uuid', Rule::exists('vinculos_laborales', 'id')->where(fn ($query) => $query->where('usuario_id', $usuario)->whereNull('fecha_cese')->where('anulado', false)->whereIn('id', VinculoLaboral::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->select('id')))];
     }
 
     /** Valida y rechaza campos que no son del formulario (autor, anulación, documento, etc.). */

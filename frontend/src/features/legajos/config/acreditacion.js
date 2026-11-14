@@ -31,7 +31,8 @@ export function precargaDesdeRegistro(tipo, registro, { familiares = [] } = {}) 
   const numero = valor => (texto(valor) ? { num_resolucion: texto(valor) } : {})
   const fecha = valor => (fechaEmision(valor) ? { fecha_emision: fechaEmision(valor) } : {})
   switch (tipo?.formulario_datos) {
-    case 'vinculos_laborales': return SIN_NUMERO_DEL_VINCULO.includes(tipo.codigo) ? {} : numero(v.numero_documento_vinculo)
+    // El número del vínculo es el registro interno (001-2026), no el de la resolución: solo se propone la fecha de emisión.
+    case 'vinculos_laborales': return SIN_NUMERO_DEL_VINCULO.includes(tipo.codigo) ? {} : fecha(v.documento_vinculo_fecha)
     case 'vinculo_adendas': return numero(v.numero)
     case 'progresiones_carrera': return numero(v.numero_resolucion)
     case 'ratificaciones_docentes': return { ...numero(v.numero_resolucion), ...fecha(v.fecha_resolucion) }

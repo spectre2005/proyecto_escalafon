@@ -44,14 +44,21 @@ class SolicitudLegajoController extends Controller
 
     private function consulta(Request $request): Builder
     {
-        return RequerimientoDocumento::query()
+        $consulta = RequerimientoDocumento::query()
             ->when(! $request->user()->veDatosSensibles(), fn (Builder $q) => $q->where(fn (Builder $q) => $q->whereNull('tipo_documento_id')->orWhereHas('tipoDocumento', fn (Builder $t) => $t->where('es_dato_sensible', false)->where('es_dato_salud', false)->whereNotIn('seccion_legajo_id', [1, 9, 10]))));
+        if (! $request->isMethodSafe() && $request->route('record')) {
+            $registro = (clone $consulta)->find($request->route('record'));
+            abort_if($registro && ! RequerimientoDocumento::query()->etapaActual()->whereKey($registro->id)->exists(), 409,
+                'Este requerimiento pertenece a una etapa anterior y está en solo consulta. Registra uno nuevo para el legajo actual.');
+        }
+
+        return $consulta;
     }
 
     public function index(Request $request): JsonResponse
     {
-        $data = $request->validate(['clase' => 'nullable|in:documentos,actualizacion', 'estado' => 'nullable|in:abierto,observado,en_revision,aceptado,cancelado', 'q' => 'nullable|string|max:120', 'page' => 'sometimes|integer|min:1', 'por_pagina' => PorPagina::regla()]);
-        $q = $this->consulta($request)->with(['usuario:id,nombres,apellido_paterno,apellido_materno', 'tipoDocumento:id,nombre,codigo,seccion_legajo_id,subseccion_legajo_id', 'tipoDocumento.subseccionLegajo:id,codigo', 'documento:id,nombre,estado', 'notificacionesUsuario' => fn ($q) => $q->whereNotNull('correo_estado')->orderByDesc('created_at')->limit(1)]);
+        $data = $request->validate(['historial' => 'sometimes|boolean', 'clase' => 'nullable|in:documentos,actualizacion', 'estado' => 'nullable|in:abierto,observado,en_revision,aceptado,cancelado', 'q' => 'nullable|string|max:120', 'page' => 'sometimes|integer|min:1', 'por_pagina' => PorPagina::regla()]);
+        $q = $this->consulta($request)->when($request->boolean('historial'), fn (Builder $query): Builder => $query->whereNot(fn (Builder $actual): Builder => $actual->etapaActual()), fn (Builder $query): Builder => $query->etapaActual())->with(['usuario:id,nombres,apellido_paterno,apellido_materno', 'tipoDocumento:id,nombre,codigo,seccion_legajo_id,subseccion_legajo_id', 'tipoDocumento.subseccionLegajo:id,codigo', 'documento:id,nombre,estado', 'notificacionesUsuario' => fn ($q) => $q->whereNotNull('correo_estado')->orderByDesc('created_at')->limit(1)]);
         foreach (['clase', 'estado'] as $campo) {
             if (! empty($data[$campo])) {
                 $q->where($campo, $data[$campo]);
@@ -170,7 +177,7 @@ class SolicitudLegajoController extends Controller
             }
             $registros = [];
             foreach ($tipos ?: [null] as $tipo) {
-                $duplicado = RequerimientoDocumento::query()->where('usuario_id', $data['usuario_id'])->where('clase', $data['clase'])->whereIn('estado', self::ABIERTOS);
+                $duplicado = RequerimientoDocumento::query()->etapaActual()->where('usuario_id', $data['usuario_id'])->where('clase', $data['clase'])->whereIn('estado', self::ABIERTOS);
                 if ($tipo) {
                     $duplicado->where('tipo_documento_id', $tipo);
                 } else {

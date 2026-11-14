@@ -25,12 +25,23 @@ class StoreUsuarioConVinculoRequest extends StoreUsuariosRequest
 
     public function rules(): array
     {
+        $rules = parent::rules();
+        $dni = $this->input('usuarios.0.numero_doc_identidad');
+        $persona = is_string($dni) ? Usuario::query()->where('numero_doc_identidad', $dni)->first() : null;
+        // Nuevo ingreso de una persona ya registrada: con su legajo pasivo, o con el activo si se confirma pasarlo a pasivo
+        // (cerrar_legajo_actual). La identidad no se duplica: se abre otro legajo para la misma persona.
+        $activo = $persona?->legajos()->where('estado_legajo', 'activo')->exists();
+        if ($persona && (($persona->legajos()->where('estado_legajo', 'pasivo')->exists() && ! $activo) || ($activo && $this->boolean('cerrar_legajo_actual')))) {
+            $rules['usuarios.*.numero_doc_identidad'] = ['bail', 'required', 'string', 'regex:/^[0-9]{8}$/'];
+        }
+
         return [
-            ...parent::rules(),
+            ...$rules,
             'usuarios' => ['required', 'array', 'list', 'size:1'],
             'vinculo' => ['required', 'array'],
             // Puede venir vacío (los datos del puesto administrativo son todos opcionales); el docente exige su condición.
             'datos_puesto' => ['present', 'array'],
+            'cerrar_legajo_actual' => ['sometimes', 'boolean'],
         ];
     }
 
@@ -38,7 +49,7 @@ class StoreUsuarioConVinculoRequest extends StoreUsuariosRequest
     {
         parent::withValidator($validator);
         $validator->after(function (Validator $validator): void {
-            foreach (array_diff(array_keys($this->all()), ['usuarios', 'vinculo', 'datos_puesto']) as $campo) {
+            foreach (array_diff(array_keys($this->all()), ['usuarios', 'vinculo', 'datos_puesto', 'cerrar_legajo_actual']) as $campo) {
                 $validator->errors()->add($campo, 'Campo no permitido.');
             }
             $this->vinculo = $this->parte($validator, 'vinculo', array_diff_key(ReglasVinculo::VINCULO, array_flip(ReglasVinculo::NO_EN_ALTA)));
@@ -89,7 +100,7 @@ class StoreUsuarioConVinculoRequest extends StoreUsuariosRequest
     /**
      * DNI ya registrado: además de los errores, identifica a la persona existente para ir a su ficha en vez de buscarla.
      * Solo con legajo.ver (quien no puede ver fichas no recibe nada más) y solo su id y nombre: sin otros datos personales.
-     * No se crea nada ni se ofrece registrar otro vínculo (reingreso y renovación pendientes de confirmar con el cliente).
+     * Los reingresos con legajo pasivo y sin legajo activo sí se admiten en rules().
      */
     protected function failedValidation(ValidatorContract $validator): void
     {

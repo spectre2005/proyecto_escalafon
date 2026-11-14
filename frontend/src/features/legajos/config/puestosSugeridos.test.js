@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { completarDesdePuesto, equivalenciaPuesto, etiquetaOtro, OTRO, puestoElegido, puestosSugeridos, seleccionPuesto, sugerenciasPuesto } from './puestosSugeridos.js'
+import { completarDesdePuesto, equivalenciaPuesto, puestosSugeridos, sugerenciasPuesto } from './puestosSugeridos.js'
 
 test('suggestions depend on the personnel type and come from a single source', () => {
   assert.ok(sugerenciasPuesto('docente').includes('Profesor ordinario principal'))
@@ -11,34 +11,9 @@ test('suggestions depend on the personnel type and come from a single source', (
   assert.equal(sugerenciasPuesto('docente'), puestosSugeridos.docente)
   // «Otro» no es una sugerencia que se guarde: es la opción para escribir una denominación propia.
   assert.ok(!Object.values(puestosSugeridos).flat().some(puesto => puesto.startsWith('Otro')))
-  assert.deepEqual(etiquetaOtro, { docente: 'Otro puesto docente', administrativo: 'Otro puesto administrativo' })
 })
 
-test('Otro lets the user write the position and never stores the Otro label', () => {
-  assert.deepEqual(puestoElegido('Analista', '', 'administrativo'), { nombre_puesto: 'Analista', otro: false })
-  // De una sugerencia a «Otro»: el campo queda para escribir.
-  assert.deepEqual(puestoElegido(OTRO, 'Analista', 'administrativo'), { nombre_puesto: '', otro: true })
-  // Con una denominación propia ya escrita, se conserva.
-  assert.deepEqual(puestoElegido(OTRO, 'Jefe de la unidad de becas', 'administrativo'), { nombre_puesto: 'Jefe de la unidad de becas', otro: true })
-  assert.equal(seleccionPuesto('', 'administrativo', true), OTRO)
-  assert.equal(seleccionPuesto('Jefe de la unidad de becas', 'administrativo', true), OTRO)
-  for (const etiqueta of Object.values(etiquetaOtro)) assert.notEqual(puestoElegido(OTRO, '', 'docente').nombre_puesto, etiqueta)
-})
-
-test('old or custom positions are kept and shown as Otro with their text', () => {
-  assert.equal(seleccionPuesto('', 'docente'), '')
-  assert.equal(seleccionPuesto('Profesor ordinario asociado', 'docente'), 'Profesor ordinario asociado')
-  assert.equal(seleccionPuesto('barrendero', 'administrativo'), OTRO)
-  assert.equal(seleccionPuesto('Docente', 'docente'), OTRO)
-  // Al cambiar el tipo de personal, una sugerencia del otro tipo no se pierde: pasa a texto propio.
-  assert.equal(seleccionPuesto('Docente contratado', 'administrativo'), OTRO)
-})
-
-test('a position saved in uppercase still matches its suggestion', () => {
-  assert.equal(seleccionPuesto('PROFESOR ORDINARIO ASOCIADO', 'docente'), 'Profesor ordinario asociado')
-  assert.equal(seleccionPuesto('JEFE DE PRÁCTICA', 'docente'), 'Jefe de práctica')
-  assert.deepEqual(puestoElegido(OTRO, 'DOCENTE CONTRATADO', 'docente'), { nombre_puesto: '', otro: true })
-  assert.deepEqual(puestoElegido(OTRO, 'BARRENDERO', 'administrativo'), { nombre_puesto: 'BARRENDERO', otro: true })
+test('a position saved in uppercase still matches its equivalence', () => {
   assert.deepEqual(equivalenciaPuesto('docente', 'PROFESOR ORDINARIO PRINCIPAL'), { condicion_docente: 'ordinario', categoria: 'principal' })
 })
 

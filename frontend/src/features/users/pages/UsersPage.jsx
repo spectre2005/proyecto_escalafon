@@ -172,13 +172,13 @@ export default function UsersPage() {
     }
   }
 
-  // Registro manual (asistente de tres pasos): una sola operación transaccional con la persona y su primer vínculo.
+  // Registro manual (asistente de cuatro pasos): una sola operación transaccional con la persona y su primer vínculo.
   // Al registrar, la ventana muestra el resultado con el siguiente paso (ResultadoRegistro) y el asistente queda vacío.
   async function registrarManual(payload) {
     let creado = null
     const resultado = await persist(async () => {
       creado = await saveUserWithLink(payload)
-      return { saved: [creado.usuario], text: `Persona registrada con su primer vínculo laboral. Se abrió su legajo ${creado.legajo.numero_legajo}.` }
+      return { saved: [creado.usuario], text: `Persona incorporada por ${creado.numero_incorporacion || 1}.ª vez. Se abrió su nuevo legajo ${creado.legajo.numero_legajo}.` }
     })
     if (resultado.ok) {
       setRegistroKey(key => key + 1)
@@ -380,7 +380,7 @@ export default function UsersPage() {
                 </span>
                 <div>
                   <h2 id="registration-title">Agregar personal</h2>
-                  <p>{tab === 'manual' ? 'Registra a la persona con su primer vínculo laboral en tres pasos.' : 'Elige cómo deseas cargar los datos de los usuarios.'}</p>
+                  <p>{tab === 'manual' ? 'Registra a la persona con su primer vínculo laboral en cuatro pasos.' : 'Elige cómo deseas cargar los datos de los usuarios.'}</p>
                 </div>
                 <button type="button" onClick={closeRegistration} disabled={saving || busy} aria-label="Cerrar formulario" className="ml-auto grid size-9 shrink-0 place-items-center rounded-lg text-[#4f6d63] hover:bg-[#edf6f2]">
                   <Icon name="close" size={20} />

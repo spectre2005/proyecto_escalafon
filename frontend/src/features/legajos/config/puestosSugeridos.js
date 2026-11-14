@@ -3,8 +3,6 @@
 // campo; no se guardan en una tabla y no crean datos nuevos. El puesto no es la condición docente, la categoría, la
 // dedicación, el grupo ocupacional, el cargo estructural ni el tipo de vínculo: cada uno tiene su propio campo.
 
-export const OTRO = '__otro__'
-
 export const puestosSugeridos = {
   docente: [
     'Profesor ordinario principal', 'Profesor ordinario asociado', 'Profesor ordinario auxiliar', 'Docente contratado',
@@ -17,34 +15,12 @@ export const puestosSugeridos = {
   ],
 }
 
-export const etiquetaOtro = { docente: 'Otro puesto docente', administrativo: 'Otro puesto administrativo' }
-
 export function sugerenciasPuesto(tipoPersonal) {
   return puestosSugeridos[tipoPersonal] || []
 }
 
 // Los puestos se escriben en mayúsculas (shared/forms/mayusculas.js): la coincidencia no distingue mayúsculas.
 const mismoTexto = (a, b) => a.toLocaleUpperCase('es-PE') === b.toLocaleUpperCase('es-PE')
-const sugerenciaDe = (texto, tipoPersonal) => sugerenciasPuesto(tipoPersonal).find(puesto => mismoTexto(puesto, texto))
-
-/**
- * Opción del selector para un puesto guardado: la sugerencia si coincide; OTRO si se eligió «Otro» o si es una
- * denominación propia o anterior que no está en las sugerencias (se conserva y se muestra para editarla); '' si no hay.
- */
-export function seleccionPuesto(valor, tipoPersonal, otroElegido = false) {
-  const texto = String(valor ?? '').trim()
-  if (otroElegido) return OTRO
-  if (!texto) return ''
-  return sugerenciaDe(texto, tipoPersonal) ?? OTRO
-}
-
-/** Valor del campo al elegir una opción: la sugerencia tal cual; con «Otro», el texto propio (nunca «Otro puesto…»). */
-export function puestoElegido(opcion, valorActual, tipoPersonal) {
-  if (opcion !== OTRO) return { nombre_puesto: opcion, otro: false }
-  // Al pasar a «Otro» se conserva una denominación propia ya escrita; si venía de una sugerencia, se escribe de nuevo.
-  const actual = String(valorActual ?? '').trim()
-  return { nombre_puesto: actual && !sugerenciaDe(actual, tipoPersonal) ? actual : '', otro: true }
-}
 
 // Equivalencias inequívocas puesto → datos del perfil docente (Ley 30220: condición y, en ordinarios, categoría). Los
 // demás puestos (p. ej. «Jefe de práctica» o «Docente investigador») no fijan esos datos y no se autocompletan.

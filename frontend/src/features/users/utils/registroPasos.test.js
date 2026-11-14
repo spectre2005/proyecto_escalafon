@@ -9,23 +9,29 @@ const catalogo = [
 ]
 const persona = { numero_doc_identidad: '71000001', nombres: ' Rosa ', apellido_paterno: 'Alta', apellido_materno: '', email_institucional: 'rosa.alta@example.test', tipo_personal: 'docente', ley: '', telefono: '', regimen_normativo_id: '' }
 
-test('the wizard has three steps in order', () => {
-  assert.deepEqual(PASOS.map(paso => [paso.numero, paso.titulo]), [[1, 'Datos de la persona'], [2, 'Primer vínculo laboral'], [3, 'Cargo y datos del puesto']])
+test('the wizard has four steps in order and the last one only reviews', () => {
+  assert.deepEqual(PASOS.map(paso => [paso.numero, paso.titulo]), [[1, 'Datos de la persona'], [2, 'Puesto y cargo'], [3, 'Vínculo laboral'], [4, 'Revisión']])
 })
 
 test('backend errors lead to the step that holds the field', () => {
   assert.equal(pasoDeError('usuarios.0.email_institucional'), 1)
   assert.equal(pasoDeError('usuarios'), 1)
+  // Paso 2: unidad, puesto, datos del puesto y condiciones.
   assert.equal(pasoDeError('vinculo.nombre_puesto'), 2)
-  assert.equal(pasoDeError('vinculo.numero_documento_vinculo'), 2)
-  assert.equal(pasoDeError('vinculo.tiene_periodo_prueba'), 3)
-  // El tipo de vínculo se elige en el paso 3, con los datos del puesto.
+  assert.equal(pasoDeError('vinculo.puesto_id'), 2)
+  assert.equal(pasoDeError('vinculo.unidad_organica_id'), 2)
+  assert.equal(pasoDeError('vinculo.tiene_periodo_prueba'), 2)
+  assert.equal(pasoDeError('datos_puesto.categoria'), 2)
+  // Paso 3: tipo y modalidad, convocatoria, documento y fechas.
   assert.equal(pasoDeError('vinculo.regimen_laboral'), 3)
-  assert.equal(pasoDeError('datos_puesto.categoria'), 3)
+  assert.equal(pasoDeError('vinculo.modalidad_vinculo_id'), 3)
+  assert.equal(pasoDeError('vinculo.convocatoria_id'), 3)
+  assert.equal(pasoDeError('vinculo.numero_documento_vinculo'), 3)
+  assert.equal(pasoDeError('vinculo.fecha_inicio'), 3)
   assert.equal(pasoDeError('otro'), null)
   assert.equal(primerPasoConError({ 'datos_puesto.categoria': ['x'], 'vinculo.fecha_inicio': ['x'] }), 2)
   assert.equal(primerPasoConError({ 'datos_puesto.categoria': ['x'], 'usuarios.0.numero_doc_identidad': ['x'] }), 1)
-  assert.equal(primerPasoConError({ 'vinculo.obligado_djbr': ['x'] }), 3)
+  assert.equal(primerPasoConError({ 'vinculo.fecha_fin_prevista': ['x'] }), 3)
   // Un 403 o un 409 no trae campos: se queda en el paso actual.
   assert.equal(primerPasoConError({}), null)
   assert.equal(primerPasoConError(undefined), null)
@@ -45,7 +51,7 @@ test('step 1 uses the same person rules as the registration', () => {
 
 test('an existing DNI identifies the person instead of creating a duplicate', () => {
   const usuarios = [{ id: 'u-1', numero_doc_identidad: '71000001', nombres: 'Rosa', apellido_paterno: 'Previa', apellido_materno: '' }]
-  assert.deepEqual(personaExistente({ numero_doc_identidad: ' 71000001 ' }, usuarios), { id: 'u-1', nombre: 'Rosa Previa' })
+  assert.deepEqual(personaExistente({ numero_doc_identidad: ' 71000001 ' }, usuarios), { id: 'u-1', nombre: 'Rosa Previa', puedeIncorporar: false, tieneLegajoActivo: false, numeroIncorporacion: 1 })
   assert.equal(personaExistente({ numero_doc_identidad: '71000002' }, usuarios), null)
   assert.equal(personaExistente({ numero_doc_identidad: '' }, usuarios), null)
 })
@@ -112,4 +118,26 @@ test('the birth date cannot be in the future or impossible', () => {
   assert.deepEqual(erroresPersona({ ...base, fecha_nacimiento: '1980-03-15' }, { catalogo }), [])
   assert.match(erroresPersona({ ...base, fecha_nacimiento: '2999-01-01' }, { catalogo }).join(' '), /posterior a hoy/)
   assert.match(erroresPersona({ ...base, fecha_nacimiento: '1980-02-30' }, { catalogo }).join(' '), /fecha válida/)
+})
+
+test('passive files allow another incorporation and active files block it', () => {
+  const lista = personaDelPaso(persona, 'ley-30220')
+  const previa = { ...lista, id: 'u-1', tiene_legajo_pasivo: true, tiene_legajo_activo: false, legajos_count: 2 }
+  assert.deepEqual(erroresPersona(lista, { catalogo, usuarios: [previa] }), [])
+  assert.equal(personaExistente(lista, [previa]).numeroIncorporacion, 3)
+  assert.equal(personaExistente(lista, [previa]).puedeIncorporar, true)
+  assert.match(erroresPersona(lista, { catalogo, usuarios: [{ ...previa, tiene_legajo_activo: true }] }).join(' '), /ya está registrada/)
+})
+
+test('a person with an active file can be registered again only after confirming the new admission', () => {
+  const usuarios = [{ id: 'u-9', numero_doc_identidad: '71000009', nombres: 'Ana', apellido_paterno: 'Vuelve', email_institucional: 'ana@x.pe', tiene_legajo_activo: true, tiene_legajo_pasivo: false, legajos_count: 1 }]
+  const nueva = { ...persona, numero_doc_identidad: '71000009', email_institucional: 'ana@x.pe' }
+  const existente = personaExistente(nueva, usuarios)
+  assert.deepEqual([existente.puedeIncorporar, existente.tieneLegajoActivo, existente.numeroIncorporacion], [false, true, 2])
+  const bloqueo = 'Esta persona ya está registrada con ese DNI.'
+  assert.ok(erroresPersona(nueva, { usuarios }).includes(bloqueo))
+  assert.ok(!erroresPersona(nueva, { usuarios, nuevoIngreso: true }).includes(bloqueo))
+  const base = { persona: { ...nueva, tipo_personal: 'administrativo' }, catalogo: [], ubigeoId: '', condiciones: {}, puedeDiscapacidad: false, vinculo: {}, puestos: { administrativo: {} } }
+  assert.equal(armarRegistro({ ...base, nuevoIngreso: true }).cerrar_legajo_actual, true)
+  assert.equal('cerrar_legajo_actual' in armarRegistro(base), false)
 })

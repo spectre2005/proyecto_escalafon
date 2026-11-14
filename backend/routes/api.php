@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BanderasSinResponderController;
 use App\Http\Controllers\Api\V1\BitacoraAccesoLegajoController;
 use App\Http\Controllers\Api\V1\CapacitacionController;
+use App\Http\Controllers\Api\V1\CatalogoVinculoController;
 use App\Http\Controllers\Api\V1\CertificadoDiscapacidadController;
 use App\Http\Controllers\Api\V1\ColegiaturaController;
 use App\Http\Controllers\Api\V1\CompensacionBeneficioController;
@@ -42,6 +43,7 @@ use App\Http\Controllers\Api\V1\Legajos\ExpedienteController;
 use App\Http\Controllers\Api\V1\Legajos\ExpedienteImprimibleController;
 use App\Http\Controllers\Api\V1\Legajos\FamiliarPersonalController;
 use App\Http\Controllers\Api\V1\Legajos\FotoPersonalController;
+use App\Http\Controllers\Api\V1\Legajos\LegajosPasivosController;
 use App\Http\Controllers\Api\V1\Legajos\Seccion01Controller;
 use App\Http\Controllers\Api\V1\Legajos\Seccion02Controller;
 use App\Http\Controllers\Api\V1\Legajos\Seccion03Controller;
@@ -176,9 +178,14 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
             ->middleware('can:sistema.administrar')->whereUuid(['usuario', 'documento']);
     });
     Route::middleware('can:legajo.ver')->group(function (): void {
+        Route::get('expedientes/legajos-pasivos', [LegajosPasivosController::class, 'index']);
+        Route::get('expedientes/legajos-pasivos/resumen', [LegajosPasivosController::class, 'resumen']);
         Route::get('expedientes', [ExpedienteController::class, 'index']);
         Route::get('ubicaciones', [ExpedienteController::class, 'locations']);
         Route::get('expediente-opciones', [ExpedienteController::class, 'editOptions']);
+        // Catálogos del vínculo (unidades, puestos, modalidades, procesos de selección y tipos de vínculo) con su uso.
+        Route::get('catalogos-vinculo', [CatalogoVinculoController::class, 'index']);
+        Route::get('expedientes/{usuario}/legajos/{legajo}', [LegajosPasivosController::class, 'show'])->whereUuid(['usuario', 'legajo']);
         Route::get('expedientes/{usuario}', [ExpedienteController::class, 'show'])->whereUuid('usuario');
         Route::get('expedientes/{usuario}/foto', [FotoPersonalController::class, 'show'])->whereUuid('usuario');
         // Vista previa del expediente imprimible (fase 1, secciones 01 a 04); antes de la ruta genérica {section}.
@@ -272,11 +279,15 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
     Route::post('expedientes/{usuario}/seccion-11/desvinculaciones/{registro}/anular', [Seccion11Controller::class, 'anularRegistro'])
         ->middleware('can:sistema.administrar')->whereUuid(['usuario', 'registro']);
 
+    // Crear y corregir (o desactivar) elementos de los catálogos del vínculo, desde el registro y desde Configuración.
+    Route::middleware('can:catalogos.gestionar')->group(function (): void {
+        $catalogos = CatalogoVinculoController::CLAVES;
+        Route::post('catalogos-vinculo/{catalogo}', [CatalogoVinculoController::class, 'store'])->whereIn('catalogo', $catalogos)->middleware('throttle:60,1');
+        Route::patch('catalogos-vinculo/{catalogo}/{registro}', [CatalogoVinculoController::class, 'update'])->whereIn('catalogo', $catalogos)->whereUuid('registro');
+    });
     Route::post('expedientes/{usuario}/legajo', [AperturaLegajoController::class, 'store'])->middleware('can:legajo.abrir')->whereUuid('usuario');
     Route::post('expedientes/{usuario}/legajos/{legajo}/cerrar', [AperturaLegajoController::class, 'cerrar'])
         ->middleware('can:legajo.editar')->whereUuid(['usuario', 'legajo']);
-    Route::post('expedientes/{usuario}/legajos/{legajo}/reabrir', [AperturaLegajoController::class, 'reabrir'])
-        ->middleware('can:legajo.abrir')->whereUuid(['usuario', 'legajo']);
 
     // Documentos del legajo (PDF + metadatos), común a todas las secciones. Las secciones 01, 09 y 10
     // exigen además datos_sensibles.ver (lo valida el controlador según la sección y el tipo).

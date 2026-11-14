@@ -79,10 +79,14 @@ export const camposDatosPuesto = {
   grupo_ocupacional: 'Grupo ocupacional', nivel_carrera: 'Nivel de carrera', cargo_estructural: 'Cargo estructural', es_cargo_confianza: 'Cargo de confianza',
 }
 
+// Etiqueta de un vínculo en listas y selectores (secciones 02, 05 y 11). Acepta el registro con values o los valores
+// sueltos. El número del documento solo existe en vínculos anteriores (hoy el número de registro es el del legajo):
+// si no hay, se muestra el tipo de vínculo.
 export function etiquetaVinculo(vinculo) {
-  const v = vinculo.values
+  const v = vinculo.values || vinculo
   const desde = v.fecha_inicio ? v.fecha_inicio.split('-').reverse().join('/') : 'sin fecha'
-  return `${v.nombre_puesto} · ${v.numero_documento_vinculo || 'sin N.º de documento'} · desde ${desde}`
+  const detalle = v.numero_documento_vinculo || regimenesLaborales[v.regimen_laboral] || 'tipo sin definir'
+  return `${v.nombre_puesto} · ${detalle} · desde ${desde}`
 }
 
 // 2.4: con «Tiene período de prueba» en No solo «no aplica» (pantalla explicativa y entrada atenuada) si no hay períodos

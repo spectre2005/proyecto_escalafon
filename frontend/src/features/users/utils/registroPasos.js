@@ -3,22 +3,23 @@ import { limpiarDatosPuesto } from '../../legajos/components/seccion02/borradore
 import { validateUser } from './usuariosCsv.js'
 import { conLey } from './leyes.js'
 
-// Registro manual en tres pasos. Todo se envía en una sola operación al final (POST /usuarios/con-vinculo); los pasos
+// Registro manual en cuatro pasos (el último solo revisa). Todo se envía en una sola operación al final (POST /usuarios/con-vinculo); los pasos
 // solo ordenan la pantalla. Los errores del backend llegan como usuarios.0.*, vinculo.* y datos_puesto.*.
 export const PASOS = [
   { numero: 1, titulo: 'Datos de la persona', resumen: 'Identificación, contacto, tipo de personal y ley' },
-  { numero: 2, titulo: 'Primer vínculo laboral', resumen: 'Puesto, unidad, fechas y documento de ingreso' },
-  { numero: 3, titulo: 'Cargo y datos del puesto', resumen: 'Perfil, tipo de vínculo y condiciones' },
+  { numero: 2, titulo: 'Puesto y cargo', resumen: 'Unidad, puesto, datos del puesto y condiciones' },
+  { numero: 3, titulo: 'Vínculo laboral', resumen: 'Tipo, modalidad, proceso de selección y fechas' },
+  { numero: 4, titulo: 'Revisión', resumen: 'Comprueba los datos antes de registrar' },
 ]
 
-// El tipo de vínculo se elige en el paso 3, después de los datos del puesto que permiten sugerirlo.
-const EN_PASO_3 = [...banderasPuesto, 'regimen_laboral']
+// Campos del vínculo que se piden en el paso 2 (con el puesto); el resto del vínculo va en el paso 3.
+const EN_PASO_2 = [...banderasPuesto, 'unidad_organica_id', 'puesto_id', 'nombre_puesto']
 
-/** Paso donde está el campo de un error del backend (las condiciones del puesto se muestran en el paso 3). */
+/** Paso donde está el campo de un error del backend. */
 export function pasoDeError(clave) {
   if (clave === 'usuarios' || clave.startsWith('usuarios.')) return 1
-  if (clave === 'datos_puesto' || clave.startsWith('datos_puesto.')) return 3
-  if (clave === 'vinculo' || clave.startsWith('vinculo.')) return EN_PASO_3.includes(clave.slice('vinculo.'.length)) ? 3 : 2
+  if (clave === 'datos_puesto' || clave.startsWith('datos_puesto.')) return 2
+  if (clave === 'vinculo' || clave.startsWith('vinculo.')) return EN_PASO_2.includes(clave.slice('vinculo.'.length)) ? 2 : 3
   return null
 }
 
@@ -39,22 +40,24 @@ export function personaDelPaso(draft, leyElegida) {
 }
 
 /** Comprobaciones del paso 1 que no cubre el formulario: las mismas del alta (validateUser), ubicación y duplicados. */
-export function erroresPersona(persona, { catalogo, usuarios = [], ubicacion = {}, ubigeoId = '' }) {
+// nuevoIngreso: se confirmó que su legajo activo pase a Legajos pasivos para registrarla otra vez con un legajo nuevo.
+export function erroresPersona(persona, { catalogo, usuarios = [], ubicacion = {}, ubigeoId = '', nuevoIngreso = false }) {
   const errores = validateUser(persona, catalogo)
   if (Object.values(ubicacion).some(Boolean) && !ubigeoId) errores.push('Selecciona región, provincia y distrito para completar la ubicación.')
-  // El DNI repetido se informa aparte con un enlace a la ficha (personaExistente): aquí solo bloquea el avance.
-  if (personaExistente(persona, usuarios)) errores.push('Esta persona ya está registrada con ese DNI.')
-  else if (usuarios.some(item => item.email_institucional?.toLowerCase() === persona.email_institucional.toLowerCase())) {
+  // El reingreso solo está disponible sin legajo activo y con un legajo pasivo.
+  const existente = personaExistente(persona, usuarios)
+  if (existente && !existente.puedeIncorporar && !(nuevoIngreso && existente.tieneLegajoActivo)) errores.push('Esta persona ya está registrada con ese DNI.')
+  else if (usuarios.some(item => item.numero_doc_identidad !== persona.numero_doc_identidad && item.email_institucional?.toLowerCase() === persona.email_institucional.toLowerCase())) {
     errores.push('Ya existe un usuario con ese correo.')
   }
   return errores
 }
 
-/** Persona ya registrada con el mismo DNI ({ id, nombre }), o null. No se crea otra: se ofrece abrir su ficha. */
+/** Persona con el mismo DNI y disponibilidad para una nueva incorporación, o null. */
 export function personaExistente(persona, usuarios = []) {
   const dni = String(persona.numero_doc_identidad || '').trim()
   const existente = dni ? usuarios.find(item => item.numero_doc_identidad === dni) : null
-  return existente ? { id: existente.id, nombre: [existente.nombres, existente.apellido_paterno, existente.apellido_materno].filter(Boolean).join(' ') } : null
+  return existente ? { id: existente.id, puedeIncorporar: existente.tiene_legajo_pasivo === true && existente.tiene_legajo_activo === false, tieneLegajoActivo: existente.tiene_legajo_activo === true, numeroIncorporacion: (existente.legajos_count || 0) + 1, nombre: [existente.nombres, existente.apellido_paterno, existente.apellido_materno].filter(Boolean).join(' ') } : null
 }
 
 /**
@@ -87,9 +90,11 @@ const recortar = datos => Object.fromEntries(Object.entries(datos).map(([clave, 
 // Campos opcionales que no se envían vacíos (así quien no ve datos sensibles nunca los manda).
 const sinVacios = (objeto, claves) => Object.fromEntries(Object.entries(objeto).filter(([clave, valor]) => !claves.includes(clave) || String(valor ?? '').trim() !== ''))
 
-export function armarRegistro({ persona, catalogo, ubigeoId, condiciones, puedeDiscapacidad, vinculo, puestos }) {
+export function armarRegistro({ persona, catalogo, ubigeoId, condiciones, puedeDiscapacidad, vinculo, puestos, nuevoIngreso = false }) {
   const docente = persona.tipo_personal === 'docente'
   return {
+    // Nuevo ingreso con su legajo aún activo: el backend lo pasa a pasivo (historial) y abre uno nuevo.
+    ...(nuevoIngreso ? { cerrar_legajo_actual: true } : {}),
     usuarios: [conLey(catalogo, { ...sinVacios(persona, ['fecha_nacimiento', 'domicilio']), ubigeo_id: ubigeoId || null, tiene_derechohabientes: condiciones.tiene_derechohabientes, con_discapacidad: puedeDiscapacidad ? condiciones.con_discapacidad : null })],
     vinculo: recortar(vinculo),
     datos_puesto: limpiarDatosPuesto(docente, recortar(puestos[persona.tipo_personal] || {})),

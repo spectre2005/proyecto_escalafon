@@ -15,6 +15,7 @@ class CatalogosInstitucionSeeder extends Seeder
     {
         $this->call([
             RegimenNormativoSeeder::class,
+            ModalidadVinculoSeeder::class,
             UbigeoSeeder::class,
             SeccionesLegajoCatalogoSeeder::class,
             Seccion01CatalogoSeeder::class,

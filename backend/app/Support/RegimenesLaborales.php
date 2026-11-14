@@ -26,6 +26,14 @@ final class RegimenesLaborales
     /** Hay vínculos abiertos, pero ninguno vigente a la fecha: no se afirma un tipo de vínculo vigente. */
     public const SIN_VIGENTE_DETERMINADO = 'No determinado: ningún vínculo abierto está vigente a la fecha (plazo vencido sin cese o inicio futuro). Revísalo en la sección 02.';
 
+    /** Vínculo que aún no empieza: su tipo y la fecha de inicio («Por iniciar: Carrera desde el 18/03/2027»). */
+    public static function porIniciar(VinculoLaboral $vinculo): string
+    {
+        $tipo = self::TIPOS_VINCULO[$vinculo->regimen_laboral] ?? 'tipo sin definir';
+
+        return 'Por iniciar: '.$tipo.' desde el '.$vinculo->fecha_inicio->format('d/m/Y').'.';
+    }
+
     /** Vínculo anterior a la migración cuyo valor era una ley (p. ej. «276»): se confirma al corregirlo. */
     public const SIN_DEFINIR_VINCULO = 'Sin definir: confírmalo en «Corregir vínculo» de la sección 02.';
 

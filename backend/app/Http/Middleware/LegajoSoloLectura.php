@@ -21,8 +21,7 @@ class LegajoSoloLectura
     {
         $usuario = $request->route('usuario');
         if ($request->isMethodSafe() || ! $usuario || ! $request->is('api/v1/expedientes/*')
-            || $request->is('api/v1/expedientes/*/legajo') || $request->is('api/v1/expedientes/*/legajos/*/cerrar')
-            || $request->is('api/v1/expedientes/*/legajos/*/reabrir')) {
+            || $request->is('api/v1/expedientes/*/legajo') || $request->is('api/v1/expedientes/*/legajos/*/cerrar')) {
             return $next($request);
         }
 
@@ -38,7 +37,12 @@ class LegajoSoloLectura
                     'El documento pertenece a un legajo cerrado. Solo se permite visualizar y descargar.');
             }
 
-            return $next($request);
+            app()->instance('legajo.escritura', $legajos->firstWhere('estado_legajo', 'activo')?->id);
+            try {
+                return $next($request);
+            } finally {
+                app()->forgetInstance('legajo.escritura');
+            }
         });
     }
 }

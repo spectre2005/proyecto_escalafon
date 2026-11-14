@@ -35,6 +35,7 @@ return [
         // Qué puede hacer el asistente con este dato está pendiente del cliente: de momento no lo tiene.
         'discapacidad.editar' => 'Registrar o cambiar si la persona tiene discapacidad (el servidor o alguno de sus hijos). Cada cambio queda en la auditoría.',
         'sistema.administrar' => 'Configuración, catálogos y herramientas internas de la ORH.',
+        'catalogos.gestionar' => 'Crear, corregir y desactivar unidades orgánicas, puestos, modalidades de vínculo y procesos de selección, y editar la descripción de los tipos de vínculo (también desde el registro de personal).',
         'configuracion.modulos' => 'Activar o desactivar funcionalidades configurables, con motivo y auditoría.',
         'equipo.gestionar' => 'Asignar, renovar y revocar accesos de asistentes y suplentes de la institución.',
     ],

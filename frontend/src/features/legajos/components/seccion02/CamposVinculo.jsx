@@ -1,9 +1,9 @@
-import { useState } from 'react'
 import { categoriasDocente, condicionesDocente, dedicacionesDocente, funcionesPrevias, gruposOcupacionales, regimenesLaborales, subtiposExtraordinario } from '../../config/seccion02'
-import { etiquetaOtro, OTRO, puestoElegido, seleccionPuesto, sugerenciasPuesto } from '../../config/puestosSugeridos'
 import Campo, { Opciones } from '../seccion01/Campo'
 import { hoy } from '../seccion01/useGuardar'
 import TresEstados from '../../../../components/ui/TresEstados'
+import { CampoModalidad, CampoPuestoCatalogo, CampoUnidadOrganica, CamposIngreso } from './CamposCatalogoVinculo'
+import { elegirTipoVinculo, modalidadElegida } from '../../config/catalogosVinculo'
 
 // Campos del vínculo laboral y de sus datos del puesto, compartidos por la sección 02 (VinculoForm, DatosPuestoForm) y
 // el registro manual de personal (RegistroManual). Las reglas las valida el backend con una sola fuente (ReglasVinculo).
@@ -17,64 +17,67 @@ export function OpcionesCatalogo({ lista, actual, vacio = 'Selecciona' }) {
   </>
 }
 
-// Puesto (nombre_puesto, texto libre) con sugerencias provisionales según el tipo de personal. «Otro» permite escribir
-// una denominación propia, que es la que se guarda. Un puesto guardado que no está en las sugerencias (anterior o propio)
-// se muestra como «Otro» con su texto, sin perderlo; también al cambiar el tipo de personal.
-export function CampoPuesto({ valor, tipoPersonal, onChange, error, nombre = 'vinculo' }) {
-  const [otro, setOtro] = useState(false)
-  const opcion = seleccionPuesto(valor, tipoPersonal, otro)
-  const sugerencias = sugerenciasPuesto(tipoPersonal)
-  function elegir(event) {
-    const elegido = puestoElegido(event.target.value, valor, tipoPersonal)
-    setOtro(elegido.otro)
-    onChange(elegido.nombre_puesto)
-  }
-  return <>
-    <Campo label="Puesto" required error={opcion === OTRO ? undefined : error}><select name={`${nombre}-puesto`} required value={opcion} onChange={elegir}>
-      <option value="">{tipoPersonal ? 'Seleccionar puesto' : 'Primero elige el tipo de personal'}</option>
-      {sugerencias.length > 0 && <optgroup label="Sugerencias provisionales">{sugerencias.map(puesto => <option key={puesto} value={puesto}>{puesto}</option>)}</optgroup>}
-      <option value={OTRO}>{etiquetaOtro[tipoPersonal] || 'Otro puesto'} (escribir denominación)</option>
-    </select></Campo>
-    {opcion === OTRO && <Campo label="Denominación del puesto" required error={error}><input name={`${nombre}-puesto-texto`} required maxLength={150} placeholder="Escribe la denominación" value={valor} onChange={event => onChange(event.target.value)} /></Campo>}
-  </>
-}
-
 const condicionesPuesto = [['obligado_djbr', 'Obligado a la declaración jurada de bienes y rentas'], ['exige_colegiatura', 'El puesto exige colegiatura'], ['exige_estudios_basicos', 'El puesto exige estudios básicos'], ['tiene_periodo_prueba', 'Tiene período de prueba']]
+
+const descripcionTipo = (opciones, regimen) => (opciones?.tipos_vinculo || []).find(tipo => tipo.codigo === regimen)?.descripcion || ''
 
 // Tipo de vínculo con la sugerencia que se deduce de los datos ({ valor, motivo }, opcional). La sugerencia solo se aplica
 // con su botón y el usuario puede elegir otro tipo: no es una validación.
-export function CampoTipoVinculo({ draft, set, poner, errors, sugerencia = null, nombre = 'vinculo' }) {
+// Debajo, la modalidad de ese tipo (catálogo).
+export function CampoTipoVinculo({ draft, poner, errors, sugerencia = null, nombre = 'vinculo', opciones = null, tipoPersonal = '' }) {
   return <>
-    <Campo label="Tipo de vínculo" required error={errors.regimen_laboral}><select name={`${nombre}-tipo`} required value={draft.regimen_laboral} onChange={set('regimen_laboral')}><Opciones lista={regimenesLaborales} actual={draft.regimen_laboral} vacio="Seleccionar tipo de vínculo" /></select></Campo>
+    <div className="grid min-w-0 content-start gap-1">
+      <Campo label="Tipo de vínculo" required error={errors.regimen_laboral}><select name={`${nombre}-tipo`} required value={draft.regimen_laboral} onChange={event => elegirTipoVinculo(draft, poner, opciones, event.target.value)}><Opciones lista={regimenesLaborales} actual={draft.regimen_laboral} vacio="Seleccionar tipo de vínculo" /></select></Campo>
+      {descripcionTipo(opciones, draft.regimen_laboral) && <small className="text-[11px] text-slate-500">{descripcionTipo(opciones, draft.regimen_laboral)}</small>}
+    </div>
+    <CampoModalidad draft={draft} poner={poner} errors={errors} opciones={opciones} tipoPersonal={tipoPersonal} nombre={nombre} />
     {sugerencia && <div role="note" className="flex flex-wrap items-center justify-between gap-2 self-end rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900 sm:col-span-1 lg:col-span-2">
       <span>{sugerencia.valor ? <>Sugerencia: <strong>{regimenesLaborales[sugerencia.valor]}</strong> ({sugerencia.motivo}) Revísala: puedes elegir otro tipo.</> : sugerencia.motivo}</span>
-      {sugerencia.valor && draft.regimen_laboral !== sugerencia.valor && <button type="button" onClick={() => poner('regimen_laboral')(sugerencia.valor)} className="font-semibold underline">Usar sugerencia</button>}
+      {sugerencia.valor && draft.regimen_laboral !== sugerencia.valor && <button type="button" onClick={() => elegirTipoVinculo(draft, poner, opciones, sugerencia.valor)} className="font-semibold underline">Usar sugerencia</button>}
     </div>}
   </>
 }
 
-// A. Información del vínculo. children: campos tras el tipo de vínculo (en 2.2, la ley y la sugerencia). conCese: solo
-// en 2.2 (el primer vínculo del registro es el vigente). conTipo: el registro manual pide el tipo en el paso 3
-// (CampoTipoVinculo), después de los datos del puesto que permiten sugerirlo.
-export function CamposVinculoBasicos({ draft, set, poner, errors, opciones, tipoPersonal, conCese = false, ceseObligatorio = false, conTipo = true, nombre = 'vinculo', children }) {
+// Fechas del vínculo. La fecha de fin es obligatoria si la modalidad lo exige; su ayuda cambia con el tipo de vínculo.
+export function CamposVigencia({ draft, poner, errors, opciones, conCese = false, ceseObligatorio = false, nombre = 'vinculo' }) {
+  const modalidad = modalidadElegida(opciones, draft)
+  const finObligatorio = !!modalidad?.exige_fin_previsto && !draft.fecha_cese
+  const ayudaFin = { designado: 'Opcional: un designado sigue hasta que se da por concluida su designación.', carrera: 'Normalmente vacía en un vínculo de carrera.' }[draft.regimen_laboral]
+  const valor = key => event => poner(key)(event.target.value)
   return <>
-    {conTipo && <Campo label="Tipo de vínculo" required error={errors.regimen_laboral}><select name={`${nombre}-tipo`} required value={draft.regimen_laboral} onChange={set('regimen_laboral')}><Opciones lista={regimenesLaborales} actual={draft.regimen_laboral} vacio="Seleccionar tipo de vínculo" /></select></Campo>}
-    {children}
-    <CampoPuesto valor={draft.nombre_puesto} tipoPersonal={tipoPersonal} onChange={poner('nombre_puesto')} error={errors.nombre_puesto} nombre={nombre} />
-    <Campo label="Unidad orgánica" error={errors.unidad_organica_id}><select name={`${nombre}-unidad`} value={draft.unidad_organica_id} onChange={set('unidad_organica_id')} disabled={!opciones}><OpcionesCatalogo lista={opciones?.unidades} actual={draft.unidad_organica_id} vacio={opciones ? 'Seleccionar unidad orgánica' : 'Cargando unidades…'} /></select></Campo>
-    <Campo label="Fecha de inicio" required error={errors.fecha_inicio}><input name={`${nombre}-inicio`} type="date" required value={draft.fecha_inicio} onChange={set('fecha_inicio')} /></Campo>
-    <Campo label="Fecha de fin prevista" error={errors.fecha_fin_prevista}><input name={`${nombre}-fin`} type="date" min={draft.fecha_inicio || undefined} value={draft.fecha_fin_prevista} onChange={set('fecha_fin_prevista')} /></Campo>
-    {conCese && <Campo label="Fecha de cese (solo si el vínculo ya terminó)" required={ceseObligatorio} error={errors.fecha_cese}><input type="date" required={ceseObligatorio} min={draft.fecha_inicio || undefined} max={hoy()} value={draft.fecha_cese} onChange={set('fecha_cese')} /></Campo>}
+    <div className="grid min-w-0 content-start gap-1">
+      <Campo label="Fecha de inicio" required error={errors.fecha_inicio}><input name={`${nombre}-inicio`} type="date" required value={draft.fecha_inicio} onChange={valor('fecha_inicio')} /></Campo>
+      {draft.fecha_inicio > hoy() && <small className="text-[11px] text-sky-800">Empieza el {draft.fecha_inicio.split('-').reverse().join('/')}: hasta entonces figurará como «por iniciar».</small>}
+    </div>
+    <div className="grid min-w-0 content-start gap-1">
+      <Campo label="Fecha de fin prevista" required={finObligatorio} error={errors.fecha_fin_prevista}><input name={`${nombre}-fin`} type="date" required={finObligatorio} min={draft.fecha_inicio || undefined} value={draft.fecha_fin_prevista} onChange={valor('fecha_fin_prevista')} /></Campo>
+      {(finObligatorio || ayudaFin) && <small className="text-[11px] text-slate-500">{finObligatorio ? `La modalidad «${modalidad.nombre}» la exige.` : ayudaFin}</small>}
+    </div>
+    {conCese && <Campo label="Fecha de cese (solo si el vínculo ya terminó)" required={ceseObligatorio} error={errors.fecha_cese}><input type="date" required={ceseObligatorio} min={draft.fecha_inicio || undefined} max={hoy()} value={draft.fecha_cese} onChange={valor('fecha_cese')} /></Campo>}
   </>
 }
 
-// B. Documento de ingreso: resolución o contrato y datos de la selección.
-export function CamposDocumentoIngreso({ draft, set, errors }) {
+// Dónde trabaja: unidad orgánica y puesto (catálogos).
+export function CamposUbicacionPuesto({ draft, poner, errors, opciones, tipoPersonal, nombre = 'vinculo' }) {
   return <>
-    <Campo label="N.º de resolución o contrato" error={errors.numero_documento_vinculo}><input maxLength={60} value={draft.numero_documento_vinculo} onChange={set('numero_documento_vinculo')} /></Campo>
-    <Campo label="Proceso de selección" error={errors.proceso_seleccion}><input maxLength={100} placeholder="Ej.: concurso o proceso CAS" value={draft.proceso_seleccion} onChange={set('proceso_seleccion')} /></Campo>
-    <Campo label="Fecha del resultado de selección" error={errors.fecha_resultado_seleccion}><input type="date" max={hoy()} value={draft.fecha_resultado_seleccion} onChange={set('fecha_resultado_seleccion')} /></Campo>
+    <CampoUnidadOrganica draft={draft} poner={poner} errors={errors} opciones={opciones} nombre={nombre} />
+    <CampoPuestoCatalogo draft={draft} poner={poner} errors={errors} opciones={opciones} tipoPersonal={tipoPersonal} nombre={nombre} />
   </>
+}
+
+// A. Información del vínculo en la sección 02: tipo y modalidad, children (la ley y la sugerencia), unidad, puesto y fechas.
+export function CamposVinculoBasicos({ draft, poner, errors, opciones, tipoPersonal, conCese = false, ceseObligatorio = false, nombre = 'vinculo', children }) {
+  return <>
+    <CampoTipoVinculo draft={draft} poner={poner} errors={errors} opciones={opciones} tipoPersonal={tipoPersonal} nombre={nombre} />
+    {children}
+    <CamposUbicacionPuesto draft={draft} poner={poner} errors={errors} opciones={opciones} tipoPersonal={tipoPersonal} nombre={nombre} />
+    <CamposVigencia draft={draft} poner={poner} errors={errors} opciones={opciones} conCese={conCese} ceseObligatorio={ceseObligatorio} nombre={nombre} />
+  </>
+}
+
+// B. Ingreso: proceso de selección (carrera y plazo determinado), número de legajo y fecha de emisión.
+export function CamposDocumentoIngreso({ draft, poner, errors, opciones, nuevo = true, numeroLegajo = '', nombre = 'vinculo' }) {
+  return <CamposIngreso draft={draft} poner={poner} errors={errors} opciones={opciones} nuevo={nuevo} numeroLegajo={numeroLegajo} nombre={nombre} />
 }
 
 // Las cuatro condiciones del puesto (Sí / No / Sin responder) en un bloque compacto.
@@ -85,10 +88,11 @@ export function CondicionesPuesto({ draft, poner, errors, nombre = 'vinculo' }) 
 }
 
 // Vínculo completo (sección 02): información, documento de ingreso y condiciones del puesto.
-export function CamposVinculo({ draft, set, poner, errors, opciones, tipoPersonal, conCese = false, ceseObligatorio = false, nombre = 'vinculo', children }) {
+export function CamposVinculo({ draft, poner, errors, opciones, tipoPersonal, conCese = false, ceseObligatorio = false, nombre = 'vinculo', nuevo = true, numeroLegajo = '', children }) {
   return <>
-    <CamposVinculoBasicos draft={draft} set={set} poner={poner} errors={errors} opciones={opciones} tipoPersonal={tipoPersonal} conCese={conCese} ceseObligatorio={ceseObligatorio} nombre={nombre}>{children}</CamposVinculoBasicos>
-    <CamposDocumentoIngreso draft={draft} set={set} errors={errors} />
+    <CamposVinculoBasicos draft={draft} poner={poner} errors={errors} opciones={opciones} tipoPersonal={tipoPersonal} conCese={conCese} ceseObligatorio={ceseObligatorio} nombre={nombre}>{children}</CamposVinculoBasicos>
+    <p className="col-span-full mt-2 text-xs font-semibold text-slate-700">Ingreso</p>
+    <CamposDocumentoIngreso draft={draft} poner={poner} errors={errors} opciones={opciones} nuevo={nuevo} numeroLegajo={numeroLegajo} nombre={nombre} />
     <CondicionesPuesto draft={draft} poner={poner} errors={errors} nombre={nombre} />
   </>
 }

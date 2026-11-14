@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\PerteneceALegajo;
 use Database\Factories\VinculoLaboralFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,6 +16,7 @@ class VinculoLaboral extends Model
     use HasFactory;
 
     use HasUuids;
+    use PerteneceALegajo;
 
     protected $table = 'vinculos_laborales';
 
@@ -38,6 +40,10 @@ class VinculoLaboral extends Model
         'anulado',
         'motivo_anulacion',
         'registrado_por',
+        'modalidad_vinculo_id',
+        'puesto_id',
+        'tipo_proceso_seleccion_id',
+        'documento_vinculo_fecha',
     ];
 
     /** @return array<string, string> */
@@ -49,6 +55,7 @@ class VinculoLaboral extends Model
             'exige_estudios_basicos' => 'boolean',
             'tiene_periodo_prueba' => 'boolean',
             'fecha_resultado_seleccion' => 'date',
+            'documento_vinculo_fecha' => 'date',
             'fecha_inicio' => 'date',
             'fecha_fin_prevista' => 'date',
             'fecha_cese' => 'date',
@@ -66,6 +73,21 @@ class VinculoLaboral extends Model
     public function regimenNormativo(): BelongsTo
     {
         return $this->belongsTo(RegimenNormativo::class, 'regimen_normativo_id', 'id');
+    }
+
+    public function modalidadVinculo(): BelongsTo
+    {
+        return $this->belongsTo(ModalidadVinculo::class, 'modalidad_vinculo_id');
+    }
+
+    public function puesto(): BelongsTo
+    {
+        return $this->belongsTo(Puesto::class, 'puesto_id');
+    }
+
+    public function tipoProcesoSeleccion(): BelongsTo
+    {
+        return $this->belongsTo(TipoProcesoSeleccion::class, 'tipo_proceso_seleccion_id');
     }
 
     public function unidadOrganica(): BelongsTo

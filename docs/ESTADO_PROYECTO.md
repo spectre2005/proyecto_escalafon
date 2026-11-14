@@ -551,3 +551,24 @@ migraciones y verificación. Respaldos (17/10/2026): uno por institución, copia
 - Pendiente antes de datos reales: cifrado de PDF y antivirus (pend. 9),
   usuario de PostgreSQL con permisos mínimos, copia de respaldos fuera del servidor y prueba de restauración,
   avisos por correo.
+
+## Catálogos del vínculo en el registro de personal (08-09/11/2026, rama feature/legajos-pasivos)
+
+Registro manual en cuatro pasos: 1 persona, 2 «Puesto y cargo» (unidad, puesto, datos del puesto y condiciones),
+3 «Vínculo laboral» (tipo y modalidad, ingreso y vigencia), 4 «Revisión». Listas normales en cascada (unidad → puesto,
+tipo → modalidad); la última opción «+ Nuevo…» abre un panel encima del formulario. Configuración → «Catálogos del
+vínculo»: unidades orgánicas, puestos, tipos de vínculo (solo la descripción), modalidades y procesos de selección; se
+agregan, editan y desactivan (nada se borra; el vínculo conserva el texto del momento). Permiso `catalogos.gestionar`
+(ADMIN por el comodín; sin él, el puesto se escribe a mano).
+Ingreso: carrera y plazo determinado eligen el proceso de selección (proceso CAS, concurso público, concurso docente o
+uno nuevo) y su fecha de resultado; un designado no pasa por concurso. Todos registran la fecha de emisión. El número de
+registro es el del legajo (uno por legajo, `NumeroLegajo`, formato en config/legajo.php): un vínculo no tiene número
+propio. Un vínculo con fecha de inicio futura figura «por iniciar» y la sección 02 lo muestra como vínculo actual.
+Pendiente de confirmar con el cliente:
+(a) Lista completa de modalidades. Se cargan cinco de partida (`ModalidadVinculoSeeder`).
+(b) Si los puestos deben salir de un documento oficial (CAP, CAP-P o cuadro de puestos).
+(c) Si el asistente o el suplente deben tener `catalogos.gestionar` (hoy no).
+(d) Si además del número de legajo hay que guardar el número oficial de la resolución o el contrato (hoy ya no se
+    pide; la constancia de trabajo sigue mostrando el «N.º de resolución o contrato» de los vínculos anteriores).
+(e) Designado: hoy solo número de registro y fecha de emisión de la resolución de designación; confirmar si piden más.
+(f) Requisitos y plazos de los procesos CAS y de concurso: no se programó ninguna regla; verificar en la directiva.

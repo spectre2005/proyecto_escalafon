@@ -7,8 +7,8 @@ use App\Models\ArchivoDocumento;
 use App\Models\ConexionCorreo;
 use App\Models\ConfiguracionFuncionalidad;
 use App\Models\Controversia;
-use App\Models\Desvinculacion;
 use App\Models\Desplazamiento;
+use App\Models\Desvinculacion;
 use App\Models\DocumentoUsuario;
 use App\Models\EvaluacionDesempeno;
 use App\Models\Familiar;
@@ -17,17 +17,21 @@ use App\Models\Induccion;
 use App\Models\Legajo;
 use App\Models\LegajoSeccion;
 use App\Models\LicenciaPermiso;
+use App\Models\ModalidadVinculo;
 use App\Models\PerfilAdministrativo;
 use App\Models\PerfilDocente;
 use App\Models\PeriodoPrueba;
 use App\Models\PeriodoVacacional;
 use App\Models\ProgresionCarrera;
+use App\Models\Puesto;
 use App\Models\RatificacionDocente;
 use App\Models\Reconocimiento;
 use App\Models\RecursoImpugnatorio;
 use App\Models\RegistroSstBienestar;
 use App\Models\Rol;
 use App\Models\Sancion;
+use App\Models\TipoProcesoSeleccion;
+use App\Models\TipoVinculo;
 use App\Models\Usuario;
 use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
@@ -68,7 +72,9 @@ class ResourceApiTest extends TestCase
      * en su lugar, test_models_without_generic_crud_have_no_endpoint verifica que no exista ningún endpoint genérico.
      * Siguen cubiertos por ModelPersistenceTest.
      */
-    private const SIN_CRUD_GENERICO = [RecursoImpugnatorio::class, ConfiguracionFuncionalidad::class, ConexionCorreo::class];
+    // Catálogos del vínculo (modalidades, puestos, procesos de selección y tipos de vínculo): solo por CatalogoVinculoController (código correlativo y auditoría).
+    private const SIN_CRUD_GENERICO = [RecursoImpugnatorio::class, ConfiguracionFuncionalidad::class, ConexionCorreo::class,
+        ModalidadVinculo::class, Puesto::class, TipoProcesoSeleccion::class, TipoVinculo::class];
 
     /** Sección 10: igual, se registran desde Legajos\Seccion10Controller (el CRUD genérico exige además datos_sensibles.ver). */
     private const SECCION_10 = [RegistroSstBienestar::class];

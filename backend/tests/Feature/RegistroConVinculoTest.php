@@ -61,6 +61,55 @@ class RegistroConVinculoTest extends TestCase
             PerfilDocente::query()->count(), PerfilAdministrativo::query()->count()]);
     }
 
+    public function test_registering_again_with_active_file_requires_confirmation_and_keeps_it_as_passive_history(): void
+    {
+        $this->actuarComo();
+        $primera = $this->postJson(self::URL, $this->datos())->assertCreated();
+        $persona = $primera->json('data.usuario.id');
+        $anterior = $primera->json('data.legajo.id');
+        // Sin confirmar, su legajo activo impide registrarla otra vez (se informa quién es para ir a su ficha).
+        $this->postJson(self::URL, $this->datos())->assertUnprocessable()->assertJsonPath('persona_existente.id', $persona);
+        // Con la confirmación: el legajo anterior pasa a pasivo (historial) y se abre uno nuevo con su vínculo.
+        $segunda = $this->postJson(self::URL, [...$this->datos(), 'cerrar_legajo_actual' => true])->assertCreated()
+            ->assertJsonPath('data.usuario.id', $persona)->assertJsonPath('data.numero_incorporacion', 2);
+        $nuevo = $segunda->json('data.legajo.id');
+        $this->assertNotSame($anterior, $nuevo);
+        $legajoAnterior = Legajo::query()->findOrFail($anterior);
+        $this->assertSame(['pasivo', today()->toDateString()], [$legajoAnterior->estado_legajo, $legajoAnterior->fecha_pasivo->toDateString()]);
+        $this->assertNotNull($legajoAnterior->datos_al_cierre);
+        $this->assertSame('activo', Legajo::query()->findOrFail($nuevo)->estado_legajo);
+        $this->assertSame(1, Usuario::query()->where('numero_doc_identidad', '71000001')->count());
+        $this->assertDatabaseHas('auditoria_eventos', ['accion' => 'legajo.cerrar_por_nuevo_ingreso', 'entidad_id' => $anterior]);
+        // El vínculo anterior se queda en su legajo; el nuevo, en el nuevo.
+        $this->assertDatabaseHas('vinculos_laborales', ['id' => $primera->json('data.vinculo.id'), 'legajo_id' => $anterior]);
+        $this->assertDatabaseHas('vinculos_laborales', ['id' => $segunda->json('data.vinculo.id'), 'legajo_id' => $nuevo]);
+        $this->getJson('/api/v1/expedientes/legajos-pasivos?q=71000001')->assertOk()->assertJsonPath('total', 1)->assertJsonPath('data.0.id', $anterior);
+    }
+
+    public function test_passive_person_can_be_incorporated_again_without_duplicating_identity(): void
+    {
+        $this->actuarComo();
+        $primera = $this->postJson(self::URL, $this->datos())->assertCreated()->assertJsonPath('data.numero_incorporacion', 1);
+        $persona = $primera->json('data.usuario.id');
+        $anterior = $primera->json('data.legajo.id');
+        $vinculo = $primera->json('data.vinculo.id');
+        $this->postJson('/api/v1/expedientes/'.$persona.'/legajos/'.$anterior.'/cerrar')->assertOk();
+        $this->getJson('/api/v1/usuarios')->assertOk()->assertJsonFragment([
+            'id' => $persona, 'legajos_count' => 1, 'tiene_legajo_pasivo' => true, 'tiene_legajo_activo' => false,
+        ]);
+        $segunda = $this->postJson(self::URL, $this->datos())->assertCreated()
+            ->assertJsonPath('data.usuario.id', $persona)->assertJsonPath('data.numero_incorporacion', 2);
+        $this->assertNotSame($anterior, $segunda->json('data.legajo.id'));
+        $this->assertDatabaseHas('legajos', ['id' => $anterior, 'estado_legajo' => 'pasivo']);
+        $this->assertDatabaseHas('vinculos_laborales', ['id' => $vinculo, 'legajo_id' => $anterior]);
+        $this->assertDatabaseHas('vinculos_laborales', ['id' => $segunda->json('data.vinculo.id'), 'legajo_id' => $segunda->json('data.legajo.id')]);
+        $this->assertSame(1, Usuario::query()->where('numero_doc_identidad', '71000001')->count());
+        $this->postJson(self::URL, $this->datos())->assertUnprocessable();
+        $this->assertDatabaseCount('legajos', 2);
+        $this->postJson('/api/v1/expedientes/'.$persona.'/legajos/'.$segunda->json('data.legajo.id').'/cerrar')->assertOk();
+        $this->postJson(self::URL, $this->datos())->assertCreated()->assertJsonPath('data.numero_incorporacion', 3);
+    }
+
     public function test_a_teacher_is_registered_with_open_file_link_and_job_data(): void
     {
         $actor = $this->actuarComo();

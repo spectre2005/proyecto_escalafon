@@ -25,6 +25,11 @@ final class ReglasVinculo
         'fecha_inicio' => 'required|date_format:Y-m-d',
         'fecha_fin_prevista' => 'nullable|date_format:Y-m-d|after_or_equal:fecha_inicio',
         'fecha_cese' => 'nullable|date_format:Y-m-d|after_or_equal:fecha_inicio|before_or_equal:today',
+        // Catálogos (App\Support\CatalogosVinculo): la coherencia con el tipo de vínculo y de personal la comprueba aplicar().
+        'modalidad_vinculo_id' => 'nullable|uuid|exists:modalidades_vinculo,id',
+        'puesto_id' => 'nullable|uuid|exists:puestos,id',
+        'tipo_proceso_seleccion_id' => 'nullable|uuid|exists:tipos_proceso_seleccion,id',
+        'documento_vinculo_fecha' => 'nullable|date_format:Y-m-d|before_or_equal:today',
     ];
 
     // Datos del puesto según el tipo de personal del vínculo: solo los campos del esquema (perfil_docente y
@@ -50,7 +55,8 @@ final class ReglasVinculo
      * Nombres de los campos en los mensajes: en el vínculo, regimen_laboral es el tipo de vínculo (no la ley, como en la
      * importación de personal).
      */
-    public const ATRIBUTOS = ['regimen_laboral' => 'tipo de vínculo', 'regimen_normativo_id' => 'ley (régimen normativo)'];
+    public const ATRIBUTOS = ['regimen_laboral' => 'tipo de vínculo', 'regimen_normativo_id' => 'ley (régimen normativo)', 'modalidad_vinculo_id' => 'modalidad',
+        'puesto_id' => 'puesto', 'tipo_proceso_seleccion_id' => 'proceso de selección', 'numero_documento_vinculo' => 'número', 'documento_vinculo_fecha' => 'fecha de emisión'];
 
     /** En el alta, el tipo de personal y la ley del vínculo son los de la persona, y el primer vínculo es el vigente. */
     public const NO_EN_ALTA = ['tipo_personal', 'regimen_normativo_id', 'fecha_cese'];
