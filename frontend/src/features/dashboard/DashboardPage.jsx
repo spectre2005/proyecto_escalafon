@@ -50,7 +50,6 @@ export default function DashboardPage() {
   const conVinculo = users.filter(user => user.situacion === 'vinculo_vigente').length
   // Tuvieron legajo pero ya no tienen vínculo vigente (cesados); sin legajo activo no cuenta aquí.
   const sinVinculo = users.filter(user => user.situacion === 'sin_vinculo_vigente').length
-  const withEmail = users.filter(user => user.email_institucional?.trim()).length
   const ready = !loading && !loadError
   const show = value => loading ? '…' : loadError ? '—' : value.toLocaleString('es')
   const percent = count => ready && users.length ? Math.round(count / users.length * 100) : 0
@@ -59,7 +58,6 @@ export default function DashboardPage() {
     { label: 'Personal registrado', value: users.length, detail: 'Ver directorio completo', icon: 'users', color: 'bg-teal-50 text-teal-700', to: '/personal' },
     { label: 'Con vínculo vigente', value: conVinculo, detail: 'Consultar situación laboral', icon: 'check', color: 'bg-sky-50 text-sky-700', to: '/personal?situacion=vinculo_vigente' },
     { label: 'Sin vínculo vigente', value: sinVinculo, detail: 'Ver personal sin vínculo', icon: 'clock', color: 'bg-amber-50 text-amber-700', to: '/personal?situacion=sin_vinculo_vigente' },
-    { label: 'Con correo registrado', value: withEmail, detail: 'Ver personal con correo', icon: 'file', color: 'bg-violet-50 text-violet-700', to: '/personal?correo=con' },
   ]
   const situacionesPersonal = Object.entries(situaciones).map(([valor, { texto }]) => ({ label: texto, count: users.filter(user => user.situacion === valor).length, to: `/personal?situacion=${valor}`,
     color: { vinculo_vigente: 'bg-teal-500', sin_vinculo_vigente: 'bg-amber-400', sin_legajo: 'bg-slate-400' }[valor] }))
@@ -81,7 +79,7 @@ export default function DashboardPage() {
       <div className="flex flex-wrap items-center gap-3"><span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs text-slate-500">{date}</span></div>
     </header>
     {loadError && <div role="alert" className="mb-6 rounded-xl border border-rose-100 bg-rose-50 px-5 py-4 text-sm text-rose-800">{loadError}<button type="button" disabled={loading} onClick={refreshUsers} className="ml-3 font-semibold underline">Reintentar</button></div>}
-    <section aria-label="Resumen del personal" aria-busy={loading} className="mb-6 grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 xl:grid-cols-5">
+    <section aria-label="Resumen del personal" aria-busy={loading} className="mb-6 grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 xl:grid-cols-4">
       {stats.map(stat => <Link key={stat.label} to={stat.to} className="group rounded-2xl border border-slate-200/80 bg-white p-5 transition hover:-translate-y-1 hover:border-teal-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-600">
         <div className="flex items-center justify-between gap-3"><p className="text-xs font-medium text-slate-600">{stat.label}</p><span className={`grid size-10 place-items-center rounded-xl ${stat.color}`}><Icon name={stat.icon} /></span></div>
         <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-800">{show(stat.value)}</p><div className="mt-3 flex items-center justify-between text-[11px] text-slate-500"><span>{stat.detail}</span><Icon name="arrow" size={16} /></div>
