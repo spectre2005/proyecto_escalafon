@@ -4,6 +4,7 @@ import PanelesConfiguracion from './PanelesConfiguracion'
 import InstitucionConfig from './InstitucionConfig'
 import CorreoRequerimientosConfig from './CorreoRequerimientosConfig'
 import CatalogosVinculoConfig from './CatalogosVinculoConfig'
+import LecturaIaConfig from './LecturaIaConfig'
 
 export default function SettingsPage() {
   const [params] = useSearchParams()
@@ -20,6 +21,7 @@ export default function SettingsPage() {
       { id: 'institucion', titulo: 'Institución y apariencia', descripcion: 'Datos, logo, colores y reportes', icono: 'building', contenido: <InstitucionConfig /> },
       { id: 'correo', titulo: 'Correo de requerimientos', descripcion: 'Cuenta institucional y conexión', icono: 'settings', contenido: <CorreoRequerimientosConfig /> },
       { id: 'catalogos', titulo: 'Catálogos del vínculo', descripcion: 'Unidades orgánicas, puestos, tipos y modalidades de vínculo y procesos de selección', icono: 'folder', contenido: <CatalogosVinculoConfig /> },
+      { id: 'lectura-ia', titulo: 'Lectura con IA', descripcion: 'Cuánto acierta al leer los PDF y avisos de documentos de otra persona', icono: 'robot', contenido: <LecturaIaConfig /> },
     ]} />
   </div>
 }

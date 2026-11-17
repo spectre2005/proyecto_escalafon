@@ -13,10 +13,10 @@ namespace App\Support;
 final class ResumenSeccion02
 {
     /**
-     * TODO pendiente de confirmar con el cliente: qué estados cuentan como "cargado". Observado se
-     * incluye porque el documento está en el legajo; falso no.
+     * Estados que cuentan como "cargado". Observado y falso no: según el CLAUDE.md (confirmado el 27/10/2026), solo
+     * cuenta como pendiente lo que falta o lo marcado expresamente como observado o falso.
      */
-    public const ESTADOS_CARGADO = ['aceptado', 'cargado', 'en_fiscalizacion', 'verificado', 'observado'];
+    public const ESTADOS_CARGADO = ['aceptado', 'cargado', 'en_fiscalizacion', 'verificado'];
 
     /**
      * @param  list<array{exigido: ?bool, cargado: bool, recepcionado: bool, verificado: bool}>  $tipos

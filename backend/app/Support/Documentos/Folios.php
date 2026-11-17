@@ -28,6 +28,10 @@ final class Folios
      */
     public static function reservar(Legajo $legajo, int $seccion, int $inicio, int $fin): LegajoSeccion
     {
+        // No depende de la validación del request: un rango invertido haría retroceder ultimo_folio.
+        if ($inicio < 1 || $fin < $inicio) {
+            throw ValidationException::withMessages(['folio_fin' => "El rango de folios {$inicio}–{$fin} no es válido: el folio final debe ser mayor o igual que el inicial."]);
+        }
         Legajo::query()->whereKey($legajo->id)->lockForUpdate()->first();
         $fila = LegajoSeccion::query()->where('legajo_id', $legajo->id)->where('seccion_legajo_id', $seccion)->lockForUpdate()->first()
             ?? LegajoSeccion::query()->create(['legajo_id' => $legajo->id, 'seccion_legajo_id' => $seccion, 'ultimo_folio' => self::mayorFolio($legajo, $seccion)]);

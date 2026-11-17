@@ -206,6 +206,18 @@ Consulta de identidad por DNI en el registro manual (20/10/2026, rama `feature/c
     manual (`IDENTIDAD_PROVEEDOR=factiliza` + `FACTILIZA_TOKEN`), sin guardar las respuestas. Pendiente: confirmar con el
     cliente el envío del DNI a ese tercero (Ley 29733), quién paga el plan y su cuota.
 
+Ubicación de los catálogos y paneles de administración (OBSERVADO el 17/11/2026, por corregir más adelante):
+35. «Catálogos del vínculo» (unidades orgánicas, puestos, tipos y modalidades de vínculo, procesos de selección) se queda
+    por ahora en Configuración, como está. Se evaluó moverlo a «Accesos y custodia» y no se recomienda: ese panel
+    corresponde al art. 6 (quién accede a los legajos, préstamo y devolución) y los catálogos son datos maestros. Lo
+    observado es lo contrario: «Accesos y custodia» muestra hoy «Módulos del sistema» y «Secciones del legajo», que son
+    configuración. Propuesta (sin decidir): dejar en «Accesos y custodia» solo «Equipo y accesos» (y la custodia cuando
+    exista) y pasar módulos y funcionalidades a Configuración.
+    Mejora de fondo relacionada (requiere migración): que cada puesto docente del catálogo `puestos` guarde su condición y
+    categoría. Hoy la coincidencia puesto ↔ datos del puesto del alta se hace por el nombre contra una lista fija
+    (`frontend/src/features/legajos/config/puestosSugeridos.js`, `equivalencias`), y un puesto docente creado en el
+    catálogo con otro nombre no se autocompleta ni se controla.
+
 ## Hoja de ruta del sistema institucional (por definir, analizado el 13/10/2026)
 
 Funcionalidades que faltan, con su base en la directiva. Orden propuesto, sin decidir:

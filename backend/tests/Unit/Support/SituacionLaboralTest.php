@@ -5,8 +5,10 @@ namespace Tests\Unit\Support;
 use App\Models\Legajo;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
+use App\Support\PuestoActual;
 use App\Support\SituacionLaboral;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class SituacionLaboralTest extends TestCase
@@ -89,9 +91,26 @@ class SituacionLaboralTest extends TestCase
 
     public function test_cargar_con_cese_futuro_coincide_con_puesto_actual(): void
     {
-        $this->markTestSkipped('Posible bug: SituacionLaboral::cargar (app/Support/SituacionLaboral.php:26) exige whereNull(fecha_cese), '
-            .'mientras PuestoActual::vigentes (app/Support/PuestoActual.php:23) acepta cese futuro. Una persona con cese programado '
-            .'a futuro sale «sin_vinculo_vigente» en el listado aunque PuestoActual la muestre con vínculo vigente; el docblock dice '
-            .'que ambas usan el mismo criterio.');
+        $this->travelTo(Carbon::parse('2026-06-15 12:00:00', 'America/Lima'));
+        $persona = Usuario::factory()->create();
+        Legajo::factory()->create(['usuario_id' => $persona->id, 'estado_legajo' => 'activo']);
+        VinculoLaboral::factory()->create(['usuario_id' => $persona->id, 'anulado' => false, 'fecha_inicio' => '2026-01-01', 'fecha_cese' => '2026-06-30']);
+
+        $this->assertSame(SituacionLaboral::VINCULO_VIGENTE, $this->situacionDe($persona));
+        $this->assertSame(1, PuestoActual::de($persona->fresh())['vinculos_vigentes']);
+    }
+
+    public function test_cargar_con_cese_hoy_sigue_vigente_y_con_cese_ayer_no(): void
+    {
+        $this->travelTo(Carbon::parse('2026-06-15 12:00:00', 'America/Lima'));
+        $hoy = Usuario::factory()->create();
+        Legajo::factory()->create(['usuario_id' => $hoy->id, 'estado_legajo' => 'activo']);
+        VinculoLaboral::factory()->create(['usuario_id' => $hoy->id, 'anulado' => false, 'fecha_inicio' => '2026-01-01', 'fecha_cese' => '2026-06-15']);
+        $ayer = Usuario::factory()->create();
+        Legajo::factory()->create(['usuario_id' => $ayer->id, 'estado_legajo' => 'activo']);
+        VinculoLaboral::factory()->create(['usuario_id' => $ayer->id, 'anulado' => false, 'fecha_inicio' => '2026-01-01', 'fecha_cese' => '2026-06-14']);
+
+        $this->assertSame(SituacionLaboral::VINCULO_VIGENTE, $this->situacionDe($hoy));
+        $this->assertSame(SituacionLaboral::SIN_VINCULO_VIGENTE, $this->situacionDe($ayer));
     }
 }

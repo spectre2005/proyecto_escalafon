@@ -19,7 +19,12 @@ export function fechaIso(valor) {
   return fechaValida(iso) ? iso : texto
 }
 
-const fechaValida = iso => /^\d{4}-\d{2}-\d{2}$/.test(iso) && new Date(`${iso}T00:00:00Z`).toISOString().slice(0, 10) === iso
+// Mes o día fuera de rango (2023-13-01, 32/01/2020) dan una fecha inválida: se rechazan sin llamar a toISOString(), que lanzaría.
+const fechaValida = iso => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false
+  const fecha = new Date(`${iso}T00:00:00Z`)
+  return !Number.isNaN(fecha.getTime()) && fecha.toISOString().slice(0, 10) === iso
+}
 
 // puedeSensibles: fecha de nacimiento y domicilio son datos sensibles; sin el permiso no se registran (el backend lo exige).
 export function validateUser(user, catalogo, { puedeSensibles = true } = {}) {

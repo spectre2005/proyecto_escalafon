@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\V1\GuiaController;
 use App\Http\Controllers\Api\V1\HistorialEstadoDocumentoController;
 use App\Http\Controllers\Api\V1\InduccionController;
 use App\Http\Controllers\Api\V1\InstitutionSettingsController;
+use App\Http\Controllers\Api\V1\LecturaIaController;
 use App\Http\Controllers\Api\V1\LegajoController;
 use App\Http\Controllers\Api\V1\Legajos\AperturaLegajoController;
 use App\Http\Controllers\Api\V1\Legajos\DocumentoLegajoController;
@@ -116,6 +117,10 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
     });
     Route::post('documentos/escanear', EscanerSeccionesController::class)
         ->middleware(['can:legajo.ver', 'can:documento.subir', 'throttle:4,1,lector']);
+    // Acierto de la lectura con IA: el formulario informa el resultado por campo (sin valores) y administración ve el resumen.
+    Route::post('documentos/escaner/lecturas/{lectura}/resultado', [LecturaIaController::class, 'resultado'])
+        ->whereUuid('lectura')->middleware(['can:documento.subir', 'throttle:30,1']);
+    Route::get('documentos/escaner/precision', [LecturaIaController::class, 'precision'])->middleware('can:sistema.administrar');
     Route::prefix('correo/gmail')->middleware('can:sistema.administrar')->controller(GmailCorreoController::class)->group(function (): void {
         Route::get('/', 'estado');
         Route::post('autorizar', 'autorizar')->middleware('throttle:10,1');

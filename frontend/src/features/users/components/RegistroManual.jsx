@@ -6,7 +6,7 @@ import UbigeoFields from '../../../components/ui/UbigeoFields'
 import { advanceOnEnter } from '../../../shared/forms/advanceOnEnter'
 import { CampoTipoVinculo, CamposDatosPuesto, CamposDocumentoIngreso, CamposUbicacionPuesto, CamposVigencia, CondicionesPuesto } from '../../legajos/components/seccion02/CamposVinculo'
 import { datosPuestoInicial, vinculoInicial } from '../../legajos/components/seccion02/borradoresVinculo'
-import { completarDesdePuesto, equivalenciaPuesto } from '../../legajos/config/puestosSugeridos'
+import { ajustarAPuesto, diferenciasConPuesto, equivalenciaPuesto, sincronizarConPuesto } from '../../legajos/config/puestosSugeridos'
 import { categoriasDocente, condicionesDocente } from '../../legajos/config/seccion02'
 import { leyesDelTipo, leyInicial } from '../utils/leyes'
 import { columns, hoyLima } from '../utils/usuariosCsv'
@@ -39,6 +39,10 @@ const etiquetas = { ...Object.fromEntries(camposPersona.map(([key, label]) => [k
 const identidadInicial = { cargando: false, mensaje: null, origen: null, pendiente: null, ubicacion: null }
 const estilosMensaje = { ok: 'bg-[#eaf4ee] text-[#2c7650]', info: 'border border-[#f1d9a6] bg-[#fff8e8] text-[#7a5a17]', error: 'bg-[#fff0ed] text-[#ac4d3a]' }
 const botonSecundario = 'rounded-lg border border-[#dbe6e1] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#4f6d63] hover:bg-[#edf6f2]'
+
+const nombresPerfil = { condicion_docente: ['condición', condicionesDocente], categoria: ['categoría', categoriasDocente] }
+// «condición «Ordinario» y categoría «Asociado»» con los valores de `datos`.
+const textoCampos = (campos, datos) => campos.map(campo => `${nombresPerfil[campo][0]} «${nombresPerfil[campo][1][datos[campo]] || datos[campo]}»`).join(' y ')
 
 function Grupo({ titulo, ayuda, children }) {
   return <fieldset className="grid min-w-0 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -112,6 +116,8 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   const [avisos, setAvisos] = useState([])
   const [errores, setErrores] = useState({})
   const [notaPuesto, setNotaPuesto] = useState('')
+  // Campos del perfil docente que rellenó el sistema desde el puesto: siguen al puesto si este cambia; lo editado a mano, no.
+  const [autoPuesto, setAutoPuesto] = useState([])
   // Persona existente informada por el backend al guardar (la lista local puede no estar al día).
   const [existenteBackend, setExistenteBackend] = useState(null)
   // Nuevo ingreso confirmado de una persona con legajo activo (pasa a pasivo al registrar). Se anula al cambiar el DNI.
@@ -207,20 +213,34 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   const setCampoPuesto = key => event => {
     const valor = event.target.type === 'checkbox' ? event.target.checked : event.target.value
     setPuestos(previos => ({ ...previos, [tipo]: { ...previos[tipo], [key]: valor } }))
+    // Elegido a mano: ya no sigue al puesto.
+    setAutoPuesto(previos => previos.filter(campo => campo !== key))
+    setNotaPuesto('')
+    setAvisos([])
   }
 
-  // Puesto docente con equivalencia inequívoca (p. ej. «Profesor ordinario principal»): completa condición y categoría
-  // solo si están vacías; si el usuario ya eligió otra cosa, no se cambia y se avisa.
+  // Puesto docente con equivalencia inequívoca (p. ej. «Profesor ordinario principal»): rellena condición y categoría.
+  // Si el puesto cambia, lo que rellenó el sistema lo sigue; lo elegido a mano se conserva y, si no coincide, se avisa abajo.
   function completarPerfil(puesto) {
-    const { datos, completados, distintos } = completarDesdePuesto(puestos.docente, equivalenciaPuesto(tipo, puesto))
-    const nombres = { condicion_docente: ['condición', condicionesDocente], categoria: ['categoría', categoriasDocente] }
-    const texto = campos => campos.map(campo => `${nombres[campo][0]} «${nombres[campo][1][datos[campo]] || datos[campo]}»`).join(' y ')
-    if (completados.length) {
-      setPuestos(previos => ({ ...previos, docente: datos }))
-      setNotaPuesto(`Se completó desde el puesto: ${texto(completados)}. Puedes cambiarlo.`)
-    } else {
-      setNotaPuesto(distintos.length ? 'El puesto elegido no coincide con la condición o la categoría indicadas en los datos del puesto: revísalas.' : '')
-    }
+    const { datos, autocompletados, completados, quitados } = sincronizarConPuesto(puestos.docente, equivalenciaPuesto(tipo, puesto), autoPuesto)
+    setPuestos(previos => ({ ...previos, docente: datos }))
+    setAutoPuesto(autocompletados)
+    setAvisos([])
+    if (completados.length) setNotaPuesto(`Se completó desde el puesto: ${textoCampos(completados, datos)}. Puedes cambiarlo.`)
+    else if (quitados.length) setNotaPuesto('Se vaciaron la condición y la categoría que venían del puesto anterior: elígelas para este puesto.')
+    else setNotaPuesto('')
+  }
+
+  // Contradicción entre el puesto y los datos del puesto, calculada siempre (al cambiar arriba o abajo).
+  const equivalenciaActual = equivalenciaPuesto(tipo, vinculo.nombre_puesto)
+  const conflictosPuesto = tipo === 'docente' ? diferenciasConPuesto(puestos.docente, equivalenciaActual) : []
+  const mensajeConflicto = `El puesto «${vinculo.nombre_puesto}» corresponde a ${textoCampos(Object.keys(equivalenciaActual), equivalenciaActual)}.`
+
+  function ajustarPerfilAlPuesto() {
+    setPuestos(previos => ({ ...previos, docente: ajustarAPuesto(previos.docente, equivalenciaActual) }))
+    setAutoPuesto(Object.keys(equivalenciaActual))
+    setNotaPuesto('')
+    setAvisos([])
   }
 
   function irA(numero) {
@@ -231,7 +251,8 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   // Validación del paso: los controles visibles (obligatorios, formatos y fechas) y, en el paso 1, las reglas del alta.
   function pasoValido() {
     if (!formRef.current.reportValidity()) return false
-    const lista = paso === 1 ? erroresPersona(personaDelPaso(draft, leyElegida), { catalogo, usuarios, ubicacion, ubigeoId, nuevoIngreso }) : []
+    const lista = paso === 1 ? erroresPersona(personaDelPaso(draft, leyElegida), { catalogo, usuarios, ubicacion, ubigeoId, nuevoIngreso })
+      : paso === 2 && conflictosPuesto.length ? [`${mensajeConflicto} Ajusta los datos del puesto (parte B) o elige otro puesto para continuar.`] : []
     setAvisos(lista)
     return !lista.length
   }
@@ -360,11 +381,16 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
           <p className="text-[11px] text-[#7b9181]">Dónde trabajará y en qué puesto. Tipo de personal: <strong>{tiposPersonal[tipo]}</strong> (paso 1). Todo se puede corregir después en la sección 02 mientras el vínculo esté abierto.</p>
           <Grupo titulo="A. Unidad y puesto" ayuda="Escribe para buscar. Si no está en la lista, puedes agregarlo.">
             <CamposUbicacionPuesto draft={vinculo} poner={ponerVinculo} errors={erroresDe(errores, 'vinculo')} opciones={opciones.data?.data} tipoPersonal={tipo} nombre="alta-vinculo" />
-            {notaPuesto && <p role="status" className="col-span-full rounded-lg bg-[#eaf4ee] px-3 py-2 text-[11px] text-[#2c7650]">{notaPuesto}</p>}
           </Grupo>
           <Grupo titulo={`B. Datos del puesto · ${tiposPersonal[tipo]?.toLowerCase() || ''}`}
             ayuda={tipo === 'docente' ? 'Condición, categoría, dedicación (tiempo completo, parcial o exclusiva), función previa y RENACYT.' : 'Grupo ocupacional, nivel de carrera, cargo estructural y si es de confianza.'}>
-            <CamposDatosPuesto docente={tipo === 'docente'} draft={puestos[tipo]} set={setCampoPuesto} errors={erroresDe(errores, 'datos_puesto')} />
+            {conflictosPuesto.length > 0 && <div role="alert" className={`col-span-full flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-[11px] leading-relaxed ${estilosMensaje.info}`}>
+              <span><strong>No coincide con el puesto.</strong> {mensajeConflicto}</span>
+              <button type="button" className={botonSecundario} onClick={ajustarPerfilAlPuesto}>Ajustar al puesto</button>
+            </div>}
+            {!conflictosPuesto.length && notaPuesto && <p role="status" className={`col-span-full rounded-lg px-3 py-2 text-[11px] ${estilosMensaje.ok}`}>{notaPuesto}</p>}
+            <CamposDatosPuesto docente={tipo === 'docente'} draft={puestos[tipo]} set={setCampoPuesto}
+              errors={{ ...erroresDe(errores, 'datos_puesto'), ...Object.fromEntries(conflictosPuesto.map(campo => [campo, ['No coincide con el puesto elegido.']])) }} />
           </Grupo>
           <Grupo titulo="C. Condiciones del puesto" ayuda="Si no lo sabes, deja «Sin responder».">
             <CondicionesPuesto draft={vinculo} poner={ponerVinculo} errors={erroresDe(errores, 'vinculo')} nombre="alta-vinculo" />

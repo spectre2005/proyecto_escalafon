@@ -14,6 +14,7 @@ use App\Models\EvaluacionDesempeno;
 use App\Models\Familiar;
 use App\Models\GoceVacacional;
 use App\Models\Induccion;
+use App\Models\LecturaIa;
 use App\Models\Legajo;
 use App\Models\LegajoSeccion;
 use App\Models\LicenciaPermiso;
@@ -74,7 +75,9 @@ class ResourceApiTest extends TestCase
      */
     // Catálogos del vínculo (modalidades, puestos, procesos de selección y tipos de vínculo): solo por CatalogoVinculoController (código correlativo y auditoría).
     private const SIN_CRUD_GENERICO = [RecursoImpugnatorio::class, ConfiguracionFuncionalidad::class, ConexionCorreo::class,
-        ModalidadVinculo::class, Puesto::class, TipoProcesoSeleccion::class, TipoVinculo::class];
+        ModalidadVinculo::class, Puesto::class, TipoProcesoSeleccion::class, TipoVinculo::class,
+        // Lecturas con IA: solo por EscanerSeccionesController y LecturaIaController.
+        LecturaIa::class];
 
     /** Sección 10: igual, se registran desde Legajos\Seccion10Controller (el CRUD genérico exige además datos_sensibles.ver). */
     private const SECCION_10 = [RegistroSstBienestar::class];

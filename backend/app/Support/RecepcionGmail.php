@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\RequerimientoDocumento;
+use App\Support\Documentos\ArchivoPdf;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -135,7 +136,7 @@ final class RecepcionGmail
                         continue;
                     }
                     $contenido = self::contenido($parte, $id, $maximo);
-                    if (! str_contains(substr($contenido, 0, 1024), '%PDF-') || (new \finfo(FILEINFO_MIME_TYPE))->buffer($contenido) !== 'application/pdf') {
+                    if (! ArchivoPdf::tieneCabecera($contenido) || (new \finfo(FILEINFO_MIME_TYPE))->buffer($contenido) !== 'application/pdf') {
                         $avisos[] = mb_substr($nombre, 0, 150).': el contenido no es un PDF válido.';
 
                         continue;

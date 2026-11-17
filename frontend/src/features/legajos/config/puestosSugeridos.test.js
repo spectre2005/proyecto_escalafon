@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { completarDesdePuesto, equivalenciaPuesto, puestosSugeridos, sugerenciasPuesto } from './puestosSugeridos.js'
+import { ajustarAPuesto, completarDesdePuesto, diferenciasConPuesto, equivalenciaPuesto, puestosSugeridos, sincronizarConPuesto, sugerenciasPuesto } from './puestosSugeridos.js'
 
 test('suggestions depend on the personnel type and come from a single source', () => {
   assert.ok(sugerenciasPuesto('docente').includes('Profesor ordinario principal'))
@@ -36,4 +36,43 @@ test('only unequivocal positions fill teacher data, and never over the user choi
   // Coincide en parte: solo se completa lo vacío.
   assert.deepEqual(completarDesdePuesto({ condicion_docente: 'ordinario', categoria: '' }, equivalenciaPuesto('docente', 'Profesor ordinario asociado')).datos,
     { condicion_docente: 'ordinario', categoria: 'asociado' })
+})
+
+test('changing the position updates what the system filled, not what the user chose', () => {
+  const vacio = { condicion_docente: '', categoria: '', dedicacion: 'exclusiva', subtipo_extraordinario: '' }
+  const auxiliar = sincronizarConPuesto(vacio, equivalenciaPuesto('docente', 'Profesor ordinario auxiliar'))
+  assert.deepEqual([auxiliar.datos.condicion_docente, auxiliar.datos.categoria], ['ordinario', 'auxiliar'])
+  assert.deepEqual(auxiliar.autocompletados, ['condicion_docente', 'categoria'])
+
+  // Caso reportado: de auxiliar a asociado, la categoría que puso el sistema sigue al puesto.
+  const asociado = sincronizarConPuesto(auxiliar.datos, equivalenciaPuesto('docente', 'Profesor ordinario asociado'), auxiliar.autocompletados)
+  assert.deepEqual([asociado.datos.condicion_docente, asociado.datos.categoria, asociado.datos.dedicacion], ['ordinario', 'asociado', 'exclusiva'])
+  assert.deepEqual([asociado.completados, asociado.distintos], [['categoria'], []])
+
+  // A un puesto sin equivalencia: lo que venía del puesto anterior se vacía.
+  const jefe = sincronizarConPuesto(asociado.datos, equivalenciaPuesto('docente', 'Jefe de práctica'), asociado.autocompletados)
+  assert.deepEqual([jefe.datos.condicion_docente, jefe.datos.categoria, jefe.datos.dedicacion], ['', '', 'exclusiva'])
+  assert.deepEqual([jefe.quitados, jefe.autocompletados], [['condicion_docente', 'categoria'], []])
+
+  // A contratado: la categoría del ordinario anterior se quita (sin ordinario no vale).
+  const contratado = sincronizarConPuesto(auxiliar.datos, equivalenciaPuesto('docente', 'Docente contratado'), auxiliar.autocompletados)
+  assert.deepEqual([contratado.datos.condicion_docente, contratado.datos.categoria], ['contratado', ''])
+})
+
+test('a manual choice that contradicts the new position is kept and reported', () => {
+  const manual = { condicion_docente: 'ordinario', categoria: 'auxiliar', subtipo_extraordinario: '' }
+  const resultado = sincronizarConPuesto(manual, equivalenciaPuesto('docente', 'Profesor ordinario asociado'), [])
+  assert.deepEqual(resultado.datos, manual)
+  assert.deepEqual([resultado.distintos, resultado.completados], [['categoria'], []])
+})
+
+test('differences are computed in both directions and adjust fixes them', () => {
+  const equivalencia = equivalenciaPuesto('docente', 'Profesor ordinario asociado')
+  assert.deepEqual(diferenciasConPuesto({ condicion_docente: 'ordinario', categoria: 'auxiliar' }, equivalencia), ['categoria'])
+  assert.deepEqual(diferenciasConPuesto({ condicion_docente: 'ordinario', categoria: '' }, equivalencia), [])
+  assert.deepEqual(diferenciasConPuesto({ condicion_docente: 'contratado', categoria: '' }, {}), [])
+
+  const ajustado = ajustarAPuesto({ condicion_docente: 'extraordinario', categoria: '', subtipo_extraordinario: 'emerito', dedicacion: 'exclusiva' }, equivalencia)
+  assert.deepEqual(ajustado, { condicion_docente: 'ordinario', categoria: 'asociado', subtipo_extraordinario: '', dedicacion: 'exclusiva' })
+  assert.deepEqual(diferenciasConPuesto(ajustado, equivalencia), [])
 })

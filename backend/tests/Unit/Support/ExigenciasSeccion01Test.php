@@ -203,9 +203,12 @@ class ExigenciasSeccion01Test extends TestCase
 
     public function test_documento_observado_cuenta_como_pendiente(): void
     {
-        $this->markTestSkipped('Posible bug: ExigenciasSeccion01::estadoEnlazado() (app/Support/ExigenciasSeccion01.php:116) usa '
-            .'ResumenSeccion02::ESTADOS_CARGADO (app/Support/ResumenSeccion02.php:19), que incluye "observado"; un documento observado '
-            .'sale cargado y el resumen no lo cuenta como pendiente, contra la regla del CLAUDE.md.');
+        $this->assertSame(['cargado' => false, 'recepcionado' => false],
+            ExigenciasSeccion01::estadoEnlazado('a', collect([$this->documento('a', 'observado', recepcionado: true)])));
+
+        // Subsanado por uno aceptado, vuelve a contar como cargado.
+        $documentos = collect([$this->documento('a', 'observado'), $this->documento('b', 'aceptado', 'a')]);
+        $this->assertTrue(ExigenciasSeccion01::estadoEnlazado('a', $documentos)['cargado']);
     }
 
     public function test_resumen_cuenta_solo_lo_exigido_y_separa_lo_por_determinar(): void

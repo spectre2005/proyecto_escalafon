@@ -110,8 +110,9 @@ class EstadoDocumentoTest extends TestCase
 
     public function test_documento_observado_no_cuenta_como_aprobado(): void
     {
-        $this->markTestSkipped('Posible bug: EstadoDocumento::aprobado() (app/Support/Documentos/EstadoDocumento.php:43) trata un documento '
-            .'"observado" con archivo y recepción como aprobado; el CLAUDE.md dice que lo observado cuenta como pendiente '
-            .'(el propio código lo deja como TODO pendiente de confirmar).');
+        $documento = $this->documento(['estado' => 'observado', 'fiscalizado' => true, ...$this->recepcion()]);
+
+        $this->assertFalse(EstadoDocumento::aprobado($documento, $this->tipo()));
+        $this->assertFalse(EstadoDocumento::aprobado($documento, $this->tipo(acreditaPerfil: true)));
     }
 }

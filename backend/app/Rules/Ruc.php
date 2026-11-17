@@ -15,7 +15,7 @@ class Ruc implements ValidationRule
 
     public static function valido(string $ruc): bool
     {
-        if (! preg_match('/^(10|15|16|17|20)\d{9}$/', $ruc)) {
+        if (! preg_match('/^(10|15|16|17|20)\d{9}$/D', $ruc)) {
             return false;
         }
         $suma = 0;

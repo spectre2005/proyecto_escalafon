@@ -100,8 +100,7 @@ test('fechaIso convierte dd/mm/aaaa y Date, y devuelve sin corregir lo que no es
   assert.equal(fechaIso(undefined), '')
 })
 
-test.skip('Posible bug: fechaIso y validateUser lanzan RangeError con mes o día fuera de rango (usuariosCsv.js:22)', () => {
-  // new Date('2023-13-01T00:00:00Z') es inválida y toISOString() lanza; debería devolverse el texto para que se informe.
+test('fechaIso y validateUser no lanzan con mes o día fuera de rango: devuelven el texto para que se informe', () => {
   assert.equal(fechaIso('2023-13-01'), '2023-13-01')
   assert.equal(fechaIso('32/01/2020'), '32/01/2020')
   assert.equal(fechaIso('00/01/2020'), '00/01/2020')

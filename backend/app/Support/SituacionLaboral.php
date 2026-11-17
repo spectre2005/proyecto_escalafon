@@ -23,7 +23,9 @@ final class SituacionLaboral
     public static function cargar(Builder $query): Builder
     {
         return $query->withExists([
-            'vinculosLaborales as tiene_vinculo_vigente' => fn (Builder $vinculos) => $vinculos->etapaActual()->where('anulado', false)->whereNull('fecha_cese'),
+            // Mismo criterio que PuestoActual::vigentes: sin cese o con cese de hoy en adelante (día de Lima).
+            'vinculosLaborales as tiene_vinculo_vigente' => fn (Builder $vinculos) => $vinculos->etapaActual()->where('anulado', false)
+                ->where(fn (Builder $q): Builder => $q->whereNull('fecha_cese')->orWhereDate('fecha_cese', '>=', VigenciaLaboral::hoy())),
             'legajos as tiene_legajo_activo' => fn (Builder $legajos) => $legajos->where('estado_legajo', 'activo'),
         ]);
     }

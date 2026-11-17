@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { datosAplicables, motivosDescarte, sugerenciasAplicables, valorLegible } from './escanerCampos.js'
+import { datosAplicables, motivosDescarte, sugerenciasAplicables, valorLegible, resultadoLectura } from './escanerCampos.js'
 
 test('solo aplica campos permitidos y conserva la edición realizada durante la lectura', () => {
   const recibidos = { emisor: { valor: 'Universidad', evidencia: 'Universidad' }, fecha_emision: { valor: '2026-10-01', evidencia: '1 de octubre de 2026' }, folio_inicio: { valor: '99', evidencia: '99' }, anios: { valor: '5', evidencia: '5 años' } }
@@ -27,4 +27,20 @@ test('lo sugerido no se repite como descartado y las fechas se leen como en un d
   assert.deepEqual(motivosDescarte({ fecha_emision: 'fecha_no_coincide', cargo: 'es_el_titular' }, ['fecha_emision', 'cargo'], { fecha_emision: {} }), [{ campo: 'cargo', motivo: 'es el nombre de la persona' }])
   assert.equal(valorLegible('2024-08-12'), '12/08/2024')
   assert.equal(valorLegible('Docente'), 'Docente')
+})
+
+test('resultado de la lectura: aceptado, corregido, borrado, sugerencia usada y no detectado, sin enviar valores', () => {
+  const resultado = resultadoLectura({
+    pedidos: ['emisor', 'fecha_emision', 'num_resolucion', 'nombre', 'horas', 'cargo'],
+    propuestos: { emisor: 'Universidad  de Ejemplo', fecha_emision: '2026-01-02', cargo: 'Director' },
+    sugeridos: { nombre: 'Resolución rectoral' },
+    finales: { emisor: 'UNIVERSIDAD DE EJEMPLO ', fecha_emision: '2026-01-03', cargo: '', nombre: 'RESOLUCIÓN RECTORAL', num_resolucion: '012-2026', horas: '' },
+  })
+  assert.deepEqual(resultado, { emisor: 'aceptado', fecha_emision: 'corregido', cargo: 'borrado', nombre: 'sugerencia_usada', num_resolucion: 'no_detectado' })
+  assert.ok(Object.values(resultado).every(valor => ['aceptado', 'corregido', 'borrado', 'sugerencia_usada', 'no_detectado'].includes(valor)))
+})
+
+test('una sugerencia distinta de lo guardado cuenta como no detectado', () => {
+  assert.deepEqual(resultadoLectura({ pedidos: ['nombre'], sugeridos: { nombre: 'A' }, finales: { nombre: 'B' } }), { nombre: 'no_detectado' })
+  assert.deepEqual(resultadoLectura({ pedidos: ['nombre'], finales: {} }), {})
 })

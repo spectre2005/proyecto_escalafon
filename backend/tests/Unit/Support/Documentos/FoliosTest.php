@@ -168,7 +168,20 @@ class FoliosTest extends TestCase
 
     public function test_reservar_rechaza_un_rango_invertido(): void
     {
-        $this->markTestSkipped('Posible bug: Folios::reservar() (app/Support/Documentos/Folios.php:36-46) no valida que fin >= inicio; '
-            .'reservar(4, 2) con siguiente folio 4 pasa y deja ultimo_folio = 2 (retrocede). Hoy depende de la validación del request.');
+        $this->documento(3, 1, 3);
+        LegajoSeccion::query()->create(['legajo_id' => $this->legajo->id, 'seccion_legajo_id' => 3, 'ultimo_folio' => 3]);
+
+        try {
+            Folios::reservar($this->legajo, 3, 4, 2);
+            $this->fail('Se esperaba rechazar el rango invertido 4–2.');
+        } catch (ValidationException $error) {
+            $this->assertStringContainsString('folio final debe ser mayor o igual', $error->errors()['folio_fin'][0]);
+        }
+        $this->assertSame(3, $this->fila(3)->ultimo_folio, 'ultimo_folio no retrocede');
+    }
+
+    public function test_reservar_acepta_un_documento_de_un_solo_folio(): void
+    {
+        $this->assertSame(1, Folios::reservar($this->legajo, 3, 1, 1)->ultimo_folio);
     }
 }

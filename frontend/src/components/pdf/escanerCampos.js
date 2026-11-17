@@ -44,3 +44,24 @@ export function datosAplicables(campos, inicial, actual, permitidos) {
     && typeof dato?.valor === 'string' && dato.valor.trim() && typeof dato.evidencia === 'string',
   ).map(([key, dato]) => [key, dato.valor]))
 }
+
+const normalizarValor = valor => String(valor ?? '').trim().replace(/\s+/g, ' ').toLocaleUpperCase('es-PE')
+
+/**
+ * Qué pasó con cada campo pedido a la IA, al enviar el formulario. Solo resultados, nunca valores: es lo que se guarda
+ * para medir el acierto. Los campos que siguen vacíos y la IA no propuso no se informan.
+ * - aceptado / corregido / borrado: la IA lo completó y quedó igual, se cambió o se vació.
+ * - sugerencia_usada: la IA lo dejó como «posible dato» y es lo que se guardó.
+ * - no_detectado: la IA no lo completó, pero la persona sí lo llenó.
+ */
+export function resultadoLectura({ pedidos = [], propuestos = {}, sugeridos = {}, finales = {} }) {
+  return Object.fromEntries(pedidos.flatMap(campo => {
+    const final = normalizarValor(finales[campo])
+    if (campo in propuestos) return [[campo, !final ? 'borrado' : final === normalizarValor(propuestos[campo]) ? 'aceptado' : 'corregido']]
+    if (final && campo in sugeridos && final === normalizarValor(sugeridos[campo])) return [[campo, 'sugerencia_usada']]
+    return final ? [[campo, 'no_detectado']] : []
+  }))
+}
+
+// Aviso sobre el titular del documento (TitularDocumento en el backend): tono según la gravedad.
+export const TONO_TITULAR = { distinto: 'error', dni_distinto: 'aviso', sin_datos: 'aviso', coincide: 'ok', coincide_nombre: 'ok' }

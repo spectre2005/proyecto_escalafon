@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Api\V1\Legajos\DocumentoLegajoController;
 use App\Http\Controllers\Controller;
+use App\Models\LecturaIa;
 use App\Models\Legajo;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
@@ -11,6 +12,7 @@ use App\Support\Auditoria;
 use App\Support\ConfiguracionFuncionalidades;
 use App\Support\Documentos\ArchivoPdf;
 use App\Support\Documentos\EscanerSecciones;
+use App\Support\Documentos\TitularDocumento;
 use App\Support\Parametros;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
@@ -45,14 +47,26 @@ class EscanerSeccionesController extends Controller
         $inicio = microtime(true);
         $resultado = 'error';
         $campos = [];
+        $titular = null;
         try {
             $texto = $escaner->leer($request->file('pdf'));
-            $titular = trim(implode(' ', array_filter([$persona->nombres, $persona->apellido_paterno, $persona->apellido_materno])));
-            $campos = $escaner->interpretar($texto, $tipo->nombre, $datos['campos'], $titular);
+            $nombreTitular = trim(implode(' ', array_filter([$persona->nombres, $persona->apellido_paterno, $persona->apellido_materno])));
+            $campos = $escaner->interpretar($texto, $tipo->nombre, $datos['campos'], $nombreTitular);
+            // ¿Es de esta persona? Búsqueda de texto (sin modelo) con su DNI y su nombre.
+            $titular = TitularDocumento::comparar($texto, ['dni' => $persona->numero_doc_identidad, 'nombres' => $persona->nombres,
+                'apellido_paterno' => $persona->apellido_paterno, 'apellido_materno' => $persona->apellido_materno]);
             $resultado = 'correcto';
             $confianzas = array_filter(array_column($escaner->paginas, 'confianza'), fn (?float $confianza): bool => $confianza !== null);
+            // Para medir el acierto: qué se pidió y qué se propuso, nunca los valores.
+            $lectura = LecturaIa::query()->create([
+                'usuario_id' => $persona->id, 'tipo_documento_id' => $tipo->id, 'registrado_por' => $request->user()->id,
+                'modelo' => (string) config('escaner.modelo'), 'segundos' => round(microtime(true) - $inicio, 1), 'titular' => $titular['estado'],
+                'campos_pedidos' => $datos['campos'], 'campos_propuestos' => array_keys($campos), 'campos_sugeridos' => array_keys($escaner->sugerencias),
+            ]);
 
             return response()->json(['data' => [
+                'lectura_id' => $lectura->id,
+                'titular' => $titular,
                 'campos' => $campos,
                 'descartados' => $escaner->descartados,
                 'sugerencias' => $escaner->sugerencias,
@@ -66,7 +80,7 @@ class EscanerSeccionesController extends Controller
             // Sin valores ni citas: el contenido del documento no se copia a la auditoría.
             Auditoria::registrar($request, 'documento.lectura_ia', 'usuarios', $persona->id, $persona->id, null, [
                 'tipo_documento_id' => $tipo->id, 'resultado' => $resultado, 'modelo' => (string) config('escaner.modelo'),
-                'segundos' => round(microtime(true) - $inicio, 1), 'paginas' => $escaner->paginas,
+                'segundos' => round(microtime(true) - $inicio, 1), 'paginas' => $escaner->paginas, 'titular' => $titular['estado'] ?? null,
                 'campos_pedidos' => $datos['campos'], 'campos_propuestos' => array_keys($campos), 'campos_sugeridos' => array_keys($escaner->sugerencias), 'descartados' => $escaner->descartados,
             ]);
         }
