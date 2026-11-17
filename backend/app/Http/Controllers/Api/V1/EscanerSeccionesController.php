@@ -4,25 +4,22 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Api\V1\Legajos\DocumentoLegajoController;
 use App\Http\Controllers\Controller;
+use App\Jobs\LeerDocumentoConIa;
 use App\Models\LecturaIa;
 use App\Models\Legajo;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
-use App\Support\Auditoria;
 use App\Support\ConfiguracionFuncionalidades;
 use App\Support\Documentos\ArchivoPdf;
 use App\Support\Documentos\EscanerSecciones;
-use App\Support\Documentos\TitularDocumento;
 use App\Support\Parametros;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 
 class EscanerSeccionesController extends Controller
 {
-    public function __invoke(Request $request, EscanerSecciones $escaner): JsonResponse
+    public function __invoke(Request $request): JsonResponse
     {
         abort_unless((bool) config('escaner.activo'), 409, 'La lectura de documentos con IA no está activa en este servidor.');
         $datos = $request->validate([
@@ -42,47 +39,22 @@ class EscanerSeccionesController extends Controller
         abort_if($seccion === 7 && ! $request->user()->can('seccion07.ver'), 403);
         abort_if(ConfiguracionFuncionalidades::inactivaPorTipo($tipo->id) !== null, 409, 'Esta funcionalidad está desactivada.');
         abort_unless(ArchivoPdf::esPdf($request->file('pdf')), 422, 'Adjunta un PDF válido.');
-        $bloqueo = Cache::lock('escaner-documentos-local', 280);
-        abort_unless($bloqueo->get(), 429, 'Hay otra lectura en curso. Espera a que termine y vuelve a intentarlo.');
-        $inicio = microtime(true);
-        $resultado = 'error';
-        $campos = [];
-        $titular = null;
-        try {
-            $texto = $escaner->leer($request->file('pdf'));
-            $nombreTitular = trim(implode(' ', array_filter([$persona->nombres, $persona->apellido_paterno, $persona->apellido_materno])));
-            $campos = $escaner->interpretar($texto, $tipo->nombre, $datos['campos'], $nombreTitular);
-            // ¿Es de esta persona? Búsqueda de texto (sin modelo) con su DNI y su nombre.
-            $titular = TitularDocumento::comparar($texto, ['dni' => $persona->numero_doc_identidad, 'nombres' => $persona->nombres,
-                'apellido_paterno' => $persona->apellido_paterno, 'apellido_materno' => $persona->apellido_materno]);
-            $resultado = 'correcto';
-            $confianzas = array_filter(array_column($escaner->paginas, 'confianza'), fn (?float $confianza): bool => $confianza !== null);
-            // Para medir el acierto: qué se pidió y qué se propuso, nunca los valores.
-            $lectura = LecturaIa::query()->create([
-                'usuario_id' => $persona->id, 'tipo_documento_id' => $tipo->id, 'registrado_por' => $request->user()->id,
-                'modelo' => (string) config('escaner.modelo'), 'segundos' => round(microtime(true) - $inicio, 1), 'titular' => $titular['estado'],
-                'campos_pedidos' => $datos['campos'], 'campos_propuestos' => array_keys($campos), 'campos_sugeridos' => array_keys($escaner->sugerencias),
-            ]);
+        // Copia propia del PDF: el archivo subido se borra al terminar la petición y la lectura sigue después.
+        $ruta = sys_get_temp_dir().'/escalafon-lectura-'.bin2hex(random_bytes(12)).'.pdf';
+        abort_unless(copy($request->file('pdf')->getRealPath(), $ruta), 500, 'No se pudo preparar el PDF para leerlo.');
+        chmod($ruta, 0600);
+        $lectura = LecturaIa::query()->create([
+            'usuario_id' => $persona->id, 'tipo_documento_id' => $tipo->id, 'registrado_por' => $request->user()->id,
+            'modelo' => (string) config('escaner.modelo'), 'estado' => 'en_espera',
+            'campos_pedidos' => $datos['campos'], 'campos_propuestos' => [], 'campos_sugeridos' => [],
+        ]);
+        // Después de responder: la pantalla consulta el avance y puede seguir usándose mientras tanto.
+        LeerDocumentoConIa::dispatchAfterResponse($lectura->id, $ruta, $tipo->nombre, $datos['campos'], [
+            'dni' => $persona->numero_doc_identidad, 'nombres' => $persona->nombres,
+            'apellido_paterno' => $persona->apellido_paterno, 'apellido_materno' => $persona->apellido_materno,
+        ]);
 
-            return response()->json(['data' => [
-                'lectura_id' => $lectura->id,
-                'titular' => $titular,
-                'campos' => $campos,
-                'descartados' => $escaner->descartados,
-                'sugerencias' => $escaner->sugerencias,
-                'lectura_dudosa' => $confianzas !== [] && min($confianzas) < 70,
-                'aviso' => 'Se leyeron hasta 3 páginas. Revisa los datos contra el PDF antes de guardar. La lectura no acredita autenticidad.',
-            ]])->header('Cache-Control', 'private, no-store');
-        } catch (ConnectionException) {
-            abort(503, 'No se pudo conectar con Ollama. Inicia el servicio y verifica el modelo local.');
-        } finally {
-            $bloqueo->release();
-            // Sin valores ni citas: el contenido del documento no se copia a la auditoría.
-            Auditoria::registrar($request, 'documento.lectura_ia', 'usuarios', $persona->id, $persona->id, null, [
-                'tipo_documento_id' => $tipo->id, 'resultado' => $resultado, 'modelo' => (string) config('escaner.modelo'),
-                'segundos' => round(microtime(true) - $inicio, 1), 'paginas' => $escaner->paginas, 'titular' => $titular['estado'] ?? null,
-                'campos_pedidos' => $datos['campos'], 'campos_propuestos' => array_keys($campos), 'campos_sugeridos' => array_keys($escaner->sugerencias), 'descartados' => $escaner->descartados,
-            ]);
-        }
+        return response()->json(['data' => ['lectura_id' => $lectura->id, 'estado' => $lectura->estado]], 202)
+            ->header('Cache-Control', 'private, no-store');
     }
 }

@@ -127,7 +127,7 @@ export default function PdfPreviewField({ name, id, label, help, maxMB = 2, curr
     <div>
       <input ref={input} name={name} id={id || generatedId} type="file" accept="application/pdf,.pdf" required={required && !currentUrl} onChange={select} aria-describedby={helpId} aria-invalid={Boolean(message)} className="min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus-visible:outline-2 focus-visible:outline-teal-600" />
     </div>
-    <p id={helpId} className="text-xs text-slate-500">{conLector ? 'El robot lee hasta 3 páginas en el servidor local y propone datos. Revisa antes de guardar; el escaneo no incorpora el archivo al legajo.' : help}</p>
+    <p id={helpId} className="text-xs text-slate-500">{conLector ? 'El robot lee todas las páginas en el servidor local (con un máximo configurable) y propone datos. Puedes seguir llenando el formulario mientras lee. Revisa antes de guardar; el escaneo no incorpora el archivo al legajo.' : help}</p>
     {message && <p role="alert" className="text-xs text-rose-700">{[].concat(message).join(' ')}</p>}
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
       <div className="flex min-w-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3">

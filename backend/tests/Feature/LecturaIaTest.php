@@ -10,7 +10,10 @@ use App\Models\Usuario;
 use App\Support\Documentos\EscanerSecciones;
 use Database\Seeders\Seccion06CatalogoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Testing\TestResponse;
+use Illuminate\Validation\ValidationException;
 use Tests\Concerns\SubeDocumentos;
 use Tests\TestCase;
 
@@ -45,10 +48,18 @@ class LecturaIaTest extends TestCase
             });
         });
 
-        return $this->post('/api/v1/documentos/escanear', [
+        return $this->leerYEsperar();
+    }
+
+    /** Envía el PDF (responde 202 al instante) y consulta la lectura, que en las pruebas termina con la petición. */
+    private function leerYEsperar(): TestResponse
+    {
+        $id = $this->post('/api/v1/documentos/escanear', [
             'usuario_id' => $this->persona->id, 'tipo_documento_id' => $this->tipo->id,
             'campos' => ['emisor', 'fecha_emision', 'num_resolucion'], 'pdf' => $this->pdf(),
-        ], ['Accept' => 'application/json']);
+        ], ['Accept' => 'application/json'])->assertAccepted()->assertJsonPath('data.estado', 'en_espera')->json('data.lectura_id');
+
+        return $this->getJson('/api/v1/documentos/escaner/lecturas/'.$id);
     }
 
     public function test_avisa_cuando_el_documento_parece_de_otra_persona(): void
@@ -147,5 +158,102 @@ class LecturaIaTest extends TestCase
         $this->actuarComo(codigo: 'asistente_legajo');
 
         $this->getJson('/api/v1/documentos/escaner/precision')->assertForbidden();
+    }
+
+    public function test_la_lectura_corre_despues_de_responder_e_informa_su_avance(): void
+    {
+        $this->actuarComo();
+        $avance = [];
+        $this->mock(EscanerSecciones::class, function ($mock) use (&$avance): void {
+            $mock->shouldReceive('leer')->once()->andReturnUsing(function ($pdf, ?callable $progreso) use ($mock, &$avance): string {
+                $this->assertFileExists($pdf->getRealPath());
+                foreach ([1, 2, 3] as $pagina) {
+                    $progreso($pagina, 3);
+                    $avance[] = LecturaIa::query()->latest()->firstOrFail()->only(['estado', 'pagina_actual', 'paginas_leer']);
+                }
+                $mock->paginasDocumento = 5;
+
+                return 'DNI 45678912';
+            });
+            $mock->shouldReceive('interpretar')->once()->andReturn([]);
+        });
+
+        $datos = $this->leerYEsperar()->assertOk()->json('data');
+
+        $this->assertSame(['estado' => 'leyendo', 'pagina_actual' => 3, 'paginas_leer' => 3], $avance[2]);
+        $this->assertSame(['lista', 3, 3, 5], [$datos['estado'], $datos['pagina_actual'], $datos['paginas_leer'], $datos['paginas_documento']]);
+        $this->assertStringContainsString('las primeras 3 de 5 páginas', $datos['aviso']);
+        // La copia temporal del PDF se borra al terminar.
+        $this->assertSame([], glob(sys_get_temp_dir().'/escalafon-lectura-*.pdf'));
+    }
+
+    public function test_un_corte_por_tiempo_se_informa_como_tal_y_no_como_falta_de_conexion(): void
+    {
+        $this->actuarComo();
+        config(['escaner.timeout' => 150]);
+        $this->mock(EscanerSecciones::class, function ($mock): void {
+            $mock->shouldReceive('leer')->once()->andReturn('texto');
+            $mock->shouldReceive('interpretar')->once()->andThrow(new ConnectionException('cURL error 28: Operation timed out after 150001 milliseconds'));
+        });
+
+        $datos = $this->leerYEsperar()->assertOk()->json('data');
+
+        $this->assertSame('error', $datos['estado']);
+        $this->assertStringContainsString('tardó más de 150 s', $datos['error']);
+        $this->assertArrayNotHasKey('campos', $datos);
+        $this->assertStringContainsString('"resultado":"error"', (string) AuditoriaEvento::query()->where('accion', 'documento.lectura_ia')->value('datos_despues'));
+    }
+
+    public function test_sin_ollama_dice_que_no_hay_conexion(): void
+    {
+        $this->actuarComo();
+        $this->mock(EscanerSecciones::class, function ($mock): void {
+            $mock->shouldReceive('leer')->once()->andReturn('texto');
+            $mock->shouldReceive('interpretar')->once()->andThrow(new ConnectionException('cURL error 7: Failed to connect to ollama port 11434'));
+        });
+
+        $this->assertStringContainsString('No se pudo conectar con Ollama', $this->leerYEsperar()->json('data.error'));
+    }
+
+    public function test_un_pdf_ilegible_muestra_el_motivo(): void
+    {
+        $this->actuarComo();
+        $this->mock(EscanerSecciones::class, function ($mock): void {
+            $mock->shouldReceive('leer')->once()->andThrow(ValidationException::withMessages(['pdf' => 'El PDF tiene contraseña. Adjunta una copia sin protección.']));
+        });
+
+        $this->assertSame('El PDF tiene contraseña. Adjunta una copia sin protección.', $this->leerYEsperar()->json('data.error'));
+    }
+
+    public function test_solo_quien_escaneo_ve_el_resultado(): void
+    {
+        $this->actuarComo();
+        $id = $this->escanear('DNI 45678912')->json('data.lectura_id');
+
+        $this->actuarComo();
+        $this->getJson('/api/v1/documentos/escaner/lecturas/'.$id)->assertForbidden();
+    }
+
+    public function test_el_resultado_no_queda_en_la_base_y_caduca(): void
+    {
+        $this->actuarComo();
+        $id = $this->escanear('UNIVERSIDAD DE EJEMPLO. DNI 45678912')->assertOk()->json('data.lectura_id');
+        $this->assertStringNotContainsString('UNIVERSIDAD DE EJEMPLO', json_encode(LecturaIa::query()->findOrFail($id)->getAttributes()));
+        // En la caché va cifrado.
+        $this->assertStringNotContainsString('UNIVERSIDAD DE EJEMPLO', (string) Cache::get('lectura-ia:'.$id));
+
+        Cache::forget('lectura-ia:'.$id);
+        $this->getJson('/api/v1/documentos/escaner/lecturas/'.$id)->assertOk()
+            ->assertJsonPath('data.estado', 'error')->assertJsonPath('data.campos', null);
+    }
+
+    public function test_una_lectura_sin_avances_se_da_por_interrumpida(): void
+    {
+        $admin = $this->actuarComo();
+        $lectura = LecturaIa::factory()->create(['registrado_por' => $admin->id, 'estado' => 'leyendo']);
+        $lectura->forceFill(['updated_at' => now()->subMinutes(LecturaIa::MINUTOS_SIN_AVANCE + 1)])->saveQuietly();
+
+        $this->getJson('/api/v1/documentos/escaner/lecturas/'.$lectura->id)->assertOk()
+            ->assertJsonPath('data.estado', 'error')->assertJsonPath('data.error', 'La lectura se interrumpió (p. ej. se reinició el servidor). Vuelve a intentarlo.');
     }
 }

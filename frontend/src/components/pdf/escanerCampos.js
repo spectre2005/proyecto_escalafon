@@ -65,3 +65,14 @@ export function resultadoLectura({ pedidos = [], propuestos = {}, sugeridos = {}
 
 // Aviso sobre el titular del documento (TitularDocumento en el backend): tono según la gravedad.
 export const TONO_TITULAR = { distinto: 'error', dni_distinto: 'aviso', sin_datos: 'aviso', coincide: 'ok', coincide_nombre: 'ok' }
+
+// Estados de una lectura que todavía corre en el servidor (LecturaIa::EN_CURSO): la pantalla sigue consultando.
+export const LECTURA_EN_CURSO = ['en_espera', 'leyendo', 'interpretando']
+
+/** Texto del avance de una lectura en curso, para mostrar junto al botón. */
+export function textoAvance(lectura) {
+  if (lectura?.estado === 'en_espera') return 'En espera: hay otra lectura en curso…'
+  if (lectura?.estado === 'interpretando') return 'La IA está interpretando el texto…'
+  if (lectura?.estado === 'leyendo' && lectura.pagina_actual && lectura.paginas_leer) return `Leyendo página ${lectura.pagina_actual} de ${lectura.paginas_leer}…`
+  return 'Leyendo el PDF…'
+}

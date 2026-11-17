@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { datosAplicables, motivosDescarte, sugerenciasAplicables, valorLegible, resultadoLectura } from './escanerCampos.js'
+import { datosAplicables, LECTURA_EN_CURSO, motivosDescarte, resultadoLectura, sugerenciasAplicables, textoAvance, valorLegible } from './escanerCampos.js'
 
 test('solo aplica campos permitidos y conserva la edición realizada durante la lectura', () => {
   const recibidos = { emisor: { valor: 'Universidad', evidencia: 'Universidad' }, fecha_emision: { valor: '2026-10-01', evidencia: '1 de octubre de 2026' }, folio_inicio: { valor: '99', evidencia: '99' }, anios: { valor: '5', evidencia: '5 años' } }
@@ -43,4 +43,12 @@ test('resultado de la lectura: aceptado, corregido, borrado, sugerencia usada y 
 test('una sugerencia distinta de lo guardado cuenta como no detectado', () => {
   assert.deepEqual(resultadoLectura({ pedidos: ['nombre'], sugeridos: { nombre: 'A' }, finales: { nombre: 'B' } }), { nombre: 'no_detectado' })
   assert.deepEqual(resultadoLectura({ pedidos: ['nombre'], finales: {} }), {})
+})
+
+test('el avance de la lectura se describe por estado y página', () => {
+  assert.equal(textoAvance({ estado: 'en_espera' }), 'En espera: hay otra lectura en curso…')
+  assert.equal(textoAvance({ estado: 'leyendo', pagina_actual: 4, paginas_leer: 12 }), 'Leyendo página 4 de 12…')
+  assert.equal(textoAvance({ estado: 'leyendo' }), 'Leyendo el PDF…')
+  assert.equal(textoAvance({ estado: 'interpretando' }), 'La IA está interpretando el texto…')
+  assert.deepEqual(LECTURA_EN_CURSO, ['en_espera', 'leyendo', 'interpretando'])
 })

@@ -23,6 +23,10 @@ return [
     // client_max_body_size de nginx (hoy 2 MB y 3 MB en docker/).
     'tamano_maximo_pdf_kb' => (int) env('LEGAJO_TAMANO_MAXIMO_PDF_KB', 2048),
 
+    // Páginas que lee como máximo la lectura con IA (EscanerSecciones). Si el PDF tiene más, se leen las primeras y se
+    // avisa. Las escaneadas pasan por OCR (unos 15 s por página en un equipo sin GPU). Se ajusta en parametros_sistema.
+    'escaner_paginas_maximas' => (int) env('ESCANER_PAGINAS_MAXIMAS', 30),
+
     // TODO pendiente de confirmar con el cliente: formato del número de legajo. Único lugar donde se define
     // (App\Support\NumeroLegajo). {anio} = año de apertura; el correlativo se reinicia cada año. Máximo 20 caracteres.
     'numero_legajo' => ['prefijo' => 'LEG-{anio}-', 'digitos' => 6],

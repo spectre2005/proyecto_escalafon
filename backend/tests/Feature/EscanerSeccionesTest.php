@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuditoriaEvento;
 use App\Models\DocumentoUsuario;
+use App\Models\LecturaIa;
 use App\Models\Legajo;
 use App\Models\TipoDocumento;
 use App\Support\Documentos\EscanerSecciones;
@@ -11,6 +12,7 @@ use Database\Seeders\Seccion06CatalogoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Concerns\SubeDocumentos;
 use Tests\TestCase;
@@ -388,7 +390,8 @@ class EscanerSeccionesTest extends TestCase
         });
         $this->post('/api/v1/documentos/escanear', [
             'usuario_id' => $legajo->usuario_id, 'tipo_documento_id' => $tipo->id, 'campos' => ['emisor', 'fecha_emision'], 'pdf' => $this->pdf(),
-        ], ['Accept' => 'application/json'])->assertOk()->assertJsonPath('data.descartados.fecha_emision', 'fecha_no_coincide')
+        ], ['Accept' => 'application/json'])->assertAccepted();
+        $this->lecturaTerminada()->assertJsonPath('data.descartados.fecha_emision', 'fecha_no_coincide')
             ->assertJsonPath('data.sugerencias.fecha_emision.valor', '2024-08-12');
         $evento = AuditoriaEvento::query()->where('accion', 'documento.lectura_ia')->firstOrFail();
         $this->assertSame($legajo->usuario_id, $evento->usuario_titular_id);
@@ -413,7 +416,8 @@ class EscanerSeccionesTest extends TestCase
         $antes = DocumentoUsuario::query()->count();
         $this->post('/api/v1/documentos/escanear', [
             'usuario_id' => $legajo->usuario_id, 'tipo_documento_id' => $tipo->id, 'campos' => ['emisor'], 'pdf' => $this->pdf(),
-        ], ['Accept' => 'application/json'])->assertOk()->assertJsonPath('data.campos.emisor.valor', 'UNIVERSIDAD DE EJEMPLO');
+        ], ['Accept' => 'application/json'])->assertAccepted();
+        $this->lecturaTerminada()->assertJsonPath('data.campos.emisor.valor', 'UNIVERSIDAD DE EJEMPLO');
         $this->assertDatabaseCount('documentos_usuario', $antes);
         $this->assertSame('activo', $legajo->fresh()->estado_legajo);
     }
@@ -441,5 +445,13 @@ class EscanerSeccionesTest extends TestCase
         $this->post('/api/v1/documentos/escanear', [
             'usuario_id' => $legajo->usuario_id, 'tipo_documento_id' => $tipo->id, 'campos' => ['emisor'], 'pdf' => $this->pdf(),
         ], ['Accept' => 'application/json'])->assertForbidden();
+    }
+
+    /** La lectura corre después de responder (en las pruebas, al terminar la petición): se consulta su resultado. */
+    private function lecturaTerminada(): TestResponse
+    {
+        $lectura = LecturaIa::query()->latest()->firstOrFail();
+
+        return $this->getJson('/api/v1/documentos/escaner/lecturas/'.$lectura->id)->assertOk()->assertJsonPath('data.estado', 'lista');
     }
 }

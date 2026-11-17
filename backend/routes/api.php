@@ -118,6 +118,9 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
     Route::post('documentos/escanear', EscanerSeccionesController::class)
         ->middleware(['can:legajo.ver', 'can:documento.subir', 'throttle:4,1,lector']);
     // Acierto de la lectura con IA: el formulario informa el resultado por campo (sin valores) y administración ve el resumen.
+    // Avance y resultado de una lectura en curso (la lectura corre después de responder: LeerDocumentoConIa).
+    Route::get('documentos/escaner/lecturas/{lectura}', [LecturaIaController::class, 'mostrar'])
+        ->whereUuid('lectura')->middleware(['can:legajo.ver', 'can:documento.subir']);
     Route::post('documentos/escaner/lecturas/{lectura}/resultado', [LecturaIaController::class, 'resultado'])
         ->whereUuid('lectura')->middleware(['can:documento.subir', 'throttle:30,1']);
     Route::get('documentos/escaner/precision', [LecturaIaController::class, 'precision'])->middleware('can:sistema.administrar');
