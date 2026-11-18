@@ -35,7 +35,7 @@ export default function CompletaPerfil({ usuario, pendientes, legajoActivo, pleg
   const contenido = <>
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h2 id="completa-perfil-titulo" className="text-sm font-semibold text-slate-800">Completa el perfil <span className="ml-1 rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600">{pendientes.length} sin responder</span></h2>
+        <h2 id="completa-perfil-titulo" className="text-sm font-semibold text-slate-800">Completa el perfil <span className="ml-1 rounded-full bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-600">{pendientes.length} sin responder</span></h2>
         <p className="mt-1 text-xs text-slate-500">Mientras una condición esté sin responder, sus documentos quedan por determinar. Si aún no sabes la respuesta, déjala como está.</p>
       </div>
     </div>
@@ -48,7 +48,7 @@ export default function CompletaPerfil({ usuario, pendientes, legajoActivo, pleg
         return <li key={clave} id={`perfil-pendiente-${pendiente.bandera}-${pendiente.vinculo_id || 'persona'}`} tabIndex={-1} className="scroll-mt-6 focus:outline-2 focus:outline-teal-600 target:bg-teal-50 flex flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div className="min-w-0">
             <p className="text-sm text-slate-700">{preguntasPerfil[pendiente.bandera] || pendiente.bandera}</p>
-            <p className="mt-0.5 text-[11px] text-slate-500">Se guarda en: {lugarPendiente(pendiente)}{motivo ? ` · ${motivo}` : ''}</p>
+            <p className="mt-0.5 text-xs text-slate-500">Se guarda en: {lugarPendiente(pendiente)}{motivo ? ` · ${motivo}` : ''}</p>
             {errores[clave] && <p role="alert" className="mt-1 text-xs text-rose-700">No se guardó: {errores[clave]}</p>}
           </div>
           {!motivo && <div className="flex shrink-0 gap-2" role="group" aria-label={`Responder: ${preguntasPerfil[pendiente.bandera]} (${lugarPendiente(pendiente)})`}>
@@ -60,7 +60,7 @@ export default function CompletaPerfil({ usuario, pendientes, legajoActivo, pleg
     </ul>
   </>
   if (plegado) return <details className="mb-4 rounded-2xl border border-slate-200 bg-white px-5 py-3">
-    <summary className="cursor-pointer text-sm text-slate-700"><strong className="font-semibold text-slate-800">Completa el perfil</strong> <span className="ml-1 rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600">{pendientes.length} sin responder</span> <span className="ml-2 text-xs font-semibold text-teal-700">Responder</span></summary>
+    <summary className="cursor-pointer text-sm text-slate-700"><strong className="font-semibold text-slate-800">Completa el perfil</strong> <span className="ml-1 rounded-full bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-600">{pendientes.length} sin responder</span> <span className="ml-2 text-xs font-semibold text-teal-700">Responder</span></summary>
     <div className="mt-3">{contenido}</div>
   </details>
   return <section aria-labelledby="completa-perfil-titulo" className="mb-6 rounded-2xl border border-slate-200 bg-white p-5">{contenido}</section>

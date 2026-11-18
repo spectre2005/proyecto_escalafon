@@ -94,8 +94,8 @@ export default function SuperadministradoresPage() {
               <p className="font-semibold text-slate-800">{cuenta.nombre}{cuenta.es_actual && <span className="font-normal text-slate-500"> (tú)</span>}</p>
               <p className="break-all text-xs text-slate-500">{cuenta.email} · último acceso {cuenta.ultimo_acceso ? fecha(cuenta.ultimo_acceso) : 'nunca'}</p>
               <div className="mt-2 flex flex-wrap gap-2">
-                <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${cuenta.activo ? 'bg-teal-50 text-teal-800 ring-teal-200' : 'bg-slate-100 text-slate-600 ring-slate-200'}`}>{cuenta.activo ? 'Activa' : 'Desactivada'}</span>
-                {cuenta.activo && cuenta.debe_cambiar_password && <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 ring-1 ring-inset ring-amber-200">Contraseña temporal pendiente de cambio</span>}
+                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${cuenta.activo ? 'bg-teal-50 text-teal-800 ring-teal-200' : 'bg-slate-100 text-slate-600 ring-slate-200'}`}>{cuenta.activo ? 'Activa' : 'Desactivada'}</span>
+                {cuenta.activo && cuenta.debe_cambiar_password && <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200">Contraseña temporal pendiente de cambio</span>}
               </div>
             </div>
             <div className="flex flex-wrap gap-2">{accionesSuperadmin(cuenta).map(accion => <button key={accion} type="button" disabled={busy}

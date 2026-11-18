@@ -13,9 +13,9 @@ function Content({ institution, onNavigate }) {
     && (!item.modulo || funcionalidades.modulos_sistema?.[item.modulo] === true)
     && (!item.funcionalidades || item.funcionalidades.some(codigo => activa(funcionalidades, codigo))))
   return <div className="flex h-full flex-col px-5 py-7">
-    <Link to="/" onClick={onNavigate} className="mb-9 flex items-center gap-3 px-1"><span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-teal-700 text-sm font-bold text-white">{institution.logo ? <img src={institution.logo} alt={`Logo de ${institution.name}`} className="size-full rounded-2xl bg-white object-contain p-1" /> : institution.initials}</span><span className="min-w-0"><strong className="block truncate text-sm text-slate-800">{institution.name}</strong><span className="text-[11px] text-slate-500">{institution.area}</span></span></Link>
-    <nav aria-label="Navegación principal" className="space-y-7">{['Principal', 'Administración'].filter(group => items.some(item => item.group === group)).map(group => <div key={group}><p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[.16em] text-slate-400">{group}</p><div className="space-y-1">{items.filter(item => item.group === group).map(item => <NavItem key={item.label} item={item} onNavigate={onNavigate} />)}</div></div>)}</nav>
-    <p className="mt-auto px-2 pt-8 text-[10px] text-slate-400">Portal de gestión institucional</p>
+    <Link to="/" onClick={onNavigate} className="mb-9 flex items-center gap-3 px-1"><span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-teal-700 text-sm font-bold text-white">{institution.logo ? <img src={institution.logo} alt={`Logo de ${institution.name}`} className="size-full rounded-2xl bg-white object-contain p-1" /> : institution.initials}</span><span className="min-w-0"><strong className="block truncate text-sm text-slate-800">{institution.name}</strong><span className="text-xs text-slate-500">{institution.area}</span></span></Link>
+    <nav aria-label="Navegación principal" className="space-y-7">{['Principal', 'Administración'].filter(group => items.some(item => item.group === group)).map(group => <div key={group}><p className="mb-3 px-3 text-xs font-semibold uppercase tracking-[.16em] text-slate-400">{group}</p><div className="space-y-1">{items.filter(item => item.group === group).map(item => <NavItem key={item.label} item={item} onNavigate={onNavigate} />)}</div></div>)}</nav>
+    <p className="mt-auto px-2 pt-8 text-xs text-slate-400">Portal de gestión institucional</p>
   </div>
 }
 

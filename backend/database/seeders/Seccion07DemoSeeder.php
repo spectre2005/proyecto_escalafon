@@ -134,7 +134,7 @@ class Seccion07DemoSeeder extends Seeder
 
             // Administrativa de carrera: evaluaciones (una con plan de mejora), una progresión y tres desplazamientos.
             $vCarrera = $vinculo($carrera, 'administrativo', 'carrera', 'Especialista administrativo');
-            PerfilAdministrativo::query()->create(['vinculo_laboral_id' => $vCarrera->id, 'grupo_ocupacional' => 'profesional', 'nivel_carrera' => 'SP-ES']);
+            PerfilAdministrativo::query()->create(['vinculo_laboral_id' => $vCarrera->id, 'grupo_ocupacional' => 'profesional', 'nivel_carrera' => 'SPC']);
             $anio = (int) $hoy->year;
             EvaluacionDesempeno::query()->create($base($carrera) + ['ciclo_anio' => $anio - 2, 'fecha_evaluacion' => ($anio - 2).'-12-15', 'calificacion' => 'Buen rendimiento', 'puntaje' => 81.5, 'evaluador_id' => $registrador]);
             EvaluacionDesempeno::query()->create($base($carrera) + ['ciclo_anio' => $anio - 1, 'fecha_evaluacion' => ($anio - 1).'-12-15', 'calificacion' => 'Sujeto a observación', 'puntaje' => 58.0, 'plan_mejora' => true, 'evaluador_id' => $registrador]);

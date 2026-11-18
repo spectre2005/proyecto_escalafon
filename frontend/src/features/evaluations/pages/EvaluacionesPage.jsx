@@ -67,7 +67,7 @@ function ConsultaEvaluaciones() {
   }
 
   return <>
-    <div className="mb-7"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[.2em] text-teal-700">Sección 07 del legajo</p><h1 className="text-3xl font-bold text-slate-800">Evaluaciones</h1><p className="mt-3 max-w-2xl text-sm text-slate-500">Consulta de evaluación de desempeño, progresión en la carrera y desplazamientos del personal. Los registros se cargan desde el legajo de cada persona.</p></div>
+    <div className="mb-7"><p className="mb-2 text-xs font-semibold uppercase tracking-[.2em] text-teal-700">Sección 07 del legajo</p><h1 className="text-3xl font-bold text-slate-800">Evaluaciones</h1><p className="mt-3 max-w-2xl text-sm text-slate-500">Consulta de evaluación de desempeño, progresión en la carrera y desplazamientos del personal. Los registros se cargan desde el legajo de cada persona.</p></div>
 
     <div role="tablist" aria-label="Tipo de registro" className="mb-5 flex gap-2 overflow-x-auto pb-1">
       {visibles.map(item => <button key={item.key} role="tab" aria-selected={item.key === tipo.key} onClick={() => changeTipo(item.key)} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-medium ${item.key === tipo.key ? 'bg-teal-700 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>{item.label}</button>)}

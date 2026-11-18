@@ -15,8 +15,17 @@ const MOTIVOS = {
   demasiado_largo: 'el texto es demasiado largo',
 }
 
+// Nombre de cada campo como lo lee una persona (la clave técnica solo si falta en la lista).
+const ETIQUETAS = {
+  nombre: 'Título del documento', emisor: 'Emisor', fecha_emision: 'Fecha de emisión', num_resolucion: 'N.º de resolución',
+  numero_documento: 'N.º de documento', fecha_caducidad: 'Fecha de caducidad', fecha_inicio: 'Fecha de inicio', fecha_fin: 'Fecha de fin',
+  fecha_vencimiento: 'Fecha de vencimiento', vigente_hasta: 'Vigente hasta', numero_registro: 'N.º de registro', numero_colegiatura: 'N.º de colegiatura',
+  horas: 'Horas', cargo: 'Cargo', funcion_asignada: 'Función asignada', anios: 'Años', meses: 'Meses', dias: 'Días', concepto: 'Concepto',
+  fecha: 'Fecha', entidad: 'Entidad', motivo: 'Motivo',
+}
+
 export function etiquetaCampo(campo) {
-  return campo.replaceAll('_', ' ')
+  return ETIQUETAS[campo] || campo.replaceAll('_', ' ')
 }
 
 // Las fechas llegan como AAAA-MM-DD: para decidir, se muestran como se leen en un documento.

@@ -32,7 +32,7 @@ export default function CambiarPasswordObligatorio({ usuario, onCambiada }) {
   }
   return <main className="grid min-h-dvh place-items-center bg-slate-50 px-4 py-10 text-slate-700 antialiased">
     <form onSubmit={cambiar} aria-busy={busy} className="w-full max-w-sm rounded-3xl bg-white p-8 shadow-xl">
-      <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-slate-400">Primer ingreso</p>
+      <p className="text-xs font-semibold uppercase tracking-[.16em] text-slate-400">Primer ingreso</p>
       <h1 className="mt-2 text-2xl font-bold text-slate-900">Cambia tu contraseña</h1>
       <p className="mt-2 text-xs text-slate-500">{usuario?.nombres ? `${usuario.nombres}, tu` : 'Tu'} contraseña es temporal. Elige una nueva, con letras y números, para continuar.</p>
       {error && <p role="alert" className="mt-5 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}

@@ -17,11 +17,22 @@ const PESTANAS = [
   { id: 'tipos_vinculo', titulo: 'Tipos de vínculo' },
   { id: 'modalidades', titulo: 'Modalidades de vínculo' },
   { id: 'procesos', titulo: 'Procesos de selección' },
+  { id: 'niveles', titulo: 'Niveles de carrera' },
 ]
 const tiposPersonal = { docente: 'Docente', administrativo: 'Administrativo' }
 const colorRegimen = { carrera: 'bg-emerald-50 text-emerald-800', plazo_determinado: 'bg-sky-50 text-sky-800', designado: 'bg-amber-50 text-amber-800' }
 const boton = 'rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50'
 const sino = valor => valor === true ? 'Sí' : valor === false ? 'No' : '—'
+
+// Posición de un nivel en su escala (ley y grupo), contando solo los activos: «1 de 6 · ingreso».
+function posicionNivel(niveles, item) {
+  if (item.activo === false) return '—'
+  const escala = (niveles || []).filter(n => n.activo !== false && n.regimen_normativo_id === item.regimen_normativo_id && n.grupo_ocupacional === item.grupo_ocupacional)
+    .sort((a, b) => a.orden - b.orden || a.codigo.localeCompare(b.codigo))
+  const indice = escala.findIndex(n => n.id === item.id)
+  const extremo = escala.length > 1 && indice === 0 ? ' · ingreso' : escala.length > 1 && indice === escala.length - 1 ? ' · máximo' : ''
+  return `${indice + 1} de ${escala.length}${extremo}`
+}
 
 // Columnas de cada catálogo: [encabezado, valor de la fila].
 function columnas(catalogo, datos) {
@@ -39,7 +50,7 @@ function columnas(catalogo, datos) {
         `DJBR ${sino(item.obligado_djbr)}`, `Colegiatura ${sino(item.exige_colegiatura)}`, `Prueba ${sino(item.tiene_periodo_prueba)}`].filter(Boolean).join(' · ')],
     ],
     modalidades: [
-      ['Tipo de vínculo', item => <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${colorRegimen[item.regimen_laboral]}`}>{regimenesLaborales[item.regimen_laboral]}</span>],
+      ['Tipo de vínculo', item => <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${colorRegimen[item.regimen_laboral]}`}>{regimenesLaborales[item.regimen_laboral]}</span>],
       ['Para', item => item.tipo_personal ? `${tiposPersonal[item.tipo_personal]}s` : 'Todos'],
       ['Ley', item => ley(item.regimen_normativo_id) || '—'],
       ['Fin previsto', item => item.exige_fin_previsto ? 'Obligatorio' : 'Opcional'],
@@ -50,6 +61,11 @@ function columnas(catalogo, datos) {
     ],
     procesos: [
       ['Se usa en', () => 'Carrera y plazo determinado'],
+    ],
+    niveles: [
+      ['Ley', item => ley(item.regimen_normativo_id) || '—'],
+      ['Grupo', item => gruposOcupacionales[item.grupo_ocupacional] || item.grupo_ocupacional],
+      ['Posición', item => posicionNivel(datos.niveles, item)],
     ],
   }[catalogo]
 }
@@ -66,11 +82,14 @@ export default function CatalogosVinculoConfig() {
   const [error, setError] = useState('')
   const [ocupado, setOcupado] = useState('')
   const nombres = NOMBRES_CATALOGO[pestana]
-  const texto = item => item.nombre
+  // Los niveles se identifican por su sigla (no tienen nombre).
+  const texto = item => pestana === 'niveles' ? item.codigo : item.nombre
   const buscado = normalizar(busqueda)
   const lista = (datos?.[pestana] || [])
     .filter(item => (verInactivos || item.activo !== false) && (!buscado || normalizar(`${texto(item)} ${item.codigo}`).includes(buscado)))
-    .sort((a, b) => (a.activo === false) - (b.activo === false) || texto(a).localeCompare(texto(b), 'es'))
+    .sort((a, b) => (a.activo === false) - (b.activo === false) || (pestana === 'niveles'
+      ? `${a.regimen_normativo_id}${a.grupo_ocupacional}`.localeCompare(`${b.regimen_normativo_id}${b.grupo_ocupacional}`) || a.orden - b.orden
+      : texto(a).localeCompare(texto(b), 'es')))
   const inactivos = datos ? datos[pestana].filter(item => item.activo === false).length : 0
 
   function cambiarPestana(id) {
@@ -111,6 +130,9 @@ export default function CatalogosVinculoConfig() {
       </button>)}
     </div>
 
+    {pestana === 'niveles' && <div role="note" className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
+      <p className="max-w-3xl">Escala de niveles del personal administrativo por ley y grupo ocupacional, del nivel de ingreso al máximo. Debe coincidir con la resolución de cada servidor y con el PAP de la entidad. CAS (D.L. 1057) no tiene nivel de carrera. Una ley sin escala registrada deja el campo vacío al registrar personal.</p>
+    </div>}
     {pestana === 'tipos_vinculo' && <div role="note" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
       <p className="max-w-2xl">Los tres tipos vienen de la directiva y de ellos depende qué documentos se exigen: su nombre no cambia, pero puedes editar su descripción. Para agregar otro tipo (por ejemplo, suplencia o encargatura), créalo como modalidad dentro de uno de ellos.</p>
       {puedeEditar && <button type="button" onClick={() => { cambiarPestana('modalidades'); setFormulario({ registro: null }) }} className="rounded-xl bg-teal-700 px-4 py-2 text-sm font-semibold text-white">+ Nueva modalidad</button>}
@@ -124,7 +146,7 @@ export default function CatalogosVinculoConfig() {
     {formulario && datos && <PanelCatalogo titulo={formulario.registro ? nombres.editar : nombres.nuevo} onCerrar={() => setFormulario(null)}>
       <FormularioCatalogo key={`${pestana}-${formulario.registro?.id || 'nuevo'}`} catalogo={pestana} registro={formulario.registro} opciones={datos}
         onCancel={() => setFormulario(null)}
-        onGuardado={item => { setFormulario(null); setAviso(formulario.registro ? `Se guardaron los cambios de «${texto(item)}».` : `Se creó «${texto(item)}» con el código ${item.codigo}.`); consulta.retry() }} />
+        onGuardado={item => { setFormulario(null); setAviso(formulario.registro ? `Se guardaron los cambios de «${texto(item)}».` : pestana === 'niveles' ? `Se agregó el nivel «${item.codigo}» a la escala.` : `Se creó «${texto(item)}» con el código ${item.codigo}.`); consulta.retry() }} />
     </PanelCatalogo>}
 
     <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
@@ -139,9 +161,9 @@ export default function CatalogosVinculoConfig() {
     {!datos && !consulta.error && <p role="status" className="mt-4 text-sm text-slate-500">Cargando catálogos…</p>}
     {datos && <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
       <table className="w-full min-w-[640px] text-left text-sm" aria-labelledby={`catalogo-${pestana}`}>
-        <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">
+        <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
           <tr>
-            <th scope="col" className="px-4 py-2.5 font-semibold">Nombre</th>
+            <th scope="col" className="px-4 py-2.5 font-semibold">{pestana === 'niveles' ? 'Sigla' : 'Nombre'}</th>
             {columnas(pestana, datos).map(([encabezado]) => <th key={encabezado} scope="col" className="px-4 py-2.5 font-semibold">{encabezado}</th>)}
             <th scope="col" className="px-4 py-2.5 text-right font-semibold">Personas</th>
             {puedeEditar && <th scope="col" className="px-4 py-2.5"><span className="sr-only">Acciones</span></th>}
@@ -154,7 +176,9 @@ export default function CatalogosVinculoConfig() {
           {lista.map(item => <tr key={item.id} className={item.activo === false ? 'bg-slate-50/70 text-slate-400' : 'text-slate-700'}>
             <th scope="row" className="px-4 py-3 font-medium">
               <span className={item.activo === false ? '' : 'text-slate-800'}>{texto(item)}</span>
-              <span className="block text-[11px] font-normal tabular-nums text-slate-400">{item.codigo}{item.activo === false ? ' · desactivado' : ''}</span>
+              {pestana === 'niveles'
+                ? <span className="block text-xs font-normal text-slate-500">{item.nombre || 'Sin nombre'}{item.activo === false ? ' · desactivado' : ''}</span>
+                : <span className="block text-xs font-normal tabular-nums text-slate-400">{item.codigo}{item.activo === false ? ' · desactivado' : ''}</span>}
             </th>
             {columnas(pestana, datos).map(([encabezado, valor]) => <td key={encabezado} className="px-4 py-3 text-xs">{valor(item)}</td>)}
             <td className="px-4 py-3 text-right tabular-nums">{item.personas}</td>

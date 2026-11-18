@@ -57,7 +57,7 @@ export function VinculoForm({ usuario, record, documentoId, onSaved, onCancel })
       <p className="text-xs leading-relaxed text-slate-600">{historico ? 'Se guardará como cesado. Indica la fecha real de cese; permanecerá en el historial.' : 'Alta normal: se guardará sin fecha de cese. Será vigente si ya inició y su fecha de fin prevista no venció.'}</p>
     </div>}
     <Campo label="Tipo de personal" required error={errors.tipo_personal}><select required value={draft.tipo_personal} onChange={cambiarTipoPersonal} disabled={tipoFijo}><Opciones lista={tiposPersonal} actual={draft.tipo_personal} vacio="Selecciona" /></select></Campo>
-    {tipoFijo && <p className="self-end text-[11px] text-slate-500">El tipo de personal no se cambia: el vínculo ya tiene datos del puesto. Si es otro, anula el vínculo y registra el correcto.</p>}
+    {tipoFijo && <p className="self-end text-xs text-slate-500">El tipo de personal no se cambia: el vínculo ya tiene datos del puesto. Si es otro, anula el vínculo y registra el correcto.</p>}
     <CamposVinculo draft={draft} poner={poner} errors={errors} opciones={opciones} tipoPersonal={draft.tipo_personal} nuevo={!record} numeroLegajo={(persona?.legajos || []).map(legajo => legajo.values || legajo).find(legajo => legajo.estado_legajo === 'activo')?.numero_legajo || ''} conCese={!!record || historico} ceseObligatorio={!record && historico}>
       <Campo label="Ley / régimen normativo" required error={errors.regimen_normativo_id}><select required value={draft.regimen_normativo_id} onChange={set('regimen_normativo_id')} disabled={!opciones}><OpcionesCatalogo lista={(opciones?.regimenes || []).filter(ley => !draft.tipo_personal || ley.aplica_a === draft.tipo_personal || ley.id === draft.regimen_normativo_id)} actual={draft.regimen_normativo_id} /></select></Campo>
       {sugerencia && <div role="note" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 sm:col-span-2">
@@ -87,12 +87,13 @@ export function SeleccionForm({ usuario, record, onSaved, onCancel }) {
 // en el mismo registro mientras el vínculo no tenga fecha de cese ni esté anulado.
 export function DatosPuestoForm({ usuario, vinculo, onSaved, onCancel }) {
   const docente = vinculo.values.tipo_personal === 'docente'
+  const escalas = useLiveQuery('/expediente-opciones').data?.data?.niveles
   const v = vinculo.datos_puesto[0]?.values || {}
   const [draft, set] = useBorrador(datosPuestoInicial(docente, v))
   const { busy, error, errors, guardar } = useGuardar(data => saveDatosPuesto(usuario, vinculo.id, limpiarDatosPuesto(docente, data)), onSaved)
   return <Formulario titulo={`Datos del puesto: ${vinculo.values.nombre_puesto}`} guardar="Guardar datos del puesto" busy={busy} error={error} onSubmit={() => guardar(draft)} onCancel={onCancel}
     nota="Se corrigen mientras el vínculo no tenga fecha de cese. El responsable se guarda con tu sesión.">
-    <CamposDatosPuesto docente={docente} draft={draft} set={set} errors={errors} />
+    <CamposDatosPuesto docente={docente} draft={draft} set={set} errors={errors} codigoLey={vinculo.regimen_normativo_codigo} escalas={escalas} />
   </Formulario>
 }
 

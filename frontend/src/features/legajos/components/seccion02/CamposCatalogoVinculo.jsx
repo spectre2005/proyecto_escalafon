@@ -15,7 +15,7 @@ import PanelCatalogo from './PanelCatalogo'
 
 const NUEVO = '__nuevo__'
 const aplicarCambios = (poner, cambios) => Object.entries(cambios).forEach(([clave, valor]) => poner(clave)(valor))
-const Nota = ({ texto }) => texto ? <p role="status" className="col-span-full rounded-lg bg-[#eaf4ee] px-3 py-2 text-[11px] text-[#2c7650]">{texto}</p> : null
+const Nota = ({ texto }) => texto ? <p role="status" className="col-span-full rounded-lg bg-teal-50 px-3 py-2 text-xs text-teal-800">{texto}</p> : null
 
 /** Panel con el formulario del catálogo; al guardar devuelve el elemento creado. */
 function PanelNuevo({ catalogo, opciones, contexto, onCerrar, onCreado }) {
@@ -58,7 +58,7 @@ function PanelOtroPuesto({ onCerrar, onUsar }) {
           onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); usar() } }}
           className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-teal-600" />
       </label>
-      <p className="text-[11px] text-slate-500">Se guarda solo en este vínculo. Para que aparezca en la lista, pide a la administración que lo agregue al catálogo.</p>
+      <p className="text-xs text-slate-500">Se guarda solo en este vínculo. Para que aparezca en la lista, pide a la administración que lo agregue al catálogo.</p>
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onCerrar} className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700">Cancelar</button>
         <button type="button" disabled={!texto.trim()} onClick={usar} className="rounded-xl bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Usar</button>
@@ -137,7 +137,7 @@ export function CampoModalidad({ draft, poner, errors, opciones, tipoPersonal, n
         {puedeCrear && draft.regimen_laboral && <option value={NUEVO}>+ Nueva modalidad</option>}
       </select>
     </Campo>
-    {elegida?.exige_fin_previsto && !draft.fecha_fin_prevista && <p role="note" className="col-span-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+    {elegida?.exige_fin_previsto && !draft.fecha_fin_prevista && <p role="note" className="col-span-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
       La modalidad «{elegida.nombre}» exige la fecha de fin prevista del vínculo.</p>}
     {creando && <PanelNuevo catalogo="modalidades" opciones={opciones} contexto={{ regimen: draft.regimen_laboral, tipoPersonal: tipoPersonal || '' }}
       onCerrar={() => setCreando(false)} onCreado={elegir} />}
@@ -180,13 +180,13 @@ export function CampoProcesoSeleccion({ draft, poner, errors, opciones, nombre =
 export function CamposIngreso({ draft, poner, errors, opciones, nuevo = true, numeroLegajo = '', nombre = 'vinculo' }) {
   const regimen = draft.regimen_laboral
   return <>
-    {!regimen && <p className="col-span-full text-[11px] text-slate-500">Elige primero el tipo de vínculo: un designado no pasa por proceso de selección.</p>}
-    {regimen === 'designado' && <p role="note" className="col-span-full rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-[11px] text-sky-900">
+    {!regimen && <p className="col-span-full text-xs text-slate-500">Elige primero el tipo de vínculo: un designado no pasa por proceso de selección.</p>}
+    {regimen === 'designado' && <p role="note" className="col-span-full rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
       Un {regimenesLaborales.designado.toLowerCase()} no pasa por concurso: ingresa con su resolución de designación.</p>}
     {CON_PROCESO.includes(regimen) && <CampoProcesoSeleccion draft={draft} poner={poner} errors={errors} opciones={opciones} nombre={nombre} />}
     {numeroLegajo && <div className="grid min-w-0 content-start gap-1">
       <Campo label="N.° de legajo"><input name={`${nombre}-legajo`} value={numeroLegajo} readOnly className="bg-slate-50 font-semibold tabular-nums text-slate-700" /></Campo>
-      <small className="text-[11px] font-normal text-slate-500">{nuevo ? 'Se asigna al registrar a la persona. Es uno por legajo.' : 'Número del legajo de la persona: todos sus vínculos lo comparten.'}</small>
+      <small className="text-xs font-normal text-slate-500">{nuevo ? 'Se asigna al registrar a la persona. Es uno por legajo.' : 'Número del legajo de la persona: todos sus vínculos lo comparten.'}</small>
     </div>}
     {!nuevo && draft.numero_documento_vinculo && <Campo label="N.° de documento (registrado antes)"><input value={draft.numero_documento_vinculo} readOnly className="bg-slate-50 text-slate-600" /></Campo>}
     <Campo label="Fecha de emisión" error={errors.documento_vinculo_fecha}><input name={`${nombre}-emision`} type="date" max={hoy()} value={draft.documento_vinculo_fecha || ''} onChange={event => poner('documento_vinculo_fecha')(event.target.value)} /></Campo>

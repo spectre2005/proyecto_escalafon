@@ -197,10 +197,10 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="font-['DM_Sans',sans-serif] text-sm text-[#243f43] antialiased selection:bg-[#b7e7df] selection:text-[#0c494b] [&_button]:cursor-pointer [&_button:disabled]:cursor-not-allowed [&_button:disabled]:opacity-50 [&_:focus-visible]:outline-3 [&_:focus-visible]:outline-offset-3 [&_:focus-visible]:outline-[#57a69a] [&_h1]:font-['Manrope',sans-serif] [&_h2]:font-['Manrope',sans-serif] [&_h2]:text-[15px] [&_h2]:font-semibold [&_h2]:tracking-tight [&_input:not([type=file])]:min-w-0 [&_input:not([type=file])]:rounded-lg [&_input:not([type=file])]:border [&_input:not([type=file])]:border-[#dce7e0] [&_input:not([type=file])]:bg-[#fcfdfc] [&_input:not([type=file])]:p-3 [&_input:not([type=file])]:text-[#3f6251] [&_select]:min-w-0 [&_select]:rounded-lg [&_select]:border [&_select]:border-[#dce7e0] [&_select]:bg-[#fcfdfc] [&_select]:p-3 [&_select]:text-[#3f6251] [&_table]:w-full [&_table]:border-collapse [&_table]:text-left [&_table]:text-[11px] [&_th]:border-y [&_th]:border-[#edf2ee] [&_th]:bg-[#f7faf8] [&_th]:px-6 [&_th]:py-3.5 [&_th]:font-medium [&_th]:whitespace-nowrap [&_th]:text-[#7b9181] [&_td]:max-w-80 [&_td]:border-b [&_td]:border-[#edf2ee] [&_td]:px-6 [&_td]:py-4 [&_td]:wrap-anywhere">
-          <div className="mb-6 flex items-start justify-between gap-4 md:items-center [&>a]:hidden md:[&>a]:inline-flex [&_h1]:mb-2.5 [&_h1]:text-[27px] [&_h1]:leading-tight [&_h1]:font-bold [&_h1]:tracking-tight md:[&_h1]:text-3xl [&>div>p:last-child]:text-xs [&>div>p:last-child]:leading-relaxed [&>div>p:last-child]:text-[#82938e]">
+    <div className="font-['DM_Sans',sans-serif] text-sm text-slate-800 antialiased selection:bg-teal-100 selection:text-teal-900 [&_button]:cursor-pointer [&_button:disabled]:cursor-not-allowed [&_button:disabled]:opacity-50 [&_:focus-visible]:outline-3 [&_:focus-visible]:outline-offset-3 [&_:focus-visible]:outline-teal-600 [&_h1]:font-['Manrope',sans-serif] [&_h2]:font-['Manrope',sans-serif] [&_h2]:text-[15px] [&_h2]:font-semibold [&_h2]:tracking-tight [&_input:not([type=file])]:min-w-0 [&_input:not([type=file])]:rounded-lg [&_input:not([type=file])]:border [&_input:not([type=file])]:border-slate-200 [&_input:not([type=file])]:bg-slate-50 [&_input:not([type=file])]:p-3 [&_input:not([type=file])]:text-slate-700 [&_select]:min-w-0 [&_select]:rounded-lg [&_select]:border [&_select]:border-slate-200 [&_select]:bg-slate-50 [&_select]:p-3 [&_select]:text-slate-700 [&_table]:w-full [&_table]:border-collapse [&_table]:text-left [&_table]:text-xs [&_th]:border-y [&_th]:border-slate-100 [&_th]:bg-slate-50 [&_th]:px-6 [&_th]:py-3.5 [&_th]:font-medium [&_th]:whitespace-nowrap [&_th]:text-slate-500 [&_td]:max-w-80 [&_td]:border-b [&_td]:border-slate-100 [&_td]:px-6 [&_td]:py-4 [&_td]:wrap-anywhere">
+          <div className="mb-6 flex items-start justify-between gap-4 md:items-center [&>a]:hidden md:[&>a]:inline-flex [&_h1]:mb-2.5 [&_h1]:text-[27px] [&_h1]:leading-tight [&_h1]:font-bold [&_h1]:tracking-tight md:[&_h1]:text-3xl [&>div>p:last-child]:text-xs [&>div>p:last-child]:leading-relaxed [&>div>p:last-child]:text-slate-500">
             <div>
-              <p className="mb-2.5 text-[9px] font-bold tracking-[1.8px] text-[#719087]">
+              <p className="mb-2.5 text-xs font-bold tracking-[1.8px] text-slate-500">
                 DIRECTORIO INSTITUCIONAL
               </p>
               <h1>Personal</h1>
@@ -221,35 +221,35 @@ export default function UsersPage() {
           </div>
           {message && !registrationOpen && (
             <div
-              className={`mt-5 rounded-lg px-5 py-4 text-xs leading-relaxed ${message.error ? 'bg-[#fff0ed] text-[#ac4d3a]' : 'bg-[#e4f2e9] text-[#2c7650]'}`}
+              className={`mt-5 rounded-lg px-5 py-4 text-xs leading-relaxed ${message.error ? 'bg-rose-50 text-rose-700' : 'bg-teal-50 text-teal-800'}`}
               role={message.error ? 'alert' : 'status'}
             >
               {message.text}
             </div>
           )}
           <section
-            className="overflow-hidden rounded-xl border border-[#e0e9e4] bg-white mt-6 scroll-mt-5"
+            className="overflow-hidden rounded-xl border border-slate-200 bg-white mt-6 scroll-mt-5"
             id="usuarios"
           >
-            <div className="flex flex-col items-start justify-between gap-4 px-4 py-5 md:flex-row md:items-center md:p-6 [&_h2]:wrap-anywhere [&_p]:mt-1.5 [&_p]:text-[11px] [&_p]:leading-relaxed [&_p]:text-[#889991]">
+            <div className="flex flex-col items-start justify-between gap-4 px-4 py-5 md:flex-row md:items-center md:p-6 [&_h2]:wrap-anywhere [&_p]:mt-1.5 [&_p]:text-xs [&_p]:leading-relaxed [&_p]:text-slate-500">
               <div>
                 <h2>
                   Usuarios registrados{' '}
-                  <span className="ml-1 inline-block rounded-md bg-[#edf5ef] px-2 py-1 align-middle text-[10px] text-[#60856d]">
+                  <span className="ml-1 inline-block rounded-md bg-teal-50 px-2 py-1 align-middle text-xs text-slate-500">
                     {users.length}
                   </span>
                 </h2>
                 <p>Consulta los registros guardados en la base de datos.</p>
               </div>
               <div className="flex w-full flex-wrap items-center gap-2 md:w-auto">
-                <button type="button" onClick={openRegistration} aria-haspopup="dialog" className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#26776d] px-4.5 py-3 text-xs font-semibold text-white hover:bg-[#1b625a]">
+                <button type="button" onClick={openRegistration} aria-haspopup="dialog" className="inline-flex items-center justify-center gap-2 rounded-lg bg-teal-700 px-4.5 py-3 text-xs font-semibold text-white hover:bg-teal-800">
                   <Icon name="plus" size={17} /> Agregar personal
                 </button>
-                <DownloadPersonalReport blank className="inline-flex items-center justify-center gap-2 rounded-lg border px-4.5 py-3 text-xs font-semibold transition-colors border-[#dbe6e1] bg-white text-[#4f6d63] hover:bg-[#edf6f2]" />
+                <DownloadPersonalReport blank className="inline-flex items-center justify-center gap-2 rounded-lg border px-4.5 py-3 text-xs font-semibold transition-colors border-slate-200 bg-white text-slate-600 hover:bg-teal-50" />
               </div>
             </div>
-            <div className="flex flex-col gap-3.5 px-4 pb-5 md:flex-row md:px-6 [&_select]:text-[11px] md:[&_select]:ml-auto">
-              <label className="flex flex-1 items-center gap-2.5 rounded-lg border border-[#dce7e0] px-3 text-[#8da294] md:max-w-105 [&_input]:w-full [&_input]:border-0! [&_input]:bg-transparent! [&_input]:pl-0! [&_input]:text-[11px]">
+            <div className="flex flex-col gap-3.5 px-4 pb-5 md:flex-row md:px-6 [&_select]:text-xs md:[&_select]:ml-auto">
+              <label className="flex flex-1 items-center gap-2.5 rounded-lg border border-slate-200 px-3 text-slate-500 md:max-w-105 [&_input]:w-full [&_input]:border-0! [&_input]:bg-transparent! [&_input]:pl-0! [&_input]:text-xs">
                 <Icon name="search" size={18} />
                 <input
                   aria-label="Buscar usuarios"
@@ -313,18 +313,18 @@ export default function UsersPage() {
                       <td>{user.email_institucional}</td>
                       <td>
                         <span
-                          className={`rounded-full px-2.5 py-1 text-[10px] ${user.tipo_personal === 'administrativo' ? 'bg-[#f6f0e1] text-[#9e8750]' : 'bg-[#eaf3f9] text-[#557f9b]'}`}
+                          className={`rounded-full px-2.5 py-1 text-xs ${user.tipo_personal === 'administrativo' ? 'bg-amber-50 text-amber-700' : 'bg-sky-50 text-sky-700'}`}
                         >
                           {user.tipo_personal === 'docente'
                             ? 'Docente'
                             : 'Administrativo'}
                         </span>
                       </td>
-                      <td className={user.ley ? '' : 'text-[#9b7a37]'}>{nombreLey(user)}</td>
+                      <td className={user.ley ? '' : 'text-amber-700'}>{nombreLey(user)}</td>
                       <td>
-                        <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] ${situacionDe(user).clase}`}>{situacionDe(user).texto}</span>
+                        <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs ${situacionDe(user).clase}`}>{situacionDe(user).texto}</span>
                       </td>
-                      <td className="whitespace-nowrap text-[11px] text-[#60796c]">{textoAcceso(user.activo)}</td>
+                      <td className="whitespace-nowrap text-xs text-slate-600">{textoAcceso(user.activo)}</td>
                     <td><DownloadPersonalReport usuario={user.id} className="whitespace-nowrap rounded-lg border border-teal-200 px-3 py-2 text-xs font-semibold text-teal-800 hover:bg-teal-50" /></td>
                     </tr>
                   ))}
@@ -332,7 +332,7 @@ export default function UsersPage() {
               </table>
             </div>
             {!loading && !loadError && !visible.length && (
-              <div className="px-5 py-9 text-center text-[#9ab3a3] [&>svg]:mx-auto [&_h3]:mt-3 [&_h3]:mb-2 [&_h3]:text-[13px] [&_h3]:font-medium [&_h3]:text-[#657f6e] [&_p]:text-[11px] [&_p]:text-[#96a69b]">
+              <div className="px-5 py-9 text-center text-slate-500 [&>svg]:mx-auto [&_h3]:mt-3 [&_h3]:mb-2 [&_h3]:text-[13px] [&_h3]:font-medium [&_h3]:text-slate-600 [&_p]:text-xs [&_p]:text-slate-500">
                 <Icon name="users" size={32} />
                 <h3>
                   {users.length
@@ -366,23 +366,23 @@ export default function UsersPage() {
             ref={registrationDialog}
             aria-labelledby="registration-title"
             aria-busy={saving || busy}
-            className={`fixed inset-0 m-auto max-h-[92dvh] w-[calc(100%_-_1.5rem)] overflow-hidden rounded-2xl border-0 bg-[#f6f8fa] p-0 text-[#243f43] shadow-2xl backdrop:bg-slate-900/50 open:flex open:flex-col ${tab === 'manual' ? 'max-w-5xl md:h-[min(760px,92dvh)]' : 'max-w-3xl'}`}
+            className={`fixed inset-0 m-auto max-h-[92dvh] w-[calc(100%_-_1.5rem)] overflow-hidden rounded-2xl border-0 bg-slate-50 p-0 text-slate-800 shadow-2xl backdrop:bg-slate-900/50 open:flex open:flex-col ${tab === 'manual' ? 'max-w-5xl md:h-[min(760px,92dvh)]' : 'max-w-3xl'}`}
             onCancel={event => { if (savingRef.current || busy) event.preventDefault() }}
             onClose={() => { setRegistrationOpen(false); setRegistrado(null) }}
           >
-            {loading && <p role="status" className="px-6 pt-4 text-xs text-[#4f6d63]">Cargando usuarios para comprobar duplicados…</p>}
+            {loading && <p role="status" className="px-6 pt-4 text-xs text-slate-600">Cargando usuarios para comprobar duplicados…</p>}
             {loadError && <p role="alert" className="px-6 pt-4 text-xs text-red-700">{loadError}</p>}
             {/* Cabecera fija (título y método de carga); el contenido de cada método tiene su propio desplazamiento. */}
-            <section id="carga" className="shrink-0 border-b border-[#e0e9e4] bg-white">
-              <div className="flex items-center gap-3 px-4 py-4 md:px-6 [&_p]:mt-1.5 [&_p]:text-[11px] [&_p]:leading-relaxed [&_p]:text-[#889991]">
-                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#edf5f1] text-[11px] text-[#518775]">
+            <section id="carga" className="shrink-0 border-b border-slate-200 bg-white">
+              <div className="flex items-center gap-3 px-4 py-4 md:px-6 [&_p]:mt-1.5 [&_p]:text-xs [&_p]:leading-relaxed [&_p]:text-slate-500">
+                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-teal-50 text-xs text-teal-700">
                   01
                 </span>
                 <div>
                   <h2 id="registration-title">Agregar personal</h2>
                   <p>{tab === 'manual' ? 'Registra a la persona con su primer vínculo laboral en cuatro pasos.' : 'Elige cómo deseas cargar los datos de los usuarios.'}</p>
                 </div>
-                <button type="button" onClick={closeRegistration} disabled={saving || busy} aria-label="Cerrar formulario" className="ml-auto grid size-9 shrink-0 place-items-center rounded-lg text-[#4f6d63] hover:bg-[#edf6f2]">
+                <button type="button" onClick={closeRegistration} disabled={saving || busy} aria-label="Cerrar formulario" className="ml-auto grid size-9 shrink-0 place-items-center rounded-lg text-slate-600 hover:bg-teal-50">
                   <Icon name="close" size={20} />
                 </button>
               </div>
@@ -394,7 +394,7 @@ export default function UsersPage() {
                   type="button"
                   aria-pressed={tab === 'csv'}
                   disabled={saving || busy}
-                  className="flex items-center gap-2 border-b-2 pb-3.5 text-xs aria-pressed:border-[#297d6a] aria-pressed:font-semibold aria-pressed:text-[#297d6a] border-transparent text-[#8a9b93]"
+                  className="flex items-center gap-2 border-b-2 pb-3.5 text-xs aria-pressed:border-teal-700 aria-pressed:font-semibold aria-pressed:text-teal-700 border-transparent text-slate-500"
                   onClick={() => setTab('csv')}
                 >
                   <Icon name="upload" size={17} /> Importar Excel / CSV
@@ -403,7 +403,7 @@ export default function UsersPage() {
                   type="button"
                   aria-pressed={tab === 'manual'}
                   disabled={saving || busy}
-                  className="flex items-center gap-2 border-b-2 pb-3.5 text-xs aria-pressed:border-[#297d6a] aria-pressed:font-semibold aria-pressed:text-[#297d6a] border-transparent text-[#8a9b93]"
+                  className="flex items-center gap-2 border-b-2 pb-3.5 text-xs aria-pressed:border-teal-700 aria-pressed:font-semibold aria-pressed:text-teal-700 border-transparent text-slate-500"
                   onClick={() => setTab('manual')}
                 >
                   <Icon name="plus" size={17} /> Registro manual
@@ -412,10 +412,10 @@ export default function UsersPage() {
             </section>
             {tab === 'csv' && (
               <div className="min-h-0 flex-1 overflow-y-auto">
-              <div className="m-4 rounded-xl border border-[#e0e9e4] bg-white md:m-6">
+              <div className="m-4 rounded-xl border border-slate-200 bg-white md:m-6">
                 <div className="px-4 py-5 md:p-6">
                   <div
-                    className="rounded-xl border-2 border-dashed border-[#bbd4c8] bg-[#fbfdfc] px-4 pt-7 pb-6 text-center [&_h3]:mb-2 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mb-4.5 [&_p]:text-xs [&_p]:text-[#8a9b93] [&_small]:mt-4 [&_small]:block [&_small]:text-[10px] [&_small]:text-[#93a399]"
+                    className="rounded-xl border-2 border-dashed border-teal-200 bg-slate-50 px-4 pt-7 pb-6 text-center [&_h3]:mb-2 [&_h3]:text-[15px] [&_h3]:font-semibold [&_p]:mb-4.5 [&_p]:text-xs [&_p]:text-slate-500 [&_small]:mt-4 [&_small]:block [&_small]:text-xs [&_small]:text-slate-500"
                     onDragOver={(event) => event.preventDefault()}
                     onDrop={(event) => {
                       event.preventDefault()
@@ -423,7 +423,7 @@ export default function UsersPage() {
                     }}
                     aria-busy={busy}
                   >
-                    <span className="mx-auto mb-4 grid size-15 place-items-center rounded-2xl bg-[#eaf4ee] text-[#448c75]">
+                    <span className="mx-auto mb-4 grid size-15 place-items-center rounded-2xl bg-teal-50 text-teal-700">
                       <Icon name="upload" size={30} />
                     </span>
                     <h3>
@@ -431,7 +431,7 @@ export default function UsersPage() {
                     </h3>
                     <p>o selecciónalo desde tu equipo</p>
                     <button
-                      className="inline-flex items-center justify-center gap-2 rounded-lg border px-4.5 py-3 text-xs font-semibold transition-colors border-transparent bg-[#26776d] text-white hover:bg-[#1b625a]"
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border px-4.5 py-3 text-xs font-semibold transition-colors border-transparent bg-teal-700 text-white hover:bg-teal-800"
                       disabled={busy || saving}
                       onClick={() => fileInput.current.click()}
                     >
@@ -448,7 +448,7 @@ export default function UsersPage() {
                       onChange={(event) => readFile(event.target.files[0])}
                     />
                   </div>
-                  <div className="mt-5 flex flex-wrap items-center justify-between gap-3 md:flex-nowrap [&>span]:flex [&>span]:items-center [&>span]:gap-2.5 [&>span]:text-[#648776] [&_strong]:block [&_strong]:text-[11px] [&_strong]:text-[#566f61] [&_small]:mt-1 [&_small]:block [&_small]:text-[10px] [&_small]:text-[#8b9e92] [&_button]:text-[11px] [&_button]:whitespace-nowrap [&_button]:text-[#36836b]">
+                  <div className="mt-5 flex flex-wrap items-center justify-between gap-3 md:flex-nowrap [&>span]:flex [&>span]:items-center [&>span]:gap-2.5 [&>span]:text-slate-500 [&_strong]:block [&_strong]:text-xs [&_strong]:text-slate-600 [&_small]:mt-1 [&_small]:block [&_small]:text-xs [&_small]:text-slate-500 [&_button]:text-xs [&_button]:whitespace-nowrap [&_button]:text-teal-700">
                     <span>
                       <Icon name="file" />
                       <span>
@@ -471,7 +471,7 @@ export default function UsersPage() {
                       Descargar Excel ↓
                     </button>
                   </div>
-                  <p className="mt-4 text-xs leading-relaxed text-[#648776]">
+                  <p className="mt-4 text-xs leading-relaxed text-slate-500">
                     Completa la hoja Personal desde la fila 2. Los campos con * son obligatorios.
                     DNI y teléfono deben conservar sus ceros iniciales. La ubicación es opcional;
                     si la incluyes, completa región, provincia y distrito. Revisa los datos antes de guardar.
@@ -480,15 +480,15 @@ export default function UsersPage() {
               </div>
           {message && (
             <div
-              className={`mt-5 rounded-lg px-5 py-4 text-xs leading-relaxed ${message.error ? 'bg-[#fff0ed] text-[#ac4d3a]' : 'bg-[#e4f2e9] text-[#2c7650]'}`}
+              className={`mt-5 rounded-lg px-5 py-4 text-xs leading-relaxed ${message.error ? 'bg-rose-50 text-rose-700' : 'bg-teal-50 text-teal-800'}`}
               role={message.error ? 'alert' : 'status'}
             >
               {message.text}
             </div>
           )}
           {tab === 'csv' && !!batch.length && (
-            <section className="overflow-hidden rounded-xl border border-[#e0e9e4] bg-white mt-6 scroll-mt-5 [&>p]:px-6">
-              <div className="flex flex-col items-start justify-between gap-4 px-4 py-5 md:flex-row md:items-center md:p-6 [&_h2]:wrap-anywhere [&_p]:mt-1.5 [&_p]:text-[11px] [&_p]:leading-relaxed [&_p]:text-[#889991]">
+            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white mt-6 scroll-mt-5 [&>p]:px-6">
+              <div className="flex flex-col items-start justify-between gap-4 px-4 py-5 md:flex-row md:items-center md:p-6 [&_h2]:wrap-anywhere [&_p]:mt-1.5 [&_p]:text-xs [&_p]:leading-relaxed [&_p]:text-slate-500">
                 <div>
                   <h2>Vista previa · {filename}</h2>
                   <p>
@@ -497,7 +497,7 @@ export default function UsersPage() {
                   </p>
                 </div>
                 <button
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border px-4.5 py-3 text-xs font-semibold transition-colors border-[#dbe6e1] bg-white text-[#4f6d63] hover:bg-[#edf6f2]"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border px-4.5 py-3 text-xs font-semibold transition-colors border-slate-200 bg-white text-slate-600 hover:bg-teal-50"
                   disabled={saving}
                   onClick={() => {
                     setBatch([])
@@ -537,7 +537,7 @@ export default function UsersPage() {
                         <td
                           className={
                             errors.length
-                              ? 'text-xs leading-relaxed text-[#ae4736]'
+                              ? 'text-xs leading-relaxed text-rose-700'
                               : ''
                           }
                         >
@@ -550,7 +550,7 @@ export default function UsersPage() {
               </div>
               {invalid > 0 && (
                 <p
-                  className="text-xs leading-relaxed text-[#ae4736]"
+                  className="text-xs leading-relaxed text-rose-700"
                   role="alert"
                 >
                   Corrige el archivo y vuelve a seleccionarlo. No se importará
@@ -570,7 +570,7 @@ export default function UsersPage() {
               )}
               <div className="flex justify-end px-6 py-5">
                 <button
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border px-4.5 py-3 text-xs font-semibold transition-colors border-transparent bg-[#26776d] text-white hover:bg-[#1b625a]"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border px-4.5 py-3 text-xs font-semibold transition-colors border-transparent bg-teal-700 text-white hover:bg-teal-800"
                   disabled={
                     !!invalid || busy || saving || loading || !!loadError
                   }
@@ -584,7 +584,7 @@ export default function UsersPage() {
 
 
             <div className="flex justify-end px-6 py-4">
-              <button type="button" onClick={closeRegistration} disabled={saving || busy} className="rounded-lg border border-[#dbe6e1] bg-white px-4 py-2.5 text-xs font-semibold text-[#4f6d63] hover:bg-[#edf6f2]">Cancelar</button>
+              <button type="button" onClick={closeRegistration} disabled={saving || busy} className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-teal-50">Cancelar</button>
             </div>
               </div>
             )}

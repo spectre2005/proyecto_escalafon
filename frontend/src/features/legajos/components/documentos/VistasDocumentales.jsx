@@ -43,7 +43,7 @@ export default function VistasDocumentales({ elementos, clasificar, idDe = eleme
         return <button key={clave} type="button" role="tab" aria-selected={activa} onClick={() => elegir(clave)}
           className={`inline-flex items-center gap-2 rounded-lg px-3 ${clasica ? 'py-1.5' : 'py-2'} text-sm ${!clasica ? 'border border-slate-200 ' : ''}${activa ? 'bg-teal-700 font-semibold text-white' : cantidad ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-50'}`}>
           {nombre}
-          {clasica && <span className={`rounded-full px-1.5 text-[11px] font-semibold ${activa ? 'bg-white/20 text-white' : alerta ? 'bg-amber-100 text-amber-900' : 'bg-slate-100 text-slate-500'}`}>{cantidad}</span>}
+          {clasica && <span className={`rounded-full px-1.5 text-xs font-semibold ${activa ? 'bg-white/20 text-white' : alerta ? 'bg-amber-100 text-amber-900' : 'bg-slate-100 text-slate-500'}`}>{cantidad}</span>}
         </button>
       })}
     </div>

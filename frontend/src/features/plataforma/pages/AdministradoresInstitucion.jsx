@@ -109,8 +109,8 @@ export default function AdministradoresInstitucion({ institucion, onCambio, onLi
           <p className="text-sm font-medium text-slate-800">{admin.nombres} {admin.apellido_paterno}</p>
           <p className="break-all text-xs text-slate-500">{admin.email_institucional} · Último acceso: {fecha(admin.ultimo_acceso)}</p>
           <div className="mt-1 flex flex-wrap gap-2">
-            {!admin.activo && <span className="inline-flex rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700 ring-1 ring-inset ring-rose-200">Desactivado</span>}
-            {admin.debe_cambiar_password && <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 ring-1 ring-inset ring-amber-200">Contraseña temporal sin cambiar</span>}
+            {!admin.activo && <span className="inline-flex rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-700 ring-1 ring-inset ring-rose-200">Desactivado</span>}
+            {admin.debe_cambiar_password && <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200">Contraseña temporal sin cambiar</span>}
           </div>
         </div>
         <div className="flex flex-wrap gap-2">

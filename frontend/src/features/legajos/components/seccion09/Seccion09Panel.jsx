@@ -28,7 +28,7 @@ const enlace = 'text-sm font-semibold text-teal-700 disabled:opacity-50'
 
 
 function Etiqueta({ children, clase }) {
-  return <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${clase}`}>{children}</span>
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${clase}`}>{children}</span>
 }
 
 const etiquetaControversia = c => `${etiqueta(instancias, c.values.instancia)} · ${c.values.materia}`

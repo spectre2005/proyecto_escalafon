@@ -3,10 +3,12 @@
 namespace App\Http\Requests;
 
 use App\Models\Usuario;
+use App\Support\RegimenesLaborales;
 use App\Support\ReglasVinculo;
 use Illuminate\Contracts\Validation\Validator as ValidatorContract;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\Validator as Validacion;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Validator;
 
 /**
@@ -54,7 +56,10 @@ class StoreUsuarioConVinculoRequest extends StoreUsuariosRequest
             }
             $this->vinculo = $this->parte($validator, 'vinculo', array_diff_key(ReglasVinculo::VINCULO, array_flip(ReglasVinculo::NO_EN_ALTA)));
             $tipo = $this->input('usuarios.0.tipo_personal');
-            $this->datosPuesto = is_string($tipo) && isset(ReglasVinculo::PERFIL[$tipo]) ? $this->parte($validator, 'datos_puesto', ReglasVinculo::PERFIL[$tipo]) : [];
+            // El nivel de carrera depende de la ley de la persona (por id; un valor que no es UUID no se consulta).
+            $idLey = $this->input('usuarios.0.regimen_normativo_id');
+            $codigoLey = is_string($idLey) && Str::isUuid($idLey) ? RegimenesLaborales::ley($idLey)?->codigo : null;
+            $this->datosPuesto = is_string($tipo) && isset(ReglasVinculo::PERFIL[$tipo]) ? $this->parte($validator, 'datos_puesto', ReglasVinculo::perfil($tipo, null, $codigoLey)) : [];
         });
     }
 

@@ -23,8 +23,8 @@ function fechaHora(valor) {
 }
 
 function Estado({ funcionalidad }) {
-  if (funcionalidad.nucleo) return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-500">Siempre activa</span>
-  return <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${funcionalidad.activa ? 'bg-teal-50 text-teal-700' : 'bg-slate-100 text-slate-500'}`}>{funcionalidad.activa ? 'Activa' : 'Desactivada'}</span>
+  if (funcionalidad.nucleo) return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">Siempre activa</span>
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${funcionalidad.activa ? 'bg-teal-50 text-teal-700' : 'bg-slate-100 text-slate-500'}`}>{funcionalidad.activa ? 'Activa' : 'Desactivada'}</span>
 }
 
 // Confirmación con motivo obligatorio: el cambio queda en la auditoría con tu nombre.

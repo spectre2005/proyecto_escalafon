@@ -141,3 +141,14 @@ test('a person with an active file can be registered again only after confirming
   assert.equal(armarRegistro({ ...base, nuevoIngreso: true }).cerrar_legajo_actual, true)
   assert.equal('cerrar_legajo_actual' in armarRegistro(base), false)
 })
+
+test('the career level is sent only if it belongs to the chosen law and group', () => {
+  const leyes = [...catalogo, { id: 'ley-276', codigo: '276', nombre: 'Decreto Legislativo N° 276', aplica_a: 'administrativo', activo: true }]
+  const administrativo = { ...persona, tipo_personal: 'administrativo' }
+  const puestos = { docente: datosPuestoInicial(true), administrativo: { ...datosPuestoInicial(false), grupo_ocupacional: 'tecnico', nivel_carrera: 'STB' } }
+  const escalas = ['STF', 'STE', 'STD', 'STC', 'STB', 'STA'].map((codigo, indice) => ({ codigo_ley: '276', grupo_ocupacional: 'tecnico', codigo, orden: indice + 1, activo: true }))
+  const armar = ley => armarRegistro({ persona: personaDelPaso(administrativo, ley), catalogo: leyes, escalas, ubigeoId: '', condiciones: {}, puedeDiscapacidad: false, vinculo: vinculoInicial(), puestos })
+  assert.equal(armar('ley-276').datos_puesto.nivel_carrera, 'STB')
+  // Se eligió STB con el 276 y luego se cambió la ley a CAS: no se envía.
+  assert.equal(armar('ley-1057').datos_puesto.nivel_carrera, '')
+})

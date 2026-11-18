@@ -21,11 +21,11 @@ function Persona({ persona, tipo }) {
 }
 
 function Reservado() {
-  return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-500" title="Pendiente de definir con la institución quién puede ver calificaciones y puntajes.">Reservado</span>
+  return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-500" title="Pendiente de definir con la institución quién puede ver calificaciones y puntajes.">Reservado</span>
 }
 
 function Documento({ registro }) {
-  return registro.tiene_documento ? <span className="rounded-full bg-teal-50 px-2.5 py-1 text-[11px] text-teal-700">Con documento</span> : <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] text-amber-700">Sin documento</span>
+  return registro.tiene_documento ? <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs text-teal-700">Con documento</span> : <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs text-amber-700">Sin documento</span>
 }
 
 const columnas = {
@@ -34,7 +34,7 @@ const columnas = {
     ['Fecha', r => fecha(r.fecha)],
     ['Calificación', r => r.calificacion_oculta ? <Reservado /> : texto(r.calificacion, 'No registrada')],
     ['Puntaje', r => r.calificacion_oculta ? <Reservado /> : texto(r.puntaje)],
-    ['Plan de mejora', r => r.plan_mejora ? <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[11px] text-violet-700">Sí</span> : 'No'],
+    ['Plan de mejora', r => r.plan_mejora ? <span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs text-violet-700">Sí</span> : 'No'],
     ['Evaluador', r => texto(r.evaluador)],
   ],
   progresiones: [

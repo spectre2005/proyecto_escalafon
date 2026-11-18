@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { datosAplicables, LECTURA_EN_CURSO, motivosDescarte, resultadoLectura, sugerenciasAplicables, textoAvance, valorLegible } from './escanerCampos.js'
+import { camposEscaner, datosAplicables, etiquetaCampo, LECTURA_EN_CURSO, motivosDescarte, resultadoLectura, sugerenciasAplicables, textoAvance, valorLegible } from './escanerCampos.js'
 
 test('solo aplica campos permitidos y conserva la edición realizada durante la lectura', () => {
   const recibidos = { emisor: { valor: 'Universidad', evidencia: 'Universidad' }, fecha_emision: { valor: '2026-10-01', evidencia: '1 de octubre de 2026' }, folio_inicio: { valor: '99', evidencia: '99' }, anios: { valor: '5', evidencia: '5 años' } }
@@ -51,4 +51,12 @@ test('el avance de la lectura se describe por estado y página', () => {
   assert.equal(textoAvance({ estado: 'leyendo' }), 'Leyendo el PDF…')
   assert.equal(textoAvance({ estado: 'interpretando' }), 'La IA está interpretando el texto…')
   assert.deepEqual(LECTURA_EN_CURSO, ['en_espera', 'leyendo', 'interpretando'])
+})
+
+test('los campos se nombran como los lee una persona', () => {
+  assert.equal(etiquetaCampo('fecha_emision'), 'Fecha de emisión')
+  assert.equal(etiquetaCampo('num_resolucion'), 'N.º de resolución')
+  assert.equal(etiquetaCampo('campo_nuevo'), 'campo nuevo')
+  // Todo campo del lector tiene nombre propio (empieza en mayúscula), no la clave técnica.
+  for (const campo of camposEscaner) assert.match(etiquetaCampo(campo), /^[A-ZÁÉÍÓÚ]/, campo)
 })

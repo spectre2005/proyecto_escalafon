@@ -218,6 +218,18 @@ Ubicación de los catálogos y paneles de administración (OBSERVADO el 17/11/20
     (`frontend/src/features/legajos/config/puestosSugeridos.js`, `equivalencias`), y un puesto docente creado en el
     catálogo con otro nombre no se autocompleta ni se controla.
 
+Nivel de carrera en cascada (18/11/2026; **pendiente de confirmar con el cliente**):
+36. El «Nivel de carrera» del personal administrativo se elige de la **escala de su ley y grupo ocupacional**, del nivel de
+    ingreso al máximo. Las escalas las edita cada institución en Configuración → Catálogos del vínculo → «Niveles de
+    carrera» (tabla escalas_nivel_carrera; el backend valida con App\Rules\NivelCarrera). Valores por defecto (migración
+    2026_11_18_100000): D.L. 276 Profesional SPF…SPA, Técnico STF…STA, Auxiliar SAF…SAA (F = ingreso, A = máximo);
+    D.L. 728 P-1…P-6, T-1…T-6, A-1…A-6 (1 = ingreso). CAS (D.L. 1057) no tiene nivel por norma. La Ley 30057 no trae
+    escala por decisión del equipo: el campo queda vacío hasta que la institución la registre. De un nivel solo cambia el
+    orden; se desactiva, no se borra, y los registros anteriores conservan su valor. Preguntas al cliente: (a) ¿sus
+    escalas del CAP/PAP coinciden (sobre todo la del 728)?; (b) ¿qué niveles usará para la Ley 30057?; (c) ¿en CAS se
+    ocultan grupo ocupacional y cargo estructural (solo se registra el puesto del contrato)?; (d) ¿usan la clasificación de
+    la Ley Marco 28175 (SP-ES, SP-AP…) en sus reportes?
+
 ## Hoja de ruta del sistema institucional (por definir, analizado el 13/10/2026)
 
 Funcionalidades que faltan, con su base en la directiva. Orden propuesto, sin decidir:

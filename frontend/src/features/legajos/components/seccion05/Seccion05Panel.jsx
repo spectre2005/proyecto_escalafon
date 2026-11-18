@@ -30,7 +30,7 @@ const rango = v => `${fecha(v.fecha_inicio)} – ${fecha(v.fecha_fin)} · ${v.di
 
 
 function Etiqueta({ children, clase }) {
-  return <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${clase}`}>{children}</span>
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${clase}`}>{children}</span>
 }
 
 // Permiso con su forma (papeleta, memorándum u otro); los registrados antes de existir el campo, sin forma.
@@ -122,7 +122,7 @@ function Documentos({ usuario, data, tipos, sinLegajo, subiendo, setSubiendo }) 
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-slate-800">{tipo.literal && <span className="mr-1 text-slate-500">{tipo.literal})</span>}{tipo.nombre}</p>
           <p className="mt-1 text-xs text-slate-500">{tipo.descripcion}{tipo.formulario_datos ? ` Acredita: ${(formulariosSeccion05[tipo.formulario_datos] || tipo.formulario_datos).toLowerCase()}.` : ''}{tipo.codigo === 'S05_D_ROL_VACACIONES' ? ' Solo documento: está pendiente de confirmar si además requiere datos estructurados.' : ''}</p>
-          {tipo.restringido ? <p className="mt-2 text-[11px] text-slate-400">Dato de salud: sus documentos requieren acceso a datos sensibles (Directiva, num. 6.2).</p>
+          {tipo.restringido ? <p className="mt-2 text-xs text-slate-400">Dato de salud: sus documentos requieren acceso a datos sensibles (Directiva, num. 6.2).</p>
             : <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo, documento, data)}
               onSubsanar={puedeSubir && !sinLegajo && !ocupado ? documento => { setAviso(''); setSubsanando({ tipoId: tipo.id, documento }) } : null}
               onEnlazar={puedeSubir && !sinLegajo && !ocupado && ofrecerTipo(noAplica, tipo) ? documento => { setAviso(''); setRecuperando({ tipoId: tipo.id, documento }) } : null} />}

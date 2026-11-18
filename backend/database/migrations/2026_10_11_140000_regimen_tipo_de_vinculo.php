@@ -90,9 +90,10 @@ return new class extends Migration
         foreach (DB::table('respaldo_regimen')->where('columna', '<>', 'creado')->orderByDesc('id')->get() as $respaldo) {
             DB::table($respaldo->tabla)->where('id', $respaldo->fila_id)->update([$respaldo->columna => $respaldo->valor_anterior]);
         }
-        // Leyes que creó esta migración, solo si nadie las usa ya.
+        // Leyes que creó esta migración, solo si nadie las usa ya (tampoco una escala de nivel de carrera).
+        $sinEscala = fn (string $id): bool => ! Schema::hasTable('escalas_nivel_carrera') || DB::table('escalas_nivel_carrera')->where('regimen_normativo_id', $id)->doesntExist();
         foreach (DB::table('respaldo_regimen')->where('columna', 'creado')->pluck('fila_id') as $id) {
-            if (DB::table('usuarios')->where('regimen_normativo_id', $id)->doesntExist() && DB::table('vinculos_laborales')->where('regimen_normativo_id', $id)->doesntExist()) {
+            if (DB::table('usuarios')->where('regimen_normativo_id', $id)->doesntExist() && DB::table('vinculos_laborales')->where('regimen_normativo_id', $id)->doesntExist() && $sinEscala($id)) {
                 DB::table('regimenes_normativos')->where('id', $id)->delete();
             }
         }

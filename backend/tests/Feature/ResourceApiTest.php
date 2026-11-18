@@ -10,6 +10,7 @@ use App\Models\Controversia;
 use App\Models\Desplazamiento;
 use App\Models\Desvinculacion;
 use App\Models\DocumentoUsuario;
+use App\Models\EscalaNivelCarrera;
 use App\Models\EvaluacionDesempeno;
 use App\Models\Familiar;
 use App\Models\GoceVacacional;
@@ -77,7 +78,9 @@ class ResourceApiTest extends TestCase
     private const SIN_CRUD_GENERICO = [RecursoImpugnatorio::class, ConfiguracionFuncionalidad::class, ConexionCorreo::class,
         ModalidadVinculo::class, Puesto::class, TipoProcesoSeleccion::class, TipoVinculo::class,
         // Lecturas con IA: solo por EscanerSeccionesController y LecturaIaController.
-        LecturaIa::class];
+        LecturaIa::class,
+        // Escalas de nivel de carrera: solo por CatalogoVinculoController.
+        EscalaNivelCarrera::class];
 
     /** Sección 10: igual, se registran desde Legajos\Seccion10Controller (el CRUD genérico exige además datos_sensibles.ver). */
     private const SECCION_10 = [RegistroSstBienestar::class];

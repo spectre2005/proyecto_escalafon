@@ -39,7 +39,7 @@ const exigencia = {
 
 
 function Etiqueta({ children, clase }) {
-  return <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${clase}`}>{children}</span>
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${clase}`}>{children}</span>
 }
 
 function Anexo05() {

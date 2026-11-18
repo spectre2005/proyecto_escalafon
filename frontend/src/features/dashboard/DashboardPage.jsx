@@ -26,10 +26,10 @@ function BanderasSinResponder({ panel }) {
       <summary className="cursor-pointer px-4 py-3 text-xs font-semibold text-teal-700">Ver personas con condiciones pendientes ({datos.total.toLocaleString('es')})</summary>
       <ul className="max-h-80 divide-y divide-slate-100 overflow-y-auto border-t border-slate-100">{datos.personas.map(persona => <li key={persona.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
         <div className="min-w-0"><Link to={`/legajos/${persona.id}`} className="text-sm font-semibold text-teal-800 hover:underline">{persona.nombre}</Link>
-          <p className="mt-0.5 text-[11px] text-slate-500">Falta: {persona.pendientes.map(bandera => nombresBandera[bandera] || bandera).join(' · ')}</p></div>
+          <p className="mt-0.5 text-xs text-slate-500">Falta: {persona.pendientes.map(bandera => nombresBandera[bandera] || bandera).join(' · ')}</p></div>
         <Link to={`/legajos/${persona.id}`} className="shrink-0 text-xs font-semibold text-teal-700 hover:underline">Completar perfil →</Link>
       </li>)}</ul>
-      {datos.total > datos.personas_mostradas && <p className="border-t border-slate-100 px-4 py-2.5 text-[11px] text-slate-500">Se muestran {datos.personas_mostradas} de {datos.total.toLocaleString('es')}, por apellido.</p>}
+      {datos.total > datos.personas_mostradas && <p className="border-t border-slate-100 px-4 py-2.5 text-xs text-slate-500">Se muestran {datos.personas_mostradas} de {datos.total.toLocaleString('es')}, por apellido.</p>}
     </details>}
   </section>
 }
@@ -39,7 +39,7 @@ function TarjetaPasivos() {
   return <Link to="/legajos/pasivos" className="group rounded-2xl border border-slate-200/80 bg-white p-5 transition hover:-translate-y-1 hover:border-teal-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-600">
     <div className="flex items-center justify-between gap-3"><p className="text-xs font-medium text-slate-600">Legajos pasivos</p><span className="grid size-10 place-items-center rounded-xl bg-slate-100 text-slate-700"><Icon name="folder" /></span></div>
     <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-800">{consulta.error ? '—' : consulta.data ? consulta.data.data.total.toLocaleString('es') : '…'}</p>
-    <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500"><span>Consultar archivo pasivo</span><Icon name="arrow" size={16} /></div>
+    <div className="mt-3 flex items-center justify-between text-xs text-slate-500"><span>Consultar archivo pasivo</span><Icon name="arrow" size={16} /></div>
   </Link>
 }
 
@@ -75,14 +75,14 @@ export default function DashboardPage() {
   const panel = 'rounded-2xl border border-slate-200/80 bg-white p-6'
   return <>
     <header className="mb-7 flex flex-wrap items-end justify-between gap-5">
-      <div><p className="text-[10px] font-semibold uppercase tracking-[.2em] text-teal-700">Panel administrativo</p><h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-800">Resumen institucional</h1><p className="mt-3 text-sm text-slate-500">Indicadores del personal y cobertura de los datos registrados.</p></div>
+      <div><p className="text-xs font-semibold uppercase tracking-[.2em] text-teal-700">Panel administrativo</p><h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-800">Resumen institucional</h1><p className="mt-3 text-sm text-slate-500">Indicadores del personal y cobertura de los datos registrados.</p></div>
       <div className="flex flex-wrap items-center gap-3"><span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs text-slate-500">{date}</span></div>
     </header>
     {loadError && <div role="alert" className="mb-6 rounded-xl border border-rose-100 bg-rose-50 px-5 py-4 text-sm text-rose-800">{loadError}<button type="button" disabled={loading} onClick={refreshUsers} className="ml-3 font-semibold underline">Reintentar</button></div>}
     <section aria-label="Resumen del personal" aria-busy={loading} className="mb-6 grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 xl:grid-cols-4">
       {stats.map(stat => <Link key={stat.label} to={stat.to} className="group rounded-2xl border border-slate-200/80 bg-white p-5 transition hover:-translate-y-1 hover:border-teal-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-600">
         <div className="flex items-center justify-between gap-3"><p className="text-xs font-medium text-slate-600">{stat.label}</p><span className={`grid size-10 place-items-center rounded-xl ${stat.color}`}><Icon name={stat.icon} /></span></div>
-        <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-800">{show(stat.value)}</p><div className="mt-3 flex items-center justify-between text-[11px] text-slate-500"><span>{stat.detail}</span><Icon name="arrow" size={16} /></div>
+        <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-800">{show(stat.value)}</p><div className="mt-3 flex items-center justify-between text-xs text-slate-500"><span>{stat.detail}</span><Icon name="arrow" size={16} /></div>
       </Link>)}
       {veLegajos && <TarjetaPasivos />}
     </section>

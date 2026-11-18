@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\EscalaNivelCarrera;
 use App\Models\ModalidadVinculo;
 use App\Models\Puesto;
 use App\Models\TipoProcesoSeleccion;
@@ -142,6 +143,10 @@ final class CatalogosVinculo
                 ->get(['id', 'codigo', 'nombre', 'tipo_personal', 'unidad_organica_id', 'grupo_ocupacional', 'es_cargo_confianza', 'obligado_djbr', 'exige_colegiatura', 'tiene_periodo_prueba', 'activo']),
             'procesos' => TipoProcesoSeleccion::query()->orderBy('nombre')->get(['id', 'codigo', 'nombre', 'activo']),
             'tipos_vinculo' => TipoVinculo::query()->orderBy('orden')->get(['id', 'codigo', 'nombre', 'descripcion']),
+            // Escalas de nivel de carrera (con los desactivados, que el formulario solo muestra si ya están guardados).
+            'niveles' => EscalaNivelCarrera::query()->with('regimenNormativo:id,codigo')->orderBy('grupo_ocupacional')->orderBy('orden')->get()
+                ->map(fn (EscalaNivelCarrera $nivel): array => [...$nivel->only(['id', 'regimen_normativo_id', 'grupo_ocupacional', 'codigo', 'nombre', 'orden', 'activo']),
+                    'codigo_ley' => $nivel->regimenNormativo?->codigo])->values(),
             'tipos_unidad' => self::TIPOS_UNIDAD,
             'siguiente_legajo' => NumeroLegajo::siguiente(),
         ];

@@ -22,9 +22,9 @@ function Navegacion({ onNavigate, obligatorio }) {
 
 function Lateral({ administrador, salir, saliendo, errorSalida, onNavigate, obligatorio }) {
   return <div className="flex h-full flex-col px-5 py-7">
-    <div className="mb-9 flex items-center gap-3 px-1"><span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-white/10 text-white"><Icon name="shield" /></span><span className="min-w-0"><strong className="block text-sm text-white">Plataforma</strong><span className="text-[11px] text-slate-400">Administración</span></span></div>
+    <div className="mb-9 flex items-center gap-3 px-1"><span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-white/10 text-white"><Icon name="shield" /></span><span className="min-w-0"><strong className="block text-sm text-white">Plataforma</strong><span className="text-xs text-slate-400">Administración</span></span></div>
     <Navegacion onNavigate={onNavigate} obligatorio={obligatorio} />
-    <div className="mt-auto pt-8 text-[11px] text-slate-400"><p className="truncate font-semibold text-slate-200">{administrador.nombre}</p><p className="truncate">{administrador.email}</p>
+    <div className="mt-auto pt-8 text-xs text-slate-400"><p className="truncate font-semibold text-slate-200">{administrador.nombre}</p><p className="truncate">{administrador.email}</p>
       <button type="button" onClick={salir} disabled={saliendo} className="mt-4 inline-flex items-center gap-2 rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-white/10"><Icon name="logout" size={15} />{saliendo ? 'Cerrando…' : 'Cerrar sesión'}</button>
       {errorSalida && <p role="alert" className="mt-2 text-rose-300">{errorSalida}</p>}
     </div>

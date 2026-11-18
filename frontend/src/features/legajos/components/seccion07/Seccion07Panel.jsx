@@ -36,11 +36,11 @@ const exigencia = {
 
 
 function Etiqueta({ children, clase }) {
-  return <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${clase}`}>{children}</span>
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${clase}`}>{children}</span>
 }
 
 function Reservado() {
-  return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-500" title="Pendiente de definir con la institución quién puede ver calificaciones y puntajes.">Reservado</span>
+  return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-500" title="Pendiente de definir con la institución quién puede ver calificaciones y puntajes.">Reservado</span>
 }
 
 // Resumen de la sección: pendientes, exigidos con documento cargado y con recepción, y estado de cada subsección.
@@ -59,7 +59,7 @@ function Resumen({ data, onNavigate, compacto = false }) {
       const [nombre, clase] = estadosSubseccion[sub.estado]
       return <button key={sub.codigo} onClick={() => onNavigate(categoriaDe[sub.codigo])} className={`rounded-xl border border-slate-200 p-3 text-left hover:bg-slate-50 ${sub.aplica ? '' : 'opacity-60'}`}>
         <span className="block text-xs font-semibold text-slate-700">{subseccionesSeccion07[categoriaDe[sub.codigo]]?.titulo || sub.nombre}</span>
-        <span className="mt-2 flex flex-wrap items-center gap-2"><Etiqueta clase={clase}>{nombre}</Etiqueta>{sub.aplica && sub.exigidos > 0 && <span className="text-[11px] text-slate-500">{sub.exigidos_cargados}/{sub.exigidos} cargados · {sub.exigidos_recepcionados} recepcionados</span>}</span>
+        <span className="mt-2 flex flex-wrap items-center gap-2"><Etiqueta clase={clase}>{nombre}</Etiqueta>{sub.aplica && sub.exigidos > 0 && <span className="text-xs text-slate-500">{sub.exigidos_cargados}/{sub.exigidos} cargados · {sub.exigidos_recepcionados} recepcionados</span>}</span>
       </button>
     })}</div>}
   </section>

@@ -1,4 +1,4 @@
-import { categoriasDocente, condicionesDocente, dedicacionesDocente, funcionesPrevias, gruposOcupacionales, regimenesLaborales, subtiposExtraordinario } from '../../config/seccion02'
+import { categoriasDocente, condicionesDocente, dedicacionesDocente, funcionesPrevias, gruposOcupacionales, motivoSinNivel, nivelTrasCambiarGrupo, opcionesNivelCarrera, regimenesLaborales, subtiposExtraordinario } from '../../config/seccion02'
 import Campo, { Opciones } from '../seccion01/Campo'
 import { hoy } from '../seccion01/useGuardar'
 import TresEstados from '../../../../components/ui/TresEstados'
@@ -28,10 +28,10 @@ export function CampoTipoVinculo({ draft, poner, errors, sugerencia = null, nomb
   return <>
     <div className="grid min-w-0 content-start gap-1">
       <Campo label="Tipo de vínculo" required error={errors.regimen_laboral}><select name={`${nombre}-tipo`} required value={draft.regimen_laboral} onChange={event => elegirTipoVinculo(draft, poner, opciones, event.target.value)}><Opciones lista={regimenesLaborales} actual={draft.regimen_laboral} vacio="Seleccionar tipo de vínculo" /></select></Campo>
-      {descripcionTipo(opciones, draft.regimen_laboral) && <small className="text-[11px] text-slate-500">{descripcionTipo(opciones, draft.regimen_laboral)}</small>}
+      {descripcionTipo(opciones, draft.regimen_laboral) && <small className="text-xs text-slate-500">{descripcionTipo(opciones, draft.regimen_laboral)}</small>}
     </div>
     <CampoModalidad draft={draft} poner={poner} errors={errors} opciones={opciones} tipoPersonal={tipoPersonal} nombre={nombre} />
-    {sugerencia && <div role="note" className="flex flex-wrap items-center justify-between gap-2 self-end rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900 sm:col-span-1 lg:col-span-2">
+    {sugerencia && <div role="note" className="flex flex-wrap items-center justify-between gap-2 self-end rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 sm:col-span-1 lg:col-span-2">
       <span>{sugerencia.valor ? <>Sugerencia: <strong>{regimenesLaborales[sugerencia.valor]}</strong> ({sugerencia.motivo}) Revísala: puedes elegir otro tipo.</> : sugerencia.motivo}</span>
       {sugerencia.valor && draft.regimen_laboral !== sugerencia.valor && <button type="button" onClick={() => elegirTipoVinculo(draft, poner, opciones, sugerencia.valor)} className="font-semibold underline">Usar sugerencia</button>}
     </div>}
@@ -47,11 +47,11 @@ export function CamposVigencia({ draft, poner, errors, opciones, conCese = false
   return <>
     <div className="grid min-w-0 content-start gap-1">
       <Campo label="Fecha de inicio" required error={errors.fecha_inicio}><input name={`${nombre}-inicio`} type="date" required value={draft.fecha_inicio} onChange={valor('fecha_inicio')} /></Campo>
-      {draft.fecha_inicio > hoy() && <small className="text-[11px] text-sky-800">Empieza el {draft.fecha_inicio.split('-').reverse().join('/')}: hasta entonces figurará como «por iniciar».</small>}
+      {draft.fecha_inicio > hoy() && <small className="text-xs text-sky-800">Empieza el {draft.fecha_inicio.split('-').reverse().join('/')}: hasta entonces figurará como «por iniciar».</small>}
     </div>
     <div className="grid min-w-0 content-start gap-1">
       <Campo label="Fecha de fin prevista" required={finObligatorio} error={errors.fecha_fin_prevista}><input name={`${nombre}-fin`} type="date" required={finObligatorio} min={draft.fecha_inicio || undefined} value={draft.fecha_fin_prevista} onChange={valor('fecha_fin_prevista')} /></Campo>
-      {(finObligatorio || ayudaFin) && <small className="text-[11px] text-slate-500">{finObligatorio ? `La modalidad «${modalidad.nombre}» la exige.` : ayudaFin}</small>}
+      {(finObligatorio || ayudaFin) && <small className="text-xs text-slate-500">{finObligatorio ? `La modalidad «${modalidad.nombre}» la exige.` : ayudaFin}</small>}
     </div>
     {conCese && <Campo label="Fecha de cese (solo si el vínculo ya terminó)" required={ceseObligatorio} error={errors.fecha_cese}><input type="date" required={ceseObligatorio} min={draft.fecha_inicio || undefined} max={hoy()} value={draft.fecha_cese} onChange={valor('fecha_cese')} /></Campo>}
   </>
@@ -97,7 +97,9 @@ export function CamposVinculo({ draft, poner, errors, opciones, tipoPersonal, co
   </>
 }
 
-export function CamposDatosPuesto({ docente, draft, set, errors }) {
+// codigoLey: código del régimen normativo (276, 728, 1057, 30057…) y escalas: las de /expediente-opciones (niveles).
+// De ambos dependen los niveles de carrera que se ofrecen.
+export function CamposDatosPuesto({ docente, draft, set, errors, codigoLey, escalas = [] }) {
   return docente ? <>
     <Campo label="Condición docente" required error={errors.condicion_docente}><select required value={draft.condicion_docente} onChange={set('condicion_docente')}><Opciones lista={condicionesDocente} actual={draft.condicion_docente} vacio="Selecciona" /></select></Campo>
     <Campo label="Categoría (solo ordinarios)" error={errors.categoria}><select disabled={draft.condicion_docente !== 'ordinario'} value={draft.condicion_docente === 'ordinario' ? draft.categoria : ''} onChange={set('categoria')}><Opciones lista={categoriasDocente} actual={draft.categoria} vacio="Sin categoría" /></select></Campo>
@@ -106,8 +108,15 @@ export function CamposDatosPuesto({ docente, draft, set, errors }) {
     <Campo label="Función previa" error={errors.funcion_previa}><select value={draft.funcion_previa} onChange={set('funcion_previa')}><Opciones lista={funcionesPrevias} actual={draft.funcion_previa} vacio="Sin registrar" /></select></Campo>
     <Campo label="Código RENACYT" error={errors.codigo_renacyt}><input maxLength={30} value={draft.codigo_renacyt} onChange={set('codigo_renacyt')} /></Campo>
   </> : <>
-    <Campo label="Grupo ocupacional" error={errors.grupo_ocupacional}><select value={draft.grupo_ocupacional} onChange={set('grupo_ocupacional')}><Opciones lista={gruposOcupacionales} actual={draft.grupo_ocupacional} vacio="Sin registrar" /></select></Campo>
-    <Campo label="Nivel de carrera" error={errors.nivel_carrera}><input maxLength={20} value={draft.nivel_carrera} onChange={set('nivel_carrera')} /></Campo>
+    {/* En cascada: el nivel depende de la ley y del grupo; al cambiar de grupo, un nivel que ya no vale se vacía. */}
+    <Campo label="Grupo ocupacional" error={errors.grupo_ocupacional}><select value={draft.grupo_ocupacional} onChange={evento => {
+      set('grupo_ocupacional')(evento)
+      const nivel = nivelTrasCambiarGrupo(escalas, draft.nivel_carrera, codigoLey, evento.target.value)
+      if (nivel !== draft.nivel_carrera) set('nivel_carrera')({ target: { type: 'select-one', value: nivel } })
+    }}><Opciones lista={gruposOcupacionales} actual={draft.grupo_ocupacional} vacio="Sin registrar" /></select></Campo>
+    <Campo label="Nivel de carrera" error={errors.nivel_carrera}><select disabled={Boolean(motivoSinNivel(escalas, codigoLey, draft.grupo_ocupacional)) && !draft.nivel_carrera} value={draft.nivel_carrera} onChange={set('nivel_carrera')}>
+      <Opciones lista={opcionesNivelCarrera(escalas, codigoLey, draft.grupo_ocupacional, draft.nivel_carrera)} actual={draft.nivel_carrera} vacio={motivoSinNivel(escalas, codigoLey, draft.grupo_ocupacional) || 'Sin registrar'} />
+    </select></Campo>
     <Campo label="Cargo estructural" error={errors.cargo_estructural} className="sm:col-span-2"><input maxLength={150} value={draft.cargo_estructural} onChange={set('cargo_estructural')} /></Campo>
     <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2"><input type="checkbox" className="size-4 accent-teal-700" checked={draft.es_cargo_confianza} onChange={set('es_cargo_confianza')} />Es cargo de confianza</label>
   </>

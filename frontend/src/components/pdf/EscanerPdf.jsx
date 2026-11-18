@@ -105,8 +105,8 @@ export default function EscanerPdf({ file, config }) {
       <Icon name="robot" size={18} />
       {busy && <span className="absolute -inset-0.5 animate-spin rounded-full border-2 border-transparent border-t-teal-700 motion-reduce:animate-none" />}
     </button>
-    {busy && avance && <p role="status" aria-live="polite" className="absolute right-0 top-9 z-20 whitespace-nowrap rounded-lg bg-white/95 px-1.5 text-[11px] font-semibold text-teal-800">{avance}</p>}
-    {aviso && !abierto && <button type="button" onClick={() => setAbierto(true)} className={`absolute right-0 top-9 whitespace-nowrap text-[11px] font-semibold underline ${aviso.titular?.estado === 'distinto' ? 'text-rose-700' : 'text-teal-800'}`}>{aviso.titular?.estado === 'distinto' ? 'Ver aviso' : 'Ver lectura'}</button>}
+    {busy && avance && <p role="status" aria-live="polite" className="absolute right-0 top-9 z-20 whitespace-nowrap rounded-lg bg-white/95 px-1.5 text-xs font-semibold text-teal-800">{avance}</p>}
+    {aviso && !abierto && <button type="button" onClick={() => setAbierto(true)} className={`absolute right-0 top-9 whitespace-nowrap text-xs font-semibold underline ${aviso.titular?.estado === 'distinto' ? 'text-rose-700' : 'text-teal-800'}`}>{aviso.titular?.estado === 'distinto' ? 'Ver aviso' : 'Ver lectura'}</button>}
     {aviso && abierto && <div role="status" className="absolute right-0 top-10 z-30 max-h-80 w-80 overflow-y-auto rounded-xl border border-teal-200 bg-white p-3 text-xs font-normal text-slate-700 shadow-lg">
       <button type="button" onClick={() => setAbierto(false)} className="float-right ml-2 text-teal-800" aria-label="Cerrar resultado"><Icon name="close" size={16} /></button>
       {aviso.titular && <p role={TONO_TITULAR[aviso.titular.estado] === 'error' ? 'alert' : undefined} className={`mb-2 rounded-lg border p-2 ${estiloTitular[TONO_TITULAR[aviso.titular.estado]] || estiloTitular.aviso}`}>

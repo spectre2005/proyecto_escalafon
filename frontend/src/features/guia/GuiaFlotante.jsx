@@ -15,18 +15,18 @@ function Tema({ tema, onCerrar }) {
 
 function ListaTemas({ titulo, temas, onCerrar }) {
   if (!temas.length) return null
-  return <section className="space-y-2"><h3 className="text-[11px] font-semibold text-slate-500">{titulo}</h3>{temas.map(tema => <Tema key={tema.id} tema={tema} onCerrar={onCerrar} />)}</section>
+  return <section className="space-y-2"><h3 className="text-xs font-semibold text-slate-500">{titulo}</h3>{temas.map(tema => <Tema key={tema.id} tema={tema} onCerrar={onCerrar} />)}</section>
 }
 
 function Mensaje({ mensaje, onCerrar }) {
   if (mensaje.rol === 'usuario') return <p className="ml-8 self-end rounded-2xl rounded-br-sm bg-teal-700 px-3 py-2 text-xs whitespace-pre-line text-white">{mensaje.texto}</p>
   const etiqueta = etiquetaOrigen(mensaje.origen)
   return <div className="mr-4 self-start rounded-2xl rounded-bl-sm border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
-    {etiqueta && <p className="mb-1 text-[10px] font-semibold text-teal-800">{etiqueta}</p>}
+    {etiqueta && <p className="mb-1 text-xs font-semibold text-teal-800">{etiqueta}</p>}
     <p className="whitespace-pre-line">{mensaje.texto}</p>
-    {mensaje.origen === 'ia' && <p className="mt-1 text-[10px] text-slate-500">Compruébala con los pasos de la guía.</p>}
+    {mensaje.origen === 'ia' && <p className="mt-1 text-xs text-slate-500">Compruébala con los pasos de la guía.</p>}
     {mensaje.temas?.length > 0 && <details className="mt-2 border-t border-slate-100 pt-2">
-      <summary className="cursor-pointer text-[11px] font-semibold text-teal-800">Ver pasos de la guía</summary>
+      <summary className="cursor-pointer text-xs font-semibold text-teal-800">Ver pasos de la guía</summary>
       <div className="mt-2 space-y-2">{mensaje.temas.map(tema => <Tema key={tema.id} tema={tema} onCerrar={onCerrar} />)}</div>
     </details>}
   </div>
@@ -106,7 +106,7 @@ export default function GuiaFlotante() {
       <header className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-3">
         <Icon name="robot" size={18} className="text-teal-700" />
         <h2 className="flex-1 text-sm font-semibold text-slate-800">Chat de ayuda</h2>
-        {mensajes.length > 0 && <button type="button" onClick={() => setMensajes([])} disabled={pensando} className="text-[11px] font-semibold text-teal-800 underline disabled:opacity-50">Nueva conversación</button>}
+        {mensajes.length > 0 && <button type="button" onClick={() => setMensajes([])} disabled={pensando} className="text-xs font-semibold text-teal-800 underline disabled:opacity-50">Nueva conversación</button>}
         <button type="button" onClick={cerrar} aria-label="Cerrar chat" className="text-slate-500"><Icon name="close" size={18} /></button>
       </header>
       <div role="tablist" aria-label="Secciones del chat" className="m-2 mb-0 flex gap-1 rounded-xl bg-slate-200/70 p-1">
@@ -137,7 +137,7 @@ export default function GuiaFlotante() {
         {filtro.trim() && guia && (resultados.length ? <ListaTemas titulo="Resultados" temas={resultados} onCerrar={cerrar} /> : <p className="text-xs text-slate-500">Sin temas con esas palabras.</p>)}
         {!filtro.trim() && <ListaTemas titulo="En esta pantalla" temas={dePantalla} onCerrar={cerrar} />}
         {!filtro.trim() && <ListaTemas titulo="Todos los temas" temas={temas.filter(tema => !dePantalla.includes(tema))} onCerrar={cerrar} />}
-        {guia?.borrador && <p className="text-[10px] text-slate-400">Guía en borrador, pendiente de revisión por la ORH.</p>}
+        {guia?.borrador && <p className="text-xs text-slate-400">Guía en borrador, pendiente de revisión por la ORH.</p>}
       </div>}
     </section>}
     <div className="flex justify-end"><button ref={boton} type="button" onClick={() => setAbierta(valor => !valor)} aria-expanded={abierta} aria-label={abierta ? 'Cerrar chat de ayuda' : 'Abrir chat de ayuda'} title="Chat de ayuda" className="grid size-12 place-items-center rounded-full bg-teal-700 text-white shadow-lg transition hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"><Icon name={abierta ? 'close' : 'robot'} size={22} /></button></div>

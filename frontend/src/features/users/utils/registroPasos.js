@@ -1,5 +1,6 @@
 import { banderasPuesto } from '../../../shared/banderas.js'
 import { limpiarDatosPuesto } from '../../legajos/components/seccion02/borradoresVinculo.js'
+import { nivelTrasCambiarGrupo } from '../../legajos/config/seccion02.js'
 import { validateUser } from './usuariosCsv.js'
 import { conLey } from './leyes.js'
 
@@ -90,13 +91,20 @@ const recortar = datos => Object.fromEntries(Object.entries(datos).map(([clave, 
 // Campos opcionales que no se envían vacíos (así quien no ve datos sensibles nunca los manda).
 const sinVacios = (objeto, claves) => Object.fromEntries(Object.entries(objeto).filter(([clave, valor]) => !claves.includes(clave) || String(valor ?? '').trim() !== ''))
 
-export function armarRegistro({ persona, catalogo, ubigeoId, condiciones, puedeDiscapacidad, vinculo, puestos, nuevoIngreso = false }) {
+// El nivel de carrera vale solo si es de la ley y del grupo elegidos (si se cambió la ley después, se envía vacío).
+function conNivelDeLaLey(docente, datos, catalogo, escalas, leyId) {
+  if (docente) return datos
+  const codigoLey = (catalogo || []).find(ley => ley.id === leyId)?.codigo
+  return { ...datos, nivel_carrera: nivelTrasCambiarGrupo(escalas, datos.nivel_carrera, codigoLey, datos.grupo_ocupacional) }
+}
+
+export function armarRegistro({ persona, catalogo, escalas = [], ubigeoId, condiciones, puedeDiscapacidad, vinculo, puestos, nuevoIngreso = false }) {
   const docente = persona.tipo_personal === 'docente'
   return {
     // Nuevo ingreso con su legajo aún activo: el backend lo pasa a pasivo (historial) y abre uno nuevo.
     ...(nuevoIngreso ? { cerrar_legajo_actual: true } : {}),
     usuarios: [conLey(catalogo, { ...sinVacios(persona, ['fecha_nacimiento', 'domicilio']), ubigeo_id: ubigeoId || null, tiene_derechohabientes: condiciones.tiene_derechohabientes, con_discapacidad: puedeDiscapacidad ? condiciones.con_discapacidad : null })],
     vinculo: recortar(vinculo),
-    datos_puesto: limpiarDatosPuesto(docente, recortar(puestos[persona.tipo_personal] || {})),
+    datos_puesto: limpiarDatosPuesto(docente, conNivelDeLaLey(docente, recortar(puestos[persona.tipo_personal] || {}), catalogo, escalas, persona.regimen_normativo_id)),
   }
 }

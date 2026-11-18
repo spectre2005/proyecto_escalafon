@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\EscalaNivelCarrera;
 use App\Models\ModalidadVinculo;
 use App\Models\Puesto;
 use App\Models\RegimenNormativo;
@@ -157,5 +158,50 @@ class CatalogosVinculoTest extends TestCase
         $this->patchJson($url, ['documento_vinculo_fecha' => '2026-03-02'])->assertOk()->assertJsonPath('data.documento_vinculo_fecha', '2026-03-02T00:00:00.000000Z');
         $this->patchJson($url, ['tipo_proceso_seleccion_id' => $this->proceso('Concurso público de méritos')->id])->assertOk()
             ->assertJsonPath('data.proceso_seleccion', 'Concurso público de méritos');
+    }
+
+    public function test_las_escalas_de_nivel_de_carrera_se_editan_por_ley_y_grupo(): void
+    {
+        $this->actuarComo();
+        $ley = fn (string $codigo): string => RegimenNormativo::query()->where('codigo', $codigo)->value('id');
+        $url = '/api/v1/catalogos-vinculo/niveles';
+
+        // La migración trae las escalas por defecto del 276 y el 728, del ingreso al máximo.
+        $niveles = collect($this->getJson('/api/v1/catalogos-vinculo')->assertOk()->json('data.niveles'));
+        $this->assertSame(['STF', 'STE', 'STD', 'STC', 'STB', 'STA'], $niveles->where('codigo_ley', '276')->where('grupo_ocupacional', 'tecnico')->sortBy('orden')->pluck('codigo')->values()->all());
+        $this->assertSame(0, $niveles->firstWhere('codigo', 'STF')['personas']);
+        // Cada nivel por defecto se lee sin conocer la sigla.
+        $this->assertSame('Servidor Técnico F', $niveles->firstWhere('codigo', 'STF')['nombre']);
+        $this->assertSame('Servidor Profesional A', $niveles->firstWhere('codigo', 'SPA')['nombre']);
+        $this->assertSame('Profesional nivel 6', $niveles->firstWhere('codigo', 'P-6')['nombre']);
+
+        // La institución registra su escala de la Ley 30057: sigla en mayúsculas y, sin orden, al final.
+        $this->postJson($url, ['regimen_normativo_id' => $ley('30057'), 'grupo_ocupacional' => 'profesional', 'codigo' => 'ca2', 'nombre' => 'Analista'])->assertCreated()
+            ->assertJsonPath('data.codigo', 'CA2')->assertJsonPath('data.orden', 1)->assertJsonPath('data.nombre', 'Analista');
+        $this->postJson($url, ['regimen_normativo_id' => $ley('30057'), 'grupo_ocupacional' => 'profesional', 'codigo' => 'CA3'])->assertCreated()->assertJsonPath('data.orden', 2);
+        $this->postJson($url, ['regimen_normativo_id' => $ley('30057'), 'grupo_ocupacional' => 'profesional', 'codigo' => 'Ca2'])->assertJsonValidationErrors('codigo');
+
+        // CAS no tiene nivel de carrera y la escala no es para leyes de docentes.
+        $this->postJson($url, ['regimen_normativo_id' => $ley('1057'), 'grupo_ocupacional' => 'tecnico', 'codigo' => 'X1'])
+            ->assertJsonValidationErrors(['regimen_normativo_id' => 'En CAS (D.L. 1057) no hay nivel de carrera: déjalo vacío.']);
+        $this->postJson($url, ['regimen_normativo_id' => $ley('30220'), 'grupo_ocupacional' => 'tecnico', 'codigo' => 'X1'])->assertJsonValidationErrors('regimen_normativo_id');
+        $this->postJson($url, ['regimen_normativo_id' => $ley('276'), 'grupo_ocupacional' => 'gerencial', 'codigo' => 'X1'])->assertJsonValidationErrors('grupo_ocupacional');
+
+        // De un nivel solo cambia el orden; se desactiva, no se borra.
+        $stf = EscalaNivelCarrera::query()->where('codigo', 'STF')->firstOrFail();
+        $this->patchJson($url.'/'.$stf->id, ['orden' => 7])->assertOk()->assertJsonPath('data.orden', 7);
+        $this->patchJson($url.'/'.$stf->id, ['nombre' => 'Servidor Técnico F (ingreso)'])->assertOk()->assertJsonPath('data.nombre', 'Servidor Técnico F (ingreso)');
+        $this->patchJson($url.'/'.$stf->id, ['codigo' => 'OTRO'])->assertStatus(422);
+        $this->patchJson($url.'/'.$stf->id, ['activo' => false])->assertOk()->assertJsonPath('data.activo', false);
+        $this->assertDatabaseHas('escalas_nivel_carrera', ['id' => $stf->id, 'codigo' => 'STF']);
+        $this->assertDatabaseHas('auditoria_eventos', ['accion' => 'catalogo.crear', 'entidad' => 'escalas_nivel_carrera']);
+    }
+
+    public function test_crear_un_nivel_requiere_el_permiso_de_catalogos(): void
+    {
+        $this->actuarComo(codigo: 'asistente_legajo');
+
+        $this->postJson('/api/v1/catalogos-vinculo/niveles', ['regimen_normativo_id' => RegimenNormativo::query()->where('codigo', '276')->value('id'), 'grupo_ocupacional' => 'tecnico', 'codigo' => 'STG'])
+            ->assertForbidden();
     }
 }

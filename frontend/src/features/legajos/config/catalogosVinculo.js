@@ -96,6 +96,7 @@ export const NOMBRES_CATALOGO = {
   modalidades: { singular: 'modalidad', nuevo: 'Nueva modalidad de vínculo', editar: 'Editar modalidad', masculino: false },
   procesos: { singular: 'proceso de selección', nuevo: 'Nuevo proceso de selección', editar: 'Editar proceso de selección', masculino: true },
   tipos_vinculo: { singular: 'tipo de vínculo', nuevo: '', editar: 'Editar tipo de vínculo', masculino: true },
+  niveles: { singular: 'nivel de carrera', nuevo: 'Nuevo nivel de carrera', editar: 'Editar nivel de carrera', masculino: true },
 }
 
 /** Unidades en el orden de su jerarquía, con su ruta desde la raíz. Las desactivadas solo si ya están elegidas. */

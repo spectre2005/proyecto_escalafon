@@ -54,8 +54,6 @@ class Seccion02Controller extends Controller
     // Reglas compartidas con el alta de personal con su primer vínculo (UsuarioController::storeConVinculo).
     private const REGLAS_VINCULO = ReglasVinculo::VINCULO;
 
-    private const REGLAS_PERFIL = ReglasVinculo::PERFIL;
-
     private const REGLAS_PERIODO = [
         'fecha_inicio' => 'required|date_format:Y-m-d',
         'fecha_fin' => 'required|date_format:Y-m-d|after_or_equal:fecha_inicio',
@@ -238,7 +236,9 @@ class Seccion02Controller extends Controller
             return response()->json(['message' => 'El vínculo está cerrado (con fecha de cese) o anulado: sus datos del puesto no se corrigen.'], 409);
         }
         $docente = $registro->tipo_personal === 'docente';
-        $data = $this->validar($request, self::REGLAS_PERFIL[$docente ? 'docente' : 'administrativo']);
+        // El nivel de carrera ya guardado se acepta aunque no esté en la lista de su grupo (registros anteriores).
+        $nivelAnterior = $docente ? null : $registro->perfilAdministrativo()->orderBy('created_at')->orderBy('id')->value('nivel_carrera');
+        $data = $this->validar($request, ReglasVinculo::perfil($docente ? 'docente' : 'administrativo', $nivelAnterior, $registro->regimenNormativo?->codigo));
         $perfiles = $docente ? $registro->perfilDocente() : $registro->perfilAdministrativo();
 
         return DB::transaction(function () use ($perfiles, $data, $request, $usuario): JsonResource|JsonResponse {
@@ -371,6 +371,8 @@ class Seccion02Controller extends Controller
             ...$this->fila($vinculo, ['tipo_personal', 'regimen_laboral', 'regimen_normativo_id', 'unidad_organica_id', 'nombre_puesto', 'obligado_djbr', 'exige_colegiatura', 'exige_estudios_basicos', 'tiene_periodo_prueba', 'proceso_seleccion', 'fecha_resultado_seleccion', 'numero_documento_vinculo', 'fecha_inicio', 'fecha_fin_prevista', 'fecha_cese',
                 'modalidad_vinculo_id', 'puesto_id', 'tipo_proceso_seleccion_id', 'documento_vinculo_fecha']),
             'regimen_normativo' => $vinculo->regimenNormativo?->nombre,
+            // Código de la ley: del vínculo dependen los niveles de carrera que se ofrecen en sus datos del puesto.
+            'regimen_normativo_codigo' => $vinculo->regimenNormativo?->codigo,
             'modalidad' => $vinculo->modalidadVinculo?->nombre,
             // Vínculo anterior con el tipo Sin definir: sugerencia para confirmar al corregirlo (no se guarda sola).
             'tipo_sugerido' => RegimenesLaborales::sugerencia($vinculo),

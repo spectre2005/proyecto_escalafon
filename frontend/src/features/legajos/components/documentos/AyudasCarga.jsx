@@ -11,7 +11,7 @@ const enlace = 'font-semibold text-teal-700 underline-offset-2 hover:underline'
 export function SugerenciaFolio({ inicio, paginas, valor, onUsar }) {
   const sugerido = folioFinalPorPaginas(inicio, paginas)
   if (!sugerido || String(valor) === String(sugerido)) return null
-  return <p role="note" className="text-[11px] text-slate-500 sm:col-span-2">
+  return <p role="note" className="text-xs text-slate-500 sm:col-span-2">
     El PDF tiene {paginas} página(s). Si cada página es un folio, el folio final sería {sugerido}.{' '}
     <button type="button" onClick={() => onUsar(String(sugerido))} className={enlace}>Usar {sugerido}</button>
   </p>
@@ -22,5 +22,5 @@ export function SugerenciaFolio({ inicio, paginas, valor, onUsar }) {
 export function EmisorInstitucion({ valor, onUsar }) {
   const nombre = useOutletContext()?.institution?.name?.trim()
   if (!nombre || nombre === defaultInstitution.name || valor === nombre) return null
-  return <button type="button" onClick={() => onUsar(nombre)} className={`justify-self-start text-[11px] ${enlace}`}>Usar «{nombre}»</button>
+  return <button type="button" onClick={() => onUsar(nombre)} className={`justify-self-start text-xs ${enlace}`}>Usar «{nombre}»</button>
 }

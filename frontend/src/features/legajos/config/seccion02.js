@@ -72,6 +72,53 @@ export const subtiposExtraordinario = { emerito: 'Emérito', honorario: 'Honorar
 export const funcionesPrevias = { jefe_practica: 'Jefe de práctica', ayudante_catedra: 'Ayudante de cátedra', ayudante_laboratorio: 'Ayudante de laboratorio' }
 export const gruposOcupacionales = { profesional: 'Profesional', tecnico: 'Técnico', auxiliar: 'Auxiliar' }
 
+// Niveles de carrera del personal administrativo: escalas por ley y grupo ocupacional que cada institución edita en
+// Configuración → Catálogos del vínculo (llegan en /expediente-opciones como «niveles»; el backend valida con
+// App\Rules\NivelCarrera). Van del ingreso (orden 1) al máximo. CAS no tiene nivel de carrera por norma.
+const SIN_NIVEL = { 1057: 'No aplica en CAS' }
+
+/** Siglas de la escala de esa ley y grupo, del ingreso al máximo. Las desactivadas solo si son el valor ya guardado. */
+export function nivelesDe(escalas, codigoLey, grupo, actual = '') {
+  return (escalas || [])
+    .filter(nivel => nivel.codigo_ley === String(codigoLey ?? '') && nivel.grupo_ocupacional === grupo && (nivel.activo !== false || nivel.codigo === actual))
+    .sort((a, b) => a.orden - b.orden || a.codigo.localeCompare(b.codigo))
+    .map(nivel => nivel.codigo)
+}
+
+/** Por qué el nivel no se puede elegir (texto corto para la lista), o null si se puede. */
+export function motivoSinNivel(escalas, codigoLey, grupo) {
+  if (SIN_NIVEL[codigoLey]) return SIN_NIVEL[codigoLey]
+  if (!codigoLey) return 'Elige primero la ley'
+  if (!(escalas || []).some(nivel => nivel.codigo_ley === String(codigoLey) && nivel.activo !== false)) return 'Sin escala registrada para esta ley'
+  if (!grupo) return 'Elige primero el grupo'
+  if (!nivelesDe(escalas, codigoLey, grupo).length) return 'Sin niveles para este grupo'
+  return null
+}
+
+/**
+ * Opciones del nivel: su nombre con la sigla entre paréntesis («Servidor Técnico F (STF)»; sin nombre, solo la sigla) y,
+ * en los extremos de la escala, cuál es el de ingreso y cuál el más alto. Se guarda la sigla; un nivel desactivado solo
+ * aparece si es el valor ya guardado.
+ */
+export function opcionesNivelCarrera(escalas, codigoLey, grupo, actual = '') {
+  const activos = nivelesDe(escalas, codigoLey, grupo)
+  const niveles = nivelesDe(escalas, codigoLey, grupo, actual)
+  const nombres = Object.fromEntries((escalas || []).filter(n => n.codigo_ley === String(codigoLey ?? '') && n.grupo_ocupacional === grupo).map(n => [n.codigo, n.nombre]))
+  return Object.fromEntries(niveles.map(nivel => {
+    const texto = nombres[nivel] ? `${nombres[nivel]} (${nivel})` : nivel
+    const indice = activos.indexOf(nivel)
+    if (indice < 0) return [nivel, `${texto} · desactivado`]
+    if (activos.length > 1 && indice === 0) return [nivel, `${texto} · nivel de ingreso`]
+    if (activos.length > 1 && indice === activos.length - 1) return [nivel, `${texto} · nivel más alto`]
+    return [nivel, texto]
+  }))
+}
+
+/** Al cambiar de ley o de grupo: el nivel se conserva solo si sigue en la escala activa; si no, se vacía. */
+export function nivelTrasCambiarGrupo(escalas, nivel, codigoLey, grupo) {
+  return nivelesDe(escalas, codigoLey, grupo).includes(String(nivel || '').toUpperCase()) ? nivel : ''
+}
+
 // Etiquetas de los datos del puesto.
 export const camposDatosPuesto = {
   condicion_docente: 'Condición docente', categoria: 'Categoría', dedicacion: 'Dedicación',

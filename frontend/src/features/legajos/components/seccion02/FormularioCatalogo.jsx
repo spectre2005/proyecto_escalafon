@@ -20,6 +20,8 @@ function inicial(catalogo, registro, contexto) {
     procesos: { nombre: r.nombre || contexto.texto || '' },
     // De los tipos de vínculo solo se edita la descripción.
     tipos_vinculo: { descripcion: r.descripcion || '' },
+    // De un nivel ya creado se editan su nombre y su orden (los legajos guardan su sigla).
+    niveles: { regimen_normativo_id: r.regimen_normativo_id || '', grupo_ocupacional: r.grupo_ocupacional || '', codigo: r.codigo || '', nombre: r.nombre || '', orden: r.orden ?? '' },
   }[catalogo]
 }
 
@@ -54,7 +56,7 @@ export default function FormularioCatalogo({ catalogo, registro = null, contexto
     setError('')
     setErrors({})
     try {
-      const datos = vacioANull(draft)
+      const datos = catalogo === 'niveles' && registro ? { orden: Number(draft.orden), nombre: draft.nombre.trim() || null } : vacioANull(draft)
       const respuesta = registro ? await actualizarElementoCatalogo(catalogo, registro.id, datos) : await crearElementoCatalogo(catalogo, datos)
       onGuardado?.(respuesta.data.data)
     } catch (fallo) {
@@ -83,7 +85,7 @@ export default function FormularioCatalogo({ catalogo, registro = null, contexto
     className={`col-span-full grid gap-4 rounded-2xl border border-teal-200 bg-white p-4 shadow-sm ${compacto ? '' : 'sm:p-5'}`}>
     <div className="flex flex-wrap items-baseline justify-between gap-2">
       <p className="text-sm font-semibold text-slate-800">{registro ? `${nombres.editar}${registro.codigo && catalogo !== 'tipos_vinculo' ? ` · ${registro.codigo}` : ''}` : nombres.nuevo}</p>
-      {!registro && <p className="text-[11px] text-slate-500">El código se asigna solo al guardar.</p>}
+      {!registro && catalogo !== 'niveles' && <p className="text-xs text-slate-500">El código se asigna solo al guardar.</p>}
     </div>
     {error && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p>}
     <fieldset disabled={busy} className="grid min-w-0 gap-4 sm:grid-cols-2">
@@ -115,7 +117,7 @@ export default function FormularioCatalogo({ catalogo, registro = null, contexto
           <label className="flex items-center gap-2 self-end pb-2.5 text-sm text-slate-700"><input type="checkbox" className="size-4 accent-teal-700" checked={draft.es_cargo_confianza} onChange={set('es_cargo_confianza')} />Es cargo de confianza</label>
         </>}
         <div className="grid gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3 sm:col-span-2 sm:grid-cols-3">
-          <p className="text-[11px] text-slate-500 sm:col-span-3">Condiciones que se proponen al elegir este puesto. Solo completan lo que siga «Sin responder».</p>
+          <p className="text-xs text-slate-500 sm:col-span-3">Condiciones que se proponen al elegir este puesto. Solo completan lo que siga «Sin responder».</p>
           <TresEstados name="catalogo-djbr" label="DJBR" value={draft.obligado_djbr} onChange={poner('obligado_djbr')} error={errors.obligado_djbr} />
           <TresEstados name="catalogo-colegiatura" label="Exige colegiatura" value={draft.exige_colegiatura} onChange={poner('exige_colegiatura')} error={errors.exige_colegiatura} />
           <TresEstados name="catalogo-prueba" label="Período de prueba" value={draft.tiene_periodo_prueba} onChange={poner('tiene_periodo_prueba')} error={errors.tiene_periodo_prueba} />
@@ -139,9 +141,24 @@ export default function FormularioCatalogo({ catalogo, registro = null, contexto
 
       {catalogo === 'tipos_vinculo' && <>
         <Campo label="Tipo de vínculo"><input className={control} value={registro?.nombre || ''} readOnly disabled /></Campo>
-        <p className="self-end pb-2.5 text-[11px] text-slate-500">El nombre viene de la directiva y no cambia: de él depende qué documentos se exigen.</p>
+        <p className="self-end pb-2.5 text-xs text-slate-500">El nombre viene de la directiva y no cambia: de él depende qué documentos se exigen.</p>
         <Campo label="Descripción" error={errors.descripcion} className="sm:col-span-2"><textarea className={control} rows={3} maxLength={300} value={draft.descripcion} onChange={set('descripcion')} autoFocus
           placeholder="Qué personal abarca este tipo. Se muestra como ayuda al elegirlo." /></Campo>
+      </>}
+
+      {catalogo === 'niveles' && <>
+        <Campo label="Ley" required error={errors.regimen_normativo_id}><select className={control} value={draft.regimen_normativo_id} onChange={set('regimen_normativo_id')} disabled={!!registro} autoFocus={!registro}>
+          <option value="">Selecciona</option>
+          {(opciones.regimenes || []).filter(ley => ley.aplica_a !== 'docente' && ley.codigo !== '1057' && (ley.activo !== false || ley.id === draft.regimen_normativo_id))
+            .map(ley => <option key={ley.id} value={ley.id}>{ley.nombre}</option>)}
+        </select></Campo>
+        <Campo label="Grupo ocupacional" required error={errors.grupo_ocupacional}><select className={control} value={draft.grupo_ocupacional} onChange={set('grupo_ocupacional')} disabled={!!registro}>
+          <option value="">Selecciona</option>{Object.entries(gruposOcupacionales).map(([valor, texto]) => <option key={valor} value={valor}>{texto}</option>)}
+        </select></Campo>
+        <Campo label="Sigla" required error={errors.codigo}><input className={control} maxLength={20} placeholder="Ej.: STF o T-1" value={draft.codigo} onChange={set('codigo')} disabled={!!registro} /></Campo>
+        <Campo label="Nombre del nivel" error={errors.nombre}><input className={control} maxLength={80} placeholder="Ej.: Servidor Técnico F" value={draft.nombre} onChange={set('nombre')} /></Campo>
+        <Campo label="Orden en la escala" error={errors.orden}><input className={control} type="number" min={1} max={99} placeholder="Al final" value={draft.orden} onChange={set('orden')} autoFocus={!!registro} /></Campo>
+        <p className="text-xs text-slate-500 sm:col-span-2">El orden va del nivel de ingreso (1) al máximo. {registro ? 'La sigla, la ley y el grupo no cambian porque los legajos ya la usan: si está mal, desactívala y crea otra.' : 'Usa la misma sigla que figura en la resolución y en el PAP de la entidad. CAS no tiene nivel de carrera.'}</p>
       </>}
 
       {catalogo === 'procesos' && <Campo label="Nombre del proceso de selección" required error={errors.nombre} className="sm:col-span-2"><input className={control} maxLength={120} placeholder="Ej.: Concurso interno de méritos" value={draft.nombre} onChange={set('nombre')} autoFocus /></Campo>}

@@ -62,7 +62,7 @@ class Seccion02DemoSeeder extends Seeder
                 'nombre_puesto' => 'Especialista administrativo', 'numero_documento_vinculo' => 'DEMO-CONTRATO-002', 'tiene_periodo_prueba' => true,
                 'proceso_seleccion' => 'Proceso DEMO-002', 'fecha_resultado_seleccion' => $fecha(-190), 'fecha_inicio' => $fecha(-180), 'fecha_fin_prevista' => $fecha(-90),
             ]);
-            PerfilAdministrativo::query()->create(['vinculo_laboral_id' => $vigente->id, 'grupo_ocupacional' => 'profesional', 'nivel_carrera' => 'SP-ES', 'cargo_estructural' => 'Especialista']);
+            PerfilAdministrativo::query()->create(['vinculo_laboral_id' => $vigente->id, 'grupo_ocupacional' => 'profesional', 'nivel_carrera' => 'SPC', 'cargo_estructural' => 'Especialista']);
             // Adendas: la última fija el fin efectivo (por vencer).
             VinculoAdenda::query()->create(['vinculo_laboral_id' => $vigente->id, 'numero' => 'DEMO-AD-01', 'motivo' => 'Ampliación de plazo', 'fecha_inicio' => $fecha(-89), 'fecha_fin' => $fecha(-1), 'registrado_por' => $registrador]);
             VinculoAdenda::query()->create(['vinculo_laboral_id' => $vigente->id, 'numero' => 'DEMO-AD-02', 'motivo' => 'Segunda ampliación de plazo', 'fecha_inicio' => $fecha(0), 'fecha_fin' => $fecha(20), 'registrado_por' => $registrador]);

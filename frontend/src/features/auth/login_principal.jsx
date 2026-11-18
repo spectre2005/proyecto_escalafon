@@ -57,7 +57,7 @@ export default function LoginPrincipal() {
         <section className="institution-panel" aria-labelledby="welcome-title">
           <div className="panel-overlay" />
           <header className="institution-brand">
-            <span aria-hidden="true" className="brand-logo grid place-items-center text-lg font-bold text-[#145958]">{institution.initials}</span>
+            <span aria-hidden="true" className="brand-logo grid place-items-center text-lg font-bold text-teal-900">{institution.initials}</span>
             <div><strong>{institution.name}</strong><span>{institution.area}</span></div>
           </header>
           <div className="institution-content">
@@ -79,7 +79,7 @@ export default function LoginPrincipal() {
         <section className="access-panel" aria-labelledby="login-title">
           <div className="access-topline"><span>PORTAL DEL PERSONAL</span><span className="institutional-badge"><span /> Acceso institucional</span></div>
           <div className="login-content">
-            <div className="system-brand"><div className="system-logo"><span aria-hidden="true" className="grid size-[51px] place-items-center text-lg font-bold text-[#214b4b]">{institution.initials}</span></div><div><span>SISTEMA DE</span><strong>Escalafón<span className="brand-dot">.</span></strong><p>PERSONAL DOCENTE Y NO DOCENTE</p></div></div>
+            <div className="system-brand"><div className="system-logo"><span aria-hidden="true" className="grid size-[51px] place-items-center text-lg font-bold text-teal-900">{institution.initials}</span></div><div><span>SISTEMA DE</span><strong>Escalafón<span className="brand-dot">.</span></strong><p>PERSONAL DOCENTE Y NO DOCENTE</p></div></div>
             <div className="login-heading"><span className="section-marker" /><p className="small-label">TE DAMOS LA BIENVENIDA</p><h2 id="login-title">Iniciar sesión</h2><p>Ingresa con tu cuenta institucional para acceder<br className="desktop-break" /> a tu información académica y laboral.</p></div>
             <form className="login-form" onSubmit={login} aria-busy={busy}>
               <label htmlFor="email">Correo institucional</label>

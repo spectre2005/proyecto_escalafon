@@ -7,7 +7,7 @@ import { advanceOnEnter } from '../../../shared/forms/advanceOnEnter'
 import { CampoTipoVinculo, CamposDatosPuesto, CamposDocumentoIngreso, CamposUbicacionPuesto, CamposVigencia, CondicionesPuesto } from '../../legajos/components/seccion02/CamposVinculo'
 import { datosPuestoInicial, vinculoInicial } from '../../legajos/components/seccion02/borradoresVinculo'
 import { ajustarAPuesto, diferenciasConPuesto, equivalenciaPuesto, sincronizarConPuesto } from '../../legajos/config/puestosSugeridos'
-import { categoriasDocente, condicionesDocente } from '../../legajos/config/seccion02'
+import { categoriasDocente, condicionesDocente, nivelTrasCambiarGrupo } from '../../legajos/config/seccion02'
 import { leyesDelTipo, leyInicial } from '../utils/leyes'
 import { columns, hoyLima } from '../utils/usuariosCsv'
 import { updateUserDraft } from '../utils/usuariosEmail'
@@ -37,8 +37,8 @@ const largo = { numero_doc_identidad: 8, telefono: 9, nombres: 120, email_instit
 const tiposPersonal = { docente: 'Docente', administrativo: 'Administrativo' }
 const etiquetas = { ...Object.fromEntries(camposPersona.map(([key, label]) => [key, label.toLowerCase()])), domicilio: 'domicilio' }
 const identidadInicial = { cargando: false, mensaje: null, origen: null, pendiente: null, ubicacion: null }
-const estilosMensaje = { ok: 'bg-[#eaf4ee] text-[#2c7650]', info: 'border border-[#f1d9a6] bg-[#fff8e8] text-[#7a5a17]', error: 'bg-[#fff0ed] text-[#ac4d3a]' }
-const botonSecundario = 'rounded-lg border border-[#dbe6e1] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#4f6d63] hover:bg-[#edf6f2]'
+const estilosMensaje = { ok: 'bg-teal-50 text-teal-800', info: 'border border-amber-200 bg-amber-50 text-amber-800', error: 'bg-rose-50 text-rose-700' }
+const botonSecundario = 'rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-teal-50'
 
 const nombresPerfil = { condicion_docente: ['condición', condicionesDocente], categoria: ['categoría', categoriasDocente] }
 // «condición «Ordinario» y categoría «Asociado»» con los valores de `datos`.
@@ -46,7 +46,7 @@ const textoCampos = (campos, datos) => campos.map(campo => `${nombresPerfil[camp
 
 function Grupo({ titulo, ayuda, children }) {
   return <fieldset className="grid min-w-0 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
-    <legend className="mb-2 text-[12px] font-semibold text-[#243f43]">{titulo}{ayuda && <span className="ml-2 font-normal text-[#7b9181]">{ayuda}</span>}</legend>
+    <legend className="mb-2 text-[12px] font-semibold text-slate-800">{titulo}{ayuda && <span className="ml-2 font-normal text-slate-500">{ayuda}</span>}</legend>
     {children}
   </fieldset>
 }
@@ -56,14 +56,14 @@ function Progreso({ paso, onIr, disabled }) {
     {PASOS.map(({ numero, titulo, resumen }) => {
       const hecho = numero < paso, actual = numero === paso
       const contenido = <>
-        <span className={`grid size-7 shrink-0 place-items-center rounded-full text-[11px] font-semibold ${actual ? 'bg-[#26776d] text-white' : hecho ? 'bg-[#e4f2e9] text-[#2c7650]' : 'bg-[#eef2f0] text-[#8a9b93]'}`}>{hecho ? <Icon name="check" size={14} /> : numero}</span>
-        <span className={`min-w-0 text-left ${actual ? '' : 'max-sm:hidden'}`}><span className={`block truncate text-[11px] font-semibold ${actual ? 'text-[#243f43]' : 'text-[#7b9181]'}`}>{titulo}</span><span className="hidden truncate text-[10px] text-[#93a399] lg:block">{resumen}</span></span>
+        <span className={`grid size-7 shrink-0 place-items-center rounded-full text-xs font-semibold ${actual ? 'bg-teal-700 text-white' : hecho ? 'bg-teal-50 text-teal-800' : 'bg-slate-100 text-slate-500'}`}>{hecho ? <Icon name="check" size={14} /> : numero}</span>
+        <span className={`min-w-0 text-left ${actual ? '' : 'max-sm:hidden'}`}><span className={`block truncate text-xs font-semibold ${actual ? 'text-slate-800' : 'text-slate-500'}`}>{titulo}</span><span className="hidden truncate text-xs text-slate-500 lg:block">{resumen}</span></span>
       </>
       // En pantallas pequeñas solo el paso actual muestra su título; los demás, su número.
       return <li key={numero} aria-current={actual ? 'step' : undefined} className={`flex min-w-0 items-center gap-2 ${actual ? 'flex-1' : 'flex-none sm:flex-1'}`}>
-        {hecho ? <button type="button" disabled={disabled} onClick={() => onIr(numero)} className="flex min-w-0 items-center gap-2 rounded-lg hover:bg-[#edf6f2]" aria-label={`Volver al paso ${numero}: ${titulo}`}>{contenido}</button>
+        {hecho ? <button type="button" disabled={disabled} onClick={() => onIr(numero)} className="flex min-w-0 items-center gap-2 rounded-lg hover:bg-teal-50" aria-label={`Volver al paso ${numero}: ${titulo}`}>{contenido}</button>
           : <span className="flex min-w-0 items-center gap-2">{contenido}</span>}
-        {numero < PASOS.length && <span aria-hidden="true" className="hidden h-px flex-1 bg-[#e0e9e4] sm:block" />}
+        {numero < PASOS.length && <span aria-hidden="true" className="hidden h-px flex-1 bg-slate-200 sm:block" />}
       </li>
     })}
   </ol>
@@ -73,20 +73,20 @@ function Progreso({ paso, onIr, disabled }) {
 // (dejó la institución y vuelve), se puede confirmar que ese legajo pase a Legajos pasivos como historial y registrar el
 // nuevo ingreso; sin confirmar, no se crea otro registro.
 function PersonaRegistrada({ persona, puedeVerFicha, puedeRegistrar, nuevoIngreso, onNuevoIngreso }) {
-  const ficha = puedeVerFicha && <Link to={rutaFicha(persona.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-[#e3c47f] bg-white px-3 py-1.5 font-semibold text-[#7a5a17] hover:bg-[#fff1cf]">Ir a su ficha <Icon name="arrow" size={14} /></Link>
+  const ficha = puedeVerFicha && <Link to={rutaFicha(persona.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 font-semibold text-amber-800 hover:bg-amber-100">Ir a su ficha <Icon name="arrow" size={14} /></Link>
   const nombre = <strong>{persona.nombre || 'Esta persona'}</strong>
-  if (persona.puedeIncorporar || nuevoIngreso) return <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#bfe0cd] bg-[#eaf4ee] px-4 py-3 text-xs leading-relaxed text-[#2c7650]">
+  if (persona.puedeIncorporar || nuevoIngreso) return <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-xs leading-relaxed text-teal-800">
     <span>Nuevo ingreso de {nombre}: se creará su legajo n.° {persona.numeroIncorporacion}.{nuevoIngreso ? ' Su legajo actual pasará a Legajos pasivos como historial, con sus documentos.' : ' Su legajo anterior se conserva en Legajos pasivos.'}</span>
     {nuevoIngreso && <button type="button" onClick={() => onNuevoIngreso(false)} className="font-semibold underline">Deshacer</button>}
   </div>
-  if (persona.tieneLegajoActivo && puedeRegistrar) return <div role="alert" className="mb-4 grid gap-3 rounded-lg border border-[#f1d9a6] bg-[#fff8e8] px-4 py-3 text-xs leading-relaxed text-[#7a5a17]">
+  if (persona.tieneLegajoActivo && puedeRegistrar) return <div role="alert" className="mb-4 grid gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-800">
     <span>{nombre} ya está registrada y tiene un legajo activo. Si dejó la institución y vuelve a ingresar, registra su nuevo ingreso: su legajo actual pasará a Legajos pasivos como historial y se abrirá uno nuevo.</span>
     <span className="flex flex-wrap gap-2">
-      <button type="button" onClick={() => onNuevoIngreso(true)} className="rounded-lg bg-[#26776d] px-3 py-1.5 font-semibold text-white hover:bg-[#1b625a]">Registrar nuevo ingreso</button>
+      <button type="button" onClick={() => onNuevoIngreso(true)} className="rounded-lg bg-teal-700 px-3 py-1.5 font-semibold text-white hover:bg-teal-800">Registrar nuevo ingreso</button>
       {ficha}
     </span>
   </div>
-  return <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#f1d9a6] bg-[#fff8e8] px-4 py-3 text-xs leading-relaxed text-[#7a5a17]">
+  return <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-800">
     <span>{nombre} ya está registrada con ese DNI. No se creará otro registro.{puedeVerFicha ? ' Revisa su ficha para continuar con su legajo.' : ''}</span>
     {ficha}
   </div>
@@ -204,7 +204,14 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
     aplicarConsulta(dni, datos, avisoUbicacion)
   }
 
-  const sugerencia = tipo ? sugerenciaTipoVinculo({ tipoPersonal: tipo, datosPuesto: puestos[tipo], codigoLey: (catalogo || []).find(ley => ley.id === leyElegida)?.codigo }) : null
+  const codigoLey = (catalogo || []).find(ley => ley.id === leyElegida)?.codigo
+  const sugerencia = tipo ? sugerenciaTipoVinculo({ tipoPersonal: tipo, datosPuesto: puestos[tipo], codigoLey }) : null
+  // El nivel de carrera depende de la ley (paso 1): si se cambió la ley, un nivel que ya no vale no se muestra ni se envía
+  // (armarRegistro aplica la misma regla).
+  const escalas = opciones.data?.data.niveles
+  const datosPuestoVisibles = tipo === 'administrativo'
+    ? { ...puestos.administrativo, nivel_carrera: nivelTrasCambiarGrupo(escalas, puestos.administrativo.nivel_carrera, codigoLey, puestos.administrativo.grupo_ocupacional) }
+    : puestos[tipo]
 
   const ponerVinculo = key => valor => {
     setVinculo(previo => ({ ...previo, [key]: valor }))
@@ -265,7 +272,7 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
     const pendientes = erroresPersona(persona, { catalogo, usuarios, ubicacion, ubigeoId, nuevoIngreso })
     if (pendientes.length) { setAvisos(pendientes); return irA(1) }
     setErrores({})
-    const resultado = await onGuardar(armarRegistro({ persona, catalogo, ubigeoId, condiciones, puedeDiscapacidad, vinculo, puestos, nuevoIngreso }))
+    const resultado = await onGuardar(armarRegistro({ persona, catalogo, escalas, ubigeoId, condiciones, puedeDiscapacidad, vinculo, puestos, nuevoIngreso }))
     if (!resultado.ok) {
       setExistenteBackend(resultado.existente ? { dni: persona.numero_doc_identidad, persona: resultado.existente } : null)
       setErrores(resultado.errors || {})
@@ -292,8 +299,8 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
           // El domicilio que trajo la consulta del DNI anterior no pasa a la persona nueva.
           setDraft(cambiaDni ? domicilioTrasCambioDni(siguiente, identidad.origen) : siguiente)
         }} />
-      {key === 'email_institucional' && <small className="text-[10px] text-[#8b9c91]">{dominioCorreo ? 'Se sugiere con el nombre y el apellido; puedes cambiarlo. ' : ''}Se utiliza para enviar requerimientos y notificaciones. Si la persona tiene una cuenta habilitada en el sistema, también puede utilizarse para iniciar sesión.</small>}
-      {identidad.origen && draft[key] && identidad.origen.valores[key] === draft[key] && <small className="text-[10px] font-semibold text-[#7a5a17]">{identidad.origen.simulada ? 'Dato simulado (ficticio)' : 'Dato de la consulta de identidad'}</small>}
+      {key === 'email_institucional' && <small className="text-xs text-slate-500">{dominioCorreo ? 'Se sugiere con el nombre y el apellido; puedes cambiarlo. ' : ''}Se utiliza para enviar requerimientos y notificaciones. Si la persona tiene una cuenta habilitada en el sistema, también puede utilizarse para iniciar sesión.</small>}
+      {identidad.origen && draft[key] && identidad.origen.valores[key] === draft[key] && <small className="text-xs font-semibold text-amber-800">{identidad.origen.simulada ? 'Dato simulado (ficticio)' : 'Dato de la consulta de identidad'}</small>}
       {erroresPersonaCampo[key] && <span className="text-rose-700">{[].concat(erroresPersonaCampo[key]).join(' ')}</span>}
     </label>
   }
@@ -305,14 +312,14 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
       <button type="button" onClick={() => consultarDni()} disabled={identidad.cargando} aria-busy={identidad.cargando} className={`inline-flex items-center gap-1.5 ${botonSecundario} disabled:cursor-wait disabled:opacity-60`}>
         <Icon name="search" size={13} />{identidad.cargando ? 'Consultando…' : 'Consultar datos de identidad'}
       </button>
-      {estadoIdentidad?.simulada && <small className="text-[10px] font-semibold text-[#7a5a17]">Modo simulado: solo datos ficticios</small>}
+      {estadoIdentidad?.simulada && <small className="text-xs font-semibold text-amber-800">Modo simulado: solo datos ficticios</small>}
     </div>}
-    {modoIdentidad === 'no_disponible' && <small className="text-[10px] text-[#8b9c91]">{NO_DISPONIBLE}</small>}
+    {modoIdentidad === 'no_disponible' && <small className="text-xs text-slate-500">{NO_DISPONIBLE}</small>}
   </div>
 
   const avisoIdentidad = <div ref={avisoIdentidadRef} className="col-span-full grid gap-2 empty:hidden" aria-live="polite">
-    {identidad.cargando && <p role="status" className="text-[11px] text-[#557566]">Consultando datos de identidad… Puedes seguir completando el formulario.</p>}
-    {identidad.pendiente && <div role="alert" className={`rounded-lg px-3 py-2.5 text-[11px] leading-relaxed ${estilosMensaje.info}`}>
+    {identidad.cargando && <p role="status" className="text-xs text-slate-600">Consultando datos de identidad… Puedes seguir completando el formulario.</p>}
+    {identidad.pendiente && <div role="alert" className={`rounded-lg px-3 py-2.5 text-xs leading-relaxed ${estilosMensaje.info}`}>
       {identidad.pendiente.datos.simulada && <strong className="block">{AVISO_SIMULACION}.</strong>}
       La consulta trae otros datos para {camposPorReemplazar(draft, identidad.pendiente.datos).map(campoNombre => etiquetas[campoNombre]).join(', ') || 'los nombres'}. ¿Reemplazar lo que escribiste?
       <span className="mt-2 flex flex-wrap gap-2">
@@ -321,23 +328,23 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
       </span>
     </div>}
     {/* Mientras se pide confirmación, el aviso de simulación va dentro de esa pregunta: uno solo a la vista. */}
-    {identidad.origen?.simulada && !identidad.pendiente && <p role="note" className={`rounded-lg px-3 py-2 text-[11px] font-semibold ${estilosMensaje.info}`}>{AVISO_SIMULACION}. No acreditan la identidad de ninguna persona.</p>}
-    {identidad.mensaje && <p role={identidad.mensaje.tipo === 'error' ? 'alert' : 'status'} className={`rounded-lg px-3 py-2 text-[11px] ${estilosMensaje[identidad.mensaje.tipo]}`}>{identidad.mensaje.texto}</p>}
+    {identidad.origen?.simulada && !identidad.pendiente && <p role="note" className={`rounded-lg px-3 py-2 text-xs font-semibold ${estilosMensaje.info}`}>{AVISO_SIMULACION}. No acreditan la identidad de ninguna persona.</p>}
+    {identidad.mensaje && <p role={identidad.mensaje.tipo === 'error' ? 'alert' : 'status'} className={`rounded-lg px-3 py-2 text-xs ${estilosMensaje[identidad.mensaje.tipo]}`}>{identidad.mensaje.texto}</p>}
   </div>
 
   // El DNI repetido se muestra con su enlace (PersonaRegistrada), no en la lista general.
   const general = [...avisos, ...[].concat(errores.usuarios || [])].filter(texto => !(existente && /ya está registrada con ese DNI/.test(texto)))
   return <form ref={formRef} onSubmit={enviar} onKeyDown={advanceOnEnter} aria-busy={saving} aria-labelledby="registro-paso-titulo"
-    className="flex min-h-0 flex-1 flex-col bg-white [&_label]:flex [&_label]:min-w-0 [&_label]:flex-col [&_label]:gap-1.5 [&_label]:text-[11px] [&_label]:text-[#557566] [&_input:not([type=file]):not([type=checkbox])]:py-2.5 [&_select]:py-2.5">
-    <div className="shrink-0 border-b border-[#e9efec] px-4 py-3 md:px-6">
+    className="flex min-h-0 flex-1 flex-col bg-white [&_label]:flex [&_label]:min-w-0 [&_label]:flex-col [&_label]:gap-1.5 [&_label]:text-xs [&_label]:text-slate-600 [&_input:not([type=file]):not([type=checkbox])]:py-2.5 [&_select]:py-2.5">
+    <div className="shrink-0 border-b border-slate-100 px-4 py-3 md:px-6">
       <Progreso paso={paso} onIr={irA} disabled={saving} />
     </div>
     <div ref={contenidoRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6">
       <h3 id="registro-paso-titulo" className="sr-only">Paso {paso} de {PASOS.length}: {PASOS[paso - 1].titulo}</h3>
-      {mensaje?.error && <p role="alert" className="mb-4 rounded-lg bg-[#fff0ed] px-4 py-3 text-xs leading-relaxed text-[#ac4d3a]">{mensaje.text}</p>}
+      {mensaje?.error && <p role="alert" className="mb-4 rounded-lg bg-rose-50 px-4 py-3 text-xs leading-relaxed text-rose-700">{mensaje.text}</p>}
       {paso === 1 && existente && <PersonaRegistrada persona={existente} puedeVerFicha={puedeVerFicha} puedeRegistrar={puedeRegistrar} nuevoIngreso={nuevoIngreso && !!existente.tieneLegajoActivo} onNuevoIngreso={valor => { setNuevoIngreso(valor); setAvisos([]) }} />}
-      {general.length > 0 && <ul role="alert" className="mb-4 list-disc rounded-lg bg-[#fff0ed] px-8 py-3 text-xs leading-relaxed text-[#ac4d3a]">{general.map(texto => <li key={texto}>{texto}</li>)}</ul>}
-      {!puedeRegistrar && <p role="alert" className="mb-4 rounded-lg bg-[#fff0ed] px-4 py-3 text-xs text-[#ac4d3a]">Tu rol no puede abrir legajos o registrar vínculos: no puedes registrar personal manualmente. La importación sigue disponible.</p>}
+      {general.length > 0 && <ul role="alert" className="mb-4 list-disc rounded-lg bg-rose-50 px-8 py-3 text-xs leading-relaxed text-rose-700">{general.map(texto => <li key={texto}>{texto}</li>)}</ul>}
+      {!puedeRegistrar && <p role="alert" className="mb-4 rounded-lg bg-rose-50 px-4 py-3 text-xs text-rose-700">Tu rol no puede abrir legajos o registrar vínculos: no puedes registrar personal manualmente. La importación sigue disponible.</p>}
       <fieldset disabled={saving || bloqueado} className="grid min-w-0 gap-5">
         {paso === 1 && <>
           <Grupo titulo="Identificación y contacto">
@@ -365,8 +372,8 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
           </Grupo>
           <Grupo titulo="Ubicación" ayuda="Opcional; si la indicas, completa región, provincia y distrito.">
             <UbigeoFields value={ubicacion} onChange={(siguiente, id) => setUbicacionEstado(ubicacionManual(siguiente, id))} disabled={saving} />
-            {ubicacionEstado.origen && ubicacionEstado.origen !== 'manual' && <small className="col-span-full text-[10px] font-semibold text-[#7a5a17]">{identidad.origen?.simulada ? 'Ubicación simulada (ficticia)' : 'Ubicación de la consulta de identidad'}</small>}
-            {identidad.ubicacion && <p role="status" className={`col-span-full rounded-lg px-3 py-2 text-[11px] ${estilosMensaje.info}`}>{identidad.ubicacion}</p>}
+            {ubicacionEstado.origen && ubicacionEstado.origen !== 'manual' && <small className="col-span-full text-xs font-semibold text-amber-800">{identidad.origen?.simulada ? 'Ubicación simulada (ficticia)' : 'Ubicación de la consulta de identidad'}</small>}
+            {identidad.ubicacion && <p role="status" className={`col-span-full rounded-lg px-3 py-2 text-xs ${estilosMensaje.info}`}>{identidad.ubicacion}</p>}
             {puedeSensibles && <div className="col-span-full">{campo('domicilio', 'Domicilio', false)}</div>}
           </Grupo>
           <Grupo titulo="Condiciones de la persona" ayuda="Si no lo sabes, deja «Sin responder».">
@@ -378,18 +385,18 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
           </Grupo>
         </>}
         {paso === 2 && <>
-          <p className="text-[11px] text-[#7b9181]">Dónde trabajará y en qué puesto. Tipo de personal: <strong>{tiposPersonal[tipo]}</strong> (paso 1). Todo se puede corregir después en la sección 02 mientras el vínculo esté abierto.</p>
+          <p className="text-xs text-slate-500">Dónde trabajará y en qué puesto. Tipo de personal: <strong>{tiposPersonal[tipo]}</strong> (paso 1). Todo se puede corregir después en la sección 02 mientras el vínculo esté abierto.</p>
           <Grupo titulo="A. Unidad y puesto" ayuda="Escribe para buscar. Si no está en la lista, puedes agregarlo.">
             <CamposUbicacionPuesto draft={vinculo} poner={ponerVinculo} errors={erroresDe(errores, 'vinculo')} opciones={opciones.data?.data} tipoPersonal={tipo} nombre="alta-vinculo" />
           </Grupo>
           <Grupo titulo={`B. Datos del puesto · ${tiposPersonal[tipo]?.toLowerCase() || ''}`}
             ayuda={tipo === 'docente' ? 'Condición, categoría, dedicación (tiempo completo, parcial o exclusiva), función previa y RENACYT.' : 'Grupo ocupacional, nivel de carrera, cargo estructural y si es de confianza.'}>
-            {conflictosPuesto.length > 0 && <div role="alert" className={`col-span-full flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-[11px] leading-relaxed ${estilosMensaje.info}`}>
+            {conflictosPuesto.length > 0 && <div role="alert" className={`col-span-full flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-xs leading-relaxed ${estilosMensaje.info}`}>
               <span><strong>No coincide con el puesto.</strong> {mensajeConflicto}</span>
               <button type="button" className={botonSecundario} onClick={ajustarPerfilAlPuesto}>Ajustar al puesto</button>
             </div>}
-            {!conflictosPuesto.length && notaPuesto && <p role="status" className={`col-span-full rounded-lg px-3 py-2 text-[11px] ${estilosMensaje.ok}`}>{notaPuesto}</p>}
-            <CamposDatosPuesto docente={tipo === 'docente'} draft={puestos[tipo]} set={setCampoPuesto}
+            {!conflictosPuesto.length && notaPuesto && <p role="status" className={`col-span-full rounded-lg px-3 py-2 text-xs ${estilosMensaje.ok}`}>{notaPuesto}</p>}
+            <CamposDatosPuesto docente={tipo === 'docente'} draft={datosPuestoVisibles} set={setCampoPuesto} codigoLey={codigoLey} escalas={escalas}
               errors={{ ...erroresDe(errores, 'datos_puesto'), ...Object.fromEntries(conflictosPuesto.map(campo => [campo, ['No coincide con el puesto elegido.']])) }} />
           </Grupo>
           <Grupo titulo="C. Condiciones del puesto" ayuda="Si no lo sabes, deja «Sin responder».">
@@ -397,7 +404,7 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
           </Grupo>
         </>}
         {paso === 3 && <>
-          <p className="text-[11px] text-[#7b9181]">Cómo se vincula la persona con la universidad. Se registra junto con ella y abre su legajo; la ley es la del paso 1.</p>
+          <p className="text-xs text-slate-500">Cómo se vincula la persona con la universidad. Se registra junto con ella y abre su legajo; la ley es la del paso 1.</p>
           <Grupo titulo="A. Tipo de vínculo" ayuda="Carrera, plazo determinado o designado, y su modalidad (p. ej. CAS). La sugerencia sale de los datos del puesto; puedes elegir otro.">
             <CampoTipoVinculo draft={vinculo} poner={ponerVinculo} errors={erroresDe(errores, 'vinculo')} sugerencia={sugerencia} nombre="alta-vinculo" opciones={opciones.data?.data} tipoPersonal={tipo} />
           </Grupo>
@@ -412,12 +419,12 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
           vinculo={vinculo} datosPuesto={puestos[tipo]} opciones={opciones.data?.data} onIr={irA} />}
       </fieldset>
     </div>
-    <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[#e9efec] bg-white px-4 py-3 md:px-6">
-      <small className="text-[10px] text-[#8b9c91]">Paso {paso} de {PASOS.length} · * Campos obligatorios</small>
+    <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-white px-4 py-3 md:px-6">
+      <small className="text-xs text-slate-500">Paso {paso} de {PASOS.length} · * Campos obligatorios</small>
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={onCancel} disabled={saving} className="rounded-lg border border-[#dbe6e1] bg-white px-4 py-2.5 text-xs font-semibold text-[#4f6d63] hover:bg-[#edf6f2]">Cancelar</button>
-        {paso > 1 && <button type="button" onClick={() => { setAvisos([]); irA(paso - 1) }} disabled={saving} className="rounded-lg border border-[#dbe6e1] bg-white px-4 py-2.5 text-xs font-semibold text-[#4f6d63] hover:bg-[#edf6f2]">Atrás</button>}
-        <button type="submit" disabled={saving || bloqueado || (paso === PASOS.length && !puedeRegistrar)} className="inline-flex items-center gap-2 rounded-lg bg-[#26776d] px-4.5 py-2.5 text-xs font-semibold text-white hover:bg-[#1b625a]">
+        <button type="button" onClick={onCancel} disabled={saving} className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-teal-50">Cancelar</button>
+        {paso > 1 && <button type="button" onClick={() => { setAvisos([]); irA(paso - 1) }} disabled={saving} className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-teal-50">Atrás</button>}
+        <button type="submit" disabled={saving || bloqueado || (paso === PASOS.length && !puedeRegistrar)} className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-4.5 py-2.5 text-xs font-semibold text-white hover:bg-teal-800">
           {paso < PASOS.length ? <>Continuar <Icon name="arrow" size={15} /></> : <><Icon name="plus" size={16} /> {saving ? 'Registrando…' : 'Registrar personal'}</>}
         </button>
       </div>

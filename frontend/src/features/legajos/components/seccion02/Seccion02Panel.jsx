@@ -42,7 +42,7 @@ const exigencia = {
 
 
 function Etiqueta({ children, clase }) {
-  return <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${clase}`}>{children}</span>
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${clase}`}>{children}</span>
 }
 
 // Resumen de la sección: pendientes de los tipos que aplican, exigidos a la persona y estado de cada subsección.
@@ -72,7 +72,7 @@ function Resumen({ data, onNavigate, compacto = false }) {
       const [nombre, clase] = estadosSubseccion[sub.estado]
       return <button key={sub.codigo} onClick={() => onNavigate(categoriaDe[sub.codigo])} className={`rounded-xl border border-slate-200 p-3 text-left hover:bg-slate-50 ${sub.aplica ? '' : 'opacity-60'}`}>
         <span className="block text-xs font-semibold text-slate-700">{subseccionesSeccion02[categoriaDe[sub.codigo]]?.titulo || sub.nombre}</span>
-        <span className="mt-2 flex flex-wrap items-center gap-2"><Etiqueta clase={clase}>{nombre}</Etiqueta>{sub.aplica && sub.exigidos > 0 && <span className="text-[11px] text-slate-500">{sub.exigidos_cargados}/{sub.exigidos} cargados · {sub.exigidos_recepcionados} recepcionados</span>}</span>
+        <span className="mt-2 flex flex-wrap items-center gap-2"><Etiqueta clase={clase}>{nombre}</Etiqueta>{sub.aplica && sub.exigidos > 0 && <span className="text-xs text-slate-500">{sub.exigidos_cargados}/{sub.exigidos} cargados · {sub.exigidos_recepcionados} recepcionados</span>}</span>
       </button>
     })}</div>}
     {r.exigidos.length > 0 && <details className="mt-4"><summary className="cursor-pointer text-xs font-semibold text-teal-700">Documentos que se exigen a esta persona ({r.exigidos.length})</summary>
@@ -364,7 +364,7 @@ function VinculoCard({ vinculo, aviso, destacado, completar, adjuntar, adjuntarA
         detalle={ultima ? `Última: N.º ${ultima.values.numero || 'sin número'}, hasta el ${fecha(ultima.values.fecha_fin)}` : 'Sin adendas registradas.'}
         acciones={<>{vinculo.adendas.length > 0 && ver('adendas')}{registrarAdenda}</>}>
         {abierto === 'adendas' && <ul className="divide-y divide-slate-100 rounded-xl border border-slate-100">{vinculo.adendas.map((adenda, i) => <li key={adenda.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 py-2.5 text-xs text-slate-700">
-          <p className="min-w-0"><span className="font-semibold text-slate-800">N.º {adenda.values.numero || 'sin número'}</span>{i === vinculo.adendas.length - 1 && <span className="ml-2 text-[10px] text-teal-700">última</span>} · {texto(adenda.values.motivo)} · {fecha(adenda.values.fecha_inicio)} – {fecha(adenda.values.fecha_fin)} · <span className="text-slate-500">Registrado por {adenda.values.registrado_por || 'No registrado'}</span></p>
+          <p className="min-w-0"><span className="font-semibold text-slate-800">N.º {adenda.values.numero || 'sin número'}</span>{i === vinculo.adendas.length - 1 && <span className="ml-2 text-xs text-teal-700">última</span>} · {texto(adenda.values.motivo)} · {fecha(adenda.values.fecha_inicio)} – {fecha(adenda.values.fecha_fin)} · <span className="text-slate-500">Registrado por {adenda.values.registrado_por || 'No registrado'}</span></p>
           <div className="flex flex-wrap items-center gap-4">{adenda.values.documento_id ? <span className="text-slate-500">Con documento</span> : adjuntarAdenda?.(adenda)}{accionAdenda?.(adenda)}</div>
         </li>)}</ul>}
       </Paso>

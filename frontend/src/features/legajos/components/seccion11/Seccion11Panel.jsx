@@ -30,7 +30,7 @@ const enlace = 'text-sm font-semibold text-teal-700 disabled:opacity-50'
 
 
 function Etiqueta({ children, clase }) {
-  return <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${clase}`}>{children}</span>
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${clase}`}>{children}</span>
 }
 
 // Vínculos que pueden recibir una desvinculación nueva: con cese registrado en la 02 y sin desvinculación vigente.
@@ -164,7 +164,7 @@ function TipoDocumento({ usuario, data, tipo, sinLegajo, ofrecer, modo, onTermin
         <p className="text-sm font-medium text-slate-800">{tipo.literal ? <span className="mr-1 text-slate-500">{tipo.literal})</span> : tipo.codigo === 'S11_X_ACEPTACION_RENUNCIA' && <span className="mr-1 text-slate-500">Anexo 05 ·</span>}{tipo.nombre}</p>
         <p className="mt-1 text-xs text-slate-500">{tipo.descripcion ? `${tipo.descripcion} ` : ''}Opcional; admite varios documentos.{tipo.motivos ? ` Solo para el motivo: ${tipo.motivos.map(m => etiqueta(motivosCese, m).toLowerCase()).join(', ')}.` : ''}</p>
         {sinDefinir && <p role="note" className="mt-2 rounded-lg bg-slate-50 p-2 text-xs text-slate-700">Hay vínculos con el tipo de vínculo sin definir y este documento solo corresponde a plazo determinado. Define el tipo de vínculo en la sección 02 (2.2: «Completar tipo» si el vínculo está cerrado).</p>}
-        {tipo.restringido ? <p className="mt-2 text-[11px] text-slate-400">Documento con datos sensibles: requiere acceso a datos sensibles.</p>
+        {tipo.restringido ? <p className="mt-2 text-xs text-slate-400">Documento con datos sensibles: requiere acceso a datos sensibles.</p>
           : <ListaDocumentos usuario={usuario} tipo={tipo} enlazado={documento => enlazadoA(tipo, documento, data)}
             onSubsanar={puedeCargar && !sinLegajo && !subiendo && !subsanando && !registrando && !recuperando ? documento => { setAviso(''); setSubsanando(documento) } : null}
             onEnlazar={puedeSubir && !sinLegajo && !subiendo && !subsanando && !registrando && !recuperando ? documento => { setAviso(''); setRecuperando(documento) } : null} />}

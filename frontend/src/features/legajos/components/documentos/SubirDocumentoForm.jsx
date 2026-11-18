@@ -105,7 +105,7 @@ export default function SubirDocumentoForm({ usuario, seccion, tipo, titular, en
       <div className="min-w-0"><p className="text-sm font-semibold text-slate-800">Nueva evidencia del documento</p><p className="mt-1 text-xs leading-relaxed text-slate-500">Anterior: {resumen(subsanar)}.</p><p className="mt-1 text-xs leading-relaxed text-slate-500">Los datos se han precargado. Revisa los que cambian; el documento anterior se conserva en el historial.</p>{errors.subsana_a_documento_id && <p role="alert" className="mt-2 text-xs text-rose-700">{[].concat(errors.subsana_a_documento_id).join(' ')}</p>}</div>
     </div>}
     {registroFijo && <p role="note" className="rounded-lg bg-teal-50 p-3 text-xs text-teal-900 sm:col-span-2">Acredita: <strong>{registroFijo.etiqueta}</strong>. Los datos del registro ya guardados no se vuelven a pedir.{errors.enlace_id ? ` ${[].concat(errors.enlace_id).join(' ')}` : ''}</p>}
-    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 sm:col-span-2">Metadatos del documento</p>
+    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 sm:col-span-2">Metadatos del documento</p>
     <Campo label="Folio inicial (siguiente de la sección)" error={errors.folio_inicio}><input readOnly value={sugerido ?? 'Calculando…'} /></Campo>
     <Campo label={folioAutomatico ? 'Folio final (automático)' : 'Folio final'} required error={errors.folio_fin}><input type="number" required readOnly={!!folioAutomatico} min={sugerido || 1} value={folioAutomatico || draft.folio_fin} onChange={set('folio_fin')} placeholder={sugerido ? String(sugerido) : ''} /></Campo>
     {folioAutomatico ? <p role="status" className="flex items-center gap-2 rounded-lg bg-teal-50 px-3 py-2 text-xs text-teal-800 sm:col-span-2"><Icon name="check" size={16} />{paginas} {paginas === 1 ? 'página' : 'páginas'} · Folios {folios(sugerido, folioAutomatico)} asignados automáticamente (una página por folio).</p> : <p className="text-xs text-slate-500 sm:col-span-2">Selecciona un PDF para calcular el folio final según sus páginas. Si la vista previa no puede leerlo, puedes indicarlo manualmente.</p>}
@@ -127,7 +127,7 @@ export default function SubirDocumentoForm({ usuario, seccion, tipo, titular, en
         {enlaces.map(enlace => <option key={enlace.id} value={enlace.id}>{enlace.etiqueta}</option>)}
       </select></Campo>}
     {titularAbierto ? <>
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 sm:col-span-2">Titular e incorporación</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 sm:col-span-2">Titular e incorporación</p>
       <Campo label="Titular (nombre)" required error={errors.titular_nombre}><input required maxLength={200} value={draft.titular_nombre} onChange={setTitular('titular_nombre')} /></Campo>
       <Campo label="Titular (DNI u otro documento)" required error={errors.titular_documento}><input required maxLength={20} value={draft.titular_documento} onChange={setTitular('titular_documento')} /></Campo>
       <Campo label="Relación con el titular" required error={errors.relacion_titular}><select required value={draft.relacion_titular} onChange={setTitular('relacion_titular')}><Opciones lista={relacionesTitular} /></select></Campo>

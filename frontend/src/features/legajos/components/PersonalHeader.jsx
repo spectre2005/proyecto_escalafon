@@ -11,7 +11,7 @@ function SummaryField({ title, value, nota }) {
   return <div className="min-w-0">
     <dt className="text-xs font-medium text-slate-500">{title}</dt>
     <dd className={`mt-1.5 break-words text-sm font-semibold ${registered ? 'text-slate-800' : 'font-normal text-slate-400'}`}>{registered ? value : 'No registrado'}</dd>
-    {registered && nota && <dd className="mt-1 text-[11px] text-slate-500">{nota}</dd>}
+    {registered && nota && <dd className="mt-1 text-xs text-slate-500">{nota}</dd>}
   </div>
 }
 
@@ -43,7 +43,7 @@ export default function PersonalHeader({ data, usuario, compacto = false, onVerF
     <div className="h-1 bg-teal-600" />
     <div className="grid gap-7 p-6 sm:p-8 md:grid-cols-[minmax(0,1fr)_160px]">
       <div className="min-w-0">
-        <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-teal-700">Ficha del personal</p>
+        <p className="text-xs font-semibold uppercase tracking-[.2em] text-teal-700">Ficha del personal</p>
         <h1 className="mt-3 break-words text-2xl font-bold leading-tight text-slate-900 sm:text-3xl">{data.nombre}</h1>
         <dl className="mt-6 grid gap-x-8 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">
           <SummaryField title={documentType ? `Documento de identidad · ${documentType.toUpperCase()}` : 'Documento de identidad'} value={person.numero_doc_identidad} />

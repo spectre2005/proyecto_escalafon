@@ -30,7 +30,7 @@ export default function PlataformaLogin() {
   return <main className="grid min-h-dvh place-items-center bg-slate-900 px-4 py-10 font-['DM_Sans',sans-serif] text-slate-700 antialiased">
     <form onSubmit={entrar} aria-busy={busy} className="w-full max-w-sm rounded-3xl bg-white p-8 shadow-xl">
       <span className="grid size-12 place-items-center rounded-2xl bg-slate-900 text-white"><Icon name="shield" size={22} /></span>
-      <p className="mt-6 text-[10px] font-semibold uppercase tracking-[.16em] text-slate-400">Administración de la plataforma</p>
+      <p className="mt-6 text-xs font-semibold uppercase tracking-[.16em] text-slate-400">Administración de la plataforma</p>
       <h1 className="mt-2 font-['Manrope',sans-serif] text-2xl font-bold text-slate-900">Iniciar sesión</h1>
       <p className="mt-2 text-xs text-slate-500">Acceso solo para la administración de la plataforma. Las cuentas de una institución entran por su propio portal.</p>
       {error && <p role="alert" className="mt-5 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}

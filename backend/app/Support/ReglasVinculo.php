@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Rules\NivelCarrera;
+
 /**
  * Reglas del vínculo laboral (vinculos_laborales) y de sus datos del puesto (perfil_docente / perfil_administrativo).
  * Una sola fuente para la sección 02 (Seccion02Controller) y para el alta de personal con su primer vínculo
@@ -50,6 +52,20 @@ final class ReglasVinculo
             'es_cargo_confianza' => 'sometimes|boolean',
         ],
     ];
+
+    /**
+     * Reglas del perfil de un tipo de personal. En el administrativo, el nivel de carrera depende de la ley y del grupo
+     * ocupacional (NivelCarrera); $nivelAnterior es el ya guardado, que se acepta si no cambia.
+     */
+    public static function perfil(string $tipo, ?string $nivelAnterior = null, ?string $codigoLey = null): array
+    {
+        $reglas = self::PERFIL[$tipo];
+        if ($tipo === 'administrativo') {
+            $reglas['nivel_carrera'] = ['nullable', 'string', 'max:20', new NivelCarrera($nivelAnterior, $codigoLey)];
+        }
+
+        return $reglas;
+    }
 
     /**
      * Nombres de los campos en los mensajes: en el vínculo, regimen_laboral es el tipo de vínculo (no la ley, como en la

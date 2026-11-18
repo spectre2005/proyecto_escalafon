@@ -31,7 +31,7 @@ export default function ListaDocumentos({ usuario, tipo, enlazado, onSubsanar, o
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const lista = tipo.lista || []
-  if (!lista.length) return <p className="mt-2 text-[11px] text-slate-400">Sin documento cargado.</p>
+  if (!lista.length) return <p className="mt-2 text-xs text-slate-400">Sin documento cargado.</p>
   const titulo = documento => `${tipo.literal ? `${tipo.literal}) ` : ''}${tipo.nombre} · folios ${folios(documento.values.folio_inicio, documento.values.folio_fin)}`
 
   async function recepcionar(documento) {
@@ -59,9 +59,9 @@ export default function ListaDocumentos({ usuario, tipo, enlazado, onSubsanar, o
         <div className="flex flex-wrap items-start justify-between gap-2">
           <p className="text-xs font-semibold text-slate-700">{tipo.codigo === 'S01_B_DOCUMENTO_IDENTIDAD' ? 'Copia de DNI' : `Folios ${folios(v.folio_inicio, v.folio_fin)}`}{documento.archivo?.num_paginas ? ` · ${documento.archivo.num_paginas} página(s)` : ''}{documento.archivo ? ` · ${kb(documento.archivo.tamano_bytes)}` : ''}</p>
           <div className="flex flex-wrap items-center gap-2">
-            {subsanado && <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-medium text-slate-600">Subsanado</span>}
-            {puedeEnlazar(documento) && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800">Sin registro asociado</span>}
-            <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${coloresEstadoDocumento[documento.estado_visible] || 'bg-slate-100 text-slate-700'}`}>{etiqueta(estadosDocumento, documento.estado_visible)}</span>
+            {subsanado && <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600">Subsanado</span>}
+            {puedeEnlazar(documento) && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">Sin registro asociado</span>}
+            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${coloresEstadoDocumento[documento.estado_visible] || 'bg-slate-100 text-slate-700'}`}>{etiqueta(estadosDocumento, documento.estado_visible)}</span>
           </div>
         </div>
         {(() => {
@@ -82,7 +82,7 @@ export default function ListaDocumentos({ usuario, tipo, enlazado, onSubsanar, o
             ['Subido por', `${documento.subido_por || 'No registrado'} · ${v.created_at || ''}`],
           ]
           const fila = ([label, valor]) => <div key={label} className="min-w-0"><dt className="inline text-slate-400">{label}: </dt><dd className="inline break-words">{valor}</dd></div>
-          return <dl className="mt-2 grid gap-x-4 gap-y-1 text-[11px] text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
+          return <dl className="mt-2 grid gap-x-4 gap-y-1 text-xs text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
             {principales.map(fila)}
             {detalle === documento.id && detalles.map(fila)}
           </dl>

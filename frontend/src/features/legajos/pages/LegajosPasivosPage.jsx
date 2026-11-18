@@ -39,10 +39,10 @@ export default function LegajosPasivosPage() {
           <td className="px-5 py-4">{fecha(legajo.fecha_apertura)}</td><td className="px-5 py-4">{fecha(legajo.fecha_pasivo)}</td>
           <td className="px-5 py-4"><div className="grid min-w-48 gap-2">
             <Link to={`/legajos/${legajo.usuario_id}/historial/${legajo.id}`} className="rounded-xl border border-teal-200 bg-teal-50 px-3 py-2.5 transition-colors hover:border-teal-400 hover:bg-teal-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700">
-              <span className="block text-xs font-semibold text-teal-900">Ficha e historial</span><span className="mt-0.5 block text-[11px] text-teal-800">Ver los datos conservados al cierre</span>
+              <span className="block text-xs font-semibold text-teal-900">Ficha e historial</span><span className="mt-0.5 block text-xs text-teal-800">Ver los datos conservados al cierre</span>
             </Link>
             <Link to={`/legajos/${legajo.usuario_id}?categoria=documentos&legajo_id=${legajo.id}`} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700">
-              <span className="block text-xs font-semibold text-slate-700">Documentos</span><span className="mt-0.5 block text-[11px] text-slate-500">Consultar archivos de este legajo</span>
+              <span className="block text-xs font-semibold text-slate-700">Documentos</span><span className="mt-0.5 block text-xs text-slate-500">Consultar archivos de este legajo</span>
             </Link>
           </div></td>
         </tr>)}</tbody>

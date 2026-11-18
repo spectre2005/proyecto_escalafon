@@ -44,7 +44,7 @@ export default function EmisionesPersonales({ usuario }) {
 
   return <section aria-label="Documentos para emitir" className="mt-6 border-t border-slate-100 pt-5">
     <h2 className="text-xs font-semibold text-slate-600">Documentos para emitir</h2>
-    <p className="mt-1 text-[11px] text-slate-500">Se generan con los datos registrados en el legajo. Las constancias solo incluyen datos sustentados con documento aceptado.</p>
+    <p className="mt-1 text-xs text-slate-500">Se generan con los datos registrados en el legajo. Las constancias solo incluyen datos sustentados con documento aceptado.</p>
     <div className="mt-3 flex flex-wrap gap-2">
       {DOCUMENTOS.map(item => <button key={item[0]} type="button" disabled={!!busy} onClick={() => emitir(item)}
         className="whitespace-nowrap rounded-lg border border-teal-200 px-3 py-2 text-xs font-semibold text-teal-800 hover:bg-teal-50 disabled:opacity-60">

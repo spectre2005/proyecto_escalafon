@@ -50,7 +50,8 @@ class RegistroConVinculoTest extends TestCase
                 'fecha_fin_prevista' => $tipo === 'docente' ? null : '2026-12-31', 'numero_documento_vinculo' => 'RES-123-2026', 'tiene_periodo_prueba' => true, ...$vinculo],
             'datos_puesto' => $puesto ?? ($tipo === 'docente'
                 ? ['condicion_docente' => 'ordinario', 'categoria' => 'asociado', 'dedicacion' => 'tiempo_completo']
-                : ['grupo_ocupacional' => 'tecnico', 'nivel_carrera' => 'STA', 'cargo_estructural' => 'Asistente', 'es_cargo_confianza' => false]),
+                // CAS (la ley por defecto del administrativo aquí): sin nivel de carrera.
+                : ['grupo_ocupacional' => 'tecnico', 'nivel_carrera' => '', 'cargo_estructural' => 'Asistente', 'es_cargo_confianza' => false]),
         ];
     }
 
@@ -150,8 +151,24 @@ class RegistroConVinculoTest extends TestCase
         $vinculo = VinculoLaboral::query()->sole();
         $this->assertSame(['administrativo', 'plazo_determinado', '2026-12-31'], [$vinculo->tipo_personal, $vinculo->regimen_laboral, $vinculo->fecha_fin_prevista->format('Y-m-d')]);
         $perfil = PerfilAdministrativo::query()->where('vinculo_laboral_id', $vinculo->id)->sole();
-        $this->assertSame(['tecnico', 'STA', 'Asistente', false], [$perfil->grupo_ocupacional, $perfil->nivel_carrera, $perfil->cargo_estructural, (bool) $perfil->es_cargo_confianza]);
+        $this->assertSame(['tecnico', null, 'Asistente', false], [$perfil->grupo_ocupacional, $perfil->nivel_carrera, $perfil->cargo_estructural, (bool) $perfil->es_cargo_confianza]);
         $this->assertSame(0, PerfilDocente::query()->count());
+    }
+
+    public function test_the_career_level_depends_on_the_law(): void
+    {
+        $this->actuarComo();
+        $tecnico = fn (string $nivel): array => ['grupo_ocupacional' => 'tecnico', 'nivel_carrera' => $nivel, 'cargo_estructural' => 'Asistente', 'es_cargo_confianza' => false];
+
+        // CAS: no hay nivel de carrera.
+        $this->postJson(self::URL, $this->datos('administrativo', puesto: $tecnico('STA')))->assertUnprocessable()
+            ->assertJsonValidationErrors(['datos_puesto.nivel_carrera' => 'En CAS (D.L. 1057) no hay nivel de carrera: déjalo vacío.']);
+        $this->nadaCreado();
+
+        // D.L. 276: escala del grupo técnico (STF a STA).
+        $this->postJson(self::URL, $this->datos('administrativo', ['regimen_normativo_id' => $this->ley('276')], ['regimen_laboral' => 'carrera', 'fecha_fin_prevista' => null], $tecnico('STA')))
+            ->assertCreated();
+        $this->assertSame('STA', PerfilAdministrativo::query()->sole()->nivel_carrera);
     }
 
     public function test_it_uses_the_same_rules_as_the_registration_and_section_02(): void

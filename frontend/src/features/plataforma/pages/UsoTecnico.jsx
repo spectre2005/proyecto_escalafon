@@ -28,11 +28,11 @@ function CargaPorMes({ porMes }) {
     <figcaption className="text-sm font-semibold text-slate-700">Documentos cargados por mes</figcaption>
     <ol aria-hidden="true" className="mt-3 flex h-36 items-end gap-0.5 border-b border-slate-200">
       {porMes.map(m => <li key={m.mes} title={`${nombreMes(m.mes)}: ${cifra(m.total)} documento${m.total === 1 ? '' : 's'}`} className="group flex h-full flex-1 flex-col items-center justify-end px-1.5 sm:px-3">
-        <span className="mb-1 text-[11px] text-slate-500 opacity-0 group-hover:opacity-100">{cifra(m.total)}</span>
+        <span className="mb-1 text-xs text-slate-500 opacity-0 group-hover:opacity-100">{cifra(m.total)}</span>
         <span className={`w-full max-w-12 rounded-t ${m.total ? 'bg-teal-600 group-hover:bg-teal-700' : 'bg-slate-200'}`} style={{ height: m.total ? `${Math.max(4, (m.total / maximo) * 100)}%` : '2px' }} />
       </li>)}
     </ol>
-    <div aria-hidden="true" className="mt-1.5 flex gap-0.5 text-center text-[11px] text-slate-500">{porMes.map(m => <span key={m.mes} className="flex-1 capitalize">{nombreMes(m.mes)}</span>)}</div>
+    <div aria-hidden="true" className="mt-1.5 flex gap-0.5 text-center text-xs text-slate-500">{porMes.map(m => <span key={m.mes} className="flex-1 capitalize">{nombreMes(m.mes)}</span>)}</div>
     <table className="sr-only"><caption>Documentos cargados por mes</caption><thead><tr><th>Mes</th><th>Documentos</th></tr></thead>
       <tbody>{porMes.map(m => <tr key={m.mes}><td>{nombreMes(m.mes)} {m.mes.slice(0, 4)}</td><td>{m.total}</td></tr>)}</tbody></table>
   </figure>
