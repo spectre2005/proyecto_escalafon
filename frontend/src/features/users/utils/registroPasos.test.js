@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { datosPuestoInicial, vinculoInicial } from '../../legajos/components/seccion02/borradoresVinculo.js'
-import { armarRegistro, erroresDe, erroresPersona, PASOS, pasoDeError, personaDelPaso, personaExistente, primerPasoConError, rutaDocumentosIngreso, rutaFicha, sugerenciaTipoVinculo } from './registroPasos.js'
+import { armarRegistro, condicionesSinResponder, DESCRIPCION_LEY, tituloLey, erroresDe, erroresPersona, iniciales, PASOS, pasoDeError, personaDelPaso, personaExistente, primerPasoConError, rutaDatosPersonales, rutaDocumentosIngreso, rutaFicha, sugerenciaTipoVinculo } from './registroPasos.js'
 
 const catalogo = [
   { id: 'ley-30220', codigo: '30220', nombre: 'Ley N° 30220 - Ley Universitaria', aplica_a: 'docente', activo: true },
@@ -9,29 +9,20 @@ const catalogo = [
 ]
 const persona = { numero_doc_identidad: '71000001', nombres: ' Rosa ', apellido_paterno: 'Alta', apellido_materno: '', email_institucional: 'rosa.alta@example.test', tipo_personal: 'docente', ley: '', telefono: '', regimen_normativo_id: '' }
 
-test('the wizard has four steps in order and the last one only reviews', () => {
-  assert.deepEqual(PASOS.map(paso => [paso.numero, paso.titulo]), [[1, 'Datos de la persona'], [2, 'Puesto y cargo'], [3, 'Vínculo laboral'], [4, 'Revisión']])
+test('the wizard has three steps and the last one only reviews', () => {
+  assert.deepEqual(PASOS.map(paso => [paso.numero, paso.titulo]), [[1, 'Persona'], [2, 'Puesto y vínculo'], [3, 'Revisar y registrar']])
 })
 
 test('backend errors lead to the step that holds the field', () => {
   assert.equal(pasoDeError('usuarios.0.email_institucional'), 1)
   assert.equal(pasoDeError('usuarios'), 1)
-  // Paso 2: unidad, puesto, datos del puesto y condiciones.
-  assert.equal(pasoDeError('vinculo.nombre_puesto'), 2)
-  assert.equal(pasoDeError('vinculo.puesto_id'), 2)
-  assert.equal(pasoDeError('vinculo.unidad_organica_id'), 2)
-  assert.equal(pasoDeError('vinculo.tiene_periodo_prueba'), 2)
-  assert.equal(pasoDeError('datos_puesto.categoria'), 2)
-  // Paso 3: tipo y modalidad, convocatoria, documento y fechas.
-  assert.equal(pasoDeError('vinculo.regimen_laboral'), 3)
-  assert.equal(pasoDeError('vinculo.modalidad_vinculo_id'), 3)
-  assert.equal(pasoDeError('vinculo.convocatoria_id'), 3)
-  assert.equal(pasoDeError('vinculo.numero_documento_vinculo'), 3)
-  assert.equal(pasoDeError('vinculo.fecha_inicio'), 3)
+  // Paso 2: puesto, datos del puesto, condiciones y todo el vínculo.
+  for (const clave of ['vinculo.nombre_puesto', 'vinculo.puesto_id', 'vinculo.tiene_periodo_prueba', 'datos_puesto.categoria', 'vinculo.regimen_laboral', 'vinculo.fecha_inicio', 'vinculo', 'datos_puesto']) {
+    assert.equal(pasoDeError(clave), 2, clave)
+  }
   assert.equal(pasoDeError('otro'), null)
   assert.equal(primerPasoConError({ 'datos_puesto.categoria': ['x'], 'vinculo.fecha_inicio': ['x'] }), 2)
   assert.equal(primerPasoConError({ 'datos_puesto.categoria': ['x'], 'usuarios.0.numero_doc_identidad': ['x'] }), 1)
-  assert.equal(primerPasoConError({ 'vinculo.fecha_fin_prevista': ['x'] }), 3)
   // Un 403 o un 409 no trae campos: se queda en el paso actual.
   assert.equal(primerPasoConError({}), null)
   assert.equal(primerPasoConError(undefined), null)
@@ -151,4 +142,25 @@ test('the career level is sent only if it belongs to the chosen law and group', 
   assert.equal(armar('ley-276').datos_puesto.nivel_carrera, 'STB')
   // Se eligió STB con el 276 y luego se cambió la ley a CAS: no se envía.
   assert.equal(armar('ley-1057').datos_puesto.nivel_carrera, '')
+})
+
+test('lists the conditions still unanswered, without blocking the registration', () => {
+  const vinculo = { obligado_djbr: false, exige_colegiatura: null, exige_estudios_basicos: true, tiene_periodo_prueba: undefined }
+  assert.deepEqual(condicionesSinResponder({ vinculo, condiciones: { tiene_derechohabientes: true, con_discapacidad: null } }),
+    ['El puesto exige colegiatura', 'Tiene período de prueba', 'Discapacidad del servidor o de alguno de sus hijos'])
+  // Sin permiso para registrar discapacidad, no se le pide.
+  assert.deepEqual(condicionesSinResponder({ vinculo: { obligado_djbr: true, exige_colegiatura: true, exige_estudios_basicos: true, tiene_periodo_prueba: true }, condiciones: { con_discapacidad: null }, puedeDiscapacidad: false }), [])
+})
+
+test('helpers for the summary: initials, law description and routes', () => {
+  assert.equal(iniciales({ nombres: 'Ana Lucía', apellido_paterno: 'Torres' }), 'AT')
+  assert.equal(iniciales({}), '')
+  assert.equal(DESCRIPCION_LEY['1057'], 'CAS · sin nivel de carrera')
+  assert.equal(rutaDatosPersonales('u-1'), '/legajos/u-1?categoria=general')
+})
+
+test('each law card has a short name', () => {
+  assert.equal(tituloLey({ codigo: '1057', nombre: 'Decreto Legislativo N° 1057 (CAS)' }), 'D.L. 1057')
+  assert.equal(tituloLey({ codigo: '30057', nombre: 'Ley N° 30057 - Ley del Servicio Civil' }), 'Ley 30057')
+  assert.equal(tituloLey({ codigo: 'OTRO', nombre: 'Régimen especial' }), 'Régimen especial')
 })

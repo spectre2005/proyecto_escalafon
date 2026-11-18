@@ -4,24 +4,51 @@ import { nivelTrasCambiarGrupo } from '../../legajos/config/seccion02.js'
 import { validateUser } from './usuariosCsv.js'
 import { conLey } from './leyes.js'
 
-// Registro manual en cuatro pasos (el último solo revisa). Todo se envía en una sola operación al final (POST /usuarios/con-vinculo); los pasos
-// solo ordenan la pantalla. Los errores del backend llegan como usuarios.0.*, vinculo.* y datos_puesto.*.
+// Registro manual en tres pasos (el último solo revisa). Puesto y vínculo van juntos: uno decide al otro. Todo se envía en
+// una sola operación al final (POST /usuarios/con-vinculo); los pasos solo ordenan la pantalla. Los errores del backend
+// llegan como usuarios.0.*, vinculo.* y datos_puesto.*.
 export const PASOS = [
-  { numero: 1, titulo: 'Datos de la persona', resumen: 'Identificación, contacto, tipo de personal y ley' },
-  { numero: 2, titulo: 'Puesto y cargo', resumen: 'Unidad, puesto, datos del puesto y condiciones' },
-  { numero: 3, titulo: 'Vínculo laboral', resumen: 'Tipo, modalidad, proceso de selección y fechas' },
-  { numero: 4, titulo: 'Revisión', resumen: 'Comprueba los datos antes de registrar' },
+  { numero: 1, titulo: 'Persona', resumen: 'Identidad, tipo de personal y ley' },
+  { numero: 2, titulo: 'Puesto y vínculo', resumen: 'Dónde, en qué y desde cuándo' },
+  { numero: 3, titulo: 'Revisar y registrar', resumen: 'Un vistazo final' },
 ]
-
-// Campos del vínculo que se piden en el paso 2 (con el puesto); el resto del vínculo va en el paso 3.
-const EN_PASO_2 = [...banderasPuesto, 'unidad_organica_id', 'puesto_id', 'nombre_puesto']
 
 /** Paso donde está el campo de un error del backend. */
 export function pasoDeError(clave) {
   if (clave === 'usuarios' || clave.startsWith('usuarios.')) return 1
-  if (clave === 'datos_puesto' || clave.startsWith('datos_puesto.')) return 2
-  if (clave === 'vinculo' || clave.startsWith('vinculo.')) return EN_PASO_2.includes(clave.slice('vinculo.'.length)) ? 2 : 3
+  if (['datos_puesto', 'vinculo'].some(parte => clave === parte || clave.startsWith(`${parte}.`))) return 2
   return null
+}
+
+/** Nombre corto de una ley para su tarjeta: «Decreto Legislativo N° 1057 (CAS)» → «D.L. 1057»; «Ley N° 30057 - …» → «Ley 30057». */
+export function tituloLey(ley) {
+  if (/^decreto legislativo/i.test(ley.nombre || '')) return `D.L. ${ley.codigo}`
+  if (/^ley\b/i.test(ley.nombre || '')) return `Ley ${ley.codigo}`
+  return ley.nombre || ley.codigo
+}
+
+/** Una línea que explica cada ley en las tarjetas del paso 1 (por código del régimen normativo). */
+export const DESCRIPCION_LEY = {
+  276: 'Carrera administrativa', 728: 'Régimen privado', 1057: 'CAS · sin nivel de carrera', 30057: 'Servicio Civil', 30220: 'Ley Universitaria',
+}
+
+// Condiciones que pueden quedar «Sin responder» al registrar (se completan después en la ficha).
+const NOMBRES_CONDICION = {
+  obligado_djbr: 'Obligado a la declaración jurada de bienes y rentas', exige_colegiatura: 'El puesto exige colegiatura',
+  exige_estudios_basicos: 'El puesto exige estudios básicos', tiene_periodo_prueba: 'Tiene período de prueba',
+  tiene_derechohabientes: 'Tiene derechohabientes', con_discapacidad: 'Discapacidad del servidor o de alguno de sus hijos',
+}
+
+/** Condiciones del puesto y de la persona que siguen «Sin responder» (no impiden registrar). */
+export function condicionesSinResponder({ vinculo = {}, condiciones = {}, puedeDiscapacidad = true }) {
+  const persona = Object.keys(condiciones).filter(clave => clave !== 'con_discapacidad' || puedeDiscapacidad)
+  return [...banderasPuesto.filter(clave => vinculo[clave] !== true && vinculo[clave] !== false),
+    ...persona.filter(clave => condiciones[clave] !== true && condiciones[clave] !== false)].map(clave => NOMBRES_CONDICION[clave] || clave)
+}
+
+/** Iniciales para el resumen lateral: «Ana Lucía Torres» → «AT». */
+export function iniciales(persona = {}) {
+  return [persona.nombres, persona.apellido_paterno].map(parte => String(parte || '').trim()[0] || '').join('').toUpperCase()
 }
 
 /** Primer paso con errores, o null si ninguno es de un campo (p. ej. un 403 o un 409). */
@@ -81,6 +108,8 @@ export function sugerenciaTipoVinculo({ tipoPersonal, datosPuesto = {}, codigoLe
 /** Ficha de la persona y su sección 02 en 2.2, con la lista de documentos a la vista (Seccion02Panel atiende ir=documentos). */
 export const rutaFicha = id => `/legajos/${id}`
 export const rutaDocumentosIngreso = id => `/legajos/${id}?categoria=s02-vinculo&ir=documentos`
+// Información personal (sección 01), donde se sube la copia del DNI.
+export const rutaDatosPersonales = id => `/legajos/${id}?categoria=general`
 
 const recortar = datos => Object.fromEntries(Object.entries(datos).map(([clave, valor]) => [clave, typeof valor === 'string' ? valor.trim() || null : valor]))
 

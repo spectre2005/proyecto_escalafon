@@ -172,7 +172,7 @@ export default function UsersPage() {
     }
   }
 
-  // Registro manual (asistente de cuatro pasos): una sola operación transaccional con la persona y su primer vínculo.
+  // Registro manual (asistente de tres pasos): una sola operación transaccional con la persona y su primer vínculo.
   // Al registrar, la ventana muestra el resultado con el siguiente paso (ResultadoRegistro) y el asistente queda vacío.
   async function registrarManual(payload) {
     let creado = null
@@ -366,7 +366,7 @@ export default function UsersPage() {
             ref={registrationDialog}
             aria-labelledby="registration-title"
             aria-busy={saving || busy}
-            className={`fixed inset-0 m-auto max-h-[92dvh] w-[calc(100%_-_1.5rem)] overflow-hidden rounded-2xl border-0 bg-slate-50 p-0 text-slate-800 shadow-2xl backdrop:bg-slate-900/50 open:flex open:flex-col ${tab === 'manual' ? 'max-w-5xl md:h-[min(760px,92dvh)]' : 'max-w-3xl'}`}
+            className={`fixed inset-0 m-auto max-h-[95dvh] w-[calc(100%_-_1.5rem)] overflow-hidden rounded-2xl border-0 bg-slate-50 p-0 text-slate-800 shadow-2xl backdrop:bg-slate-900/50 open:flex open:flex-col ${tab === 'manual' ? 'max-w-[1240px] md:h-[min(920px,95dvh)]' : 'max-w-3xl'}`}
             onCancel={event => { if (savingRef.current || busy) event.preventDefault() }}
             onClose={() => { setRegistrationOpen(false); setRegistrado(null) }}
           >
@@ -380,7 +380,7 @@ export default function UsersPage() {
                 </span>
                 <div>
                   <h2 id="registration-title">Agregar personal</h2>
-                  <p>{tab === 'manual' ? 'Registra a la persona con su primer vínculo laboral en cuatro pasos.' : 'Elige cómo deseas cargar los datos de los usuarios.'}</p>
+                  <p>{tab === 'manual' ? 'Registra a la persona con su primer vínculo laboral en tres pasos.' : 'Elige cómo deseas cargar los datos de los usuarios.'}</p>
                 </div>
                 <button type="button" onClick={closeRegistration} disabled={saving || busy} aria-label="Cerrar formulario" className="ml-auto grid size-9 shrink-0 place-items-center rounded-lg text-slate-600 hover:bg-teal-50">
                   <Icon name="close" size={20} />

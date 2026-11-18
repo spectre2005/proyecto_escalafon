@@ -24,7 +24,32 @@ const descripcionTipo = (opciones, regimen) => (opciones?.tipos_vinculo || []).f
 // Tipo de vínculo con la sugerencia que se deduce de los datos ({ valor, motivo }, opcional). La sugerencia solo se aplica
 // con su botón y el usuario puede elegir otro tipo: no es una validación.
 // Debajo, la modalidad de ese tipo (catálogo).
-export function CampoTipoVinculo({ draft, poner, errors, sugerencia = null, nombre = 'vinculo', opciones = null, tipoPersonal = '' }) {
+// Una línea por tipo de vínculo para la versión en tarjetas (registro de personal).
+const RESUMEN_TIPO = { carrera: 'Nombrado · sin fecha de fin', plazo_determinado: 'Contratado · con fecha de fin', designado: 'Cargo de confianza' }
+
+// enTarjetas: los tres tipos a la vista, como tarjetas (la sugerida, marcada). Sin él, una lista (sección 02).
+export function CampoTipoVinculo({ draft, poner, errors, sugerencia = null, nombre = 'vinculo', opciones = null, tipoPersonal = '', enTarjetas = false }) {
+  if (enTarjetas) return <>
+    <div className="col-span-full grid min-w-0 gap-2">
+      <p id={`${nombre}-tipo-etiqueta`} className="text-[13px] font-semibold text-slate-700">Tipo de vínculo *</p>
+      <div role="radiogroup" aria-labelledby={`${nombre}-tipo-etiqueta`} className="grid gap-2.5 sm:grid-cols-3">
+        {Object.entries(regimenesLaborales).map(([valor, texto]) => {
+          const elegido = draft.regimen_laboral === valor
+          return <button key={valor} type="button" role="radio" aria-checked={elegido} onClick={() => elegirTipoVinculo(draft, poner, opciones, valor)}
+            className={`min-w-0 rounded-xl p-3.5 text-left transition-colors ${elegido ? 'border-2 border-teal-700 bg-teal-50' : 'border border-slate-200 bg-white hover:border-teal-300'}`}>
+            <span className="flex items-center justify-between gap-2">
+              <span className={`text-[15px] font-bold ${elegido ? 'text-teal-900' : 'text-slate-800'}`}>{texto}</span>
+              {sugerencia?.valor === valor && <span className="rounded-full bg-teal-700 px-2 py-0.5 text-xs font-bold text-white">Sugerido</span>}
+            </span>
+            <span className={`mt-1 block text-[13px] ${elegido ? 'text-teal-800' : 'text-slate-500'}`}>{RESUMEN_TIPO[valor]}</span>
+          </button>
+        })}
+      </div>
+      {sugerencia && <small className="text-xs text-slate-500">{sugerencia.valor ? `Sugerido por: ${sugerencia.motivo.replace(/\.$/, '')}. Puedes elegir otro.` : sugerencia.motivo}</small>}
+      {errors.regimen_laboral && <span className="text-xs text-rose-700">{[].concat(errors.regimen_laboral).join(' ')}</span>}
+    </div>
+    <CampoModalidad draft={draft} poner={poner} errors={errors} opciones={opciones} tipoPersonal={tipoPersonal} nombre={nombre} />
+  </>
   return <>
     <div className="grid min-w-0 content-start gap-1">
       <Campo label="Tipo de vínculo" required error={errors.regimen_laboral}><select name={`${nombre}-tipo`} required value={draft.regimen_laboral} onChange={event => elegirTipoVinculo(draft, poner, opciones, event.target.value)}><Opciones lista={regimenesLaborales} actual={draft.regimen_laboral} vacio="Seleccionar tipo de vínculo" /></select></Campo>
@@ -98,8 +123,14 @@ export function CamposVinculo({ draft, poner, errors, opciones, tipoPersonal, co
 }
 
 // codigoLey: código del régimen normativo (276, 728, 1057, 30057…) y escalas: las de /expediente-opciones (niveles).
-// De ambos dependen los niveles de carrera que se ofrecen.
-export function CamposDatosPuesto({ docente, draft, set, errors, codigoLey, escalas = [] }) {
+// De ambos dependen los niveles de carrera que se ofrecen. grupoEnBotones: el grupo ocupacional como botones (registro).
+export function CamposDatosPuesto({ docente, draft, set, errors, codigoLey, escalas = [], grupoEnBotones = false }) {
+  const elegirGrupo = valor => {
+    const evento = { target: { type: 'select-one', value: valor } }
+    set('grupo_ocupacional')(evento)
+    const nivel = nivelTrasCambiarGrupo(escalas, draft.nivel_carrera, codigoLey, valor)
+    if (nivel !== draft.nivel_carrera) set('nivel_carrera')({ target: { type: 'select-one', value: nivel } })
+  }
   return docente ? <>
     <Campo label="Condición docente" required error={errors.condicion_docente}><select required value={draft.condicion_docente} onChange={set('condicion_docente')}><Opciones lista={condicionesDocente} actual={draft.condicion_docente} vacio="Selecciona" /></select></Campo>
     <Campo label="Categoría (solo ordinarios)" error={errors.categoria}><select disabled={draft.condicion_docente !== 'ordinario'} value={draft.condicion_docente === 'ordinario' ? draft.categoria : ''} onChange={set('categoria')}><Opciones lista={categoriasDocente} actual={draft.categoria} vacio="Sin categoría" /></select></Campo>
@@ -109,15 +140,21 @@ export function CamposDatosPuesto({ docente, draft, set, errors, codigoLey, esca
     <Campo label="Código RENACYT" error={errors.codigo_renacyt}><input maxLength={30} value={draft.codigo_renacyt} onChange={set('codigo_renacyt')} /></Campo>
   </> : <>
     {/* En cascada: el nivel depende de la ley y del grupo; al cambiar de grupo, un nivel que ya no vale se vacía. */}
-    <Campo label="Grupo ocupacional" error={errors.grupo_ocupacional}><select value={draft.grupo_ocupacional} onChange={evento => {
-      set('grupo_ocupacional')(evento)
-      const nivel = nivelTrasCambiarGrupo(escalas, draft.nivel_carrera, codigoLey, evento.target.value)
-      if (nivel !== draft.nivel_carrera) set('nivel_carrera')({ target: { type: 'select-one', value: nivel } })
-    }}><Opciones lista={gruposOcupacionales} actual={draft.grupo_ocupacional} vacio="Sin registrar" /></select></Campo>
+    {grupoEnBotones
+      ? <div className="grid min-w-0 content-start gap-1.5">
+        <p id="grupo-ocupacional-etiqueta" className="text-[13px] font-semibold text-slate-700">Grupo ocupacional</p>
+        <div role="radiogroup" aria-labelledby="grupo-ocupacional-etiqueta" className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1">
+          {Object.entries(gruposOcupacionales).map(([valor, texto]) => <button key={valor} type="button" role="radio" aria-checked={draft.grupo_ocupacional === valor} onClick={() => elegirGrupo(draft.grupo_ocupacional === valor ? '' : valor)}
+            className={`rounded-lg px-2 py-2 text-sm font-semibold ${draft.grupo_ocupacional === valor ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}>{texto}</button>)}
+        </div>
+        {errors.grupo_ocupacional && <span className="text-xs text-rose-700">{[].concat(errors.grupo_ocupacional).join(' ')}</span>}
+      </div>
+      : <Campo label="Grupo ocupacional" error={errors.grupo_ocupacional}><select value={draft.grupo_ocupacional} onChange={evento => elegirGrupo(evento.target.value)}><Opciones lista={gruposOcupacionales} actual={draft.grupo_ocupacional} vacio="Sin registrar" /></select></Campo>}
     <Campo label="Nivel de carrera" error={errors.nivel_carrera}><select disabled={Boolean(motivoSinNivel(escalas, codigoLey, draft.grupo_ocupacional)) && !draft.nivel_carrera} value={draft.nivel_carrera} onChange={set('nivel_carrera')}>
       <Opciones lista={opcionesNivelCarrera(escalas, codigoLey, draft.grupo_ocupacional, draft.nivel_carrera)} actual={draft.nivel_carrera} vacio={motivoSinNivel(escalas, codigoLey, draft.grupo_ocupacional) || 'Sin registrar'} />
     </select></Campo>
-    <Campo label="Cargo estructural" error={errors.cargo_estructural} className="sm:col-span-2"><input maxLength={150} value={draft.cargo_estructural} onChange={set('cargo_estructural')} /></Campo>
-    <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2"><input type="checkbox" className="size-4 accent-teal-700" checked={draft.es_cargo_confianza} onChange={set('es_cargo_confianza')} />Es cargo de confianza</label>
+    <Campo label="Cargo estructural" error={errors.cargo_estructural}><input maxLength={150} value={draft.cargo_estructural} onChange={set('cargo_estructural')} /></Campo>
+    {/* En línea con la casilla y alineado con el campo de al lado (flex-row! pisa el estilo de columna de los formularios). */}
+    <label className="flex-row! items-center! gap-2 self-end py-3 text-sm text-slate-700"><input type="checkbox" className="size-4 shrink-0 accent-teal-700" checked={draft.es_cargo_confianza} onChange={set('es_cargo_confianza')} />Es cargo de confianza</label>
   </>
 }

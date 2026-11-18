@@ -230,6 +230,15 @@ Nivel de carrera en cascada (18/11/2026; **pendiente de confirmar con el cliente
     ocultan grupo ocupacional y cargo estructural (solo se registra el puesto del contrato)?; (d) ¿usan la clasificación de
     la Ley Marco 28175 (SP-ES, SP-AP…) en sus reportes?
 
+Catálogos del vínculo fuera de la pantalla (18/11/2026, decisión del equipo):
+37. Se quitaron de los formularios del vínculo (registro de personal y sección 02) las opciones «+ Nueva unidad
+    orgánica», «+ Nuevo puesto» / «+ Otro puesto (escribir)», «+ Nueva modalidad» y «+ Nuevo proceso de selección», y de
+    Configuración el panel «Catálogos del vínculo» (incluida la pestaña «Niveles de carrera»). Solo se elige de lo que
+    hay; lo ya guardado fuera de la lista se conserva. Los endpoints (/catalogos-vinculo) y CatalogosVinculoConfig.jsx
+    siguen en el código para volver a mostrarlos. Consecuencia: unidades, puestos, modalidades, procesos y escalas de
+    nivel solo se cargan por seeder, migración o la API. Pendiente: definir quién y cómo carga esos catálogos en cada
+    institución.
+
 ## Hoja de ruta del sistema institucional (por definir, analizado el 13/10/2026)
 
 Funcionalidades que faltan, con su base en la directiva. Orden propuesto, sin decidir:

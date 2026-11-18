@@ -63,7 +63,7 @@ class NivelCarrera implements DataAwareRule, ValidationRule
         }
         $conEscala = EscalaNivelCarrera::query()->where('activo', true)->whereHas('regimenNormativo', fn ($ley) => $ley->where('codigo', $this->codigoLey))->exists();
         if (! $conEscala) {
-            $fail('Esta ley no tiene escala de niveles registrada (Configuración → Catálogos del vínculo): déjalo vacío por ahora.');
+            $fail('Esta ley no tiene escala de niveles registrada: déjalo vacío por ahora.');
 
             return;
         }

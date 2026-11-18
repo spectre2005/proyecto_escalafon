@@ -8,6 +8,8 @@ import { NOMBRES_CATALOGO, normalizar, rutaUnidad } from '../legajos/config/cata
 import { gruposOcupacionales, regimenesLaborales } from '../legajos/config/seccion02'
 import { useLiveQuery } from '../../shared/queries/useLiveQuery'
 
+// Oculto por ahora (decisión del 18/11/2026): no se muestra en Configuración. Para volver a mostrarlo, agrégalo a las
+// secciones de SettingsPage.jsx. Los endpoints del backend (/catalogos-vinculo) siguen activos.
 // Catálogos del vínculo en Configuración: lo que se crea desde el registro de personal también se revisa, corrige y
 // desactiva aquí. Nada se borra: un elemento desactivado deja de ofrecerse, pero los vínculos ya registrados lo conservan.
 
