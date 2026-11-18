@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BanderasSinResponderController;
 use App\Http\Controllers\Api\V1\BitacoraAccesoLegajoController;
 use App\Http\Controllers\Api\V1\CapacitacionController;
+use App\Http\Controllers\Api\V1\CatalogosVinculoController;
 use App\Http\Controllers\Api\V1\CertificadoDiscapacidadController;
 use App\Http\Controllers\Api\V1\ColegiaturaController;
 use App\Http\Controllers\Api\V1\CompensacionBeneficioController;
@@ -307,6 +308,13 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
         ->middleware('can:legajo.ver')->whereUuid('usuario');
 
     Route::middleware('can:sistema.administrar')->group(function (): void {
+        // Listas de puestos y unidades orgánicas de la institución: agregar, corregir y desactivar (nunca se borra).
+        Route::get('catalogos/puestos', [CatalogosVinculoController::class, 'puestos']);
+        Route::post('catalogos/puestos', [CatalogosVinculoController::class, 'crearPuesto']);
+        Route::patch('catalogos/puestos/{puesto}', [CatalogosVinculoController::class, 'actualizarPuesto'])->whereUuid('puesto');
+        Route::get('catalogos/unidades-organicas', [CatalogosVinculoController::class, 'unidades']);
+        Route::post('catalogos/unidades-organicas', [CatalogosVinculoController::class, 'crearUnidad']);
+        Route::patch('catalogos/unidades-organicas/{unidad}', [CatalogosVinculoController::class, 'actualizarUnidad'])->whereUuid('unidad');
         // Personas con banderas del perfil sin responder (Sí / No / Sin responder).
         Route::get('personal/banderas-sin-responder', BanderasSinResponderController::class);
         // URI propia: la misma forma que la de la sección 01 la reemplazaría.

@@ -38,6 +38,7 @@ use App\Models\PeriodoPrueba;
 use App\Models\PeriodoVacacional;
 use App\Models\ProcesoFiscalizacion;
 use App\Models\ProgresionCarrera;
+use App\Models\Puesto;
 use App\Models\RatificacionDocente;
 use App\Models\Reconocimiento;
 use App\Models\ReferenciaLegajoPasivo;
@@ -368,6 +369,8 @@ class ExpedienteController extends Controller
         return response()->json(['data' => [
             'unidades' => UnidadOrganica::query()->orderBy('nombre')->get(['id', 'nombre', 'activo']),
             'regimenes' => RegimenNormativo::query()->orderBy('nombre')->get(['id', 'codigo', 'nombre', 'aplica_a', 'activo']),
+            // Lista de puestos de la institución (empieza vacía y aprende de los vínculos): solo los activos se ofrecen.
+            'puestos' => Puesto::query()->where('activo', true)->orderBy('nombre')->get(['id', 'nombre', 'tipo_personal']),
         ]]);
     }
 

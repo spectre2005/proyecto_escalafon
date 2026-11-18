@@ -14,6 +14,9 @@ final class ReglasVinculo
         'regimen_laboral' => 'required|in:carrera,plazo_determinado,designado',
         'regimen_normativo_id' => 'required|uuid|exists:regimenes_normativos,id',
         'unidad_organica_id' => 'nullable|uuid|exists:unidades_organicas,id',
+        // Unidad escrita en el formulario: si no está en la lista se crea (App\Support\CatalogosVinculo). No se guarda en
+        // el vínculo: se convierte en unidad_organica_id.
+        'unidad_organica_nombre' => 'nullable|string|max:150',
         'nombre_puesto' => 'required|string|max:150',
         'obligado_djbr' => 'sometimes|nullable|boolean',
         'exige_colegiatura' => 'sometimes|nullable|boolean',
@@ -50,7 +53,7 @@ final class ReglasVinculo
      * Nombres de los campos en los mensajes: en el vínculo, regimen_laboral es el tipo de vínculo (no la ley, como en la
      * importación de personal).
      */
-    public const ATRIBUTOS = ['regimen_laboral' => 'tipo de vínculo', 'regimen_normativo_id' => 'ley (régimen normativo)'];
+    public const ATRIBUTOS = ['regimen_laboral' => 'tipo de vínculo', 'regimen_normativo_id' => 'ley (régimen normativo)', 'unidad_organica_nombre' => 'unidad orgánica'];
 
     /** En el alta, el tipo de personal y la ley del vínculo son los de la persona, y el primer vínculo es el vigente. */
     public const NO_EN_ALTA = ['tipo_personal', 'regimen_normativo_id', 'fecha_cese'];

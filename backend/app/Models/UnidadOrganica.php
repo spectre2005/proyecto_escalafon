@@ -24,6 +24,7 @@ class UnidadOrganica extends Model
         'tipo',
         'unidad_padre_id',
         'activo',
+        'registrado_por',
     ];
 
     /** @return array<string, string> */
@@ -34,6 +35,11 @@ class UnidadOrganica extends Model
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
+    }
+
+    public function registradoPor(): BelongsTo
+    {
+        return $this->belongsTo(Usuario::class, 'registrado_por', 'id');
     }
 
     public function unidadPadre(): BelongsTo

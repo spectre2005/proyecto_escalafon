@@ -6,8 +6,6 @@ import UbigeoFields from '../../../components/ui/UbigeoFields'
 import { advanceOnEnter } from '../../../shared/forms/advanceOnEnter'
 import { CampoTipoVinculo, CamposDatosPuesto, CamposDocumentoIngreso, CamposVinculoBasicos, CondicionesPuesto } from '../../legajos/components/seccion02/CamposVinculo'
 import { datosPuestoInicial, vinculoInicial } from '../../legajos/components/seccion02/borradoresVinculo'
-import { completarDesdePuesto, equivalenciaPuesto } from '../../legajos/config/puestosSugeridos'
-import { categoriasDocente, condicionesDocente } from '../../legajos/config/seccion02'
 import { leyesDelTipo, leyInicial } from '../utils/leyes'
 import { columns, hoyLima } from '../utils/usuariosCsv'
 import { updateUserDraft } from '../utils/usuariosEmail'
@@ -89,7 +87,6 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   const [puestos, setPuestos] = useState(puestosVacios)
   const [avisos, setAvisos] = useState([])
   const [errores, setErrores] = useState({})
-  const [notaPuesto, setNotaPuesto] = useState('')
   // Persona existente informada por el backend al guardar (la lista local puede no estar al día).
   const [existenteBackend, setExistenteBackend] = useState(null)
   // Consulta de identidad por DNI (opcional): estado de la institución, una consulta a la vez y lo que se completó.
@@ -176,28 +173,12 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
 
   const sugerencia = tipo ? sugerenciaTipoVinculo({ tipoPersonal: tipo, datosPuesto: puestos[tipo], codigoLey: (catalogo || []).find(ley => ley.id === leyElegida)?.codigo }) : null
 
-  const ponerVinculo = key => valor => {
-    setVinculo(previo => ({ ...previo, [key]: valor }))
-    if (key === 'nombre_puesto') completarPerfil(valor)
-  }
+  // La condición y la categoría docente no se completan desde el puesto: las decide quien registra (17/11/2026).
+  const ponerVinculo = key => valor => setVinculo(previo => ({ ...previo, [key]: valor }))
   const setCampoVinculo = key => event => ponerVinculo(key)(event.target.value)
   const setCampoPuesto = key => event => {
     const valor = event.target.type === 'checkbox' ? event.target.checked : event.target.value
     setPuestos(previos => ({ ...previos, [tipo]: { ...previos[tipo], [key]: valor } }))
-  }
-
-  // Puesto docente con equivalencia inequívoca (p. ej. «Profesor ordinario principal»): completa condición y categoría
-  // solo si están vacías; si el usuario ya eligió otra cosa, no se cambia y se avisa.
-  function completarPerfil(puesto) {
-    const { datos, completados, distintos } = completarDesdePuesto(puestos.docente, equivalenciaPuesto(tipo, puesto))
-    const nombres = { condicion_docente: ['condición', condicionesDocente], categoria: ['categoría', categoriasDocente] }
-    const texto = campos => campos.map(campo => `${nombres[campo][0]} «${nombres[campo][1][datos[campo]] || datos[campo]}»`).join(' y ')
-    if (completados.length) {
-      setPuestos(previos => ({ ...previos, docente: datos }))
-      setNotaPuesto(`Se completó desde el puesto: ${texto(completados)}. Puedes cambiarlo.`)
-    } else {
-      setNotaPuesto(distintos.length ? 'El puesto elegido no coincide con la condición o la categoría ya indicadas en el paso 3: revísalas.' : '')
-    }
   }
 
   function irA(numero) {
@@ -334,9 +315,8 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
         </>}
         {paso === 2 && <>
           <p className="text-[11px] text-[#7b9181]">Resolución o contrato con el que la persona está vinculada. Se registra junto con ella y abre su legajo. Tipo de personal: <strong>{tiposPersonal[tipo]}</strong>; la ley es la del paso 1.</p>
-          <Grupo titulo="A. Información del vínculo" ayuda="Las sugerencias de puesto son provisionales.">
+          <Grupo titulo="A. Información del vínculo" ayuda="El puesto y la unidad se escriben o se eligen de la lista de la institución; los nuevos quedan en la lista.">
             <CamposVinculoBasicos draft={vinculo} set={setCampoVinculo} poner={ponerVinculo} errors={erroresDe(errores, 'vinculo')} opciones={opciones.data?.data} tipoPersonal={tipo} conTipo={false} nombre="alta-vinculo" />
-            {notaPuesto && <p role="status" className="col-span-full rounded-lg bg-[#eaf4ee] px-3 py-2 text-[11px] text-[#2c7650]">{notaPuesto}</p>}
           </Grupo>
           <Grupo titulo="B. Documento de ingreso">
             <CamposDocumentoIngreso draft={vinculo} set={setCampoVinculo} errors={erroresDe(errores, 'vinculo')} />
@@ -345,7 +325,6 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
         {paso === 3 && <>
           <Grupo titulo={`Datos del puesto · ${tiposPersonal[tipo]?.toLowerCase() || ''}`} ayuda={`Puesto: ${vinculo.nombre_puesto || 'sin indicar'}. Se pueden corregir después en la sección 02 mientras el vínculo esté abierto.`}>
             <CamposDatosPuesto docente={tipo === 'docente'} draft={puestos[tipo]} set={setCampoPuesto} errors={erroresDe(errores, 'datos_puesto')} />
-            {notaPuesto && tipo === 'docente' && <p role="status" className="col-span-full rounded-lg bg-[#eaf4ee] px-3 py-2 text-[11px] text-[#2c7650]">{notaPuesto}</p>}
           </Grupo>
           <Grupo titulo="Tipo de vínculo" ayuda="Carrera, plazo determinado o designado. La sugerencia sale de los datos anteriores; puedes elegir otro.">
             <CampoTipoVinculo draft={vinculo} set={setCampoVinculo} poner={ponerVinculo} errors={erroresDe(errores, 'vinculo')} sugerencia={sugerencia} nombre="alta-vinculo" />
