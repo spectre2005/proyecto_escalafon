@@ -1,6 +1,7 @@
 import { categoriasDocente, condicionesDocente, dedicacionesDocente, funcionesPrevias, gruposOcupacionales, motivoSinNivel, nivelTrasCambiarGrupo, opcionesNivelCarrera, regimenesLaborales, subtiposExtraordinario } from '../../config/seccion02'
 import Campo, { Opciones } from '../seccion01/Campo'
 import { hoy } from '../seccion01/useGuardar'
+import ListaDesplegable from '../../../../components/ui/ListaDesplegable'
 import TresEstados from '../../../../components/ui/TresEstados'
 import { CampoModalidad, CampoPuestoCatalogo, CampoUnidadOrganica, CamposIngreso } from './CamposCatalogoVinculo'
 import { elegirTipoVinculo, modalidadElegida } from '../../config/catalogosVinculo'
@@ -24,30 +25,18 @@ const descripcionTipo = (opciones, regimen) => (opciones?.tipos_vinculo || []).f
 // Tipo de vínculo con la sugerencia que se deduce de los datos ({ valor, motivo }, opcional). La sugerencia solo se aplica
 // con su botón y el usuario puede elegir otro tipo: no es una validación.
 // Debajo, la modalidad de ese tipo (catálogo).
-// Una línea por tipo de vínculo para la versión en tarjetas (registro de personal).
+// Una línea de ayuda por tipo de vínculo para la lista enriquecida (registro de personal).
 const RESUMEN_TIPO = { carrera: 'Nombrado · sin fecha de fin', plazo_determinado: 'Contratado · con fecha de fin', designado: 'Cargo de confianza' }
 
-// enTarjetas: los tres tipos a la vista, como tarjetas (la sugerida, marcada). Sin él, una lista (sección 02).
-export function CampoTipoVinculo({ draft, poner, errors, sugerencia = null, nombre = 'vinculo', opciones = null, tipoPersonal = '', enTarjetas = false }) {
-  if (enTarjetas) return <>
-    <div className="col-span-full grid min-w-0 gap-2">
-      <p id={`${nombre}-tipo-etiqueta`} className="text-[13px] font-semibold text-slate-700">Tipo de vínculo *</p>
-      <div role="radiogroup" aria-labelledby={`${nombre}-tipo-etiqueta`} className="grid gap-2.5 sm:grid-cols-3">
-        {Object.entries(regimenesLaborales).map(([valor, texto]) => {
-          const elegido = draft.regimen_laboral === valor
-          return <button key={valor} type="button" role="radio" aria-checked={elegido} onClick={() => elegirTipoVinculo(draft, poner, opciones, valor)}
-            className={`min-w-0 rounded-xl p-3.5 text-left transition-colors ${elegido ? 'border-2 border-teal-700 bg-teal-50' : 'border border-slate-200 bg-white hover:border-teal-300'}`}>
-            <span className="flex items-center justify-between gap-2">
-              <span className={`text-[15px] font-bold ${elegido ? 'text-teal-900' : 'text-slate-800'}`}>{texto}</span>
-              {sugerencia?.valor === valor && <span className="rounded-full bg-teal-700 px-2 py-0.5 text-xs font-bold text-white">Sugerido</span>}
-            </span>
-            <span className={`mt-1 block text-[13px] ${elegido ? 'text-teal-800' : 'text-slate-500'}`}>{RESUMEN_TIPO[valor]}</span>
-          </button>
-        })}
-      </div>
-      {sugerencia && <small className="text-xs text-slate-500">{sugerencia.valor ? `Sugerido por: ${sugerencia.motivo.replace(/\.$/, '')}. Puedes elegir otro.` : sugerencia.motivo}</small>}
-      {errors.regimen_laboral && <span className="text-xs text-rose-700">{[].concat(errors.regimen_laboral).join(' ')}</span>}
-    </div>
+// enLista: lista desplegable con la ayuda de cada tipo y la sugerencia marcada (registro de personal). Sin él, un <select>
+// (sección 02).
+export function CampoTipoVinculo({ draft, poner, errors, sugerencia = null, nombre = 'vinculo', opciones = null, tipoPersonal = '', enLista = false }) {
+  if (enLista) return <>
+    <ListaDesplegable id={`${nombre}-tipo`} etiqueta="Tipo de vínculo" requerido valor={draft.regimen_laboral} vacio="Seleccionar tipo de vínculo" error={errors.regimen_laboral}
+      opciones={Object.entries(regimenesLaborales).map(([valor, texto]) => ({ valor, titulo: texto.replace(/ \(.*\)$/, ''), descripcion: RESUMEN_TIPO[valor],
+        ...(sugerencia?.valor === valor && { etiqueta: 'Sugerido', tono: 'sugerido' }) }))}
+      onElegir={valor => elegirTipoVinculo(draft, poner, opciones, valor)}
+      ayuda={sugerencia && (sugerencia.valor ? `Sugerido por: ${sugerencia.motivo.replace(/\.$/, '')}. Puedes elegir otro.` : sugerencia.motivo)} />
     <CampoModalidad draft={draft} poner={poner} errors={errors} opciones={opciones} tipoPersonal={tipoPersonal} nombre={nombre} />
   </>
   return <>

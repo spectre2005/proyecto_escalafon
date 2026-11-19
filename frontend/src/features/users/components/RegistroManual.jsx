@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import Icon from '../../../components/ui/Icon'
 import TresEstados from '../../../components/ui/TresEstados'
 import UbigeoFields from '../../../components/ui/UbigeoFields'
+import ListaDesplegable from '../../../components/ui/ListaDesplegable'
 import { advanceOnEnter } from '../../../shared/forms/advanceOnEnter'
 import { CampoTipoVinculo, CamposDatosPuesto, CamposDocumentoIngreso, CamposUbicacionPuesto, CamposVigencia, CondicionesPuesto } from '../../legajos/components/seccion02/CamposVinculo'
 import { datosPuestoInicial, vinculoInicial } from '../../legajos/components/seccion02/borradoresVinculo'
@@ -16,7 +17,6 @@ import { usePuede } from '../../auth/session'
 import { AVISO_SIMULACION, aplicarIdentidad, camposPorReemplazar, consultarAlCompletar, crearConsultaIdentidad, domicilioTrasCambioDni, ESPERA_CONSULTA_MS, mensajeErrorConsulta, modoConsulta, mensajeUbicacion, NO_DISPONIBLE, UBICACION_VACIA, ubicacionManual, ubicacionTrasCambioDni, ubicacionTrasConsulta, valoresIdentidad } from '../utils/consultaIdentidad'
 import ResumenLateral from './ResumenLateral'
 import ResumenRegistro from './ResumenRegistro'
-import TarjetasOpcion from './TarjetasOpcion'
 import { armarRegistro, condicionesSinResponder, DESCRIPCION_LEY, erroresDe, erroresPersona, PASOS, personaDelPaso, personaExistente, primerPasoConError, rutaFicha, sugerenciaTipoVinculo, tituloLey } from '../utils/registroPasos'
 
 // Registro manual en tres pasos dentro de la ventana «Agregar personal»: persona (el DNI primero; tipo y ley en tarjetas),
@@ -369,7 +369,8 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
 
   // El DNI repetido se muestra con su enlace (PersonaRegistrada), no en la lista general.
   const general = [...avisos, ...[].concat(errores.usuarios || [])].filter(texto => !(existente && /ya está registrada con ese DNI/.test(texto)))
-  const leyes = leyesDelTipo(catalogo, tipo).map(ley => ({ valor: ley.id, titulo: tituloLey(ley), descripcion: DESCRIPCION_LEY[ley.codigo] || ley.nombre }))
+  const leyes = leyesDelTipo(catalogo, tipo).map(ley => ({ valor: ley.id, titulo: tituloLey(ley), descripcion: DESCRIPCION_LEY[ley.codigo] || ley.nombre,
+    ...(ley.codigo === '1057' && { etiqueta: 'Sin nivel', tono: 'aviso' }) }))
   const nombreLey = (catalogo || []).find(ley => ley.id === leyElegida)?.nombre
   const erroresVinculo = erroresDe(errores, 'vinculo')
   const sinResponder = condicionesSinResponder({ vinculo, condiciones, puedeDiscapacidad })
@@ -402,13 +403,14 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
               {campo('email_institucional', 'Correo electrónico', true)}
               {avisoIdentidad}
             </Seccion>
-            <Seccion titulo="¿Qué tipo de personal es?" ayuda="De esto dependen los documentos que se exigirán en su legajo." columnas="">
-              <TarjetasOpcion id="alta-tipo" etiqueta="Tipo de personal *" opciones={opcionesTipo} valor={tipo} error={erroresPersonaCampo.tipo_personal}
+            <Seccion titulo="¿Qué tipo de personal es?" ayuda="De esto dependen los documentos que se exigirán en su legajo. La ley ofrece solo las de ese tipo de personal." columnas="sm:grid-cols-2">
+              <ListaDesplegable id="alta-tipo" etiqueta="Tipo de personal" requerido opciones={opcionesTipo} valor={tipo} vacio="Seleccionar tipo de personal" error={erroresPersonaCampo.tipo_personal}
                 onElegir={valor => { if (valor !== tipo) setDraft({ ...draft, tipo_personal: valor, regimen_normativo_id: '' }) }} />
-              <TarjetasOpcion id="alta-ley" etiqueta="Ley o régimen *" opciones={leyes} valor={leyElegida} error={erroresPersonaCampo.regimen_normativo_id} columnas="grid-cols-2 lg:grid-cols-4" conMarca={false}
-                vacio={!catalogo ? 'Cargando leyes…' : tipo ? 'No hay leyes activas para este tipo de personal.' : 'Primero elige el tipo de personal.'}
+              <ListaDesplegable id="alta-ley" etiqueta="Ley o régimen" requerido opciones={leyes} valor={leyElegida} error={erroresPersonaCampo.regimen_normativo_id} disabled={!tipo || !leyes.length}
+                vacio={!catalogo ? 'Cargando leyes…' : tipo ? 'Seleccionar ley' : 'Primero elige el tipo de personal'}
+                ayuda={tipo === 'docente' && leyes.length === 1 ? 'Es la única ley para docentes: se completa sola.' : undefined}
                 onElegir={valor => setDraft({ ...draft, regimen_normativo_id: valor })} />
-              {opciones.error && <p role="alert" className="text-xs text-rose-700">No se pudo cargar el catálogo de leyes. <button type="button" className="underline" onClick={opciones.retry}>Reintentar</button></p>}
+              {opciones.error && <p role="alert" className="col-span-full text-xs text-rose-700">No se pudo cargar el catálogo de leyes. <button type="button" className="underline" onClick={opciones.retry}>Reintentar</button></p>}
             </Seccion>
             <Plegable titulo="Más datos" detalle={`opcional · ${detalleMasDatos}`} abierto={masDatosAbierto} onCambiar={setMasDatos}>
               {campo('telefono', 'Teléfono', false)}
@@ -444,8 +446,8 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
                 errors={{ ...erroresDe(errores, 'datos_puesto'), ...Object.fromEntries(conflictosPuesto.map(campo => [campo, ['No coincide con el puesto elegido.']])) }} />
             </Seccion>
             <Seccion titulo="Vínculo laboral" ayuda={`Tipo de vínculo, documento de ingreso y fechas${nombreLey ? ` · ${nombreLey}` : ''}. La sugerencia sale de la ley y del puesto; puedes elegir otro.`} columnas="">
-              <div className="grid min-w-0 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
-                <CampoTipoVinculo draft={vinculo} poner={ponerVinculo} errors={erroresVinculo} sugerencia={sugerencia} nombre="alta-vinculo" opciones={opciones.data?.data} tipoPersonal={tipo} enTarjetas />
+              <div className="grid min-w-0 gap-x-4 gap-y-3 sm:grid-cols-2">
+                <CampoTipoVinculo draft={vinculo} poner={ponerVinculo} errors={erroresVinculo} sugerencia={sugerencia} nombre="alta-vinculo" opciones={opciones.data?.data} tipoPersonal={tipo} enLista />
               </div>
               <div className="grid min-w-0 gap-x-4 gap-y-3 border-t border-slate-100 pt-4 sm:grid-cols-2 lg:grid-cols-3">
                 <CamposDocumentoIngreso draft={vinculo} poner={ponerVinculo} errors={erroresVinculo} opciones={opciones.data?.data} numeroLegajo={opciones.data?.data?.siguiente_legajo || ''} nombre="alta-vinculo" />
