@@ -8,6 +8,7 @@ use App\Models\Legajo;
 use App\Models\RequerimientoDocumento;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
+use App\Support\DiasHabiles;
 use Database\Seeders\SeccionesLegajoCatalogoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -43,8 +44,10 @@ class RequerimientosAutomaticosTest extends TestCase
         $incierto = $this->tipo(['nombre' => 'Colegiatura por determinar', 'requiere_colegiatura' => true]);
         $this->tipo(['nombre' => 'Documento opcional', 'obligatorio' => false]);
         $this->tipo(['nombre' => 'Documento desactivado', 'activo' => false]);
-        $this->postJson('/api/v1/solicitudes-legajo/sincronizar')->assertOk()->assertJsonPath('creados', 1)->assertJsonPath('plazo_dias', 7);
-        $this->assertDatabaseHas('requerimientos_documentos', ['usuario_id' => $legajo->usuario_id, 'tipo_documento_id' => $exigido->id, 'origen' => 'automatico', 'estado' => 'abierto']);
+        $this->postJson('/api/v1/solicitudes-legajo/sincronizar')->assertOk()->assertJsonPath('creados', 1)->assertJsonPath('plazo_dias_habiles', 5);
+        // Art. 4.3: 5 días hábiles desde el día siguiente (sin fines de semana ni feriados registrados).
+        $this->assertDatabaseHas('requerimientos_documentos', ['usuario_id' => $legajo->usuario_id, 'tipo_documento_id' => $exigido->id, 'origen' => 'automatico', 'estado' => 'abierto', 'plazo_dias_habiles' => 5]);
+        $this->assertSame(DiasHabiles::sumar(5)->toDateString(), RequerimientoDocumento::query()->where('tipo_documento_id', $exigido->id)->sole()->fecha_limite->toDateString());
         $this->assertDatabaseMissing('requerimientos_documentos', ['tipo_documento_id' => $incierto->id]);
         $this->postJson('/api/v1/solicitudes-legajo/sincronizar')->assertOk()->assertJsonPath('creados', 0);
         $this->assertDatabaseCount('notificaciones_usuario', 0);

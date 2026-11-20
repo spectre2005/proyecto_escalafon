@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { clasificarTipos, depurarSeleccion } from './tiposAplicables.js'
+import { agruparPorSeccion, clasificarTipos, depurarSeleccion } from './tiposAplicables.js'
 
 const ana = [
   { id: 'basicos', nombre: 'Certificado oficial de estudios básicos', no_aplica: 'Corresponde solo si el puesto exige estudios básicos…', por_definir: null },
@@ -29,4 +29,12 @@ test('cambiar de persona actualiza las opciones y quita la selección que dejó 
 test('un tipo que la persona no tiene en su lista tampoco se conserva', () => {
   assert.deepEqual(depurarSeleccion(['otro'], ana), { seleccion: [], quitados: ['otro'] })
   assert.deepEqual(depurarSeleccion([], []), { seleccion: [], quitados: [] })
+})
+
+test('los tipos se agrupan por sección del legajo, en orden y por nombre dentro de cada una', () => {
+  const grupos = agruparPorSeccion([
+    { id: '3', nombre: 'Título', seccion: 3 }, { id: '1b', nombre: 'Ficha', seccion: 1 }, { id: '1a', nombre: 'DNI', seccion: 1 }, { id: 'x', nombre: 'Suelto' },
+  ])
+  assert.deepEqual(grupos.map(g => g.titulo), ['01. Información personal y familiar', '03. Formación académica y capacitación', 'Otros documentos'])
+  assert.deepEqual(grupos[0].tipos.map(t => t.id), ['1a', '1b'])
 })

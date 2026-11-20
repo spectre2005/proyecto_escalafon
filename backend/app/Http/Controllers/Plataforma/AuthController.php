@@ -6,12 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Middleware\SesionPlataformaValida;
 use App\Models\Plataforma\AdministradorPlataforma;
 use App\Models\Plataforma\AuditoriaPlataforma;
+use App\Support\LimiteInicioSesion;
 use App\Support\Plataforma\AuditoriaOperaciones;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -21,10 +21,6 @@ use Illuminate\Validation\ValidationException;
  */
 class AuthController extends Controller
 {
-    private const INTENTOS_MAXIMOS = 5;
-
-    private const BLOQUEO_SEGUNDOS = 60;
-
     /** Token CSRF de la sesión de plataforma, para la cabecera X-CSRF-TOKEN (su cookie XSRF-TOKEN no es legible desde el SPA). */
     public function csrf(Request $request): JsonResponse
     {
@@ -35,17 +31,16 @@ class AuthController extends Controller
     {
         $data = $request->validate(['email' => 'required|email|max:255', 'password' => 'required|string|max:255']);
         $email = mb_strtolower(trim($data['email']));
-        $clave = 'plataforma-login:'.$email.'|'.$request->ip();
-        if (RateLimiter::tooManyAttempts($clave, self::INTENTOS_MAXIMOS)) {
-            $segundos = RateLimiter::availableIn($clave);
+        // Límite por correo e IP y, además, por cuenta desde cualquier IP (LimiteInicioSesion).
+        if (($segundos = LimiteInicioSesion::espera('plataforma', $email, $request->ip())) !== null) {
 
             return response()->json(['message' => "Demasiados intentos. Intenta de nuevo en {$segundos} segundos."], 429)->header('Retry-After', (string) $segundos);
         }
         if (! Auth::guard('plataforma')->attempt(['email' => $email, 'password' => $data['password'], 'activo' => true])) {
-            RateLimiter::hit($clave, self::BLOQUEO_SEGUNDOS);
+            LimiteInicioSesion::fallo('plataforma', $email, $request->ip());
             throw ValidationException::withMessages(['email' => 'Correo o contraseña incorrectos.']);
         }
-        RateLimiter::clear($clave);
+        LimiteInicioSesion::exito('plataforma', $email, $request->ip());
         $request->session()->regenerate();
         /** @var AdministradorPlataforma $administrador */
         $administrador = Auth::guard('plataforma')->user();

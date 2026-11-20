@@ -166,9 +166,14 @@ class AuthenticationTest extends TestCase
         UsuarioRol::query()->update(['vigente_desde' => '2020-01-01']);
         Rol::query()->update(['activo' => false]);
         $this->assertSame([], Usuario::firstOrFail()->permisos());
+    }
 
-        // Una sesión abierta pierde el acceso en cuanto el rol deja de estar vigente.
-        Rol::query()->update(['activo' => true]);
+    /**
+     * Una sesión abierta pierde el acceso en cuanto el rol deja de estar vigente. Va en su propia prueba: un intento de
+     * inicio rechazado antes, en la misma prueba, deja el estado de autenticación de ese intento (Laravel 12.73).
+     */
+    public function test_an_open_session_loses_access_when_the_role_expires(): void
+    {
         $usuario = $this->actuarComo(Usuario::factory()->create());
         $this->getJson('/api/v1/expedientes')->assertOk();
         UsuarioRol::query()->where('usuario_id', $usuario->id)->update(['vigente_hasta' => today()->subDay()->toDateString()]);
@@ -177,6 +182,18 @@ class AuthenticationTest extends TestCase
         Sanctum::actingAs($usuario->fresh());
         $this->getJson('/api/v1/expedientes')->assertForbidden();
         $this->getJson('/api/v1/auth/me')->assertUnauthorized();
+    }
+
+    public function test_a_request_without_session_and_without_permissions_gets_401_not_a_server_error(): void
+    {
+        // Sin Origin del SPA la petición no trae sesión (p. ej. con token): cerrar no debe fallar por no haber sesión.
+        $this->flushHeaders();
+        $usuario = $this->actuarComo(Usuario::factory()->create());
+        UsuarioRol::query()->where('usuario_id', $usuario->id)->update(['vigente_hasta' => today()->subDay()->toDateString()]);
+        $this->app['auth']->forgetGuards();
+        Sanctum::actingAs($usuario->fresh());
+        $this->getJson('/api/v1/auth/me')->assertUnauthorized();
+        $this->postJson('/api/v1/auth/logout')->assertOk();
     }
 
     public function test_missing_permission_returns_403(): void

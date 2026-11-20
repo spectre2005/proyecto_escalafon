@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Ubigeo;
+use Database\Seeders\UbigeoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -12,7 +13,7 @@ class UbigeoSeederTest extends TestCase
 
     public function test_catalog_seeds_25_regions_196_provinces_and_1893_districts_idempotently(): void
     {
-        $this->seed(\Database\Seeders\UbigeoSeeder::class);
+        $this->seed(UbigeoSeeder::class);
 
         $this->assertSame(1893, Ubigeo::query()->count());
         $this->assertSame(25, Ubigeo::query()->distinct()->count('region'));
@@ -21,7 +22,7 @@ class UbigeoSeederTest extends TestCase
             ->unique();
         $this->assertCount(196, $provinces);
 
-        $this->seed(\Database\Seeders\UbigeoSeeder::class);
+        $this->seed(UbigeoSeeder::class);
         $this->assertSame(1893, Ubigeo::query()->count());
     }
 }

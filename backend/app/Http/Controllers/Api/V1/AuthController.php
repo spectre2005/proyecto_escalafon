@@ -5,29 +5,22 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Plataforma\Institucion;
 use App\Models\Usuario;
+use App\Support\LimiteInicioSesion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    private const INTENTOS_MAXIMOS = 5;
-
-    private const BLOQUEO_SEGUNDOS = 60;
-
     public function login(Request $request): JsonResponse
     {
         $data = $request->validate(['email' => 'required|email|max:255', 'password' => 'required|string|max:255']);
         $email = mb_strtolower(trim($data['email']));
-        $clave = 'login:'.$email.'|'.$request->ip();
-
-        if (RateLimiter::tooManyAttempts($clave, self::INTENTOS_MAXIMOS)) {
-            $segundos = RateLimiter::availableIn($clave);
-
+        // Límite por correo e IP y, además, por cuenta desde cualquier IP (LimiteInicioSesion).
+        if (($segundos = LimiteInicioSesion::espera('institucion', $email, $request->ip())) !== null) {
             return response()->json(['message' => "Demasiados intentos. Intenta de nuevo en {$segundos} segundos."], 429)
                 ->header('Retry-After', (string) $segundos);
         }
@@ -37,11 +30,11 @@ class AuthController extends Controller
         if (! Auth::guard('web')->attempt(['email_institucional' => $email, 'password' => $data['password'], 'activo' => true])
             || $request->user()->permisos() === []) {
             Auth::guard('web')->logout();
-            RateLimiter::hit($clave, self::BLOQUEO_SEGUNDOS);
+            LimiteInicioSesion::fallo('institucion', $email, $request->ip());
             throw ValidationException::withMessages(['email' => 'Correo o contraseña incorrectos.']);
         }
 
-        RateLimiter::clear($clave);
+        LimiteInicioSesion::exito('institucion', $email, $request->ip());
         $request->session()->regenerate();
         // Huella de la contraseña desde el inicio de la sesión, con la misma clave y cálculo que AuthenticateSession
         // de Sanctum (que solo la guarda al terminar una petición que ya traía usuario). Así, si la contraseña cambia
@@ -137,7 +130,10 @@ class AuthController extends Controller
     private function cerrar(Request $request): void
     {
         Auth::guard('web')->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        // Sin sesión (petición con token, no desde el SPA) no hay nada que invalidar: no debe responder 500.
+        if ($request->hasSession()) {
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
     }
 }

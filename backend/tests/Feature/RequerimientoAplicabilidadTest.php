@@ -197,7 +197,7 @@ class RequerimientoAplicabilidadTest extends TestCase
     public function test_options_without_person_keep_their_format_and_an_unknown_person_is_rejected(): void
     {
         $tipos = $this->getJson('/api/v1/solicitudes-legajo/opciones')->assertOk()->json('tipos');
-        $this->assertSame(['id', 'nombre'], array_keys($tipos[0]));
+        $this->assertSame(['id', 'nombre', 'seccion'], array_keys($tipos[0]));
         $this->getJson('/api/v1/solicitudes-legajo/opciones?usuario_id='.Usuario::factory()->create()->id)->assertNotFound();
     }
 

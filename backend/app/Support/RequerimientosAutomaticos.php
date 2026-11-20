@@ -33,11 +33,11 @@ final class RequerimientosAutomaticos
                 }
                 $motivo = ['faltante' => 'Presentar documento faltante', 'observado' => 'Subsanar documento observado', 'vencido' => 'Actualizar documento vencido'][$fila['estado_codigo']];
                 $descripcion = mb_substr($motivo.': '.$fila['detalle'], 0, 300);
-                $dias = max(1, Parametros::entero('requerimiento_plazo_dias_calendario'));
                 $r = RequerimientoDocumento::query()->create([
                     'clave_automatica' => $clave, 'clase' => 'documentos', 'usuario_id' => $fila['usuario_id'], 'tipo_documento_id' => $fila['tipo_documento_id'],
                     'origen' => 'automatico', 'descripcion' => $descripcion, 'fecha_requerimiento' => now('America/Lima')->toDateString(),
-                    'plazo_dias_habiles' => 0, 'fecha_limite' => now('America/Lima')->addDays($dias)->toDateString(),
+                    // Art. 4.3: hasta 5 días hábiles desde el día siguiente al requerimiento.
+                    'plazo_dias_habiles' => DiasHabiles::PLAZO_DOCUMENTOS, 'fecha_limite' => DiasHabiles::sumar(DiasHabiles::PLAZO_DOCUMENTOS)->toDateString(),
                     'estado' => 'abierto', 'solicitado_por' => $actor->id,
                     'seguimiento' => [['accion' => 'detección automática', 'mensaje' => $descripcion,
                         'motivo' => $fila['estado_codigo'], 'autor' => null, 'fecha' => now()->toIso8601String()]],

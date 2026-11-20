@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Afiliacion;
 use App\Models\ArchivoDocumento;
+use App\Models\AuditoriaEvento;
+use App\Models\BitacoraAccesoLegajo;
 use App\Models\ConexionCorreo;
 use App\Models\ConfiguracionFuncionalidad;
 use App\Models\Controversia;
@@ -13,6 +15,7 @@ use App\Models\DocumentoUsuario;
 use App\Models\EvaluacionDesempeno;
 use App\Models\Familiar;
 use App\Models\GoceVacacional;
+use App\Models\HistorialEstadoDocumento;
 use App\Models\Induccion;
 use App\Models\Legajo;
 use App\Models\LegajoSeccion;
@@ -30,6 +33,7 @@ use App\Models\RegistroSstBienestar;
 use App\Models\Rol;
 use App\Models\Sancion;
 use App\Models\Usuario;
+use App\Models\UsuarioRol;
 use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -57,6 +61,13 @@ class ResourceApiTest extends TestCase
 
     /** Sección 08: igual, se registran desde Legajos\Seccion08Controller (sanciones exige además seccion08.sanciones.ver). */
     private const SECCION_08 = [Reconocimiento::class, Sancion::class];
+
+    /**
+     * Evidencia y folios: solo lectura siempre (ni con API_CRUD_GENERICO_ESCRITURA). La auditoría, la bitácora y el historial
+     * dicen quién hizo qué; el legajo se abre y cierra en AperturaLegajoController y el último folio solo lo mueve
+     * Folios::reservar.
+     */
+    private const EVIDENCIA = [AuditoriaEvento::class, BitacoraAccesoLegajo::class, HistorialEstadoDocumento::class, Legajo::class, LegajoSeccion::class];
 
     /** Sección 09: igual, desde Legajos\Seccion09Controller (y el CRUD genérico exige además datos_sensibles.ver). */
     private const SECCION_09 = [Afiliacion::class, Controversia::class];
@@ -160,7 +171,7 @@ class ResourceApiTest extends TestCase
             unset($payload['registrado_por']);
         }
         $uri = '/api/v1/'.str_replace('_', '-', $model->getTable());
-        $soloLectura = $model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento || in_array($class, [...self::SECCION_02, ...self::SECCION_05, ...self::SECCION_07, ...self::SECCION_08, ...self::SECCION_09, ...self::SECCION_10, ...self::SECCION_11], true);
+        $soloLectura = $model instanceof DocumentoUsuario || $model instanceof ArchivoDocumento || in_array($class, [...self::SECCION_02, ...self::SECCION_05, ...self::SECCION_07, ...self::SECCION_08, ...self::SECCION_09, ...self::SECCION_10, ...self::SECCION_11, ...self::EVIDENCIA], true);
         if ($soloLectura) {
             // Documentos y archivos se crean únicamente por la carga del legajo (folios, hash y bitácora); los registros de
             // las secciones 02 y 05, solo desde Seccion02Controller y Seccion05Controller.
@@ -199,10 +210,11 @@ class ResourceApiTest extends TestCase
     {
         $this->postJson('/api/v1/roles', [])->assertUnprocessable()->assertJsonValidationErrors('nombre');
         $this->postJson('/api/v1/roles', ['password' => 'secret'])->assertUnprocessable()->assertJsonValidationErrors('password');
-        $this->postJson('/api/v1/legajos', [
-            'usuario_id' => '00000000-0000-4000-8000-000000000000',
-            'numero_legajo' => 'L-001', 'fecha_apertura' => '2026-09-30',
+        $this->postJson('/api/v1/usuario-roles', [
+            'usuario_id' => '00000000-0000-4000-8000-000000000000', 'rol_id' => Rol::factory()->create()->id,
         ])->assertUnprocessable()->assertJsonValidationErrors('usuario_id');
+        // Los legajos no se crean por el CRUD genérico: se abren en AperturaLegajoController.
+        $this->postJson('/api/v1/legajos', ['numero_legajo' => 'L-001'])->assertStatus(405);
         $this->assertDatabaseCount('legajos', 0);
     }
 
@@ -217,9 +229,14 @@ class ResourceApiTest extends TestCase
 
     public function test_related_records_cannot_be_deleted(): void
     {
+        $rol = Rol::factory()->create();
+        UsuarioRol::factory()->create(['rol_id' => $rol->id]);
+        $this->deleteJson('/api/v1/roles/'.$rol->id)->assertConflict();
+        $this->assertDatabaseHas('roles', ['id' => $rol->id]);
+        // Un legajo nunca se borra por el CRUD genérico, tenga o no secciones.
         $legajo = Legajo::factory()->create();
         LegajoSeccion::factory()->create(['legajo_id' => $legajo->id]);
-        $this->deleteJson('/api/v1/legajos/'.$legajo->id)->assertConflict();
+        $this->deleteJson('/api/v1/legajos/'.$legajo->id)->assertStatus(405);
         $this->assertDatabaseHas('legajos', ['id' => $legajo->id]);
     }
 

@@ -12,6 +12,7 @@ use App\Models\Usuario;
 use App\Support\AplicacionDocumental;
 use App\Support\ConsultaReportes;
 use App\Support\CorreoRequerimiento;
+use App\Support\DiasHabiles;
 use App\Support\Documentos\ArchivoPdf;
 use App\Support\GmailCorreo;
 use App\Support\MensajeRequerimiento;
@@ -32,6 +33,7 @@ use Database\Seeders\Seccion07CatalogoSeeder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -86,6 +88,8 @@ class SolicitudLegajoController extends Controller
             $datos['correo'] = $r->notificacionesUsuario->first()?->only(['id', 'correo_estado', 'correo_destinatario', 'correo_enviado_en', 'correo_error']);
             unset($datos['notificaciones_usuario']);
             $datos['atrasado'] = in_array($r->estado, ['abierto', 'observado'], true) && ($r->prorroga_hasta ?? $r->fecha_limite)->toDateString() < now('America/Lima')->toDateString();
+            // Art. 4.3: la prórroga de documentos es de hasta 5 días hábiles más allá del plazo original.
+            $datos['prorroga_maxima'] = $r->clase === 'documentos' ? DiasHabiles::sumar(DiasHabiles::PRORROGA_DOCUMENTOS, $r->fecha_limite)->toDateString() : null;
 
             return $datos;
         });
@@ -101,7 +105,7 @@ class SolicitudLegajoController extends Controller
         abort_unless($request->user()->can('sistema.administrar'), 403);
 
         return response()->json(['creados' => RequerimientosAutomaticos::sincronizar($request->user()),
-            'plazo_dias' => max(1, Parametros::entero('requerimiento_plazo_dias_calendario'))]);
+            'plazo_dias_habiles' => DiasHabiles::PLAZO_DOCUMENTOS]);
     }
 
     private function tiposDisponibles(): Builder
@@ -140,10 +144,14 @@ class SolicitudLegajoController extends Controller
         $aplicacion = isset($data['usuario_id']) && $personas->contains('id', $data['usuario_id'])
             ? AplicacionDocumental::para(Usuario::query()->findOrFail($data['usuario_id'])) : null;
         abort_if(isset($data['usuario_id']) && ! $aplicacion, 404);
-        $tipos = $tipos->map(fn (TipoDocumento $t): array => ['id' => $t->id, 'nombre' => $t->nombre,
+        $tipos = $tipos->map(fn (TipoDocumento $t): array => ['id' => $t->id, 'nombre' => $t->nombre, 'seccion' => $t->seccion_legajo_id,
             ...($aplicacion ? ['no_aplica' => $aplicacion->noAplica($t), 'por_definir' => $aplicacion->porDefinir($t)] : [])])->values();
 
-        return response()->json(['personas' => $personas, 'tipos' => $tipos, 'maximo_pdf_kb' => Parametros::entero('tamano_maximo_pdf_kb')]);
+        return response()->json(['personas' => $personas, 'tipos' => $tipos, 'maximo_pdf_kb' => Parametros::entero('tamano_maximo_pdf_kb'),
+            // Plazos de la Directiva en días hábiles (sin fines de semana ni feriados registrados): documentos, hasta 5
+            // (art. 4.3, es el máximo); actualización, 30 si la ORH no indica otro (art. 5.1).
+            'plazos' => ['documentos' => DiasHabiles::sumar(DiasHabiles::PLAZO_DOCUMENTOS)->toDateString(),
+                'actualizacion' => DiasHabiles::sumar(DiasHabiles::PLAZO_ACTUALIZACION)->toDateString()]]);
     }
 
     public function store(Request $request): JsonResponse
@@ -154,8 +162,16 @@ class SolicitudLegajoController extends Controller
             'descripcion' => 'required|string|max:300', 'tipo_documento_id' => 'nullable|uuid|exists:tipos_documento,id',
             'tipo_documento_ids' => 'sometimes|array|max:20',
             'tipo_documento_ids.*' => 'required|uuid|distinct|exists:tipos_documento,id',
-            'fecha_limite' => 'required|date_format:Y-m-d|after_or_equal:'.now('America/Lima')->toDateString(),
+            'fecha_limite' => 'nullable|date_format:Y-m-d|after_or_equal:'.now('America/Lima')->toDateString(),
         ]);
+        // Plazos en días hábiles: documentos, hasta 5 (art. 4.3); actualización, el que indique la ORH o 30 (art. 5.1).
+        $limiteDocumentos = DiasHabiles::sumar(DiasHabiles::PLAZO_DOCUMENTOS)->toDateString();
+        if ($data['clase'] === 'documentos' && ! empty($data['fecha_limite']) && $data['fecha_limite'] > $limiteDocumentos) {
+            throw ValidationException::withMessages(['fecha_limite' => 'El plazo para presentar documentos es de hasta '.DiasHabiles::PLAZO_DOCUMENTOS
+                .' días hábiles (art. 4.3 de la Directiva): elige una fecha hasta el '.Carbon::parse($limiteDocumentos)->format('d/m/Y').'. Si hace falta más tiempo, usa la prórroga.']);
+        }
+        $data['fecha_limite'] ??= $data['clase'] === 'documentos' ? $limiteDocumentos : DiasHabiles::sumar(DiasHabiles::PLAZO_ACTUALIZACION)->toDateString();
+        $data['plazo_dias_habiles'] = DiasHabiles::entre(now('America/Lima'), $data['fecha_limite']);
         $tipos = $data['tipo_documento_ids'] ?? (! empty($data['tipo_documento_id']) ? [$data['tipo_documento_id']] : []);
         foreach ($tipos as $tipo) {
             $this->tipoVisible($request, $tipo);
@@ -188,7 +204,7 @@ class SolicitudLegajoController extends Controller
                 $nombreTipo = $tipo ? TipoDocumento::query()->whereKey($tipo)->value('nombre') : null;
                 $descripcion = mb_substr(($nombreTipo ? $nombreTipo.': ' : '').$data['descripcion'], 0, 300);
                 $valores = [...$data, 'tipo_documento_id' => $tipo, 'descripcion' => $descripcion, 'origen' => 'legajo',
-                    'fecha_requerimiento' => now('America/Lima')->toDateString(), 'plazo_dias_habiles' => 0,
+                    'fecha_requerimiento' => now('America/Lima')->toDateString(),
                     'estado' => 'abierto', 'solicitado_por' => $request->user()->id, 'prorroga_hasta' => null];
                 if ($existente) {
                     $existente->update($valores);
@@ -302,6 +318,10 @@ class SolicitudLegajoController extends Controller
             }
             if ($data['accion'] === 'prorrogar') {
                 abort_unless($r->fecha_limite->lte($data['prorroga_hasta']) && (! $r->prorroga_hasta || $r->prorroga_hasta->lte($data['prorroga_hasta'])), 422, 'La prórroga no puede reducir el plazo.');
+                // Art. 4.3: hasta 5 días hábiles adicionales, contados desde el plazo original (no se encadenan prórrogas).
+                $maxima = DiasHabiles::sumar(DiasHabiles::PRORROGA_DOCUMENTOS, $r->fecha_limite);
+                abort_if($r->clase === 'documentos' && $data['prorroga_hasta'] > $maxima->toDateString(), 422,
+                    'La prórroga es de hasta '.DiasHabiles::PRORROGA_DOCUMENTOS.' días hábiles (art. 4.3 de la Directiva): como máximo hasta el '.$maxima->format('d/m/Y').'.');
                 $cambios['prorroga_hasta'] = $data['prorroga_hasta'];
             }
             if ($data['accion'] === 'recordar') {

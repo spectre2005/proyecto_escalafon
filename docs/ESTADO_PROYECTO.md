@@ -574,3 +574,26 @@ unidades orgánicas no se podían crear en producción (sin pantalla y con la es
 - Migración: tabla `puestos`; `unidades_organicas.codigo` y `tipo` pasan a opcionales y se agrega `registrado_por`.
 - Queda fuera: «puesto de destino» de la sección 05 (texto libre) y los nombres de UNIQ en `UnidadOrganicaSeeder`
   (solo local/pruebas; cambiarlos duplicaría unidades en las bases locales ya sembradas).
+
+## Revisión de seguridad y fallas (20/11/2026)
+
+Corregido en la rama fix/correcciones-revision: dependencias sin avisos (composer y pnpm), Pint sin fallas (se quitó
+`app/Models/Afiliacion copy.php`, copia sobrante), cabecera Content-Security-Policy en producción, límite de inicio de
+sesión también por cuenta (App\Support\LimiteInicioSesion), auditoría, bitácora, historial de estados, legajos y
+secciones del legajo siempre de solo lectura en el CRUD genérico, y plazos de requerimientos en días hábiles.
+
+Plazos de los requerimientos (20/11/2026, verificado en la Directiva):
+- Documentos (art. 4.3): hasta 5 días hábiles desde el día siguiente al requerimiento, con prórroga de hasta 5 días
+  hábiles más allá del plazo original. Actualización (art. 5.1): el plazo que indique la ORH o, en su defecto, 30 días
+  hábiles. Se calculan con App\Support\DiasHabiles (sin sábados, domingos ni la tabla `feriados`); los automáticos
+  usan 5 días hábiles (antes 7 días calendario).
+- **Pendiente:** la tabla `feriados` está vacía y no tiene pantalla (el CRUD genérico es de solo lectura en
+  producción). Mientras no se carguen, los días hábiles solo descuentan fines de semana. Definir quién carga el
+  calendario de feriados (nacionales y de la institución) y desde dónde.
+
+Decisiones pendientes del cliente que salieron de la revisión (no se tocaron):
+- (a) ¿El teléfono es dato sensible? Hoy se muestra con personal.ver, pero el reingreso lo protege como sensible.
+- (b) Qué documento de formalización de la sección 02 (resoluciones c, d, e, contrato f, adenda g) corresponde a cada
+  régimen. Mientras tanto todos aplican a todos y los requerimientos automáticos los piden a la vez.
+- (c) Quién entrega cada tipo de documento (servidor, entidad u ORH por consulta): hoy Requerimientos ofrece los 87
+  tipos, incluidos los que emite la propia institución (resoluciones, contrato, informe de ORH, liquidación).

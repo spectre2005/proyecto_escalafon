@@ -16,6 +16,10 @@
 		X-Frame-Options DENY
 		Referrer-Policy strict-origin-when-cross-origin
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# Solo código y datos del propio sitio. blob: para los PDF del visor (iframe) y el lector de PDF (worker); data: y
+		# blob: para el logo y las fotos. Estilos en línea: los ponen algunas librerías (PDF); no habilitan scripts.
+		# Fuentes DM Sans y Manrope de Google Fonts (frontend/src/index.css).
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; worker-src 'self' blob:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 		-Server
 	}
 }

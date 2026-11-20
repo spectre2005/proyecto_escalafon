@@ -1,2 +1,7 @@
 allowBuilds:
   core-js: false
+# Versiones corregidas de dependencias indirectas (avisos de seguridad de pnpm audit): jspdf trae dompurify y exceljs trae
+# uuid en versiones con fallas conocidas, y aún no publican una versión que las actualice.
+overrides:
+  dompurify: ^3.4.17
+  uuid: ^11.1.1

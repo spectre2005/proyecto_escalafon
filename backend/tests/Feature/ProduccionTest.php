@@ -130,11 +130,16 @@ class ProduccionTest extends TestCase
 
         // CRUD genérico: se puede leer (con sesión), pero no escribir salvo que se abra expresamente.
         $this->getJson('/api/v1/feriados')->assertUnauthorized();
-        foreach (['postJson' => '/api/v1/feriados', 'deleteJson' => '/api/v1/auditoria-eventos/'.Str::uuid(), 'patchJson' => '/api/v1/legajos/'.Str::uuid()] as $metodo => $url) {
+        foreach (['postJson' => '/api/v1/feriados', 'deleteJson' => '/api/v1/feriados/'.Str::uuid(), 'patchJson' => '/api/v1/roles/'.Str::uuid()] as $metodo => $url) {
             $this->{$metodo}($url)->assertForbidden()->assertJsonPath('message', 'En este entorno, el acceso genérico por tabla es de solo lectura. Usa las pantallas de cada sección.');
         }
         config(['app.crud_generico_escritura' => true]);
         $this->postJson('/api/v1/feriados')->assertUnauthorized();
+        // La evidencia (auditoría, bitácora, historial) y los legajos no se escriben nunca, ni con la escritura abierta.
+        foreach (['/api/v1/auditoria-eventos/', '/api/v1/bitacora-accesos-legajo/', '/api/v1/historial-estados-documento/', '/api/v1/legajos/', '/api/v1/legajo-secciones/'] as $url) {
+            $this->deleteJson($url.Str::uuid())->assertStatus(405);
+            $this->patchJson($url.Str::uuid())->assertStatus(405);
+        }
         // Las rutas de cada sección (con sus reglas) no se ven afectadas.
         config(['app.crud_generico_escritura' => false]);
         $this->postJson('/api/v1/usuarios/con-vinculo')->assertUnauthorized();
