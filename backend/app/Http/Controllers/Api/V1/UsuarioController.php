@@ -31,7 +31,7 @@ class UsuarioController extends Controller
 {
     public function index(): AnonymousResourceCollection
     {
-        return UsuarioResource::collection(SituacionLaboral::cargar(Usuario::query()->with('regimenNormativo'))->orderBy('id')->paginate(100));
+        return UsuarioResource::collection(SituacionLaboral::cargar(Usuario::query()->with('regimenNormativo'))->orderByDesc('created_at')->orderByDesc('id')->paginate(100));
     }
 
     public function show(string $record): UsuarioResource

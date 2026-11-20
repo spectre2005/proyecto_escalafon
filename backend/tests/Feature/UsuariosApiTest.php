@@ -154,6 +154,19 @@ class UsuariosApiTest extends TestCase
         $this->getJson('/api/v1/usuarios?page=2')->assertOk()->assertJsonCount(2, 'data');
     }
 
+    public function test_list_shows_the_most_recently_registered_people_first_whatever_their_id(): void
+    {
+        // El id no indica el orden de registro: los UUID al azar (datos demo, importaciones) se mezclan con los nuevos.
+        $antigua = Usuario::factory()->create(['id' => '00000000-0000-4000-8000-000000000000', 'created_at' => now()->subDays(2)]);
+        $intermedia = Usuario::factory()->create(['created_at' => now()->subDay()]);
+        $reciente = Usuario::factory()->create(['id' => 'ffffffff-ffff-4fff-bfff-ffffffffffff', 'created_at' => now()->addMinute()]);
+
+        $ids = collect($this->getJson('/api/v1/usuarios')->assertOk()->json('data'))->pluck('id');
+
+        $this->assertSame($reciente->id, $ids->first());
+        $this->assertLessThan($ids->search($antigua->id), $ids->search($intermedia->id));
+    }
+
     public function test_database_index_prevents_duplicate_emails_even_without_api_validation(): void
     {
         Usuario::factory()->create(['email_institucional' => 'Ana@uniq.edu.pe']);
