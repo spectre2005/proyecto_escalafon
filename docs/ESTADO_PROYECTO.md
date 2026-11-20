@@ -551,3 +551,19 @@ migraciones y verificación. Respaldos (17/10/2026): uno por institución, copia
 - Pendiente antes de datos reales: cifrado de PDF y antivirus (pend. 9),
   usuario de PostgreSQL con permisos mínimos, copia de respaldos fuera del servidor y prueba de restauración,
   avisos por correo.
+
+## Listas de puestos y unidades orgánicas (17/11/2026, rama feature/catalogos-puestos-unidades)
+Observación del docente: el desplegable «Puesto» usaba una lista fija en el código (`puestosSugeridos.js`) y las
+unidades orgánicas no se podían crear en producción (sin pantalla y con la escritura del CRUD genérico cerrada).
+- Las dos listas son propias de cada institución y **empiezan vacías**. Lo que se escribe al registrar un vínculo (alta
+  manual o sección 02, también el asistente) queda en la lista si no estaba (`App\Support\CatalogosVinculo`).
+- Sin duplicados: dos nombres son el mismo sin mayúsculas, tildes ni espacios repetidos; el vínculo toma el de la lista.
+  Un puesto es por tipo de personal.
+- Configuración → «Puestos y unidades orgánicas» (solo `sistema.administrar`): agregar, corregir nombre (en unidades,
+  también código, tipo y dependencia) y desactivar. Nunca se borra; queda en la auditoría.
+- El vínculo guarda su texto de puesto: renombrar en la lista no cambia vínculos. Un puesto o unidad desactivado no se
+  elige de nuevo, pero un vínculo que ya lo tenía se sigue corrigiendo.
+- Se quitó el llenado automático de condición y categoría docente desde el puesto: lo decide quien registra.
+- Migración: tabla `puestos`; `unidades_organicas.codigo` y `tipo` pasan a opcionales y se agrega `registrado_por`.
+- Queda fuera: «puesto de destino» de la sección 05 (texto libre) y los nombres de UNIQ en `UnidadOrganicaSeeder`
+  (solo local/pruebas; cambiarlos duplicaría unidades en las bases locales ya sembradas).

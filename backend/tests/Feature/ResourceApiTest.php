@@ -7,8 +7,8 @@ use App\Models\ArchivoDocumento;
 use App\Models\ConexionCorreo;
 use App\Models\ConfiguracionFuncionalidad;
 use App\Models\Controversia;
-use App\Models\Desvinculacion;
 use App\Models\Desplazamiento;
+use App\Models\Desvinculacion;
 use App\Models\DocumentoUsuario;
 use App\Models\EvaluacionDesempeno;
 use App\Models\Familiar;
@@ -22,6 +22,7 @@ use App\Models\PerfilDocente;
 use App\Models\PeriodoPrueba;
 use App\Models\PeriodoVacacional;
 use App\Models\ProgresionCarrera;
+use App\Models\Puesto;
 use App\Models\RatificacionDocente;
 use App\Models\Reconocimiento;
 use App\Models\RecursoImpugnatorio;
@@ -64,11 +65,12 @@ class ResourceApiTest extends TestCase
      * Modelos que deliberadamente NO tienen CRUD genérico (ni lectura): solo existen dentro de su sección.
      * RecursoImpugnatorio (sección 08): se registra únicamente desde Legajos\Seccion08Controller al subir la resolución
      * del recurso. ConfiguracionFuncionalidad: solo cambia por App\Support\ConfiguracionFuncionalidades, que exige
-     * motivo, comprueba las restricciones y audita. No participan de test_resource_can_be_created_read_updated_and_deleted;
+     * motivo, comprueba las restricciones y audita. Puesto: se agrega desde los vínculos (CatalogosVinculo) y se corrige en
+     * CatalogosVinculoController, que evita duplicados y audita. No participan de test_resource_can_be_created_read_updated_and_deleted;
      * en su lugar, test_models_without_generic_crud_have_no_endpoint verifica que no exista ningún endpoint genérico.
      * Siguen cubiertos por ModelPersistenceTest.
      */
-    private const SIN_CRUD_GENERICO = [RecursoImpugnatorio::class, ConfiguracionFuncionalidad::class, ConexionCorreo::class];
+    private const SIN_CRUD_GENERICO = [RecursoImpugnatorio::class, ConfiguracionFuncionalidad::class, ConexionCorreo::class, Puesto::class];
 
     /** Sección 10: igual, se registran desde Legajos\Seccion10Controller (el CRUD genérico exige además datos_sensibles.ver). */
     private const SECCION_10 = [RegistroSstBienestar::class];

@@ -4,12 +4,14 @@ import DocumentoModal from '../documentos/DocumentoModal'
 const control = 'min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-teal-600 disabled:bg-slate-50 disabled:text-slate-400'
 
 // Etiqueta + control + mensaje de error del backend. El control recibe el estilo del panel.
-export default function Campo({ label, required, error, className = '', children }) {
+// ayuda: texto breve bajo el control (opcional); no se muestra si hay un error.
+export default function Campo({ label, required, error, ayuda, className = '', children }) {
   const child = Children.only(children)
   return <label className={`grid min-w-0 content-start gap-2 text-xs font-medium text-slate-600 ${className}`}>
     {label}{required ? ' *' : ''}
     {cloneElement(child, { className: `${control} ${child.props.className || ''}`, 'aria-invalid': !!error })}
     {error && <span className="text-rose-700">{[].concat(error).join(' ')}</span>}
+    {ayuda && !error && <span className="text-[11px] font-normal text-teal-700">{ayuda}</span>}
   </label>
 }
 

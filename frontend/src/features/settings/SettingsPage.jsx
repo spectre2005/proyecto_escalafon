@@ -3,6 +3,7 @@ import { usePuede } from '../auth/session'
 import PanelesConfiguracion from './PanelesConfiguracion'
 import InstitucionConfig from './InstitucionConfig'
 import CorreoRequerimientosConfig from './CorreoRequerimientosConfig'
+import CatalogosVinculoConfig from './CatalogosVinculoConfig'
 
 export default function SettingsPage() {
   const [params] = useSearchParams()
@@ -18,6 +19,7 @@ export default function SettingsPage() {
     <PanelesConfiguracion inicial={params.has('gmail') ? 'correo' : null} secciones={[
       { id: 'institucion', titulo: 'Institución y apariencia', descripcion: 'Datos, logo, colores y reportes', icono: 'building', contenido: <InstitucionConfig /> },
       { id: 'correo', titulo: 'Correo de requerimientos', descripcion: 'Cuenta institucional y conexión', icono: 'settings', contenido: <CorreoRequerimientosConfig /> },
+      { id: 'catalogos', titulo: 'Puestos y unidades orgánicas', descripcion: 'Listas que se llenan al registrar vínculos', icono: 'folder', contenido: <CatalogosVinculoConfig /> },
     ]} />
   </div>
 }

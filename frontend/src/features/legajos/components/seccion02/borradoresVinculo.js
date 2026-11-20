@@ -5,7 +5,7 @@ import { valorBandera } from '../../../../shared/banderas.js'
 // Borrador del vínculo (sin tipo de personal ni ley, que cada formulario agrega). Condiciones: Sí / No / Sin responder.
 export function vinculoInicial(v = {}) {
   return {
-    regimen_laboral: v.regimen_laboral || '', unidad_organica_id: v.unidad_organica_id || '', nombre_puesto: v.nombre_puesto || '',
+    regimen_laboral: v.regimen_laboral || '', unidad_organica_id: v.unidad_organica_id || '', unidad_organica_nombre: '', nombre_puesto: v.nombre_puesto || '',
     numero_documento_vinculo: v.numero_documento_vinculo || '', fecha_inicio: v.fecha_inicio || '', fecha_fin_prevista: v.fecha_fin_prevista || '',
     proceso_seleccion: v.proceso_seleccion || '', fecha_resultado_seleccion: v.fecha_resultado_seleccion || '',
     obligado_djbr: valorBandera(v.obligado_djbr), exige_colegiatura: valorBandera(v.exige_colegiatura), exige_estudios_basicos: valorBandera(v.exige_estudios_basicos), tiene_periodo_prueba: valorBandera(v.tiene_periodo_prueba),

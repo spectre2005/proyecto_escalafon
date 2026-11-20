@@ -15,6 +15,7 @@ use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
 use App\Support\AplicacionDocumental;
 use App\Support\Auditoria;
+use App\Support\CatalogosVinculo;
 use App\Support\Documentos\EstadoDocumento;
 use App\Support\Documentos\FormulariosDatos;
 use App\Support\Parametros;
@@ -153,7 +154,10 @@ class Seccion02Controller extends Controller
 
         // vinculos_laborales no tiene documento_id: el documento (c a f) apunta al vínculo.
         return $this->creado(DB::transaction(function () use ($data, $usuario, $documento, $request): VinculoLaboral {
-            $vinculo = VinculoLaboral::query()->create([...collect($data)->except('documento_id')->all(), 'usuario_id' => $usuario, 'registrado_por' => $request->user()->getAuthIdentifier()]);
+            $actor = $request->user()->getAuthIdentifier();
+            // El puesto y la unidad escritos quedan en las listas de la institución si aún no estaban.
+            $datos = CatalogosVinculo::aplicar(collect($data)->except('documento_id')->all(), $data['tipo_personal'], $actor);
+            $vinculo = VinculoLaboral::query()->create([...$datos, 'usuario_id' => $usuario, 'registrado_por' => $actor]);
             // Enlace de una sola vez: si otra carga ya lo enlazó entre tanto, no se pisa.
             if ($documento && DocumentoUsuario::query()->whereKey($documento->id)->whereNull('vinculo_laboral_id')->update(['vinculo_laboral_id' => $vinculo->id]) !== 1) {
                 throw ValidationException::withMessages(['documento_id' => 'El documento ya está enlazado a otro vínculo.']);
@@ -177,6 +181,7 @@ class Seccion02Controller extends Controller
             // Bloqueo del vínculo: los datos del puesto no se registran a la vez que se cambia su tipo de personal.
             $actual = VinculoLaboral::query()->whereKey($registro->id)->lockForUpdate()->firstOrFail();
             $this->exigirTipoSinDatosPuesto($actual, $cambios);
+            $cambios = CatalogosVinculo::aplicar($cambios, $cambios['tipo_personal'] ?? $actual->tipo_personal, $request->user()->getAuthIdentifier(), $actual);
             $antes = $actual->getAttributes();
             $actual->update($cambios);
             $this->auditarCambio($request, 'vinculo.corregir', $actual, $usuario, $antes);

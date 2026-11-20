@@ -1,8 +1,8 @@
-import { useState } from 'react'
 import { categoriasDocente, condicionesDocente, dedicacionesDocente, funcionesPrevias, gruposOcupacionales, regimenesLaborales, subtiposExtraordinario } from '../../config/seccion02'
-import { etiquetaOtro, OTRO, puestoElegido, seleccionPuesto, sugerenciasPuesto } from '../../config/puestosSugeridos'
+import { elegirUnidad, esNuevo, puestosDelTipo, textoUnidad } from '../../config/catalogosVinculo'
 import Campo, { Opciones } from '../seccion01/Campo'
 import { hoy } from '../seccion01/useGuardar'
+import ListaEditable from '../../../../components/ui/ListaEditable'
 import TresEstados from '../../../../components/ui/TresEstados'
 
 // Campos del vínculo laboral y de sus datos del puesto, compartidos por la sección 02 (VinculoForm, DatosPuestoForm) y
@@ -17,26 +17,35 @@ export function OpcionesCatalogo({ lista, actual, vacio = 'Selecciona' }) {
   </>
 }
 
-// Puesto (nombre_puesto, texto libre) con sugerencias provisionales según el tipo de personal. «Otro» permite escribir
-// una denominación propia, que es la que se guarda. Un puesto guardado que no está en las sugerencias (anterior o propio)
-// se muestra como «Otro» con su texto, sin perderlo; también al cambiar el tipo de personal.
-export function CampoPuesto({ valor, tipoPersonal, onChange, error, nombre = 'vinculo' }) {
-  const [otro, setOtro] = useState(false)
-  const opcion = seleccionPuesto(valor, tipoPersonal, otro)
-  const sugerencias = sugerenciasPuesto(tipoPersonal)
-  function elegir(event) {
-    const elegido = puestoElegido(event.target.value, valor, tipoPersonal)
-    setOtro(elegido.otro)
-    onChange(elegido.nombre_puesto)
+// Puesto (nombre_puesto, texto): se escribe o se elige de la lista de puestos de la institución para el tipo de personal.
+// La lista empieza vacía y aprende: un puesto que no está se agrega al guardar el vínculo. El vínculo guarda su texto.
+export function CampoPuesto({ valor, tipoPersonal, puestos, onChange, error, nombre = 'vinculo' }) {
+  const lista = puestosDelTipo(puestos, tipoPersonal)
+  return <Campo label="Puesto" required error={error} ayuda={esNuevo(valor, lista) ? 'Puesto nuevo: quedará en la lista de puestos al guardar.' : null}>
+    <ListaEditable name={`${nombre}-puesto`} required maxLength={150} disabled={!tipoPersonal} opciones={lista}
+      vacio={`Aún no hay puestos ${tipoPersonal === 'docente' ? 'docentes' : 'administrativos'} registrados: escribe uno nuevo.`}
+      placeholder={tipoPersonal ? (lista.length ? 'Escribe o elige un puesto' : 'Escribe el puesto') : 'Primero elige el tipo de personal'}
+      value={valor} onChange={onChange} />
+  </Campo>
+}
+
+// Unidad orgánica: se escribe o se elige de la lista de la institución. Si coincide con una unidad activa se guarda su id;
+// si no, se envía el nombre (unidad_organica_nombre) y el backend la agrega a la lista.
+export function CampoUnidad({ draft, poner, unidades, error, nombre = 'vinculo' }) {
+  const activas = (unidades || []).filter(unidad => unidad.activo !== false).map(unidad => unidad.nombre)
+  const texto = textoUnidad(draft, unidades)
+  const elegir = valor => {
+    const eleccion = elegirUnidad(valor, unidades)
+    poner('unidad_organica_id')(eleccion.unidad_organica_id)
+    poner('unidad_organica_nombre')(eleccion.unidad_organica_nombre)
   }
-  return <>
-    <Campo label="Puesto" required error={opcion === OTRO ? undefined : error}><select name={`${nombre}-puesto`} required value={opcion} onChange={elegir}>
-      <option value="">{tipoPersonal ? 'Seleccionar puesto' : 'Primero elige el tipo de personal'}</option>
-      {sugerencias.length > 0 && <optgroup label="Sugerencias provisionales">{sugerencias.map(puesto => <option key={puesto} value={puesto}>{puesto}</option>)}</optgroup>}
-      <option value={OTRO}>{etiquetaOtro[tipoPersonal] || 'Otro puesto'} (escribir denominación)</option>
-    </select></Campo>
-    {opcion === OTRO && <Campo label="Denominación del puesto" required error={error}><input name={`${nombre}-puesto-texto`} required maxLength={150} placeholder="Escribe la denominación" value={valor} onChange={event => onChange(event.target.value)} /></Campo>}
-  </>
+  const nueva = !draft.unidad_organica_id && texto.trim() !== ''
+  return <Campo label="Unidad orgánica" error={error} ayuda={nueva ? 'Unidad nueva: quedará en la lista de unidades al guardar.' : null}>
+    <ListaEditable name={`${nombre}-unidad`} maxLength={150} disabled={!unidades} opciones={activas}
+      vacio="Aún no hay unidades orgánicas registradas: escribe una nueva."
+      placeholder={unidades ? (activas.length ? 'Escribe o elige una unidad' : 'Escribe la unidad orgánica') : 'Cargando unidades…'}
+      value={texto} onChange={elegir} />
+  </Campo>
 }
 
 const condicionesPuesto = [['obligado_djbr', 'Obligado a la declaración jurada de bienes y rentas'], ['exige_colegiatura', 'El puesto exige colegiatura'], ['exige_estudios_basicos', 'El puesto exige estudios básicos'], ['tiene_periodo_prueba', 'Tiene período de prueba']]
@@ -60,8 +69,8 @@ export function CamposVinculoBasicos({ draft, set, poner, errors, opciones, tipo
   return <>
     {conTipo && <Campo label="Tipo de vínculo" required error={errors.regimen_laboral}><select name={`${nombre}-tipo`} required value={draft.regimen_laboral} onChange={set('regimen_laboral')}><Opciones lista={regimenesLaborales} actual={draft.regimen_laboral} vacio="Seleccionar tipo de vínculo" /></select></Campo>}
     {children}
-    <CampoPuesto valor={draft.nombre_puesto} tipoPersonal={tipoPersonal} onChange={poner('nombre_puesto')} error={errors.nombre_puesto} nombre={nombre} />
-    <Campo label="Unidad orgánica" error={errors.unidad_organica_id}><select name={`${nombre}-unidad`} value={draft.unidad_organica_id} onChange={set('unidad_organica_id')} disabled={!opciones}><OpcionesCatalogo lista={opciones?.unidades} actual={draft.unidad_organica_id} vacio={opciones ? 'Seleccionar unidad orgánica' : 'Cargando unidades…'} /></select></Campo>
+    <CampoPuesto valor={draft.nombre_puesto} tipoPersonal={tipoPersonal} puestos={opciones?.puestos} onChange={poner('nombre_puesto')} error={errors.nombre_puesto} nombre={nombre} />
+    <CampoUnidad draft={draft} poner={poner} unidades={opciones?.unidades} error={errors.unidad_organica_nombre || errors.unidad_organica_id} nombre={nombre} />
     <Campo label="Fecha de inicio" required error={errors.fecha_inicio}><input name={`${nombre}-inicio`} type="date" required value={draft.fecha_inicio} onChange={set('fecha_inicio')} /></Campo>
     <Campo label="Fecha de fin prevista" error={errors.fecha_fin_prevista}><input name={`${nombre}-fin`} type="date" min={draft.fecha_inicio || undefined} value={draft.fecha_fin_prevista} onChange={set('fecha_fin_prevista')} /></Campo>
     {conCese && <Campo label="Fecha de cese (solo si el vínculo ya terminó)" required={ceseObligatorio} error={errors.fecha_cese}><input type="date" required={ceseObligatorio} min={draft.fecha_inicio || undefined} max={hoy()} value={draft.fecha_cese} onChange={set('fecha_cese')} /></Campo>}
