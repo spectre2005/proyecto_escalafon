@@ -5,10 +5,9 @@ namespace App\Support;
 /**
  * Resumen de la sección 02: estado de cada subsección y conteo de tipos de documento.
  *
- * No es la fórmula de completitud del legajo (decisión abierta del cliente: ¿cuentan los cargados, los
- * recepcionados o solo los verificados?). Por eso se entregan los números por separado, calculados con los
- * documentos reales (documentos_usuario). El estado "completa" de una subsección usa los cargados.
- * TODO pendiente de confirmar con el cliente: si "completa" debe exigir documentos verificados.
+ * Se calcula con los documentos reales (documentos_usuario). Un documento cargado cuenta como aprobado: llegan ya
+ * validados, sin recepción ni verificación (confirmado por el usuario el 27/10/2026). El estado "completa" de una
+ * subsección usa los cargados. exigidos_recepcionados se sigue entregando por compatibilidad; la pantalla no lo usa.
  */
 final class ResumenSeccion02
 {

@@ -35,8 +35,11 @@ class LeerDocumentoConIa
 
     public const RESULTADO_MINUTOS = 30;
 
-    /** Ollama atiende una lectura a la vez: las demás esperan su turno hasta este tiempo. */
-    private const ESPERA_TURNO_SEGUNDOS = 900;
+    /** Ollama atiende una lectura a la vez: las demás esperan su turno hasta este tiempo (ocupan un proceso de PHP). */
+    private const ESPERA_TURNO_SEGUNDOS = 300;
+
+    /** Duración máxima de un turno: si el proceso muere, el turno se libera solo pasado este tiempo. */
+    private const TURNO_SEGUNDOS = 1800;
 
     /**
      * @param  list<string>  $campos
@@ -48,6 +51,8 @@ class LeerDocumentoConIa
         public string $tipoNombre,
         public array $campos,
         public array $persona,
+        // false en documentos de familiares (DNI de cónyuge o hijos, partida de matrimonio): su titular no es el servidor.
+        public bool $compararTitular = true,
         public ?string $institucionId = null,
     ) {
         $this->institucionId ??= app()->bound(Institucion::class) ? app(Institucion::class)->id : null;
@@ -55,32 +60,45 @@ class LeerDocumentoConIa
 
     public function handle(EscanerSecciones $escaner): void
     {
-        if ($this->institucionId === null) {
-            $this->leer($escaner);
-
-            return;
-        }
-        $institucion = Institucion::query()->find($this->institucionId);
-        if (! $institucion) {
-            @unlink($this->rutaPdf);
-
-            return;
-        }
-        ConexionInstitucion::usar($institucion, fn () => $this->leer($escaner));
-    }
-
-    private function leer(EscanerSecciones $escaner): void
-    {
         // Solo cuenta el tiempo de CPU de PHP, pero el OCR de muchas páginas no debe quedar a medias por el límite.
         set_time_limit(0);
         ignore_user_abort(true);
-        $lectura = LecturaIa::query()->findOrFail($this->lecturaId);
+        // El turno se toma ANTES de entrar a la institución: con la caché de la plataforma, es uno solo para todas (Ollama
+        // es uno solo). Dentro de ConexionInstitucion::usar cada institución tendría su propio turno.
+        $bloqueo = Cache::lock('escaner-documentos-local', self::TURNO_SEGUNDOS);
+        $sinTurno = null;
+        try {
+            $bloqueo->block(self::ESPERA_TURNO_SEGUNDOS);
+        } catch (LockTimeoutException $error) {
+            $sinTurno = $error;
+        }
+        try {
+            $institucion = $this->institucionId === null ? null : Institucion::query()->find($this->institucionId);
+            if ($this->institucionId !== null && ! $institucion) {
+                return;
+            }
+            $institucion ? ConexionInstitucion::usar($institucion, fn () => $this->leer($escaner, $sinTurno)) : $this->leer($escaner, $sinTurno);
+        } finally {
+            if (! $sinTurno) {
+                $bloqueo->release();
+            }
+            @unlink($this->rutaPdf);
+        }
+    }
+
+    private function leer(EscanerSecciones $escaner, ?Throwable $sinTurno): void
+    {
+        $lectura = LecturaIa::query()->find($this->lecturaId);
+        if (! $lectura) {
+            return;
+        }
         $inicio = microtime(true);
-        $bloqueo = Cache::lock('escaner-documentos-local', self::ESPERA_TURNO_SEGUNDOS * 2);
         $campos = [];
         $titular = null;
         try {
-            $bloqueo->block(self::ESPERA_TURNO_SEGUNDOS);
+            if ($sinTurno) {
+                throw $sinTurno;
+            }
             $lectura->update(['estado' => 'leyendo']);
             $texto = $escaner->leer(new UploadedFile($this->rutaPdf, 'documento.pdf', 'application/pdf', null, true),
                 fn (int $pagina, int $total) => $lectura->update(['pagina_actual' => $pagina, 'paginas_leer' => $total]));
@@ -88,7 +106,7 @@ class LeerDocumentoConIa
             $nombre = trim(implode(' ', array_filter([$this->persona['nombres'] ?? null, $this->persona['apellido_paterno'] ?? null, $this->persona['apellido_materno'] ?? null])));
             $campos = $escaner->interpretar($texto, $this->tipoNombre, $this->campos, $nombre);
             // ¿Es de esta persona? Con el texto de todas las páginas leídas, sin modelo.
-            $titular = TitularDocumento::comparar($texto, $this->persona);
+            $titular = $this->compararTitular ? TitularDocumento::comparar($texto, $this->persona) : null;
             $confianzas = array_filter(array_column($escaner->paginas, 'confianza'), fn (?float $confianza): bool => $confianza !== null);
             Cache::put($lectura->claveResultado(), Crypt::encryptString(json_encode([
                 'titular' => $titular,
@@ -98,7 +116,7 @@ class LeerDocumentoConIa
                 'lectura_dudosa' => $confianzas !== [] && min($confianzas) < 70,
             ], JSON_THROW_ON_ERROR)), now()->addMinutes(self::RESULTADO_MINUTOS));
             $lectura->update([
-                'estado' => 'lista', 'titular' => $titular['estado'], 'segundos' => round(microtime(true) - $inicio, 1),
+                'estado' => 'lista', 'titular' => $titular['estado'] ?? null, 'segundos' => round(microtime(true) - $inicio, 1),
                 'campos_propuestos' => array_keys($campos), 'campos_sugeridos' => array_keys($escaner->sugerencias),
             ]);
         } catch (Throwable $error) {
@@ -107,8 +125,6 @@ class LeerDocumentoConIa
                 report($error);
             }
         } finally {
-            $bloqueo->release();
-            @unlink($this->rutaPdf);
             // Sin valores ni citas: el contenido del documento no se copia a la auditoría.
             Auditoria::registrar(request(), 'documento.lectura_ia', 'usuarios', $lectura->usuario_id, $lectura->usuario_id, null, [
                 'tipo_documento_id' => $lectura->tipo_documento_id, 'resultado' => $lectura->estado === 'lista' ? 'correcto' : 'error',

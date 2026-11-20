@@ -52,7 +52,7 @@ export default function ResumenLateral({ persona, ley, codigoLey, vinculo, datos
     {conPuesto && <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-[13px]">
       {filas.map(([etiqueta, valor]) => <div key={etiqueta} className="contents">
         <dt className="text-slate-500">{etiqueta}</dt>
-        <dd className={`m-0 break-words ${valor ? 'text-slate-800' : 'text-slate-400'}`}>{valor || '—'}</dd>
+        <dd className={`m-0 break-words ${valor ? 'text-slate-800' : 'text-slate-500'}`}>{valor || '—'}</dd>
       </div>)}
     </dl>}
     {opciones?.siguiente_legajo && <p className="rounded-xl bg-slate-50 px-3 py-2.5 text-[13px] text-slate-600">Legajo que se abrirá: <strong className="text-slate-800">{opciones.siguiente_legajo}</strong></p>}

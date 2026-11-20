@@ -21,6 +21,9 @@ export default function ListaDesplegable({ id, etiqueta, requerido = false, opci
   const [abierta, setAbierta] = useState(false)
   const [activa, setActiva] = useState(-1)
   const caja = useRef(null)
+  const boton = useRef(null)
+  // Deshabilitada mientras estaba abierta (p. ej. al guardar): se muestra cerrada.
+  const visible = abierta && !disabled
   const elegida = opciones.find(opcion => opcion.valor === valor)
   const indiceElegida = opciones.findIndex(opcion => opcion.valor === valor)
 
@@ -30,6 +33,10 @@ export default function ListaDesplegable({ id, etiqueta, requerido = false, opci
     document.addEventListener('mousedown', fuera)
     return () => document.removeEventListener('mousedown', fuera)
   }, [abierta])
+  // La opción activa con el teclado siempre queda a la vista dentro de la lista con scroll.
+  useEffect(() => {
+    if (visible && activa >= 0) document.getElementById(`${id}-opcion-${activa}`)?.scrollIntoView?.({ block: 'nearest' })
+  }, [visible, activa, id])
 
   function abrir() {
     if (disabled || !opciones.length) return
@@ -42,7 +49,7 @@ export default function ListaDesplegable({ id, etiqueta, requerido = false, opci
     setAbierta(false)
   }
   function teclado(event) {
-    if (!abierta) {
+    if (!visible) {
       if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) { event.preventDefault(); abrir() }
       return
     }
@@ -55,19 +62,19 @@ export default function ListaDesplegable({ id, etiqueta, requerido = false, opci
   }
 
   return <div ref={caja} className="relative grid min-w-0 content-start gap-1.5">
-    <p id={`${id}-etiqueta`} className="text-[13px] font-semibold text-slate-700">{etiqueta}{requerido && ' *'}</p>
-    <button type="button" role="combobox" aria-haspopup="listbox" aria-expanded={abierta} aria-controls={`${id}-lista`} aria-labelledby={`${id}-etiqueta ${id}-valor`}
-      aria-activedescendant={abierta && activa >= 0 ? `${id}-opcion-${activa}` : undefined} aria-invalid={error ? true : undefined} aria-required={requerido || undefined}
-      disabled={disabled} onClick={() => (abierta ? setAbierta(false) : abrir())} onKeyDown={teclado}
-      className={`flex min-w-0 items-center justify-between gap-2.5 rounded-xl bg-white px-3.5 py-2.5 text-left text-[15px] disabled:cursor-not-allowed disabled:bg-slate-50 ${abierta ? 'border-2 border-teal-700 text-teal-700' : error ? 'border border-rose-400 text-slate-500' : 'border border-slate-300 text-slate-500'}`}>
+    <p id={`${id}-etiqueta`} onClick={() => boton.current?.focus()} className="text-[13px] font-semibold text-slate-700">{etiqueta}{requerido && ' *'}</p>
+    <button ref={boton} type="button" role="combobox" aria-haspopup="listbox" aria-expanded={visible} aria-controls={`${id}-lista`} aria-labelledby={`${id}-etiqueta ${id}-valor`}
+      aria-activedescendant={visible && activa >= 0 ? `${id}-opcion-${activa}` : undefined} aria-invalid={error ? true : undefined} aria-required={requerido || undefined}
+      disabled={disabled} onClick={() => (visible ? setAbierta(false) : abrir())} onKeyDown={teclado}
+      className={`flex min-w-0 items-center justify-between gap-2.5 rounded-xl bg-white px-3.5 py-2.5 text-left text-[15px] disabled:cursor-not-allowed disabled:bg-slate-50 ${visible ? 'border-2 border-teal-700 text-teal-700' : error ? 'border border-rose-400 text-slate-500' : 'border border-slate-300 text-slate-500'}`}>
       <span id={`${id}-valor`} className="min-w-0 truncate">
         {elegida
           ? <><span className="font-medium text-slate-900">{elegida.titulo}</span>{elegida.descripcion && <span className="text-slate-500"> · {elegida.descripcion}</span>}</>
           : <span className="text-slate-500">{vacio}</span>}
       </span>
-      <span className="flex shrink-0 items-center gap-2">{elegida && <Etiqueta opcion={elegida} />}<Flecha abierta={abierta} /></span>
+      <span className="flex shrink-0 items-center gap-2">{elegida && <Etiqueta opcion={elegida} />}<Flecha abierta={visible} /></span>
     </button>
-    {abierta && <ul id={`${id}-lista`} role="listbox" aria-labelledby={`${id}-etiqueta`}
+    {visible && <ul id={`${id}-lista`} role="listbox" aria-labelledby={`${id}-etiqueta`}
       className="absolute top-full right-0 left-0 z-30 mt-1.5 grid max-h-72 gap-0.5 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
       {opciones.map((opcion, indice) => {
         const seleccionada = opcion.valor === valor

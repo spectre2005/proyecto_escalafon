@@ -19,6 +19,30 @@ export function sugerenciasPuesto(tipoPersonal) {
   return puestosSugeridos[tipoPersonal] || []
 }
 
+// Grupos ocupacionales que admite cada denominación sugerida del personal administrativo (D.L. 276: profesional, técnico,
+// auxiliar). PROVISIONAL, como las denominaciones: TODO pendiente de confirmar con el cliente según su CAP/PAP.
+const gruposSugeridos = {
+  'Director o jefe de oficina': ['profesional'], Coordinador: ['profesional'], Especialista: ['profesional'], Analista: ['profesional'],
+  Asesor: ['profesional'], 'Asistente administrativo': ['tecnico'], Secretario: ['tecnico', 'auxiliar'], 'Técnico administrativo': ['tecnico'],
+  'Auxiliar administrativo': ['auxiliar'], 'Personal de informática y soporte': ['profesional', 'tecnico'],
+  'Personal de biblioteca y archivo': ['tecnico', 'auxiliar'], 'Personal de contabilidad y tesorería': ['profesional', 'tecnico'],
+  'Personal de servicios y mantenimiento': ['auxiliar'],
+}
+
+/**
+ * Grupos ocupacionales que admite el puesto, o null si admite cualquiera (puesto escrito antes, o del catálogo sin grupo).
+ * Un puesto del catálogo manda con su grupo; si no está en el catálogo, se usa la denominación sugerida.
+ */
+export function gruposDelPuesto(nombrePuesto, puestosCatalogo = []) {
+  const texto = String(nombrePuesto ?? '').trim()
+  if (!texto) return null
+  const delCatalogo = (puestosCatalogo || []).filter(p => p.tipo_personal !== 'docente' && mismoTexto(p.nombre, texto))
+  if (delCatalogo.length) return delCatalogo.every(p => p.grupo_ocupacional) ? [...new Set(delCatalogo.map(p => p.grupo_ocupacional))] : null
+  const clave = Object.keys(gruposSugeridos).find(puesto => mismoTexto(puesto, texto))
+  return clave ? gruposSugeridos[clave] : null
+}
+
+
 // Los puestos se escriben en mayúsculas (shared/forms/mayusculas.js): la coincidencia no distingue mayúsculas.
 const mismoTexto = (a, b) => a.toLocaleUpperCase('es-PE') === b.toLocaleUpperCase('es-PE')
 

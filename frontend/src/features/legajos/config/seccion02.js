@@ -72,8 +72,8 @@ export const subtiposExtraordinario = { emerito: 'Emérito', honorario: 'Honorar
 export const funcionesPrevias = { jefe_practica: 'Jefe de práctica', ayudante_catedra: 'Ayudante de cátedra', ayudante_laboratorio: 'Ayudante de laboratorio' }
 export const gruposOcupacionales = { profesional: 'Profesional', tecnico: 'Técnico', auxiliar: 'Auxiliar' }
 
-// Niveles de carrera del personal administrativo: escalas por ley y grupo ocupacional que cada institución edita en
-// Configuración → Catálogos del vínculo (llegan en /expediente-opciones como «niveles»; el backend valida con
+// Niveles de carrera del personal administrativo: escalas por ley y grupo ocupacional de cada institución
+// (escalas_nivel_carrera; llegan en /expediente-opciones como «niveles»; el backend valida con
 // App\Rules\NivelCarrera). Van del ingreso (orden 1) al máximo. CAS no tiene nivel de carrera por norma.
 const SIN_NIVEL = { 1057: 'No aplica en CAS' }
 

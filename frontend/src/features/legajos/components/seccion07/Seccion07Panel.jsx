@@ -43,8 +43,8 @@ function Reservado() {
   return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-500" title="Pendiente de definir con la institución quién puede ver calificaciones y puntajes.">Reservado</span>
 }
 
-// Resumen de la sección: pendientes, exigidos con documento cargado y con recepción, y estado de cada subsección.
-// La fórmula de completitud del legajo la define el cliente: los números van por separado.
+// Resumen de la sección: pendientes, exigidos con documento cargado (cuenta como aprobado: llegan validados) y estado
+// de cada subsección.
 // Dentro de la cabecera (EspacioSeccion) va plegado y sin las tarjetas de subsección: la cabecera ya las muestra.
 function Resumen({ data, onNavigate, compacto = false }) {
   const r = data.resumen
@@ -52,14 +52,13 @@ function Resumen({ data, onNavigate, compacto = false }) {
     <div className="flex flex-wrap gap-x-10 gap-y-4">
       <div><p className="text-xs text-slate-500">Tipos de documento pendientes</p><p className="mt-1 text-2xl font-bold text-slate-800">{r.pendientes} <span className="text-sm font-normal text-slate-500">de {r.tipos}</span></p></div>
       <div><p className="text-xs text-slate-500">Exigidos con documento cargado</p><p className="mt-1 text-2xl font-bold text-slate-800">{r.exigidos_cargados} <span className="text-sm font-normal text-slate-500">de {r.exigidos.length}</span></p></div>
-      <div><p className="text-xs text-slate-500">Exigidos con recepción registrada</p><p className="mt-1 text-2xl font-bold text-slate-800">{r.exigidos_recepcionados} <span className="text-sm font-normal text-slate-500">de {r.exigidos.length}</span></p></div>
     </div>
-    <p className="mt-3 text-xs text-slate-500">{data.perfil.es_carrera ? '' : 'La subsección 7.2 no aplica (la persona no es servidor/a de carrera) y no se cuenta. '}Los documentos de progresión y de desplazamiento existen solo si hubo el movimiento: no se exigen. Cargados y recepcionados se muestran por separado: el criterio de completitud está pendiente de definir.</p>
+    <p className="mt-3 text-xs text-slate-500">{data.perfil.es_carrera ? '' : 'La subsección 7.2 no aplica (la persona no es servidor/a de carrera) y no se cuenta. '}Los documentos de progresión y de desplazamiento existen solo si hubo el movimiento: no se exigen. Un documento cargado ya cuenta como aprobado: llegan validados (no hay paso de recepción).</p>
     {!compacto && <div className="mt-4 grid gap-2 sm:grid-cols-3">{data.subsecciones.map(sub => {
       const [nombre, clase] = estadosSubseccion[sub.estado]
       return <button key={sub.codigo} onClick={() => onNavigate(categoriaDe[sub.codigo])} className={`rounded-xl border border-slate-200 p-3 text-left hover:bg-slate-50 ${sub.aplica ? '' : 'opacity-60'}`}>
         <span className="block text-xs font-semibold text-slate-700">{subseccionesSeccion07[categoriaDe[sub.codigo]]?.titulo || sub.nombre}</span>
-        <span className="mt-2 flex flex-wrap items-center gap-2"><Etiqueta clase={clase}>{nombre}</Etiqueta>{sub.aplica && sub.exigidos > 0 && <span className="text-xs text-slate-500">{sub.exigidos_cargados}/{sub.exigidos} cargados · {sub.exigidos_recepcionados} recepcionados</span>}</span>
+        <span className="mt-2 flex flex-wrap items-center gap-2"><Etiqueta clase={clase}>{nombre}</Etiqueta>{sub.aplica && sub.exigidos > 0 && <span className="text-xs text-slate-500">{sub.exigidos_cargados}/{sub.exigidos} cargados</span>}</span>
       </button>
     })}</div>}
   </section>
@@ -280,7 +279,7 @@ export default function Seccion07Panel({ usuario, categoria, onNavigate }) {
     aplica: sub.aplica, activa: sub.codigo === codigo, onIr: () => onNavigate(categoriaDe[sub.codigo]) }))
 
   return <EspacioSeccion seccion={tituloSeccion('07')} subseccion={titulo} subsecciones={subsecciones}
-    cifras={`Sección: ${r.pendientes} de ${r.tipos} tipos pendientes · exigidos ${r.exigidos_cargados}/${r.exigidos.length} con documento, ${r.exigidos_recepcionados} con recepción.`}
+    cifras={`Sección: ${r.pendientes} de ${r.tipos} tipos pendientes · exigidos ${r.exigidos_cargados}/${r.exigidos.length} con documento.`}
     resumen={<Resumen data={data} onNavigate={onNavigate} compacto />} atajos={atajosDe({ registros, tipos: subseccion?.tipos })}>
     {error}
     {sinLegajo && <Aviso accion={<AbrirLegajo usuario={usuario} />}>{sinLegajo} Los formularios y la carga de documentos de la sección 07 están deshabilitados hasta abrirlo.</Aviso>}

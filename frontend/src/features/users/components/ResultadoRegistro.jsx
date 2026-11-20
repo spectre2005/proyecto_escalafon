@@ -29,7 +29,7 @@ export default function ResultadoRegistro({ registro, puedeVerFicha, onOtra, onC
         <div className="grid gap-3 sm:grid-cols-2">
           {puedeVerFicha && <Link to={rutaDocumentosIngreso(usuario.id)} className={`${tarjeta} border-2 border-teal-700 bg-teal-50 hover:bg-teal-100`}>
             <span className="text-sm font-semibold text-teal-900">Subir la resolución de ingreso</span>
-            <span className="text-xs text-teal-800">Sección 02 · el robot puede leerla y completar los datos</span>
+            <span className="text-xs text-teal-800">Sección 02 · la lectura con IA puede proponer los datos del documento</span>
           </Link>}
           {puedeVerFicha && <Link to={rutaDatosPersonales(usuario.id)} className={secundaria}>
             <span className="text-sm font-semibold text-slate-800">Subir copia del DNI</span>

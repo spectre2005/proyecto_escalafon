@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ajustarAPuesto, completarDesdePuesto, diferenciasConPuesto, equivalenciaPuesto, puestosSugeridos, sincronizarConPuesto, sugerenciasPuesto } from './puestosSugeridos.js'
+import { ajustarAPuesto, completarDesdePuesto, diferenciasConPuesto, equivalenciaPuesto, gruposDelPuesto, puestosSugeridos, sincronizarConPuesto, sugerenciasPuesto } from './puestosSugeridos.js'
 
 test('suggestions depend on the personnel type and come from a single source', () => {
   assert.ok(sugerenciasPuesto('docente').includes('Profesor ordinario principal'))
@@ -75,4 +75,18 @@ test('differences are computed in both directions and adjust fixes them', () => 
   const ajustado = ajustarAPuesto({ condicion_docente: 'extraordinario', categoria: '', subtipo_extraordinario: 'emerito', dedicacion: 'exclusiva' }, equivalencia)
   assert.deepEqual(ajustado, { condicion_docente: 'ordinario', categoria: 'asociado', subtipo_extraordinario: '', dedicacion: 'exclusiva' })
   assert.deepEqual(diferenciasConPuesto(ajustado, equivalencia), [])
+})
+
+test('cada denominación sugerida admite solo sus grupos ocupacionales', () => {
+  assert.deepEqual(gruposDelPuesto('Técnico administrativo'), ['tecnico'])
+  assert.deepEqual(gruposDelPuesto('AUXILIAR ADMINISTRATIVO'), ['auxiliar'])
+  assert.deepEqual(gruposDelPuesto('Secretario'), ['tecnico', 'auxiliar'])
+  assert.equal(gruposDelPuesto('Puesto escrito antes'), null)
+  assert.equal(gruposDelPuesto(''), null)
+})
+
+test('el puesto del catálogo manda con su grupo; sin grupo admite cualquiera', () => {
+  const catalogo = [{ nombre: 'Técnico administrativo', tipo_personal: 'administrativo', grupo_ocupacional: 'profesional' }, { nombre: 'Chofer', tipo_personal: 'administrativo', grupo_ocupacional: null }]
+  assert.deepEqual(gruposDelPuesto('Técnico administrativo', catalogo), ['profesional'])
+  assert.equal(gruposDelPuesto('Chofer', catalogo), null)
 })

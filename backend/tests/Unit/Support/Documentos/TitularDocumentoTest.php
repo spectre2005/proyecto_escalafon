@@ -21,6 +21,7 @@ class TitularDocumentoTest extends TestCase
             'apellido paterno y primer nombre' => ['El docente Quispe, María ha concluido.', 'coincide_nombre'],
             'otro DNI y otro nombre' => ['Otorgado a JUAN PÉREZ ROJAS, identificado con DNI 40123456.', 'distinto'],
             'otro DNI pero su nombre (error de OCR)' => ['MARIA ELENA QUISPE HUAMAN, DNI 45678918', 'dni_distinto'],
+            'su nombre y DNI de terceros (firmante)' => ['A favor de MARIA ELENA QUISPE HUAMAN. Firma: Juan Ruiz, DNI 40123456. Visto: Ana Paz, DNI 40999888.', 'coincide_nombre'],
             'ni DNI ni nombre' => ['RESOLUCIÓN RECTORAL N° 0123-2026-R. Se aprueba el plan anual.', 'sin_datos'],
         ];
     }

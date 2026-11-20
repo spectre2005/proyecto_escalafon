@@ -15,6 +15,7 @@ use App\Support\CatalogosVinculo;
 use App\Support\ConfiguracionFuncionalidades;
 use App\Support\RegimenesLaborales;
 use App\Support\SituacionLaboral;
+use App\Support\VigenciaLaboral;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -31,6 +32,9 @@ use Illuminate\Validation\ValidationException;
 
 class UsuarioController extends Controller
 {
+    /** Datos personales que, en un nuevo ingreso, solo se completan si estaban vacíos cuando el actor no ve datos sensibles. */
+    private const SENSIBLES_REINGRESO = ['fecha_nacimiento', 'domicilio', 'telefono', 'ubigeo_id', 'tiene_derechohabientes', 'con_discapacidad', 'estado_civil', 'nacionalidad'];
+
     public function index(): AnonymousResourceCollection
     {
         return UsuarioResource::collection(SituacionLaboral::cargar(Usuario::query()->with('regimenNormativo')->withCount('legajos')->withExists(['legajos as tiene_legajo_pasivo' => fn (Builder $query): Builder => $query->where('estado_legajo', 'pasivo')]))->orderBy('id')->paginate(100));
@@ -170,7 +174,7 @@ class UsuarioController extends Controller
                     abort_unless($request->boolean('cerrar_legajo_actual'), 409, "La persona tiene un legajo activo ({$activo->numero_legajo}). "
                         .'Para registrarla nuevamente, confirma que su legajo actual pase a Legajos pasivos.');
                     $antes = $activo->only(['estado_legajo', 'fecha_pasivo']);
-                    $activo->update(['estado_legajo' => 'pasivo', 'fecha_pasivo' => today()]);
+                    $activo->update(['estado_legajo' => 'pasivo', 'fecha_pasivo' => VigenciaLaboral::hoy()]);
                     Auditoria::registrar($request, 'legajo.cerrar_por_nuevo_ingreso', 'legajos', $activo->id, $persona->id, $antes, $activo->only(['estado_legajo', 'fecha_pasivo']));
                 }
                 abort_unless($persona->legajos()->where('estado_legajo', 'pasivo')->exists(), 409,
@@ -179,9 +183,15 @@ class UsuarioController extends Controller
                     throw ValidationException::withMessages(['usuarios.0.email_institucional' => 'Este correo ya está registrado.']);
                 }
                 $antes = $persona->getAttributes();
-                $discapacidad = CambioDiscapacidad::valor($fila['con_discapacidad'] ?? $persona->con_discapacidad);
+                // Sin datos_sensibles.ver no se ven los datos personales guardados: solo se completan los vacíos, no se
+                // reemplaza lo que ya estaba (art. 6.2).
+                $nuevos = array_filter($fila, fn (mixed $valor): bool => $valor !== null);
+                if (! $actor->can('datos_sensibles.ver')) {
+                    $nuevos = array_filter($nuevos, fn (mixed $valor, string $campo): bool => ! in_array($campo, self::SENSIBLES_REINGRESO, true) || $persona->getAttribute($campo) === null, ARRAY_FILTER_USE_BOTH);
+                }
+                $discapacidad = CambioDiscapacidad::valor($nuevos['con_discapacidad'] ?? $persona->con_discapacidad);
                 CambioDiscapacidad::autorizar($actor, $persona->con_discapacidad, $discapacidad);
-                $persona->update([...array_filter($fila, fn (mixed $valor): bool => $valor !== null), ...$this->ley($fila), 'email_institucional' => strtolower($fila['email_institucional'])]);
+                $persona->update([...$nuevos, ...$this->ley($fila), 'email_institucional' => strtolower($fila['email_institucional'])]);
                 Auditoria::registrar($request, 'persona.editar', 'usuarios', $persona->id, $persona->id,
                     Arr::except($antes, ['password', 'remember_token']), Arr::except($persona->getAttributes(), ['password', 'remember_token']));
                 CambioDiscapacidad::auditar($persona->id, $antes['con_discapacidad'], $discapacidad, $actor, $request);
@@ -194,8 +204,8 @@ class UsuarioController extends Controller
             $legajo = AperturaLegajo::abrir($registro['id']);
             abort_unless($legajo, 409, 'La persona ya tiene un legajo activo.');
             // El tipo de personal y la ley del vínculo son los de la persona; el tipo de vínculo, el que se indicó.
-            $vinculo = VinculoLaboral::query()->create([...CatalogosVinculo::aplicar($request->vinculo(), $registro['tipo_personal'], null, 'vinculo.'), 'usuario_id' => $registro['id'], 'tipo_personal' => $registro['tipo_personal'],
-                'regimen_normativo_id' => $registro['regimen_normativo_id'], 'registrado_por' => $actor->getAuthIdentifier()]);
+            $vinculo = VinculoLaboral::query()->create([...CatalogosVinculo::aplicar([...$request->vinculo(), 'regimen_normativo_id' => $registro['regimen_normativo_id']], $registro['tipo_personal'], null, 'vinculo.'),
+                'usuario_id' => $registro['id'], 'tipo_personal' => $registro['tipo_personal'], 'registrado_por' => $actor->getAuthIdentifier()]);
             // Sin datos del puesto (todos opcionales en el administrativo) no se crea un perfil vacío: se registra después en 2.2.
             $perfil = $request->datosPuesto() === [] ? null
                 : ($registro['tipo_personal'] === 'docente' ? $vinculo->perfilDocente() : $vinculo->perfilAdministrativo())->create($request->datosPuesto());

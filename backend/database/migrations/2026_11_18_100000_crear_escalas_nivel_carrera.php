@@ -7,9 +7,10 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
- * Escalas de nivel de carrera por ley y grupo ocupacional, editables por cada institución en Configuración → Catálogos
- * del vínculo (antes fijas en config/legajo.php). Cada entidad aprueba la suya en su CAP/PAP: sobre todo la del D.L. 728
+ * Escalas de nivel de carrera por ley y grupo ocupacional, propias de cada institución (se mantienen por la API de
+ * catálogos; antes fijas en config/legajo.php). Cada entidad aprueba la suya en su CAP/PAP: sobre todo la del D.L. 728
  * varía. Los niveles van del ingreso (orden 1) al máximo. Nada se borra: se desactiva.
+ * TODO pendiente de confirmar con el cliente: las escalas por defecto (sobre todo la del D.L. 728).
  *
  * Se cargan los valores por defecto del producto: D.L. 276 (F = ingreso, A = máximo) y D.L. 728 (1 = ingreso).
  * CAS (1057) no tiene nivel de carrera; la Ley 30057 queda sin escala hasta que la institución la defina.

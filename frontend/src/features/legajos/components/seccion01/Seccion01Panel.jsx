@@ -46,19 +46,19 @@ function Anexo05() {
   return <Etiqueta clase="bg-slate-50 text-slate-600">Pendiente de confirmar (Anexo 05)</Etiqueta>
 }
 
-// Resumen de la sección: exigencias (una por tipo; en i y j, una por familiar). Pendientes, cargados y recepcionados
-// van por separado: la fórmula de completitud la define el cliente. Lo que no se exige no cuenta como pendiente.
+// Resumen de la sección: exigencias (una por tipo; en i y j, una por familiar). Un documento cargado cuenta como
+// aprobado (llegan validados, sin recepción). Lo que no se exige no cuenta como pendiente.
 // Dentro de la cabecera (EspacioSeccion) va plegado.
 function Resumen({ data, compacto = false }) {
   const r = data.resumen
   return <section aria-label="Resumen de la sección 01" className={compacto ? '' : 'mb-8 rounded-2xl border border-teal-100 bg-white p-5'}>
     <div className="flex flex-wrap gap-x-10 gap-y-4">
-      {[['Exigidos pendientes', r.pendientes], ['Exigidos con documento cargado', r.cargados], ['Exigidos con recepción registrada', r.recepcionados]].map(([titulo, valor]) =>
+      {[['Exigidos pendientes', r.pendientes], ['Exigidos con documento cargado', r.cargados]].map(([titulo, valor]) =>
         <div key={titulo}><p className="text-xs text-slate-500">{titulo}</p><p className="mt-1 text-2xl font-bold text-slate-800">{valor} <span className="text-sm font-normal text-slate-500">de {r.exigidos}</span></p></div>)}
     </div>
-    <p className="mt-3 text-xs text-slate-500">Cargados y recepcionados se muestran por separado: el criterio de completitud del legajo está pendiente de definir. Sin recepción un documento no cuenta como aprobado. Los documentos de familiares se cuentan uno por familiar.{r.por_determinar ? ` ${r.por_determinar} exigencia(s) no se pueden determinar (falta un dato, como la fecha de nacimiento).` : ''}</p>
+    <p className="mt-3 text-xs text-slate-500">Un documento cargado ya cuenta como aprobado: llegan validados (no hay paso de recepción). Los documentos de familiares se cuentan uno por familiar.{r.por_determinar ? ` ${r.por_determinar} exigencia(s) no se pueden determinar (falta un dato, como la fecha de nacimiento).` : ''}</p>
     {r.detalle.length > 0 && <details className="mt-4"><summary className="cursor-pointer text-xs font-semibold text-teal-700">Documentos que se exigen a esta persona ({r.detalle.length})</summary>
-      <ul className="mt-3 grid gap-1 text-xs text-slate-600 sm:grid-cols-2">{r.detalle.map(item => <li key={item.nombre}>{item.literal ? `${item.literal}) ` : ''}{item.nombre} — {item.recepcionado ? 'recepcionado' : item.cargado ? 'cargado' : 'pendiente'}</li>)}</ul>
+      <ul className="mt-3 grid gap-1 text-xs text-slate-600 sm:grid-cols-2">{r.detalle.map(item => <li key={item.nombre}>{item.literal ? `${item.literal}) ` : ''}{item.nombre} — {item.cargado ? 'cargado' : 'pendiente'}</li>)}</ul>
     </details>}
   </section>
 }
@@ -236,7 +236,7 @@ function Familia({ usuario, data }) {
         const [texto, clase] = exigencia[String(item.exigido)]
         return <li key={item.codigo} className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
           <span className="font-medium text-slate-700">{item.literal}) DNI</span><Etiqueta clase={clase}>{texto}</Etiqueta>
-          <Etiqueta clase={item.recepcionado ? coloresEstadoDocumento.recepcionado : item.cargado ? coloresEstadoDocumento.cargado : 'bg-slate-100 text-slate-600'}>{item.recepcionado ? 'Recepcionado' : item.cargado ? 'Cargado' : 'Sin documento'}</Etiqueta>
+          <Etiqueta clase={item.cargado ? coloresEstadoDocumento.aceptado : 'bg-slate-100 text-slate-600'}>{item.cargado ? 'Cargado' : 'Sin documento'}</Etiqueta>
           <span>{item.motivo}</span>
         </li>
       })}</ul>}
@@ -299,6 +299,6 @@ export default function Seccion01Panel({ usuario, categoria }) {
   </>
   // «Datos personales e identidad» va bajo la información personal de la ficha: sin cabecera propia.
   if (categoria === 'general') return <section aria-label={grupo.titulo} className="mt-6">{contenido}</section>
-  return <EspacioSeccion seccion={tituloSeccion('01')} subseccion={grupo.titulo} cifras={`Sección: ${r.pendientes} de ${r.exigidos} exigidos pendientes · ${r.cargados} con documento, ${r.recepcionados} con recepción.`}
+  return <EspacioSeccion seccion={tituloSeccion('01')} subseccion={grupo.titulo} cifras={`Sección: ${r.pendientes} de ${r.exigidos} exigidos pendientes · ${r.cargados} con documento.`}
     resumen={<Resumen data={data} compacto />} atajos={atajosDe({ registros, tipos })}>{contenido}</EspacioSeccion>
 }

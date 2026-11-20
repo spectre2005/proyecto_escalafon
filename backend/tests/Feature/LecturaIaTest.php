@@ -2,12 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\Api\V1\EscanerSeccionesController;
 use App\Models\AuditoriaEvento;
 use App\Models\LecturaIa;
 use App\Models\Legajo;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Support\Documentos\EscanerSecciones;
+use App\Support\Seccion01;
+use Database\Seeders\Seccion01CatalogoSeeder;
 use Database\Seeders\Seccion06CatalogoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
@@ -255,5 +258,63 @@ class LecturaIaTest extends TestCase
 
         $this->getJson('/api/v1/documentos/escaner/lecturas/'.$lectura->id)->assertOk()
             ->assertJsonPath('data.estado', 'error')->assertJsonPath('data.error', 'La lectura se interrumpió (p. ej. se reinició el servidor). Vuelve a intentarlo.');
+    }
+
+    public function test_una_persona_no_puede_lanzar_otra_lectura_mientras_tiene_una_en_curso(): void
+    {
+        $usuario = $this->actuarComo();
+        LecturaIa::factory()->create(['registrado_por' => $usuario->id, 'estado' => 'leyendo']);
+        $this->mock(EscanerSecciones::class, fn ($mock) => $mock->shouldNotReceive('leer'));
+
+        $this->post('/api/v1/documentos/escanear', [
+            'usuario_id' => $this->persona->id, 'tipo_documento_id' => $this->tipo->id, 'campos' => ['emisor'], 'pdf' => $this->pdf(),
+        ], ['Accept' => 'application/json'])->assertStatus(429)->assertJsonPath('message', 'Ya tienes una lectura en curso: espera a que termine.');
+    }
+
+    public function test_hay_un_tope_de_lecturas_en_curso_en_la_institucion(): void
+    {
+        $this->actuarComo();
+        LecturaIa::factory()->count(EscanerSeccionesController::MAXIMO_EN_CURSO)->create(['estado' => 'en_espera']);
+        $this->mock(EscanerSecciones::class, fn ($mock) => $mock->shouldNotReceive('leer'));
+
+        $this->post('/api/v1/documentos/escanear', [
+            'usuario_id' => $this->persona->id, 'tipo_documento_id' => $this->tipo->id, 'campos' => ['emisor'], 'pdf' => $this->pdf(),
+        ], ['Accept' => 'application/json'])->assertStatus(429);
+    }
+
+    public function test_una_lectura_colgada_no_cuenta_para_el_tope(): void
+    {
+        $usuario = $this->actuarComo();
+        $colgada = LecturaIa::factory()->create(['registrado_por' => $usuario->id, 'estado' => 'leyendo']);
+        $colgada->forceFill(['updated_at' => now()->subMinutes(LecturaIa::MINUTOS_SIN_AVANCE + 1)])->saveQuietly();
+
+        $this->escanear('DNI 45678912')->assertOk()->assertJsonPath('data.estado', 'lista');
+    }
+
+    public function test_se_borran_las_copias_temporales_de_lecturas_interrumpidas(): void
+    {
+        $vieja = sys_get_temp_dir().'/'.EscanerSeccionesController::PREFIJO_TEMPORAL.'prueba-vieja.pdf';
+        $reciente = sys_get_temp_dir().'/'.EscanerSeccionesController::PREFIJO_TEMPORAL.'prueba-reciente.pdf';
+        file_put_contents($vieja, '%PDF-1.4');
+        file_put_contents($reciente, '%PDF-1.4');
+        touch($vieja, time() - 7200);
+
+        EscanerSeccionesController::limpiarTemporales();
+
+        $this->assertFileDoesNotExist($vieja);
+        $this->assertFileExists($reciente);
+        @unlink($reciente);
+    }
+
+    public function test_en_documentos_de_familiares_no_se_compara_el_titular(): void
+    {
+        $this->actuarComo();
+        $this->seed(Seccion01CatalogoSeeder::class);
+        $this->tipo = TipoDocumento::query()->where('codigo', Seccion01::DNI_HIJOS)->firstOrFail();
+
+        $datos = $this->escanear('DNI del hijo: JUAN QUISPE ROJAS, DNI 79123456')->assertOk()->json('data');
+
+        $this->assertSame('lista', $datos['estado']);
+        $this->assertNull($datos['titular']);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\PerfilAdministrativoFactory;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -34,6 +35,12 @@ class PerfilAdministrativo extends Model
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
+    }
+
+    /** El nivel se guarda como en la escala (en mayúsculas): así se compara y se cuenta su uso sin variantes. */
+    protected function nivelCarrera(): Attribute
+    {
+        return Attribute::set(fn (?string $valor): ?string => $valor === null || trim($valor) === '' ? null : mb_strtoupper(trim($valor)));
     }
 
     public function vinculoLaboral(): BelongsTo

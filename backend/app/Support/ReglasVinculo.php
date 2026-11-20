@@ -55,13 +55,13 @@ final class ReglasVinculo
 
     /**
      * Reglas del perfil de un tipo de personal. En el administrativo, el nivel de carrera depende de la ley y del grupo
-     * ocupacional (NivelCarrera); $nivelAnterior es el ya guardado, que se acepta si no cambia.
+     * ocupacional (NivelCarrera); $nivelAnterior es el ya guardado, que se acepta si no cambian ni él ni $grupoAnterior.
      */
-    public static function perfil(string $tipo, ?string $nivelAnterior = null, ?string $codigoLey = null): array
+    public static function perfil(string $tipo, ?string $nivelAnterior = null, ?string $codigoLey = null, ?string $grupoAnterior = null): array
     {
         $reglas = self::PERFIL[$tipo];
         if ($tipo === 'administrativo') {
-            $reglas['nivel_carrera'] = ['nullable', 'string', 'max:20', new NivelCarrera($nivelAnterior, $codigoLey)];
+            $reglas['nivel_carrera'] = ['nullable', 'string', 'max:20', new NivelCarrera($nivelAnterior, $codigoLey, $grupoAnterior)];
         }
 
         return $reglas;

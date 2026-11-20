@@ -239,6 +239,32 @@ Catálogos del vínculo fuera de la pantalla (18/11/2026, decisión del equipo):
     nivel solo se cargan por seeder, migración o la API. Pendiente: definir quién y cómo carga esos catálogos en cada
     institución.
 
+Correcciones de la revisión con agentes (19/11/2026, rama feature/rediseño-registro-personal):
+38. Hechas: conteo de páginas del PDF con costo lineal; un solo turno de lectura con IA para todas las instituciones,
+    máximo 3 lecturas en curso (1 por usuario) y limpieza de temporales; sin aviso de titular en documentos de
+    familiares; unidad orgánica opcional en el registro (igual que el backend); el nivel de carrera anterior solo se
+    conserva si no cambia el grupo, se guarda en mayúsculas y la ley de un vínculo no cambia si su nivel no existe en la
+    nueva escala; en un nuevo ingreso, quien no ve datos sensibles no reemplaza teléfono, ubicación ni condiciones ya
+    guardadas; sin contadores de «recepción» en las secciones 01, 02 y 07; modalidades de partida sembradas por
+    migración si la tabla está vacía. No se rellenó la ficha al cierre de legajos pasivos anteriores: se haría con los
+    datos de hoy, no con los del cierre.
+    Pendiente de confirmar con el cliente (no se tocó):
+    (a) Registros de secciones sin `legajo_id` (anteriores a la conservación por legajo): ¿a qué legajo se asignan?
+    (b) Criterio de «vínculo vigente» cuando hay varios abiertos o uno con inicio futuro.
+    (c) Coherencia puesto–categoría docente validada también en el backend (hoy solo la avisa el frontend).
+
+Coherencia del vínculo con la persona (19/11/2026):
+39. Los procesos de selección tienen alcance (tipo de personal y ley; vacío = todos; migración 2026_11_19_110000):
+    Proceso CAS → administrativo D.L. 1057; Concurso público de méritos → administrativo; Concurso docente → docente.
+    Frontend y backend rechazan: proceso de otro tipo de personal o de otra ley, modalidad de otra ley (p. ej.
+    «Nombrado (D.L. 276)» en un 728) y puesto de otra unidad orgánica. Al cambiar el tipo de personal o la ley se vacía lo
+    que deja de corresponder. En la revisión del registro se avisa, sin bloquear: carrera con fecha de fin, CAS como
+    carrera, cargo de confianza sin vínculo designado, resultado de selección posterior al inicio, docente ordinario sin
+    vínculo de carrera (o contratado como carrera) y grupo ocupacional distinto del que indica el puesto (p. ej. «Técnico
+    administrativo» en el grupo Profesional).
+    Pendiente de confirmar con el cliente: (a) el alcance de cada proceso (¿el concurso público vale para docentes?);
+    (b) si alguno de los avisos debe impedir el registro.
+
 ## Hoja de ruta del sistema institucional (por definir, analizado el 13/10/2026)
 
 Funcionalidades que faltan, con su base en la directiva. Orden propuesto, sin decidir:

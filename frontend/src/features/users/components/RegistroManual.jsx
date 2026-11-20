@@ -7,8 +7,9 @@ import ListaDesplegable from '../../../components/ui/ListaDesplegable'
 import { advanceOnEnter } from '../../../shared/forms/advanceOnEnter'
 import { CampoTipoVinculo, CamposDatosPuesto, CamposDocumentoIngreso, CamposUbicacionPuesto, CamposVigencia, CondicionesPuesto } from '../../legajos/components/seccion02/CamposVinculo'
 import { datosPuestoInicial, vinculoInicial } from '../../legajos/components/seccion02/borradoresVinculo'
-import { ajustarAPuesto, diferenciasConPuesto, equivalenciaPuesto, sincronizarConPuesto } from '../../legajos/config/puestosSugeridos'
-import { categoriasDocente, condicionesDocente, nivelTrasCambiarGrupo, opcionesNivelCarrera } from '../../legajos/config/seccion02'
+import { ajustesPorPersona } from '../../legajos/config/catalogosVinculo'
+import { ajustarAPuesto, diferenciasConPuesto, equivalenciaPuesto, gruposDelPuesto, sincronizarConPuesto } from '../../legajos/config/puestosSugeridos'
+import { categoriasDocente, condicionesDocente, gruposOcupacionales, nivelTrasCambiarGrupo, opcionesNivelCarrera } from '../../legajos/config/seccion02'
 import { leyesDelTipo, leyInicial } from '../utils/leyes'
 import { columns, hoyLima } from '../utils/usuariosCsv'
 import { updateUserDraft } from '../utils/usuariosEmail'
@@ -140,6 +141,10 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   const [vinculo, setVinculo] = useState(vinculoInicial)
   const [puestos, setPuestos] = useState(puestosVacios)
   const [avisos, setAvisos] = useState([])
+  // Listas obligatorias sin elegir al intentar avanzar: se marcan en rojo (los <select> nativos ya los marca el navegador).
+  const [faltantes, setFaltantes] = useState({})
+  const tituloRef = useRef(null)
+  const enfocarTituloRef = useRef(false)
   const [errores, setErrores] = useState({})
   const [notaPuesto, setNotaPuesto] = useState('')
   // Campos del perfil docente que rellenó el sistema desde el puesto: siguen al puesto si este cambia; lo editado a mano, no.
@@ -167,6 +172,12 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   const modoIdentidad = modoConsulta({ dni: draft.numero_doc_identidad, existente, estado: estadoIdentidad, puedeRegistrar })
 
   useEffect(() => { draftRef.current = draft }, [draft])
+  // Al cambiar de paso (no al abrir), el foco va al título del paso: el lector de pantalla anuncia dónde está.
+  useEffect(() => {
+    if (!enfocarTituloRef.current) return
+    enfocarTituloRef.current = false
+    tituloRef.current?.focus({ preventScroll: true })
+  }, [paso])
   useEffect(() => { ubicacionRef.current = ubicacionEstado }, [ubicacionEstado])
   // Sin permiso no se pregunta; si el estado no llega, no hay botón y el registro sigue manual.
   useEffect(() => {
@@ -244,7 +255,22 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
 
   const ponerVinculo = key => valor => {
     setVinculo(previo => ({ ...previo, [key]: valor }))
-    if (key === 'nombre_puesto') completarPerfil(valor)
+    if (key === 'nombre_puesto') { completarPerfil(valor); ajustarGrupoAlPuesto(valor) }
+  }
+
+  // Puesto y grupo ocupacional se filtran entre sí. Al elegir un puesto: si el grupo elegido no le corresponde se vacía, y
+  // si el puesto admite un solo grupo, se completa (con su nivel de carrera solo si sigue valiendo).
+  function ajustarGrupoAlPuesto(nombrePuesto) {
+    if (tipo !== 'administrativo') return
+    const grupos = gruposDelPuesto(nombrePuesto, opciones.data?.data?.puestos)
+    const actual = puestos.administrativo.grupo_ocupacional
+    if (!grupos || grupos.includes(actual) && actual) return
+    const grupo = grupos.length === 1 ? grupos[0] : ''
+    if (grupo === actual) return
+    const nivel = nivelTrasCambiarGrupo(escalas, puestos.administrativo.nivel_carrera, codigoLey, grupo)
+    setPuestos(previos => ({ ...previos, administrativo: { ...previos.administrativo, grupo_ocupacional: grupo, nivel_carrera: nivel } }))
+    setNotaPuesto(grupo ? `Se completó el grupo ocupacional ${gruposOcupacionales[grupo]}: es el del puesto elegido.`
+      : `El grupo ${gruposOcupacionales[actual]} no corresponde al puesto elegido: elige el grupo en «Grupo y nivel de carrera».`)
   }
   const setCampoPuesto = key => event => {
     const valor = event.target.type === 'checkbox' ? event.target.checked : event.target.value
@@ -280,8 +306,25 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   }
 
   function irA(numero) {
+    if (numero !== paso) enfocarTituloRef.current = true
     setPaso(numero)
     contenidoRef.current?.scrollTo({ top: 0 })
+  }
+
+  // Otro tipo de personal: el puesto y la modalidad elegidos eran del tipo anterior y se vacían; la ley se vuelve a elegir.
+  function elegirTipo(valor) {
+    if (valor === tipo) return
+    setDraft({ ...draft, tipo_personal: valor, regimen_normativo_id: '' })
+    setVinculo(previo => ({ ...previo, puesto_id: '', nombre_puesto: '', modalidad_vinculo_id: '', ...ajustesPorPersona(previo, opciones.data?.data, valor, '') }))
+    setAutoPuesto([])
+    setNotaPuesto('')
+    setAvisos([])
+  }
+
+  // Otra ley: la modalidad o el proceso de selección de la ley anterior se vacían (p. ej. «Proceso CAS» al pasar al 276).
+  function elegirLey(valor) {
+    setDraft({ ...draft, regimen_normativo_id: valor })
+    setVinculo(previo => ({ ...previo, ...ajustesPorPersona(previo, opciones.data?.data, tipo, valor) }))
   }
 
   // Validación del paso: los controles visibles (obligatorios, formatos y fechas) y, en el paso 1, las reglas del alta.
@@ -291,11 +334,14 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
     const plegado = invalido?.closest('details')
     if (plegado && !plegado.open) plegado.open = true
     if (!formRef.current.reportValidity()) return false
+    setFaltantes(paso === 1 ? { tipo: !tipo, ley: !!tipo && !leyElegida } : paso === 2 ? { regimen_laboral: !vinculo.regimen_laboral } : {})
     const lista = paso === 1 ? erroresPersona(personaDelPaso(draft, leyElegida), { catalogo, usuarios, ubicacion, ubigeoId, nuevoIngreso })
+      .map(texto => (!tipo && texto === 'El tipo debe ser docente o administrativo.' ? 'Elige el tipo de personal: docente o administrativo.' : texto))
       : paso === 2 ? [!vinculo.regimen_laboral && 'Elige el tipo de vínculo: carrera, plazo determinado o designado.',
         conflictosPuesto.length && `${mensajeConflicto} Ajusta la condición o la categoría, o elige otro puesto, para continuar.`].filter(Boolean) : []
     if (paso === 1 && Object.values(ubicacion).some(Boolean) && !ubigeoId) setMasDatos(true)
     setAvisos(lista)
+    if (lista.length) contenidoRef.current?.scrollTo({ top: 0 })
     return !lista.length
   }
 
@@ -313,6 +359,7 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
       setErrores(resultado.errors || {})
       const destino = primerPasoConError(resultado.errors)
       if (destino) irA(destino)
+      else contenidoRef.current?.scrollTo({ top: 0 })
     }
   }
 
@@ -372,7 +419,9 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   const leyes = leyesDelTipo(catalogo, tipo).map(ley => ({ valor: ley.id, titulo: tituloLey(ley), descripcion: DESCRIPCION_LEY[ley.codigo] || ley.nombre,
     ...(ley.codigo === '1057' && { etiqueta: 'Sin nivel', tono: 'aviso' }) }))
   const nombreLey = (catalogo || []).find(ley => ley.id === leyElegida)?.nombre
-  const erroresVinculo = erroresDe(errores, 'vinculo')
+  // La ley se elige en el paso 1 (es de la persona): las listas del vínculo la necesitan para filtrar modalidades y procesos.
+  const vinculoConLey = { ...vinculo, regimen_normativo_id: leyElegida }
+  const erroresVinculo = { ...(faltantes.regimen_laboral && !vinculo.regimen_laboral && { regimen_laboral: ['Elige el tipo de vínculo.'] }), ...erroresDe(errores, 'vinculo') }
   const sinResponder = condicionesSinResponder({ vinculo, condiciones, puedeDiscapacidad })
   const condicionesPuestoPendientes = condicionesSinResponder({ vinculo, condiciones: {} }).length
   const nivelVisible = tipo === 'administrativo' ? opcionesNivelCarrera(escalas, codigoLey, datosPuestoVisibles.grupo_ocupacional, datosPuestoVisibles.nivel_carrera)[datosPuestoVisibles.nivel_carrera] || '' : ''
@@ -387,7 +436,7 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
       <Progreso paso={paso} onIr={irA} disabled={saving} />
     </div>
     <div ref={contenidoRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-6">
-      <h3 id="registro-paso-titulo" className="sr-only">Paso {paso} de {PASOS.length}: {PASOS[paso - 1].titulo}</h3>
+      <h3 ref={tituloRef} tabIndex={-1} id="registro-paso-titulo" className="sr-only">Paso {paso} de {PASOS.length}: {PASOS[paso - 1].titulo}</h3>
       {mensaje?.error && <p role="alert" className="mb-4 rounded-xl bg-rose-50 px-4 py-3 text-xs leading-relaxed text-rose-700">{mensaje.text}</p>}
       {paso === 1 && existente && <PersonaRegistrada persona={existente} puedeVerFicha={puedeVerFicha} puedeRegistrar={puedeRegistrar} nuevoIngreso={nuevoIngreso && !!existente.tieneLegajoActivo} onNuevoIngreso={valor => { setNuevoIngreso(valor); setAvisos([]) }} />}
       {general.length > 0 && <ul role="alert" className="mb-4 list-disc rounded-xl bg-rose-50 px-8 py-3 text-xs leading-relaxed text-rose-700">{general.map(texto => <li key={texto}>{texto}</li>)}</ul>}
@@ -404,12 +453,13 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
               {avisoIdentidad}
             </Seccion>
             <Seccion titulo="¿Qué tipo de personal es?" ayuda="De esto dependen los documentos que se exigirán en su legajo. La ley ofrece solo las de ese tipo de personal." columnas="sm:grid-cols-2">
-              <ListaDesplegable id="alta-tipo" etiqueta="Tipo de personal" requerido opciones={opcionesTipo} valor={tipo} vacio="Seleccionar tipo de personal" error={erroresPersonaCampo.tipo_personal}
-                onElegir={valor => { if (valor !== tipo) setDraft({ ...draft, tipo_personal: valor, regimen_normativo_id: '' }) }} />
-              <ListaDesplegable id="alta-ley" etiqueta="Ley o régimen" requerido opciones={leyes} valor={leyElegida} error={erroresPersonaCampo.regimen_normativo_id} disabled={!tipo || !leyes.length}
-                vacio={!catalogo ? 'Cargando leyes…' : tipo ? 'Seleccionar ley' : 'Primero elige el tipo de personal'}
+              <ListaDesplegable id="alta-tipo" etiqueta="Tipo de personal" requerido opciones={opcionesTipo} valor={tipo} vacio="Seleccionar tipo de personal"
+                error={erroresPersonaCampo.tipo_personal || (faltantes.tipo && !tipo ? 'Elige el tipo de personal.' : undefined)} onElegir={elegirTipo} />
+              <ListaDesplegable id="alta-ley" etiqueta="Ley o régimen" requerido opciones={leyes} valor={leyElegida} disabled={!tipo || !leyes.length}
+                error={erroresPersonaCampo.regimen_normativo_id || (faltantes.ley && tipo && !leyElegida ? 'Elige la ley o régimen.' : undefined)}
+                vacio={opciones.error ? 'No se pudo cargar' : !catalogo ? 'Cargando leyes…' : !tipo ? 'Primero elige el tipo de personal' : leyes.length ? 'Seleccionar ley' : 'No hay leyes activas para este tipo'}
                 ayuda={tipo === 'docente' && leyes.length === 1 ? 'Es la única ley para docentes: se completa sola.' : undefined}
-                onElegir={valor => setDraft({ ...draft, regimen_normativo_id: valor })} />
+                onElegir={elegirLey} />
               {opciones.error && <p role="alert" className="col-span-full text-xs text-rose-700">No se pudo cargar el catálogo de leyes. <button type="button" className="underline" onClick={opciones.retry}>Reintentar</button></p>}
             </Seccion>
             <Plegable titulo="Más datos" detalle={`opcional · ${detalleMasDatos}`} abierto={masDatosAbierto} onCambiar={setMasDatos}>
@@ -431,7 +481,7 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
             </Plegable>
           </>}
           {paso === 2 && <>
-            <Seccion titulo="¿Dónde y en qué puesto trabajará?" ayuda="Escribe para buscar. Si no está en la lista, puedes agregarlo." columnas="sm:grid-cols-2">
+            <Seccion titulo="¿Dónde y en qué puesto trabajará?" ayuda="Elige de las listas. Si falta una unidad o un puesto, pide a la ORH que lo agregue al catálogo." columnas="sm:grid-cols-2">
               <CamposUbicacionPuesto draft={vinculo} poner={ponerVinculo} errors={erroresVinculo} opciones={opciones.data?.data} tipoPersonal={tipo} nombre="alta-vinculo" />
             </Seccion>
             <Seccion titulo={tipo === 'docente' ? 'Condición y categoría docente' : 'Grupo y nivel de carrera'}
@@ -442,15 +492,15 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
                 <button type="button" className={botonSecundario} onClick={ajustarPerfilAlPuesto}>Ajustar al puesto</button>
               </div>}
               {!conflictosPuesto.length && notaPuesto && <p role="status" className={`col-span-full rounded-lg px-3 py-2 text-xs ${estilosMensaje.ok}`}>{notaPuesto}</p>}
-              <CamposDatosPuesto docente={tipo === 'docente'} draft={datosPuestoVisibles} set={setCampoPuesto} codigoLey={codigoLey} escalas={escalas} grupoEnBotones
+              <CamposDatosPuesto docente={tipo === 'docente'} draft={datosPuestoVisibles} set={setCampoPuesto} codigoLey={codigoLey} escalas={escalas} grupoEnLista gruposPermitidos={tipo === 'administrativo' ? gruposDelPuesto(vinculo.nombre_puesto, opciones.data?.data?.puestos) : null}
                 errors={{ ...erroresDe(errores, 'datos_puesto'), ...Object.fromEntries(conflictosPuesto.map(campo => [campo, ['No coincide con el puesto elegido.']])) }} />
             </Seccion>
             <Seccion titulo="Vínculo laboral" ayuda={`Tipo de vínculo, documento de ingreso y fechas${nombreLey ? ` · ${nombreLey}` : ''}. La sugerencia sale de la ley y del puesto; puedes elegir otro.`} columnas="">
               <div className="grid min-w-0 gap-x-4 gap-y-3 sm:grid-cols-2">
-                <CampoTipoVinculo draft={vinculo} poner={ponerVinculo} errors={erroresVinculo} sugerencia={sugerencia} nombre="alta-vinculo" opciones={opciones.data?.data} tipoPersonal={tipo} enLista />
+                <CampoTipoVinculo draft={vinculoConLey} poner={ponerVinculo} errors={erroresVinculo} sugerencia={sugerencia} nombre="alta-vinculo" opciones={opciones.data?.data} tipoPersonal={tipo} enLista />
               </div>
               <div className="grid min-w-0 gap-x-4 gap-y-3 border-t border-slate-100 pt-4 sm:grid-cols-2 lg:grid-cols-3">
-                <CamposDocumentoIngreso draft={vinculo} poner={ponerVinculo} errors={erroresVinculo} opciones={opciones.data?.data} numeroLegajo={opciones.data?.data?.siguiente_legajo || ''} nombre="alta-vinculo" />
+                <CamposDocumentoIngreso draft={vinculoConLey} poner={ponerVinculo} errors={erroresVinculo} opciones={opciones.data?.data} tipoPersonal={tipo} numeroLegajo={opciones.data?.data?.siguiente_legajo || ''} nombre="alta-vinculo" />
               </div>
               <div className="grid min-w-0 gap-x-4 gap-y-3 border-t border-slate-100 pt-4 sm:grid-cols-2 lg:grid-cols-3">
                 <CamposVigencia draft={vinculo} poner={ponerVinculo} errors={erroresVinculo} opciones={opciones.data?.data} nombre="alta-vinculo" />
@@ -462,7 +512,7 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
               </div>
             </Plegable>
           </>}
-          {paso === 3 && <ResumenRegistro nuevoIngreso={nuevoIngreso} persona={personaDelPaso(draft, leyElegida)} ley={nombreLey} nivel={nivelVisible}
+          {paso === 3 && <ResumenRegistro nuevoIngreso={nuevoIngreso} persona={personaDelPaso(draft, leyElegida)} ley={nombreLey} codigoLey={codigoLey} nivel={nivelVisible}
             vinculo={vinculo} datosPuesto={datosPuestoVisibles} opciones={opciones.data?.data} sinResponder={sinResponder} onIr={irA} />}
         </fieldset>
         {paso < PASOS.length && <div className="hidden lg:sticky lg:top-0 lg:block">

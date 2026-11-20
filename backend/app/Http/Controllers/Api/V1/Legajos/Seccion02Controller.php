@@ -13,6 +13,7 @@ use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Models\VinculoAdenda;
 use App\Models\VinculoLaboral;
+use App\Rules\NivelCarrera;
 use App\Support\AplicacionDocumental;
 use App\Support\Auditoria;
 use App\Support\CatalogosVinculo;
@@ -178,6 +179,7 @@ class Seccion02Controller extends Controller
             // Bloqueo del vínculo: los datos del puesto no se registran a la vez que se cambia su tipo de personal.
             $actual = VinculoLaboral::query()->whereKey($registro->id)->lockForUpdate()->firstOrFail();
             $this->exigirTipoSinDatosPuesto($actual, $cambios);
+            $this->exigirNivelDeLaLey($actual, $cambios);
             $antes = $actual->getAttributes();
             $actual->update($cambios);
             $this->auditarCambio($request, 'vinculo.corregir', $actual, $usuario, $antes);
@@ -203,6 +205,27 @@ class Seccion02Controller extends Controller
             : ($ley && $ley->aplica_a !== $tipo ? "La ley {$ley->nombre} corresponde al personal {$ley->aplica_a}, no al {$tipo}." : null);
         if ($error !== null) {
             throw ValidationException::withMessages(['regimen_normativo_id' => $error]);
+        }
+    }
+
+    /**
+     * Al cambiar la ley de un vínculo con nivel de carrera registrado, ese nivel debe existir también en la escala de la
+     * ley nueva para su grupo: si no, se corrige primero el nivel en los datos del puesto (no se borra solo).
+     */
+    private function exigirNivelDeLaLey(VinculoLaboral $vinculo, array $cambios): void
+    {
+        if (! array_key_exists('regimen_normativo_id', $cambios) || (string) $cambios['regimen_normativo_id'] === (string) $vinculo->regimen_normativo_id) {
+            return;
+        }
+        $perfil = $vinculo->perfilAdministrativo()->whereNotNull('nivel_carrera')->where('nivel_carrera', '!=', '')->orderBy('created_at')->orderBy('id')->first();
+        if (! $perfil) {
+            return;
+        }
+        $codigo = RegimenesLaborales::ley((string) $cambios['regimen_normativo_id'])?->codigo;
+        $nivel = mb_strtoupper(trim((string) $perfil->nivel_carrera));
+        if (! in_array($nivel, NivelCarrera::niveles($codigo, $perfil->grupo_ocupacional), true)) {
+            throw ValidationException::withMessages(['regimen_normativo_id' => "El nivel de carrera registrado ({$nivel}) no existe en la escala de la ley nueva"
+                .($perfil->grupo_ocupacional ? " para el grupo {$perfil->grupo_ocupacional}" : '').': corrige primero el nivel en los datos del puesto (o déjalo vacío) y luego cambia la ley.']);
         }
     }
 
@@ -236,9 +259,10 @@ class Seccion02Controller extends Controller
             return response()->json(['message' => 'El vínculo está cerrado (con fecha de cese) o anulado: sus datos del puesto no se corrigen.'], 409);
         }
         $docente = $registro->tipo_personal === 'docente';
-        // El nivel de carrera ya guardado se acepta aunque no esté en la lista de su grupo (registros anteriores).
-        $nivelAnterior = $docente ? null : $registro->perfilAdministrativo()->orderBy('created_at')->orderBy('id')->value('nivel_carrera');
-        $data = $this->validar($request, ReglasVinculo::perfil($docente ? 'docente' : 'administrativo', $nivelAnterior, $registro->regimenNormativo?->codigo));
+        // El nivel de carrera ya guardado se acepta aunque no esté en la lista de su grupo (registros anteriores), si no
+        // cambian ni el nivel ni el grupo.
+        $anterior = $docente ? null : $registro->perfilAdministrativo()->orderBy('created_at')->orderBy('id')->first(['nivel_carrera', 'grupo_ocupacional']);
+        $data = $this->validar($request, ReglasVinculo::perfil($docente ? 'docente' : 'administrativo', $anterior?->nivel_carrera, $registro->regimenNormativo?->codigo, $anterior?->grupo_ocupacional));
         $perfiles = $docente ? $registro->perfilDocente() : $registro->perfilAdministrativo();
 
         return DB::transaction(function () use ($perfiles, $data, $request, $usuario): JsonResource|JsonResponse {

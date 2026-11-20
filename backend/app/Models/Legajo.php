@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\LegajoFactory;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -68,10 +69,19 @@ class Legajo extends Model
         });
     }
 
-    /** Datos históricos; null indica que el cierre fue anterior a la conservación de la ficha. */
+    /**
+     * Datos históricos; null indica que el cierre fue anterior a la conservación de la ficha, o que no se pueden
+     * descifrar (p. ej. tras cambiar APP_KEY): la ficha no se muestra, pero el listado no se rompe.
+     */
     public function datosHistoricos(bool $sensibles): ?array
     {
-        $datos = $this->datos_al_cierre;
+        try {
+            $datos = $this->datos_al_cierre;
+        } catch (DecryptException $error) {
+            report($error);
+
+            return null;
+        }
         if ($datos === null || $sensibles) {
             return $datos;
         }

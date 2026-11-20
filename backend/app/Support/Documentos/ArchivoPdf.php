@@ -57,9 +57,16 @@ final class ArchivoPdf
         return $paginas;
     }
 
+    /** Nodos /Pages que se examinan como máximo: un PDF real tiene pocos; uno manipulado podría tener miles. */
+    private const MAX_NODOS = 200;
+
+    /** Distancia máxima (bytes) que se recorre hacia atrás y hacia adelante para delimitar un diccionario. */
+    private const MAX_RECORRIDO = 8192;
+
     /**
      * Busca cada /Type /Pages, toma el diccionario << … >> que lo contiene (respetando diccionarios anidados como
-     * /Resources << … >>) y lee su /Count de primer nivel.
+     * /Resources << … >>) y lee su /Count de primer nivel. Con límites de nodos y de recorrido, el costo es lineal: un
+     * archivo manipulado no puede ocupar el servidor (antes crecía al cuadrado del tamaño).
      */
     private static function contar(string $contenido): ?int
     {
@@ -67,7 +74,7 @@ final class ArchivoPdf
             return null;
         }
         $conteos = [];
-        foreach ($m[0] as [, $posicion]) {
+        foreach (array_slice($m[0], 0, self::MAX_NODOS) as [, $posicion]) {
             $diccionario = self::diccionarioEn($contenido, $posicion);
             if ($diccionario === null) {
                 continue;
@@ -89,7 +96,8 @@ final class ArchivoPdf
     {
         $profundidad = 0;
         $inicio = null;
-        for ($i = $posicion - 1; $i > 0; $i--) {
+        $limiteAtras = max(0, $posicion - self::MAX_RECORRIDO);
+        for ($i = $posicion - 1; $i > $limiteAtras; $i--) {
             $par = $contenido[$i - 1].$contenido[$i];
             if ($par === '>>') {
                 $profundidad++;
@@ -107,7 +115,7 @@ final class ArchivoPdf
             return null;
         }
         $profundidad = 0;
-        $largo = strlen($contenido);
+        $largo = min(strlen($contenido), $inicio + self::MAX_RECORRIDO);
         for ($i = $inicio; $i < $largo - 1; $i++) {
             $par = $contenido[$i].$contenido[$i + 1];
             if ($par === '<<') {

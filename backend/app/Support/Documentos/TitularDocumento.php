@@ -32,9 +32,13 @@ final class TitularDocumento
         if ($dni !== '' && in_array($dni, $dnis, true)) {
             return self::resultado('coincide', 'El DNI del documento coincide con la persona de este legajo.', $dnis);
         }
+        // Con su nombre y varios DNI, los demás suelen ser de terceros (quien firma, un familiar): no se alerta.
+        if (count($dnis) > 1 && $nombre) {
+            return self::resultado('coincide_nombre', 'El nombre del documento coincide con la persona de este legajo.', []);
+        }
         if ($dnis !== [] && $nombre) {
-            return self::resultado('dni_distinto', 'El nombre coincide, pero el DNI leído ('.implode(', ', $dnis).') no es el de esta persona. '
-                .'Puede ser un error de lectura del escaneo: compruébalo en el PDF.', $dnis);
+            return self::resultado('dni_distinto', 'El nombre coincide, pero el DNI que aparece ('.implode(', ', $dnis).') no es el suyo: '
+                .'puede ser de otra persona mencionada (por ejemplo, quien firma) o un error del escaneo. Compruébalo en el PDF.', $dnis);
         }
         if ($dnis !== []) {
             return self::resultado('distinto', 'Este documento parece ser de otra persona: el DNI leído ('.implode(', ', $dnis).') no es el de este legajo '

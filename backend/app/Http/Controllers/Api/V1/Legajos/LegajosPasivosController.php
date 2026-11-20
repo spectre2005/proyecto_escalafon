@@ -43,12 +43,15 @@ class LegajosPasivosController extends Controller
             });
         }
 
-        return response()->json($consulta->orderByDesc('fecha_pasivo')->orderByDesc('id')->paginate(PorPagina::de($datos))->through(fn (Legajo $legajo): array => [
-            ...$legajo->only(['id', 'usuario_id', 'numero_legajo', 'estado_legajo']),
-            'fecha_apertura' => $legajo->fecha_apertura?->format('Y-m-d'), 'fecha_pasivo' => $legajo->fecha_pasivo?->format('Y-m-d'),
-            'persona' => $legajo->datos_al_cierre !== null
-                ? array_intersect_key($legajo->datosHistoricos(false), array_flip(['nombres', 'apellido_paterno', 'apellido_materno', 'numero_doc_identidad']))
-                : $legajo->usuario?->only(['nombres', 'apellido_paterno', 'apellido_materno', 'numero_doc_identidad']),
-        ]));
+        return response()->json($consulta->orderByDesc('fecha_pasivo')->orderByDesc('id')->paginate(PorPagina::de($datos))->through(function (Legajo $legajo): array {
+            $historico = $legajo->datosHistoricos(false);
+            $campos = array_flip(['nombres', 'apellido_paterno', 'apellido_materno', 'numero_doc_identidad']);
+
+            return [
+                ...$legajo->only(['id', 'usuario_id', 'numero_legajo', 'estado_legajo']),
+                'fecha_apertura' => $legajo->fecha_apertura?->format('Y-m-d'), 'fecha_pasivo' => $legajo->fecha_pasivo?->format('Y-m-d'),
+                'persona' => $historico !== null ? array_intersect_key($historico, $campos) : $legajo->usuario?->only(array_keys($campos)),
+            ];
+        }));
     }
 }

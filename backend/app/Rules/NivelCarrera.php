@@ -9,10 +9,11 @@ use Illuminate\Contracts\Validation\ValidationRule;
 
 /**
  * Nivel de carrera de un perfil administrativo: debe estar en la escala de su ley y grupo ocupacional, tal como la
- * registró la institución en Configuración → Catálogos del vínculo (escalas_nivel_carrera, solo niveles activos).
+ * registró la institución (escalas_nivel_carrera, solo niveles activos).
  * En CAS no existe nivel de carrera. Una ley sin escala registrada (p. ej. la 30057, hasta que se defina) deja el campo
- * vacío. Un nivel ya guardado que no se cambia se acepta aunque ya no esté en la escala: los registros anteriores se
- * pueden seguir corrigiendo en sus otros campos.
+ * vacío. Un nivel ya guardado se acepta aunque ya no esté en la escala solo si no cambian ni el nivel ni el grupo: los
+ * registros anteriores se pueden seguir corrigiendo en sus otros campos.
+ * TODO pendiente de confirmar con el cliente: las escalas por ley y grupo (hoy las registra cada institución).
  */
 class NivelCarrera implements DataAwareRule, ValidationRule
 {
@@ -21,7 +22,7 @@ class NivelCarrera implements DataAwareRule, ValidationRule
 
     private array $datos = [];
 
-    public function __construct(private ?string $anterior = null, private ?string $codigoLey = null) {}
+    public function __construct(private ?string $anterior = null, private ?string $codigoLey = null, private ?string $grupoAnterior = null) {}
 
     public function setData(array $data): static
     {
@@ -48,7 +49,9 @@ class NivelCarrera implements DataAwareRule, ValidationRule
             return;
         }
         $nivel = mb_strtoupper(trim((string) $value));
-        if ($this->anterior !== null && $nivel === mb_strtoupper(trim($this->anterior))) {
+        $grupoEnviado = $this->datos['grupo_ocupacional'] ?? null;
+        $mismoGrupo = ! array_key_exists('grupo_ocupacional', $this->datos) || $grupoEnviado === $this->grupoAnterior;
+        if ($this->anterior !== null && $mismoGrupo && $nivel === mb_strtoupper(trim($this->anterior))) {
             return;
         }
         if (isset(self::SIN_NIVEL[$this->codigoLey])) {

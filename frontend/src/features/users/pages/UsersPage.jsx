@@ -85,6 +85,13 @@ export default function UsersPage() {
     registrationDialog.current.close()
   }
 
+  // Cancelar descarta lo escrito: al volver a abrir, el registro empieza vacío (cerrar con la X lo conserva).
+  function cancelarRegistro() {
+    if (savingRef.current || busy) return
+    closeRegistration()
+    setRegistroKey(clave => clave + 1)
+  }
+
   // enviar devuelve { saved: usuarios guardados, text: mensaje }. Resultado: { ok } o { ok: false, errors } (errores por campo).
   async function persist(enviar) {
     if (savingRef.current || loading || loadError) return { ok: false }
@@ -395,7 +402,7 @@ export default function UsersPage() {
                   aria-pressed={tab === 'csv'}
                   disabled={saving || busy}
                   className="flex items-center gap-2 border-b-2 pb-3.5 text-xs aria-pressed:border-teal-700 aria-pressed:font-semibold aria-pressed:text-teal-700 border-transparent text-slate-500"
-                  onClick={() => setTab('csv')}
+                  onClick={() => { setTab('csv'); setMessage(null) }}
                 >
                   <Icon name="upload" size={17} /> Importar Excel / CSV
                 </button>
@@ -404,7 +411,7 @@ export default function UsersPage() {
                   aria-pressed={tab === 'manual'}
                   disabled={saving || busy}
                   className="flex items-center gap-2 border-b-2 pb-3.5 text-xs aria-pressed:border-teal-700 aria-pressed:font-semibold aria-pressed:text-teal-700 border-transparent text-slate-500"
-                  onClick={() => setTab('manual')}
+                  onClick={() => { setTab('manual'); setMessage(null) }}
                 >
                   <Icon name="plus" size={17} /> Registro manual
                 </button>
@@ -592,7 +599,7 @@ export default function UsersPage() {
             {tab === 'manual' && registrado && <ResultadoRegistro registro={registrado} puedeVerFicha={puedeVerFicha} onOtra={() => { setMessage(null); setRegistrado(null) }} onCerrar={closeRegistration} />}
             <div className={tab === 'manual' && !registrado ? 'contents' : 'hidden'}>
               <RegistroManual key={registroKey} usuarios={users} opciones={opciones} dominioCorreo={dominioCorreo} puedeDiscapacidad={puedeDiscapacidad} puedeRegistrar={puedeAbrir && puedeVincular} puedeVerFicha={puedeVerFicha}
-                saving={saving} bloqueado={loading || !!loadError} mensaje={message} onGuardar={registrarManual} onCancel={closeRegistration} />
+                saving={saving} bloqueado={loading || !!loadError} mensaje={message} onGuardar={registrarManual} onCancel={cancelarRegistro} />
             </div>
           </dialog>
     </div>

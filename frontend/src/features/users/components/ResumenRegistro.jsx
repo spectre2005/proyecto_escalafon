@@ -1,4 +1,5 @@
 import { CON_PROCESO, modalidadElegida, rutaUnidad } from '../../legajos/config/catalogosVinculo'
+import { avisosDeCoherencia } from '../utils/registroPasos'
 import { categoriasDocente, condicionesDocente, dedicacionesDocente, gruposOcupacionales, regimenesLaborales } from '../../legajos/config/seccion02'
 
 // Paso final del registro manual: todo lo que se va a guardar, por bloques, con «Cambiar» para volver a cada uno, y lo que
@@ -17,13 +18,13 @@ function Bloque({ titulo, paso, onIr, filas }) {
     <dl className="grid grid-cols-[minmax(0,9.5rem)_minmax(0,1fr)] gap-x-3 gap-y-2.5 px-4 py-4 text-sm sm:px-5">
       {filas.filter(Boolean).map(([etiqueta, valor]) => <div key={etiqueta} className="contents">
         <dt className="text-slate-500">{etiqueta}</dt>
-        <dd className={`m-0 break-words ${valor ? 'text-slate-800' : 'text-slate-400'}`}>{valor || 'Sin indicar'}</dd>
+        <dd className={`m-0 break-words ${valor ? 'text-slate-800' : 'text-slate-500'}`}>{valor || 'Sin indicar'}</dd>
       </div>)}
     </dl>
   </section>
 }
 
-export default function ResumenRegistro({ nuevoIngreso = false, persona, ley, nivel = '', vinculo, datosPuesto = {}, opciones, sinResponder = [], onIr }) {
+export default function ResumenRegistro({ nuevoIngreso = false, persona, ley, codigoLey = '', nivel = '', vinculo, datosPuesto = {}, opciones, sinResponder = [], onIr }) {
   const tipo = persona.tipo_personal
   const modalidad = modalidadElegida(opciones, vinculo)
   const designado = vinculo.regimen_laboral === 'designado'
@@ -31,6 +32,7 @@ export default function ResumenRegistro({ nuevoIngreso = false, persona, ley, ni
     nuevoIngreso && 'Nuevo ingreso: su legajo actual pasará a Legajos pasivos como historial, con sus documentos, y se abrirá un legajo nuevo.',
     modalidad?.exige_fin_previsto && !vinculo.fecha_fin_prevista && `La modalidad «${modalidad.nombre}» exige la fecha de fin prevista: complétala en el paso 2.`,
     CON_PROCESO.includes(vinculo.regimen_laboral) && !vinculo.proceso_seleccion && 'Aún no se indica el proceso de selección. Puedes registrarlo ahora en el paso 2 o después en la sección 02.',
+    ...avisosDeCoherencia({ vinculo, datosPuesto, codigoLey, tipo, grupoDelPuesto: (opciones?.puestos || []).find(p => p.id === vinculo.puesto_id)?.grupo_ocupacional }),
   ].filter(Boolean)
   const puesto = tipo === 'docente'
     ? [['Condición docente', condicionesDocente[datosPuesto.condicion_docente]], ['Categoría', categoriasDocente[datosPuesto.categoria]], ['Dedicación', dedicacionesDocente[datosPuesto.dedicacion]]]
@@ -65,7 +67,7 @@ export default function ResumenRegistro({ nuevoIngreso = false, persona, ley, ni
       <h4 className="text-base font-semibold text-slate-800">Qué falta <span className="font-normal text-slate-500">(no impide registrar)</span></h4>
       <ul className="mt-3 grid gap-2 text-sm">
         {sinResponder.map(condicion => <li key={condicion} className="rounded-xl bg-amber-50 px-3 py-2.5 text-amber-800">{condicion}: <strong>Sin responder</strong></li>)}
-        <li className="rounded-xl bg-slate-50 px-3 py-2.5 text-slate-600">Después del registro podrás subir su DNI y la resolución o el contrato de ingreso.</li>
+        <li className="rounded-xl bg-slate-50 px-3 py-2.5 text-slate-600">Este registro no sube documentos. Después, en su legajo, sube el DNI en la sección 01 y la resolución o el contrato de ingreso en la sección 02.</li>
       </ul>
     </section>
     </div>

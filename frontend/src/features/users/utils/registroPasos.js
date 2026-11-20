@@ -137,3 +137,38 @@ export function armarRegistro({ persona, catalogo, escalas = [], ubigeoId, condi
     datos_puesto: limpiarDatosPuesto(docente, conNivelDeLaLey(docente, recortar(puestos[persona.tipo_personal] || {}), catalogo, escalas, persona.regimen_normativo_id)),
   }
 }
+
+/**
+ * Datos que se pueden guardar pero suelen ser un error al escribir (no bloquean: hay casos reales). Lo que nunca corresponde
+ * (proceso o modalidad de otro tipo de personal o de otra ley) ya no se puede elegir y el backend lo rechaza.
+ * TODO pendiente de confirmar con el cliente: si alguno de estos casos debe impedir el registro.
+ */
+export function avisosDeCoherencia({ vinculo, datosPuesto = {}, codigoLey = '', tipo = '', grupoDelPuesto = '' }) {
+  const condicion = tipo === 'docente' ? datosPuesto.condicion_docente : ''
+  const grupoEsperado = tipo === 'administrativo' ? (grupoDelPuesto || grupoPorNombre(vinculo.nombre_puesto)) : ''
+  return [
+    condicion === 'ordinario' && vinculo.regimen_laboral && vinculo.regimen_laboral !== 'carrera'
+      && 'Un docente ordinario es de carrera, pero el tipo de vínculo no es «Carrera». Si es un contrato temporal, la condición docente es «Contratado».',
+    condicion === 'contratado' && vinculo.regimen_laboral === 'carrera'
+      && 'Un docente contratado no es de carrera: su tipo de vínculo suele ser «Plazo determinado».',
+    grupoEsperado && datosPuesto.grupo_ocupacional && datosPuesto.grupo_ocupacional !== grupoEsperado
+      && `El puesto «${vinculo.nombre_puesto}» es del grupo ${GRUPOS[grupoEsperado]}, pero elegiste el grupo ${GRUPOS[datosPuesto.grupo_ocupacional] || datosPuesto.grupo_ocupacional}: revisa el grupo y el nivel de carrera.`,
+    vinculo.regimen_laboral === 'carrera' && vinculo.fecha_fin_prevista
+      && `Un vínculo de carrera (nombrado u ordinario) normalmente no tiene fecha de fin, y este termina el ${vinculo.fecha_fin_prevista.split('-').reverse().join('/')}. Si es un contrato temporal, el tipo de vínculo es «Plazo determinado».`,
+    codigoLey === '1057' && vinculo.regimen_laboral === 'carrera'
+      && 'Un contrato CAS (D.L. 1057) no es de carrera: suele ser «Plazo determinado», o «Designado» si es CAS de confianza.',
+    tipo === 'administrativo' && datosPuesto.es_cargo_confianza && vinculo.regimen_laboral && vinculo.regimen_laboral !== 'designado'
+      && 'Marcaste «Cargo de confianza», pero el tipo de vínculo no es «Designado (confianza)».',
+    vinculo.fecha_resultado_seleccion && vinculo.fecha_inicio && vinculo.fecha_resultado_seleccion > vinculo.fecha_inicio
+      && 'El resultado del proceso de selección es posterior al inicio del vínculo: revisa las fechas.',
+  ].filter(Boolean)
+}
+
+const GRUPOS = { profesional: 'Profesional', tecnico: 'Técnico', auxiliar: 'Auxiliar' }
+
+/** Grupo ocupacional que el nombre del puesto dice expresamente («Técnico administrativo» → técnico), o ''. */
+export function grupoPorNombre(nombrePuesto = '') {
+  const texto = String(nombrePuesto || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const grupos = Object.keys(GRUPOS).filter(grupo => new RegExp(`\\b${grupo.toUpperCase()}\\b`).test(texto))
+  return grupos.length === 1 ? grupos[0] : ''
+}

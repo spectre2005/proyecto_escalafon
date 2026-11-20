@@ -30,6 +30,8 @@ export default function EscanerPdf({ file, config }) {
     const alEnviar = () => {
       const datos = lectura.current
       if (!datos?.id) return
+      // Se informa una sola vez por lectura: si el guardado falla y se vuelve a enviar, no se cuenta dos veces.
+      lectura.current = null
       const resultado = resultadoLectura({ ...datos, finales: actual.current.valores })
       api.post(`/documentos/escaner/lecturas/${datos.id}/resultado`, { resultado }, { sinAvisoCambios: true }).catch(() => {})
     }

@@ -47,9 +47,37 @@ export function parecido(lista, nombre, texto = item => item.nombre) {
   return mejor?.item || null
 }
 
-/** Modalidades del tipo de vínculo y del tipo de personal (las de ambos tipos de personal tienen tipo_personal vacío). */
-export function modalidadesDe(modalidades, regimen, tipoPersonal) {
-  return (modalidades || []).filter(m => m.regimen_laboral === regimen && (!m.tipo_personal || !tipoPersonal || m.tipo_personal === tipoPersonal))
+// ¿Corresponde el elemento del catálogo a ese tipo de personal y esa ley? Vacío en el catálogo = vale para todos.
+const deLaPersona = (item, tipoPersonal, leyId) => (!item.tipo_personal || !tipoPersonal || item.tipo_personal === tipoPersonal)
+  && (!item.regimen_normativo_id || !leyId || item.regimen_normativo_id === leyId)
+
+/**
+ * Modalidades del tipo de vínculo, del tipo de personal y de la ley (p. ej. «Nombrado (D.L. 276)» solo con el 276). Igual
+ * que el backend (App\Support\CatalogosVinculo::aplicar).
+ */
+export function modalidadesDe(modalidades, regimen, tipoPersonal, leyId = '') {
+  return (modalidades || []).filter(m => m.regimen_laboral === regimen && deLaPersona(m, tipoPersonal, leyId))
+}
+
+/** Procesos de selección del tipo de personal y de la ley (el «Proceso CAS» solo con el D.L. 1057; el docente, solo docentes). */
+export function procesosDe(procesos, tipoPersonal, leyId = '') {
+  return (procesos || []).filter(p => deLaPersona(p, tipoPersonal, leyId))
+}
+
+/**
+ * Al cambiar el tipo de personal o la ley: lo elegido que ya no corresponde se vacía (puesto de otro tipo, modalidad o
+ * proceso de otra ley). Devuelve solo los campos que cambian.
+ */
+export function ajustesPorPersona(draft, opciones, tipoPersonal, leyId) {
+  const buscar = (lista, id) => id ? (lista || []).find(item => item.id === id) : null
+  const cambios = {}
+  const puesto = buscar(opciones?.puestos, draft.puesto_id)
+  if (puesto && tipoPersonal && puesto.tipo_personal !== tipoPersonal) Object.assign(cambios, { puesto_id: '', nombre_puesto: '' })
+  const modalidad = buscar(opciones?.modalidades, draft.modalidad_vinculo_id)
+  if (modalidad && !deLaPersona(modalidad, tipoPersonal, leyId)) cambios.modalidad_vinculo_id = ''
+  const proceso = buscar(opciones?.procesos, draft.tipo_proceso_seleccion_id)
+  if (proceso && !deLaPersona(proceso, tipoPersonal, leyId)) Object.assign(cambios, { tipo_proceso_seleccion_id: '', proceso_seleccion: '' })
+  return cambios
 }
 
 /** Puestos del tipo de personal: primero los de la unidad elegida, luego los generales y después los de otras unidades. */

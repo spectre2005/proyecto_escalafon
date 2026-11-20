@@ -17,6 +17,7 @@ use App\Support\CatalogosVinculo;
 use App\Support\RegimenesLaborales;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -74,15 +75,21 @@ class CatalogoVinculoController extends Controller
         if ($catalogo === 'niveles') {
             $data = $this->nivelNuevo($data);
         }
-        $registro = DB::transaction(function () use ($request, $catalogo, $modelo, $entidad, $data): Model {
-            $this->exigirUnico($catalogo, $data);
-            // Los niveles conservan la sigla que escribió la ORH (la de su PAP); los demás reciben un código correlativo.
-            $codigo = $catalogo === 'niveles' ? $data['codigo'] : CatalogosVinculo::siguienteCodigo($modelo);
-            $registro = $modelo::query()->create([...$data, 'codigo' => $codigo, 'activo' => true]);
-            Auditoria::registrar($request, 'catalogo.crear', $entidad, $registro->id, null, null, $registro->getAttributes());
+        try {
+            $registro = DB::transaction(function () use ($request, $catalogo, $modelo, $entidad, $data): Model {
+                $this->exigirUnico($catalogo, $data);
+                // Los niveles conservan la sigla que escribió la ORH (la de su PAP); los demás reciben un código correlativo.
+                $codigo = $catalogo === 'niveles' ? $data['codigo'] : CatalogosVinculo::siguienteCodigo($modelo);
+                $registro = $modelo::query()->create([...$data, 'codigo' => $codigo, 'activo' => true]);
+                Auditoria::registrar($request, 'catalogo.crear', $entidad, $registro->id, null, null, $registro->getAttributes());
 
-            return $registro;
-        });
+                return $registro;
+            });
+        } catch (UniqueConstraintViolationException) {
+            // Dos altas a la vez: la otra ganó el código o la sigla. Se pide repetir en lugar de un error 500.
+            throw ValidationException::withMessages([$catalogo === 'niveles' ? 'codigo' : 'nombre' => $catalogo === 'niveles'
+                ? 'Ese nivel ya existe en la escala de esta ley y grupo.' : 'Otro registro se creó al mismo tiempo. Vuelve a intentarlo.']);
+        }
 
         return response()->json(['data' => $registro->refresh()], 201);
     }
@@ -139,7 +146,11 @@ class CatalogoVinculoController extends Controller
                 'tiene_periodo_prueba' => $bandera,
                 'exige_fin_previsto' => ['boolean'],
             ],
-            'procesos' => ['nombre' => ['required', 'string', 'max:120']],
+            'procesos' => [
+                'nombre' => ['required', 'string', 'max:120'],
+                'tipo_personal' => ['nullable', Rule::in(['docente', 'administrativo'])],
+                'regimen_normativo_id' => ['nullable', 'uuid', 'exists:regimenes_normativos,id'],
+            ],
             // Solo la descripción: el código y el nombre son los de la directiva.
             'tipos_vinculo' => ['descripcion' => ['nullable', 'string', 'max:300']],
             'niveles' => [
@@ -212,16 +223,20 @@ class CatalogoVinculoController extends Controller
         return $data;
     }
 
-    /** Niveles con cuántas personas tienen un vínculo vigente (no anulado) de esa ley con ese nivel. */
+    /**
+     * Niveles con cuántas personas tienen un vínculo no anulado de esa ley, con ese grupo y ese nivel (la misma sigla
+     * puede existir en dos grupos de una ley).
+     */
     private function nivelesConUso(iterable $niveles): Collection
     {
         $uso = DB::table('perfil_administrativo')->join('vinculos_laborales', 'vinculos_laborales.id', '=', 'perfil_administrativo.vinculo_laboral_id')
             ->where('vinculos_laborales.anulado', false)->whereNotNull('perfil_administrativo.nivel_carrera')
-            ->selectRaw('vinculos_laborales.regimen_normativo_id as ley, UPPER(perfil_administrativo.nivel_carrera) as nivel, count(distinct vinculos_laborales.usuario_id) as total')
-            ->groupBy('vinculos_laborales.regimen_normativo_id', DB::raw('UPPER(perfil_administrativo.nivel_carrera)'))->get()
-            ->mapWithKeys(fn (object $fila): array => [$fila->ley.'|'.$fila->nivel => (int) $fila->total]);
+            ->selectRaw('vinculos_laborales.regimen_normativo_id as ley, perfil_administrativo.grupo_ocupacional as grupo, UPPER(perfil_administrativo.nivel_carrera) as nivel, count(distinct vinculos_laborales.usuario_id) as total')
+            ->groupBy('vinculos_laborales.regimen_normativo_id', 'perfil_administrativo.grupo_ocupacional', DB::raw('UPPER(perfil_administrativo.nivel_carrera)'))->get()
+            ->mapWithKeys(fn (object $fila): array => [$fila->ley.'|'.$fila->grupo.'|'.$fila->nivel => (int) $fila->total]);
 
-        return collect($niveles)->map(fn (array $nivel): array => [...$nivel, 'personas' => $uso[$nivel['regimen_normativo_id'].'|'.$nivel['codigo']] ?? 0])->values();
+        return collect($niveles)->map(fn (array $nivel): array => [...$nivel,
+            'personas' => $uso[$nivel['regimen_normativo_id'].'|'.$nivel['grupo_ocupacional'].'|'.$nivel['codigo']] ?? 0])->values();
     }
 
     /** Una unidad no puede depender de sí misma ni de una unidad que depende de ella. */

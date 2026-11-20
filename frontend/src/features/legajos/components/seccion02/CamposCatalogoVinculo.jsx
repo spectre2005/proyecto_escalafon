@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { aplicarModalidad, aplicarPuesto, CON_PROCESO, modalidadElegida, modalidadesDe, notaCompletado, opcionesUnidad, puestosDe } from '../../config/catalogosVinculo'
+import { aplicarModalidad, aplicarPuesto, CON_PROCESO, modalidadElegida, modalidadesDe, notaCompletado, opcionesUnidad, procesosDe, puestosDe } from '../../config/catalogosVinculo'
 import { sugerenciasPuesto } from '../../config/puestosSugeridos'
 import { regimenesLaborales } from '../../config/seccion02'
 import Campo from '../seccion01/Campo'
@@ -13,7 +13,10 @@ import { hoy } from '../seccion01/useGuardar'
 const aplicarCambios = (poner, cambios) => Object.entries(cambios).forEach(([clave, valor]) => poner(clave)(valor))
 const Nota = ({ texto }) => texto ? <p role="status" className="col-span-full rounded-lg bg-teal-50 px-3 py-2 text-xs text-teal-800">{texto}</p> : null
 
-/** Unidad orgánica: lista con la jerarquía (de qué unidad depende cada una). Cambiarla quita un puesto de otra unidad. */
+/**
+ * Unidad orgánica (opcional, como en el backend): lista con la jerarquía. Cambiarla quita un puesto de otra unidad.
+ * Sin unidad, el puesto se elige de los generales y las denominaciones sugeridas.
+ */
 export function CampoUnidadOrganica({ draft, poner, errors, opciones, nombre = 'vinculo' }) {
   const unidades = opcionesUnidad(opciones?.unidades, draft.unidad_organica_id)
   function elegir(id) {
@@ -22,9 +25,9 @@ export function CampoUnidadOrganica({ draft, poner, errors, opciones, nombre = '
     if (puesto?.unidad_organica_id && puesto.unidad_organica_id !== id) aplicarCambios(poner, { puesto_id: '', nombre_puesto: '' })
   }
   return <>
-    <Campo label="Unidad orgánica" required error={errors.unidad_organica_id}>
-      <select name={`${nombre}-unidad`} required value={draft.unidad_organica_id} disabled={!opciones} onChange={event => elegir(event.target.value)}>
-        <option value="">{opciones ? 'Seleccionar unidad orgánica' : 'Cargando unidades…'}</option>
+    <Campo label="Unidad orgánica" error={errors.unidad_organica_id}>
+      <select name={`${nombre}-unidad`} value={draft.unidad_organica_id || ''} disabled={!opciones || !unidades.length} onChange={event => elegir(event.target.value)}>
+        <option value="">{!opciones ? 'Cargando unidades…' : !unidades.length ? 'No hay unidades registradas' : 'Sin unidad (opcional)'}</option>
         {unidades.map(u => <option key={u.id} value={u.id}>{u.ruta.join(' › ')}</option>)}
       </select>
     </Campo>
@@ -38,6 +41,7 @@ export function CampoUnidadOrganica({ draft, poner, errors, opciones, nombre = '
 export function CampoPuestoCatalogo({ draft, poner, errors, opciones, tipoPersonal, nombre = 'vinculo' }) {
   const [nota, setNota] = useState('')
   const unidad = draft.unidad_organica_id
+  // Lista completa del tipo de personal: el puesto no se filtra por grupo; es el grupo el que se limita al puesto (CamposDatosPuesto).
   const catalogo = puestosDe((opciones?.puestos || []).filter(p => p.activo !== false || p.id === draft.puesto_id), tipoPersonal, unidad)
   const deUnidad = catalogo.filter(p => unidad && p.unidad_organica_id === unidad)
   const generales = catalogo.filter(p => !p.unidad_organica_id)
@@ -61,8 +65,8 @@ export function CampoPuestoCatalogo({ draft, poner, errors, opciones, tipoPerson
   }
   return <>
     <Campo label="Puesto" required error={errors.nombre_puesto || errors.puesto_id}>
-      <select name={`${nombre}-puesto`} required value={valor} disabled={!tipoPersonal || !unidad || !opciones} onChange={event => elegir(event.target.value)}>
-        <option value="">{!tipoPersonal ? 'Primero elige el tipo de personal' : !unidad ? 'Primero elige la unidad orgánica' : 'Seleccionar puesto'}</option>
+      <select name={`${nombre}-puesto`} required value={valor} disabled={!tipoPersonal || !opciones} onChange={event => elegir(event.target.value)}>
+        <option value="">{!tipoPersonal ? 'Primero elige el tipo de personal' : 'Seleccionar puesto'}</option>
         {propio && <option value={valor}>{propio}</option>}
         {deUnidad.length > 0 && <optgroup label="Puestos de esta unidad">{deUnidad.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}</optgroup>}
         {generales.length > 0 && <optgroup label="Puestos generales">{generales.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}</optgroup>}
@@ -76,7 +80,7 @@ export function CampoPuestoCatalogo({ draft, poner, errors, opciones, tipoPerson
 /** Modalidad dentro del tipo de vínculo elegido (p. ej. CAS en plazo determinado). */
 export function CampoModalidad({ draft, poner, errors, opciones, tipoPersonal, nombre = 'vinculo' }) {
   const [nota, setNota] = useState('')
-  const lista = modalidadesDe(opciones?.modalidades, draft.regimen_laboral, tipoPersonal).filter(m => m.activo !== false || m.id === draft.modalidad_vinculo_id)
+  const lista = modalidadesDe(opciones?.modalidades, draft.regimen_laboral, tipoPersonal, draft.regimen_normativo_id).filter(m => m.activo !== false || m.id === draft.modalidad_vinculo_id)
   const elegida = modalidadElegida(opciones, draft)
   function elegir(modalidad) {
     const { draft: siguiente, completados } = aplicarModalidad(draft, modalidad)
@@ -98,8 +102,10 @@ export function CampoModalidad({ draft, poner, errors, opciones, tipoPersonal, n
 }
 
 /** Proceso de selección (proceso CAS, concurso público, concurso docente…) y la fecha de su resultado. */
-export function CampoProcesoSeleccion({ draft, poner, errors, opciones, nombre = 'vinculo' }) {
-  const procesos = (opciones?.procesos || []).filter(p => p.activo !== false || p.id === draft.tipo_proceso_seleccion_id)
+export function CampoProcesoSeleccion({ draft, poner, errors, opciones, tipoPersonal = draft.tipo_personal, nombre = 'vinculo' }) {
+  // Solo los del tipo de personal y la ley del vínculo; el ya guardado se conserva aunque no corresponda (registros anteriores).
+  const procesos = (opciones?.procesos || []).filter(p => p.id === draft.tipo_proceso_seleccion_id
+    || (p.activo !== false && procesosDe([p], tipoPersonal, draft.regimen_normativo_id).length))
   // Un proceso escrito a mano antes de existir el catálogo se conserva como opción.
   const anterior = !draft.tipo_proceso_seleccion_id && draft.proceso_seleccion ? draft.proceso_seleccion : ''
   const valor = draft.tipo_proceso_seleccion_id || (anterior ? 'anterior' : '')
@@ -125,13 +131,13 @@ export function CampoProcesoSeleccion({ draft, poner, errors, opciones, nombre =
  * concurso; ingresa con su resolución de designación. En todos, la fecha de emisión. El número de registro es el del
  * legajo (uno por legajo): numeroLegajo es el del legajo abierto o, en el registro de personal, el que se asignará.
  */
-export function CamposIngreso({ draft, poner, errors, opciones, nuevo = true, numeroLegajo = '', nombre = 'vinculo' }) {
+export function CamposIngreso({ draft, poner, errors, opciones, tipoPersonal, nuevo = true, numeroLegajo = '', nombre = 'vinculo' }) {
   const regimen = draft.regimen_laboral
   return <>
     {!regimen && <p className="col-span-full text-xs text-slate-500">Elige primero el tipo de vínculo: un designado no pasa por proceso de selección.</p>}
     {regimen === 'designado' && <p role="note" className="col-span-full rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
       Un {regimenesLaborales.designado.toLowerCase()} no pasa por concurso: ingresa con su resolución de designación.</p>}
-    {CON_PROCESO.includes(regimen) && <CampoProcesoSeleccion draft={draft} poner={poner} errors={errors} opciones={opciones} nombre={nombre} />}
+    {CON_PROCESO.includes(regimen) && <CampoProcesoSeleccion draft={draft} poner={poner} errors={errors} opciones={opciones} tipoPersonal={tipoPersonal || draft.tipo_personal} nombre={nombre} />}
     {numeroLegajo && <div className="grid min-w-0 content-start gap-1">
       <Campo label="N.° de legajo"><input name={`${nombre}-legajo`} value={numeroLegajo} readOnly className="bg-slate-50 font-semibold tabular-nums text-slate-700" /></Campo>
       <small className="text-xs font-normal text-slate-500">{nuevo ? 'Se asigna al registrar a la persona. Es uno por legajo.' : 'Número del legajo de la persona: todos sus vínculos lo comparten.'}</small>

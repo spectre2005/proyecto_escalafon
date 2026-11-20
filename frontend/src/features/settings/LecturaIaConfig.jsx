@@ -94,7 +94,7 @@ export default function LecturaIaConfig() {
     {!datos && !consulta.error && <p className="mt-6 text-sm text-slate-500">Cargando…</p>}
     {datos && datos.lecturas === 0 && <div className="mt-6 rounded-xl bg-slate-50 p-5 text-sm text-slate-600">
       <p className="font-semibold text-slate-800">Todavía no hay lecturas en este periodo.</p>
-      <p className="mt-1">Cuando el personal suba un PDF, pulse el botón del robot y guarde el documento, aquí verás qué tan bien lee la IA cada dato.</p>
+      <p className="mt-1">Cuando el personal suba un PDF, use el botón «Leer PDF y completar campos» y guarde el documento, aquí verás qué tan bien lee la IA cada dato.</p>
     </div>}
 
     {datos && datos.lecturas > 0 && <>

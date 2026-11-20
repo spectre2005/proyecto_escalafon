@@ -46,7 +46,7 @@ function Etiqueta({ children, clase }) {
 }
 
 // Resumen de la sección: pendientes de los tipos que aplican, exigidos a la persona y estado de cada subsección.
-// Cargados y recepcionados (documentos reales) van por separado: la fórmula de completitud la define el cliente.
+// Un documento cargado cuenta como aprobado: llegan validados, sin paso de recepción.
 // Dentro de la cabecera (EspacioSeccion) va plegado y sin las tarjetas de subsección: la cabecera ya las muestra.
 function Resumen({ data, onNavigate, compacto = false }) {
   const r = data.resumen
@@ -54,7 +54,6 @@ function Resumen({ data, onNavigate, compacto = false }) {
     <div className="flex flex-wrap gap-x-10 gap-y-4">
       <div><p className="text-xs text-slate-500">Tipos de documento pendientes</p><p className="mt-1 text-2xl font-bold text-slate-800">{r.pendientes} <span className="text-sm font-normal text-slate-500">de {r.tipos}</span></p></div>
       <div><p className="text-xs text-slate-500">Exigidos con documento cargado</p><p className="mt-1 text-2xl font-bold text-slate-800">{r.exigidos_cargados} <span className="text-sm font-normal text-slate-500">de {r.exigidos.length}</span></p></div>
-      <div><p className="text-xs text-slate-500">Exigidos con recepción registrada</p><p className="mt-1 text-2xl font-bold text-slate-800">{r.exigidos_recepcionados} <span className="text-sm font-normal text-slate-500">de {r.exigidos.length}</span></p></div>
     </div>
     {/* A la vista solo lo que cambia según la persona (2.4 y tipos por determinar); el método, al desplegar. */}
     {(() => {
@@ -66,17 +65,17 @@ function Resumen({ data, onNavigate, compacto = false }) {
     })()}
     <details className="mt-2 text-xs text-slate-500">
       <summary className="cursor-pointer font-semibold text-slate-600">¿Cómo se cuenta?</summary>
-      <p className="mt-2">Cargados y recepcionados se muestran por separado: el criterio de completitud del legajo está pendiente de definir. Sin recepción un documento no cuenta como aprobado. Un tipo queda por determinar cuando falta definir una condición del puesto o el régimen laboral registrado no es carrera, plazo determinado ni designado.</p>
+      <p className="mt-2">Un documento cargado ya cuenta como aprobado: llegan validados (no hay paso de recepción). Un tipo queda por determinar cuando falta definir una condición del puesto o el régimen laboral registrado no es carrera, plazo determinado ni designado.</p>
     </details>
     {!compacto && <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">{data.subsecciones.map(sub => {
       const [nombre, clase] = estadosSubseccion[sub.estado]
       return <button key={sub.codigo} onClick={() => onNavigate(categoriaDe[sub.codigo])} className={`rounded-xl border border-slate-200 p-3 text-left hover:bg-slate-50 ${sub.aplica ? '' : 'opacity-60'}`}>
         <span className="block text-xs font-semibold text-slate-700">{subseccionesSeccion02[categoriaDe[sub.codigo]]?.titulo || sub.nombre}</span>
-        <span className="mt-2 flex flex-wrap items-center gap-2"><Etiqueta clase={clase}>{nombre}</Etiqueta>{sub.aplica && sub.exigidos > 0 && <span className="text-xs text-slate-500">{sub.exigidos_cargados}/{sub.exigidos} cargados · {sub.exigidos_recepcionados} recepcionados</span>}</span>
+        <span className="mt-2 flex flex-wrap items-center gap-2"><Etiqueta clase={clase}>{nombre}</Etiqueta>{sub.aplica && sub.exigidos > 0 && <span className="text-xs text-slate-500">{sub.exigidos_cargados}/{sub.exigidos} cargados</span>}</span>
       </button>
     })}</div>}
     {r.exigidos.length > 0 && <details className="mt-4"><summary className="cursor-pointer text-xs font-semibold text-teal-700">Documentos que se exigen a esta persona ({r.exigidos.length})</summary>
-      <ul className="mt-3 grid gap-1 text-xs text-slate-600 sm:grid-cols-2">{r.exigidos.map(tipo => <li key={tipo.literal + tipo.nombre}>{tipo.literal}) {tipo.nombre} — {tipo.recepcionado ? 'recepcionado' : tipo.cargado ? 'cargado' : 'pendiente'}</li>)}</ul>
+      <ul className="mt-3 grid gap-1 text-xs text-slate-600 sm:grid-cols-2">{r.exigidos.map(tipo => <li key={tipo.literal + tipo.nombre}>{tipo.literal}) {tipo.nombre} — {tipo.cargado ? 'cargado' : 'pendiente'}</li>)}</ul>
     </details>}
   </section>
 }
@@ -571,7 +570,7 @@ export default function Seccion02Panel({ usuario, categoria, onNavigate }) {
   const subsecciones = data.subsecciones.map(sub => ({ codigo: sub.codigo, titulo: subseccionesSeccion02[categoriaDe[sub.codigo]]?.titulo || sub.nombre, estado: sub.estado,
     aplica: sub.aplica, activa: sub.codigo === codigo, onIr: () => onNavigate(categoriaDe[sub.codigo]) }))
   return <EspacioSeccion seccion={tituloSeccion('02')} subseccion={titulo} subsecciones={subsecciones}
-    cifras={`Sección: ${r.pendientes} de ${r.tipos} tipos pendientes · exigidos ${r.exigidos_cargados}/${r.exigidos.length} con documento, ${r.exigidos_recepcionados} con recepción.`}
+    cifras={`Sección: ${r.pendientes} de ${r.tipos} tipos pendientes · exigidos ${r.exigidos_cargados}/${r.exigidos.length} con documento.`}
     resumen={<Resumen data={data} onNavigate={onNavigate} compacto />} atajos={noAplica ? [] : atajosDe({ registros, tipos: subseccion?.tipos })}>
     {error}
     <AvisosExpediente usuario={usuario} avisos={data.avisos_perfil || []} />

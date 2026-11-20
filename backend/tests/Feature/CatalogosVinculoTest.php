@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\EscalaNivelCarrera;
 use App\Models\ModalidadVinculo;
+use App\Models\PerfilAdministrativo;
 use App\Models\Puesto;
 use App\Models\RegimenNormativo;
 use App\Models\TipoProcesoSeleccion;
@@ -145,6 +146,35 @@ class CatalogosVinculoTest extends TestCase
         $this->assertSame(0, VinculoLaboral::query()->count());
     }
 
+    public function test_proceso_modalidad_y_puesto_deben_corresponder_a_la_persona_y_su_ley(): void
+    {
+        $this->actuarComo();
+        $ley = fn (string $codigo): string => RegimenNormativo::query()->where('codigo', $codigo)->value('id');
+        $con276 = fn (array $vinculo, string $dni = '71000003'): array => array_replace_recursive($this->alta($vinculo, $dni), ['usuarios' => [['regimen_normativo_id' => $ley('276')]]]);
+
+        // Lo de tu captura: un administrativo del D.L. 276 con «Concurso docente».
+        $this->postJson(self::ALTA, $con276(['regimen_laboral' => 'carrera', 'tipo_proceso_seleccion_id' => $this->proceso('Concurso docente')->id]))
+            ->assertJsonValidationErrors(['vinculo.tipo_proceso_seleccion_id' => '«Concurso docente» es un proceso para personal docente: elige uno del personal administrativo.']);
+        // El proceso CAS es propio del D.L. 1057.
+        $this->postJson(self::ALTA, $con276(['regimen_laboral' => 'carrera', 'tipo_proceso_seleccion_id' => $this->proceso('Proceso CAS')->id]))
+            ->assertJsonValidationErrors('vinculo.tipo_proceso_seleccion_id');
+        // La modalidad del CAS no vale en un vínculo del 276.
+        $this->postJson(self::ALTA, $con276(['modalidad_vinculo_id' => $this->modalidad('CAS (D.L. 1057)')->id]))->assertJsonValidationErrors('vinculo.modalidad_vinculo_id');
+        // Un puesto de otra unidad orgánica.
+        [$unidad, $otra] = UnidadOrganica::factory()->count(2)->create();
+        $puesto = Puesto::query()->create(['codigo' => 'PU-001', 'nombre' => 'Secretaria', 'tipo_personal' => 'administrativo', 'unidad_organica_id' => $otra->id]);
+        $this->postJson(self::ALTA, $this->alta(['unidad_organica_id' => $unidad->id, 'puesto_id' => $puesto->id]))->assertJsonValidationErrors('vinculo.puesto_id');
+        $this->assertSame(0, VinculoLaboral::query()->count());
+
+        // Lo coherente sí se registra: 276 carrera, nombrado, concurso público y el puesto de su unidad.
+        $this->postJson(self::ALTA, $con276(['regimen_laboral' => 'carrera', 'modalidad_vinculo_id' => $this->modalidad('Nombrado (D.L. 276)')->id,
+            'tipo_proceso_seleccion_id' => $this->proceso('Concurso público de méritos')->id, 'unidad_organica_id' => $otra->id, 'puesto_id' => $puesto->id]))->assertCreated();
+        // El catálogo informa a quién corresponde cada proceso.
+        $procesos = collect($this->getJson('/api/v1/expediente-opciones')->assertOk()->json('data.procesos'));
+        $this->assertSame(['docente', null], [$procesos->firstWhere('nombre', 'Concurso docente')['tipo_personal'], $procesos->firstWhere('nombre', 'Concurso docente')['regimen_normativo_id']]);
+        $this->assertSame(['administrativo', $ley('1057')], [$procesos->firstWhere('nombre', 'Proceso CAS')['tipo_personal'], $procesos->firstWhere('nombre', 'Proceso CAS')['regimen_normativo_id']]);
+    }
+
     public function test_la_seccion_02_corrige_con_las_mismas_reglas_y_conserva_lo_desactivado(): void
     {
         $this->actuarComo();
@@ -180,6 +210,14 @@ class CatalogosVinculoTest extends TestCase
             ->assertJsonPath('data.codigo', 'CA2')->assertJsonPath('data.orden', 1)->assertJsonPath('data.nombre', 'Analista');
         $this->postJson($url, ['regimen_normativo_id' => $ley('30057'), 'grupo_ocupacional' => 'profesional', 'codigo' => 'CA3'])->assertCreated()->assertJsonPath('data.orden', 2);
         $this->postJson($url, ['regimen_normativo_id' => $ley('30057'), 'grupo_ocupacional' => 'profesional', 'codigo' => 'Ca2'])->assertJsonValidationErrors('codigo');
+
+        // La misma sigla en otro grupo es otro nivel: el uso se cuenta por ley, grupo y sigla.
+        $this->postJson($url, ['regimen_normativo_id' => $ley('30057'), 'grupo_ocupacional' => 'tecnico', 'codigo' => 'CA2'])->assertCreated();
+        $vinculo = VinculoLaboral::factory()->create(['regimen_normativo_id' => $ley('30057'), 'tipo_personal' => 'administrativo']);
+        PerfilAdministrativo::factory()->create(['vinculo_laboral_id' => $vinculo->id, 'grupo_ocupacional' => 'profesional', 'nivel_carrera' => 'ca2']);
+        $ca2 = collect($this->getJson('/api/v1/catalogos-vinculo')->json('data.niveles'))->where('codigo', 'CA2');
+        $this->assertSame(1, $ca2->firstWhere('grupo_ocupacional', 'profesional')['personas']);
+        $this->assertSame(0, $ca2->firstWhere('grupo_ocupacional', 'tecnico')['personas']);
 
         // CAS no tiene nivel de carrera y la escala no es para leyes de docentes.
         $this->postJson($url, ['regimen_normativo_id' => $ley('1057'), 'grupo_ocupacional' => 'tecnico', 'codigo' => 'X1'])

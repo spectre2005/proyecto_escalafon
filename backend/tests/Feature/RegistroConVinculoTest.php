@@ -11,6 +11,7 @@ use App\Models\RegimenNormativo;
 use App\Models\UnidadOrganica;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
+use App\Support\VigenciaLaboral;
 use Database\Seeders\SeccionesLegajoCatalogoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use RuntimeException;
@@ -76,7 +77,7 @@ class RegistroConVinculoTest extends TestCase
         $nuevo = $segunda->json('data.legajo.id');
         $this->assertNotSame($anterior, $nuevo);
         $legajoAnterior = Legajo::query()->findOrFail($anterior);
-        $this->assertSame(['pasivo', today()->toDateString()], [$legajoAnterior->estado_legajo, $legajoAnterior->fecha_pasivo->toDateString()]);
+        $this->assertSame(['pasivo', VigenciaLaboral::hoy()], [$legajoAnterior->estado_legajo, $legajoAnterior->fecha_pasivo->toDateString()]);
         $this->assertNotNull($legajoAnterior->datos_al_cierre);
         $this->assertSame('activo', Legajo::query()->findOrFail($nuevo)->estado_legajo);
         $this->assertSame(1, Usuario::query()->where('numero_doc_identidad', '71000001')->count());
@@ -311,5 +312,22 @@ class RegistroConVinculoTest extends TestCase
         $this->postJson(self::URL, $this->datos())->assertCreated()
             ->assertJsonPath('data.usuario.situacion', 'vinculo_vigente')->assertJsonPath('data.usuario.activo', false)
             ->assertJsonStructure(['data' => ['usuario' => ['id'], 'legajo' => ['id', 'numero_legajo', 'estado_legajo']]]);
+    }
+
+    public function test_sin_datos_sensibles_el_nuevo_ingreso_no_reemplaza_los_datos_personales(): void
+    {
+        $this->actuarComo();
+        $primera = $this->postJson(self::URL, $this->datos(persona: ['telefono' => '987654321']))->assertCreated();
+        $persona = $primera->json('data.usuario.id');
+        $this->postJson('/api/v1/expedientes/'.$persona.'/legajos/'.$primera->json('data.legajo.id').'/cerrar')->assertOk();
+
+        config()->set('permisos.roles.SIN_SENSIBLES', ['usuarios.gestionar', 'personal.ver', 'legajo.ver', 'legajo.abrir', 'legajo.editar']);
+        $this->actuarComo(null, 'SIN_SENSIBLES');
+        $this->postJson(self::URL, $this->datos(persona: ['telefono' => '911111111', 'tiene_derechohabientes' => true, 'nombres' => 'Rosa María']))
+            ->assertCreated()->assertJsonPath('data.numero_incorporacion', 2);
+
+        $guardada = Usuario::query()->findOrFail($persona);
+        // Lo que ya tenía se conserva; lo vacío se completa; los datos no sensibles se actualizan.
+        $this->assertSame(['987654321', true, 'Rosa María'], [$guardada->telefono, (bool) $guardada->tiene_derechohabientes, $guardada->nombres]);
     }
 }

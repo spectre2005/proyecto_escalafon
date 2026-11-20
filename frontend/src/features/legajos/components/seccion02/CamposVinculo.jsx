@@ -90,8 +90,8 @@ export function CamposVinculoBasicos({ draft, poner, errors, opciones, tipoPerso
 }
 
 // B. Ingreso: proceso de selección (carrera y plazo determinado), número de legajo y fecha de emisión.
-export function CamposDocumentoIngreso({ draft, poner, errors, opciones, nuevo = true, numeroLegajo = '', nombre = 'vinculo' }) {
-  return <CamposIngreso draft={draft} poner={poner} errors={errors} opciones={opciones} nuevo={nuevo} numeroLegajo={numeroLegajo} nombre={nombre} />
+export function CamposDocumentoIngreso({ draft, poner, errors, opciones, tipoPersonal, nuevo = true, numeroLegajo = '', nombre = 'vinculo' }) {
+  return <CamposIngreso draft={draft} poner={poner} errors={errors} opciones={opciones} tipoPersonal={tipoPersonal} nuevo={nuevo} numeroLegajo={numeroLegajo} nombre={nombre} />
 }
 
 // Las cuatro condiciones del puesto (Sí / No / Sin responder) en un bloque compacto.
@@ -106,14 +106,24 @@ export function CamposVinculo({ draft, poner, errors, opciones, tipoPersonal, co
   return <>
     <CamposVinculoBasicos draft={draft} poner={poner} errors={errors} opciones={opciones} tipoPersonal={tipoPersonal} conCese={conCese} ceseObligatorio={ceseObligatorio} nombre={nombre}>{children}</CamposVinculoBasicos>
     <p className="col-span-full mt-2 text-xs font-semibold text-slate-700">Ingreso</p>
-    <CamposDocumentoIngreso draft={draft} poner={poner} errors={errors} opciones={opciones} nuevo={nuevo} numeroLegajo={numeroLegajo} nombre={nombre} />
+    <CamposDocumentoIngreso draft={draft} poner={poner} errors={errors} opciones={opciones} tipoPersonal={tipoPersonal} nuevo={nuevo} numeroLegajo={numeroLegajo} nombre={nombre} />
     <CondicionesPuesto draft={draft} poner={poner} errors={errors} nombre={nombre} />
   </>
 }
 
 // codigoLey: código del régimen normativo (276, 728, 1057, 30057…) y escalas: las de /expediente-opciones (niveles).
-// De ambos dependen los niveles de carrera que se ofrecen. grupoEnBotones: el grupo ocupacional como botones (registro).
-export function CamposDatosPuesto({ docente, draft, set, errors, codigoLey, escalas = [], grupoEnBotones = false }) {
+// De ambos dependen los niveles de carrera que se ofrecen. grupoEnLista: el grupo ocupacional como lista desplegable con
+// la ayuda de cada grupo, igual que el tipo de personal y el tipo de vínculo (registro de personal).
+const OPCIONES_GRUPO = [
+  { valor: '', titulo: 'Sin registrar', descripcion: 'Se puede completar después en la sección 02' },
+  { valor: 'profesional', titulo: gruposOcupacionales.profesional, descripcion: 'Con título profesional universitario' },
+  { valor: 'tecnico', titulo: gruposOcupacionales.tecnico, descripcion: 'Con formación técnica o superior' },
+  { valor: 'auxiliar', titulo: gruposOcupacionales.auxiliar, descripcion: 'Apoyo y servicios: secundaria completa' },
+]
+
+// gruposPermitidos: los grupos que admite el puesto elegido (null = todos); el grupo ya elegido se conserva como opción.
+export function CamposDatosPuesto({ docente, draft, set, errors, codigoLey, escalas = [], grupoEnLista = false, gruposPermitidos = null }) {
+  const opcionesGrupo = OPCIONES_GRUPO.filter(o => !o.valor || !gruposPermitidos || gruposPermitidos.includes(o.valor) || o.valor === draft.grupo_ocupacional)
   const elegirGrupo = valor => {
     const evento = { target: { type: 'select-one', value: valor } }
     set('grupo_ocupacional')(evento)
@@ -129,15 +139,10 @@ export function CamposDatosPuesto({ docente, draft, set, errors, codigoLey, esca
     <Campo label="Código RENACYT" error={errors.codigo_renacyt}><input maxLength={30} value={draft.codigo_renacyt} onChange={set('codigo_renacyt')} /></Campo>
   </> : <>
     {/* En cascada: el nivel depende de la ley y del grupo; al cambiar de grupo, un nivel que ya no vale se vacía. */}
-    {grupoEnBotones
-      ? <div className="grid min-w-0 content-start gap-1.5">
-        <p id="grupo-ocupacional-etiqueta" className="text-[13px] font-semibold text-slate-700">Grupo ocupacional</p>
-        <div role="radiogroup" aria-labelledby="grupo-ocupacional-etiqueta" className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1">
-          {Object.entries(gruposOcupacionales).map(([valor, texto]) => <button key={valor} type="button" role="radio" aria-checked={draft.grupo_ocupacional === valor} onClick={() => elegirGrupo(draft.grupo_ocupacional === valor ? '' : valor)}
-            className={`rounded-lg px-2 py-2 text-sm font-semibold ${draft.grupo_ocupacional === valor ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}>{texto}</button>)}
-        </div>
-        {errors.grupo_ocupacional && <span className="text-xs text-rose-700">{[].concat(errors.grupo_ocupacional).join(' ')}</span>}
-      </div>
+    {grupoEnLista
+      ? <ListaDesplegable id="grupo-ocupacional" etiqueta="Grupo ocupacional" opciones={opcionesGrupo} valor={draft.grupo_ocupacional || ''} vacio="Seleccionar grupo ocupacional"
+        error={errors.grupo_ocupacional} onElegir={elegirGrupo}
+        ayuda={gruposPermitidos ? `El puesto elegido es del grupo ${gruposPermitidos.map(g => gruposOcupacionales[g].toLowerCase()).join(' o ')}.` : undefined} />
       : <Campo label="Grupo ocupacional" error={errors.grupo_ocupacional}><select value={draft.grupo_ocupacional} onChange={evento => elegirGrupo(evento.target.value)}><Opciones lista={gruposOcupacionales} actual={draft.grupo_ocupacional} vacio="Sin registrar" /></select></Campo>}
     <Campo label="Nivel de carrera" error={errors.nivel_carrera}><select disabled={Boolean(motivoSinNivel(escalas, codigoLey, draft.grupo_ocupacional)) && !draft.nivel_carrera} value={draft.nivel_carrera} onChange={set('nivel_carrera')}>
       <Opciones lista={opcionesNivelCarrera(escalas, codigoLey, draft.grupo_ocupacional, draft.nivel_carrera)} actual={draft.nivel_carrera} vacio={motivoSinNivel(escalas, codigoLey, draft.grupo_ocupacional) || 'Sin registrar'} />

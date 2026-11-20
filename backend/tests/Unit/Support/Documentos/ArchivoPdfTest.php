@@ -137,4 +137,24 @@ class ArchivoPdfTest extends TestCase
 
         $this->assertSame(3, ArchivoPdf::paginas($this->archivo($this->pdf($cuerpo))));
     }
+
+    public function test_un_archivo_manipulado_no_ocupa_el_servidor(): void
+    {
+        // Antes: el costo crecía al cuadrado (52 KB tardaban 10 s). Ahora, 2 MB deben resolverse en menos de 2 s.
+        $malicioso = "%PDF-1.4\n".str_repeat('/Type /Pages ', 160000);
+        $inicio = microtime(true);
+        $paginas = ArchivoPdf::paginas($this->archivo($malicioso));
+
+        $this->assertNull($paginas);
+        $this->assertLessThan(2.0, microtime(true) - $inicio, 'El conteo de páginas debe tener costo lineal.');
+    }
+
+    public function test_un_diccionario_enorme_no_se_recorre_entero(): void
+    {
+        $cuerpo = '2 0 obj << /Type /Pages /Kids [] /Count 4 >> endobj';
+        $relleno = str_repeat('x', 50000);
+
+        // El nodo real se sigue leyendo aunque haya basura antes y después.
+        $this->assertSame(4, ArchivoPdf::paginas($this->archivo($this->pdf($relleno."\n".$cuerpo."\n".$relleno))));
+    }
 }

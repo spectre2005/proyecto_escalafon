@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\EscalaNivelCarrera;
 use App\Models\ModalidadVinculo;
 use App\Models\Puesto;
+use App\Models\RegimenNormativo;
 use App\Models\TipoProcesoSeleccion;
 use App\Models\TipoVinculo;
 use App\Models\UnidadOrganica;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Catálogos del vínculo que la ORH amplía al registrar personal y desde Configuración: unidades orgánicas, puestos,
+ * Catálogos del vínculo (se mantienen por la API de catálogos; desde el 18/11/2026 el registro de personal solo elige): unidades orgánicas, puestos,
  * modalidades de vínculo y procesos de selección; de los tres tipos de vínculo solo se edita la descripción. Nada se
  * borra: se desactiva, y lo ya registrado conserva su valor. El vínculo guarda la referencia y el texto del momento
  * (nombre_puesto, proceso_seleccion).
@@ -63,7 +64,11 @@ final class CatalogosVinculo
         $valor = fn (string $campo): mixed => array_key_exists($campo, $data) ? $data[$campo] : $actual?->getAttribute($campo);
         $errores = [];
         $regimen = $valor('regimen_laboral');
+        $ley = $valor('regimen_normativo_id');
         $tipos = RegimenesLaborales::TIPOS_VINCULO;
+        // Al corregir, solo se comprueba la coherencia de lo que cambia: un vínculo anterior se sigue corrigiendo en lo demás.
+        $cambia = fn (string ...$campos): bool => $actual === null || array_intersect($campos, array_keys($data)) !== [];
+        $nombreLey = fn (?string $id): string => RegimenNormativo::query()->whereKey($id)->value('nombre') ?? 'otra ley';
 
         $modalidad = self::elemento(ModalidadVinculo::class, 'modalidad_vinculo_id', $data, $actual, $errores);
         if ($modalidad) {
@@ -72,6 +77,8 @@ final class CatalogosVinculo
                     .'. Elige una modalidad de '.mb_strtolower($tipos[$regimen] ?? $regimen).' o cambia el tipo de vínculo.';
             } elseif ($modalidad->tipo_personal && $tipoPersonal && $modalidad->tipo_personal !== $tipoPersonal) {
                 $errores['modalidad_vinculo_id'] = "La modalidad «{$modalidad->nombre}» es solo para personal {$modalidad->tipo_personal}.";
+            } elseif ($modalidad->regimen_normativo_id && $ley && (string) $modalidad->regimen_normativo_id !== (string) $ley && $cambia('modalidad_vinculo_id', 'regimen_normativo_id')) {
+                $errores['modalidad_vinculo_id'] = "La modalidad «{$modalidad->nombre}» es de la ley {$nombreLey($modalidad->regimen_normativo_id)}, no de la del vínculo. Elige otra modalidad.";
             }
             if ($modalidad->exige_fin_previsto && ! $valor('fecha_fin_prevista') && ! $valor('fecha_cese')) {
                 $errores['fecha_fin_prevista'] = "La modalidad «{$modalidad->nombre}» exige la fecha de fin prevista.";
@@ -80,8 +87,11 @@ final class CatalogosVinculo
 
         $puesto = self::elemento(Puesto::class, 'puesto_id', $data, $actual, $errores);
         if ($puesto) {
+            $unidad = $valor('unidad_organica_id');
             if ($tipoPersonal && $puesto->tipo_personal !== $tipoPersonal) {
                 $errores['puesto_id'] = "El puesto «{$puesto->nombre}» es de personal {$puesto->tipo_personal}.";
+            } elseif ($puesto->unidad_organica_id && $unidad && (string) $puesto->unidad_organica_id !== (string) $unidad && $cambia('puesto_id', 'unidad_organica_id')) {
+                $errores['puesto_id'] = "El puesto «{$puesto->nombre}» es de otra unidad orgánica: elige un puesto de la unidad del vínculo o un puesto general.";
             }
             $data['nombre_puesto'] = $puesto->nombre;
         }
@@ -90,6 +100,10 @@ final class CatalogosVinculo
         if ($proceso) {
             if ($regimen && ! in_array($regimen, self::CON_PROCESO, true)) {
                 $errores['tipo_proceso_seleccion_id'] = 'Un vínculo designado no pasa por proceso de selección: deja el proceso vacío.';
+            } elseif ($proceso->tipo_personal && $tipoPersonal && $proceso->tipo_personal !== $tipoPersonal && $cambia('tipo_proceso_seleccion_id', 'tipo_personal')) {
+                $errores['tipo_proceso_seleccion_id'] = "«{$proceso->nombre}» es un proceso para personal {$proceso->tipo_personal}: elige uno del personal {$tipoPersonal}.";
+            } elseif ($proceso->regimen_normativo_id && $ley && (string) $proceso->regimen_normativo_id !== (string) $ley && $cambia('tipo_proceso_seleccion_id', 'regimen_normativo_id')) {
+                $errores['tipo_proceso_seleccion_id'] = "«{$proceso->nombre}» es propio de la ley {$nombreLey($proceso->regimen_normativo_id)}: elige otro proceso para la ley del vínculo.";
             }
             if (array_key_exists('tipo_proceso_seleccion_id', $data)) {
                 $data['proceso_seleccion'] = $proceso->nombre;
@@ -141,7 +155,7 @@ final class CatalogosVinculo
                 ->get(['id', 'codigo', 'nombre', 'regimen_laboral', 'tipo_personal', 'regimen_normativo_id', 'tiene_periodo_prueba', 'exige_fin_previsto', 'activo']),
             'puestos' => Puesto::query()->orderBy('nombre')
                 ->get(['id', 'codigo', 'nombre', 'tipo_personal', 'unidad_organica_id', 'grupo_ocupacional', 'es_cargo_confianza', 'obligado_djbr', 'exige_colegiatura', 'tiene_periodo_prueba', 'activo']),
-            'procesos' => TipoProcesoSeleccion::query()->orderBy('nombre')->get(['id', 'codigo', 'nombre', 'activo']),
+            'procesos' => TipoProcesoSeleccion::query()->orderBy('nombre')->get(['id', 'codigo', 'nombre', 'tipo_personal', 'regimen_normativo_id', 'activo']),
             'tipos_vinculo' => TipoVinculo::query()->orderBy('orden')->get(['id', 'codigo', 'nombre', 'descripcion']),
             // Escalas de nivel de carrera (con los desactivados, que el formulario solo muestra si ya están guardados).
             'niveles' => EscalaNivelCarrera::query()->with('regimenNormativo:id,codigo')->orderBy('grupo_ocupacional')->orderBy('orden')->get()

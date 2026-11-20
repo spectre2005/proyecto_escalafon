@@ -146,6 +146,10 @@ class Seccion02CierreTest extends TestCase
         $perfil->refresh()->forceFill(['nivel_carrera' => 'SUPERIOR'])->save();
         $this->putJson($url, ['grupo_ocupacional' => 'tecnico', 'nivel_carrera' => 'superior', 'cargo_estructural' => 'Asistente'])->assertOk();
         $this->putJson($url, ['grupo_ocupacional' => 'tecnico', 'nivel_carrera' => 'INVENTADO'])->assertUnprocessable()->assertJsonValidationErrors('nivel_carrera');
+        // Con otro grupo, el nivel anterior ya no se conserva.
+        $this->putJson($url, ['grupo_ocupacional' => 'auxiliar', 'nivel_carrera' => 'SUPERIOR'])->assertUnprocessable()->assertJsonValidationErrors('nivel_carrera');
+        // Se guarda en mayúsculas, como en la escala.
+        $this->putJson($url, ['grupo_ocupacional' => 'tecnico', 'nivel_carrera' => ' stc '])->assertOk()->assertJsonPath('data.nivel_carrera', 'STC');
 
         $docente = $this->vinculoVigente($this->personaDemo('99000202'));
         $urlDocente = $this->url($this->personaDemo('99000202'), 'vinculos-laborales/'.$docente->id.'/datos-puesto');
@@ -261,5 +265,24 @@ class Seccion02CierreTest extends TestCase
         SeccionLegajo::query()->whereKey(12)->delete();
         $this->postJson($this->url($persona, 'legajo'))->assertConflict();
         $this->assertSame(0, Legajo::query()->where('usuario_id', $persona->id)->count());
+    }
+
+    public function test_la_ley_no_cambia_si_el_nivel_registrado_no_existe_en_la_nueva(): void
+    {
+        $this->actuarComo();
+        $persona = $this->personaDemo();
+        $vinculo = $this->vinculoVigente($persona);
+        $ley = fn (string $codigo) => RegimenNormativo::query()->where('codigo', $codigo)->first() ?? RegimenNormativo::factory()->create(['codigo' => $codigo, 'aplica_a' => 'administrativo']);
+        $vinculo->update(['regimen_normativo_id' => $ley('276')->id]);
+        PerfilAdministrativo::query()->where('vinculo_laboral_id', $vinculo->id)->update(['grupo_ocupacional' => 'tecnico', 'nivel_carrera' => 'STB']);
+        $url = $this->url($persona, 'vinculos-laborales/'.$vinculo->id);
+
+        $this->patchJson($url, ['regimen_normativo_id' => $ley('728')->id])->assertUnprocessable()
+            ->assertJsonValidationErrors(['regimen_normativo_id' => 'El nivel de carrera registrado (STB) no existe en la escala de la ley nueva para el grupo tecnico: corrige primero el nivel en los datos del puesto (o déjalo vacío) y luego cambia la ley.']);
+        $this->assertSame($ley('276')->id, $vinculo->refresh()->regimen_normativo_id);
+
+        // Sin nivel registrado, la ley se cambia.
+        PerfilAdministrativo::query()->where('vinculo_laboral_id', $vinculo->id)->update(['nivel_carrera' => null]);
+        $this->patchJson($url, ['regimen_normativo_id' => $ley('728')->id])->assertOk();
     }
 }

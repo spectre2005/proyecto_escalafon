@@ -15,9 +15,9 @@ class NivelCarreraTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function falla(array $datos, ?string $ley = '276', ?string $anterior = null): ?string
+    private function falla(array $datos, ?string $ley = '276', ?string $anterior = null, ?string $grupoAnterior = null): ?string
     {
-        $validador = Validator::make($datos, ['nivel_carrera' => ['nullable', new NivelCarrera($anterior, $ley)]]);
+        $validador = Validator::make($datos, ['nivel_carrera' => ['nullable', new NivelCarrera($anterior, $ley, $grupoAnterior)]]);
 
         return $validador->fails() ? $validador->errors()->first('nivel_carrera') : null;
     }
@@ -81,7 +81,15 @@ class NivelCarreraTest extends TestCase
 
     public function test_un_nivel_anterior_que_no_cambia_se_conserva(): void
     {
-        $this->assertNull($this->falla(['grupo_ocupacional' => 'profesional', 'nivel_carrera' => 'superior'], '1057', 'SUPERIOR'));
-        $this->assertNotNull($this->falla(['grupo_ocupacional' => 'profesional', 'nivel_carrera' => 'OTRO'], '276', 'SUPERIOR'));
+        $this->assertNull($this->falla(['grupo_ocupacional' => 'profesional', 'nivel_carrera' => 'superior'], '1057', 'SUPERIOR', 'profesional'));
+        $this->assertNull($this->falla(['nivel_carrera' => 'SUPERIOR'], '276', 'SUPERIOR', 'profesional'), 'sin enviar el grupo, el grupo no cambia');
+        $this->assertNotNull($this->falla(['grupo_ocupacional' => 'profesional', 'nivel_carrera' => 'OTRO'], '276', 'SUPERIOR', 'profesional'));
+    }
+
+    public function test_un_nivel_anterior_no_se_conserva_si_cambia_el_grupo(): void
+    {
+        // SPA es del grupo profesional: al pasar a técnico ya no vale aunque el nivel no cambie.
+        $this->assertSame('El nivel de carrera no corresponde al grupo tecnico de esta ley: elige uno de STF, STE, STD, STC, STB, STA.',
+            $this->falla(['grupo_ocupacional' => 'tecnico', 'nivel_carrera' => 'SPA'], '276', 'SPA', 'profesional'));
     }
 }

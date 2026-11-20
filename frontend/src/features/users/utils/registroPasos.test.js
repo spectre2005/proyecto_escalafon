@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { datosPuestoInicial, vinculoInicial } from '../../legajos/components/seccion02/borradoresVinculo.js'
-import { armarRegistro, condicionesSinResponder, DESCRIPCION_LEY, tituloLey, erroresDe, erroresPersona, iniciales, PASOS, pasoDeError, personaDelPaso, personaExistente, primerPasoConError, rutaDatosPersonales, rutaDocumentosIngreso, rutaFicha, sugerenciaTipoVinculo } from './registroPasos.js'
+import { armarRegistro, avisosDeCoherencia, grupoPorNombre, condicionesSinResponder, DESCRIPCION_LEY, tituloLey, erroresDe, erroresPersona, iniciales, PASOS, pasoDeError, personaDelPaso, personaExistente, primerPasoConError, rutaDatosPersonales, rutaDocumentosIngreso, rutaFicha, sugerenciaTipoVinculo } from './registroPasos.js'
 
 const catalogo = [
   { id: 'ley-30220', codigo: '30220', nombre: 'Ley N° 30220 - Ley Universitaria', aplica_a: 'docente', activo: true },
@@ -163,4 +163,37 @@ test('each law card has a short name', () => {
   assert.equal(tituloLey({ codigo: '1057', nombre: 'Decreto Legislativo N° 1057 (CAS)' }), 'D.L. 1057')
   assert.equal(tituloLey({ codigo: '30057', nombre: 'Ley N° 30057 - Ley del Servicio Civil' }), 'Ley 30057')
   assert.equal(tituloLey({ codigo: 'OTRO', nombre: 'Régimen especial' }), 'Régimen especial')
+})
+
+test('avisa de datos que suelen ser un error, sin impedir registrar', () => {
+  const carrera = { regimen_laboral: 'carrera', fecha_inicio: '2026-11-19', fecha_fin_prevista: '2026-11-30' }
+  assert.match(avisosDeCoherencia({ vinculo: carrera })[0], /carrera .* normalmente no tiene fecha de fin, y este termina el 30\/11\/2026/)
+  assert.match(avisosDeCoherencia({ vinculo: { regimen_laboral: 'carrera' }, codigoLey: '1057' })[0], /CAS .* no es de carrera/)
+  assert.match(avisosDeCoherencia({ vinculo: { regimen_laboral: 'plazo_determinado' }, datosPuesto: { es_cargo_confianza: true }, tipo: 'administrativo' })[0], /Cargo de confianza/)
+  assert.match(avisosDeCoherencia({ vinculo: { fecha_inicio: '2026-03-01', fecha_resultado_seleccion: '2026-03-10' } })[0], /posterior al inicio/)
+  // Lo coherente no genera avisos.
+  assert.deepEqual(avisosDeCoherencia({ vinculo: { regimen_laboral: 'carrera', fecha_inicio: '2026-03-01', fecha_resultado_seleccion: '2026-02-20' }, codigoLey: '276', tipo: 'administrativo' }), [])
+})
+
+test('casos de las capturas: docente ordinario contratado y técnico en el grupo profesional', () => {
+  // Captura 1: Profesor ordinario principal con vínculo «Plazo determinado · Docente contratado».
+  const docente = avisosDeCoherencia({ tipo: 'docente', datosPuesto: { condicion_docente: 'ordinario' }, vinculo: { regimen_laboral: 'plazo_determinado', fecha_inicio: '2026-11-19', fecha_fin_prevista: '2026-12-01' } })
+  assert.match(docente[0], /docente ordinario es de carrera/)
+  assert.match(avisosDeCoherencia({ tipo: 'docente', datosPuesto: { condicion_docente: 'contratado' }, vinculo: { regimen_laboral: 'carrera' } })[0], /contratado no es de carrera/)
+  // Captura 2: «Técnico administrativo» con grupo Profesional.
+  const tecnico = avisosDeCoherencia({ tipo: 'administrativo', datosPuesto: { grupo_ocupacional: 'profesional' }, vinculo: { nombre_puesto: 'Técnico administrativo', regimen_laboral: 'plazo_determinado' } })
+  assert.match(tecnico[0], /es del grupo Técnico, pero elegiste el grupo Profesional/)
+  // El grupo del puesto del catálogo manda sobre el nombre.
+  assert.deepEqual(avisosDeCoherencia({ tipo: 'administrativo', grupoDelPuesto: 'profesional', datosPuesto: { grupo_ocupacional: 'profesional' }, vinculo: { nombre_puesto: 'Técnico administrativo' } }), [])
+  // Lo coherente no avisa.
+  assert.deepEqual(avisosDeCoherencia({ tipo: 'docente', datosPuesto: { condicion_docente: 'ordinario' }, vinculo: { regimen_laboral: 'carrera' } }), [])
+})
+
+test('el grupo se deduce del nombre solo si lo dice una vez y como palabra', () => {
+  assert.equal(grupoPorNombre('Técnico administrativo'), 'tecnico')
+  assert.equal(grupoPorNombre('AUXILIAR DE ARCHIVO'), 'auxiliar')
+  assert.equal(grupoPorNombre('Profesional en contabilidad'), 'profesional')
+  assert.equal(grupoPorNombre('Secretaria'), '')
+  assert.equal(grupoPorNombre('Técnico o auxiliar'), '')
+  assert.equal(grupoPorNombre('Tecnicos varios'), '')
 })
