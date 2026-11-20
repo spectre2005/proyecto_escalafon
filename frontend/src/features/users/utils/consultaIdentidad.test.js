@@ -33,7 +33,7 @@ test('the button appears only for a valid new DNI when the query is enabled and 
 test('an already registered person keeps the current warning and does not trigger a query', () => {
   const usuarios = [{ id: 'u1', numero_doc_identidad: '00000001', nombres: 'Rosa', apellido_paterno: 'Alta' }]
   const existente = personaExistente(vacio, usuarios)
-  assert.deepEqual(existente, { id: 'u1', nombre: 'Rosa Alta' })
+  assert.deepEqual(existente, { id: 'u1', nombre: 'Rosa Alta', puedeIncorporar: false, tieneLegajoActivo: false, numeroIncorporacion: 1 })
   assert.equal(modoConsulta({ dni: vacio.numero_doc_identidad, existente, estado: activa, puedeRegistrar: true }), null)
 })
 

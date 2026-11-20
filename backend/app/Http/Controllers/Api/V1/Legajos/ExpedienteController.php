@@ -14,6 +14,7 @@ use App\Models\Colegiatura;
 use App\Models\CompensacionBeneficio;
 use App\Models\CompromisoDocumento;
 use App\Models\CompromisoEntregaOriginal;
+use App\Models\Concerns\PerteneceALegajo;
 use App\Models\Controversia;
 use App\Models\DeclaracionVerificacion;
 use App\Models\Desplazamiento;
@@ -205,6 +206,10 @@ class ExpedienteController extends Controller
                 // Sin datos_sensibles.ver no se cuentan los documentos de las secciones 01, 09 y 10.
                 'documentosUsuarioPorUsuario' => fn (Builder $query): Builder => $veSensibles ? $query : $query->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES),
             ]);
+        // Quien solo tiene legajos pasivos se consulta desde su archivo dedicado; un reingreso (con legajo activo) sigue aquí.
+        $query->where(fn (Builder $personas): Builder => $personas
+            ->whereDoesntHave('legajos', fn (Builder $legajos): Builder => $legajos->where('estado_legajo', 'pasivo'))
+            ->orWhereHas('legajos', fn (Builder $legajos): Builder => $legajos->where('estado_legajo', 'activo')));
         if (! empty($filters['q'])) {
             $search = '%'.mb_strtolower(trim($filters['q'])).'%';
             $query->where(function (Builder $query) use ($search): void {
@@ -266,7 +271,7 @@ class ExpedienteController extends Controller
             'document_states' => DocumentoUsuario::query()->where('usuario_id', $usuario)->whereHas('legajo', fn (Builder $query): Builder => $query->where('usuario_id', $usuario))
                 ->when(! $veSensibles, fn (Builder $query): Builder => $query->whereNotIn('seccion_legajo_id', self::SECCIONES_SENSIBLES))
                 ->distinct()->orderBy('estado')->pluck('estado'),
-            'legajos' => $person->legajos()->orderByDesc('fecha_apertura')->get()->map(fn (Model $row): array => $this->present($row)),
+            'legajos' => $person->legajos()->orderByDesc('fecha_apertura')->orderByDesc('created_at')->orderByDesc('numero_legajo')->get()->map(fn (Model $row): array => $this->present($row)),
             // Sin datos sensibles no se ofrecen sus listados (responden 403): ni siquiera su nombre.
             'sections' => collect(self::SECTIONS)->when(! $veSensibles, fn ($secciones) => $secciones->except(self::SENSIBLES))->map(fn (array $section, string $key): array => [
                 'key' => $key, 'label' => $section['label'], 'group' => $section['group'],
@@ -425,7 +430,8 @@ class ExpedienteController extends Controller
         $ids = match ($config['scope']) {
             'legajo' => (clone $legajos)->select('id'),
             'documento' => (clone $documents)->select('id'),
-            'vinculo' => VinculoLaboral::query()->where('usuario_id', $usuario)->select('id'),
+            'vinculo' => VinculoLaboral::query()->where('usuario_id', $usuario)
+                ->when(! empty($filters['legajo_id']), fn (Builder $vinculos): Builder => $vinculos->delLegajo($filters['legajo_id']))->select('id'),
             'compromiso' => CompromisoEntregaOriginal::query()->where('usuario_id', $usuario)->whereIn('legajo_id', (clone $legajos)->select('id'))->select('id'),
             'proceso' => ProcesoFiscalizacion::query()->where('usuario_id', $usuario)->whereIn('legajo_id', (clone $legajos)->select('id'))->select('id'),
             'archivo' => (clone $documents)->whereNotNull('archivo_id')->select('archivo_id')
@@ -438,6 +444,9 @@ class ExpedienteController extends Controller
             $query->whereIn($config['field'], $ids);
         } elseif ($config['scope'] === 'persona') {
             $query->where($config['field'], $usuario);
+        }
+        if (! empty($filters['legajo_id']) && in_array(PerteneceALegajo::class, class_uses_recursive($query->getModel()), true)) {
+            $query->delLegajo($filters['legajo_id']);
         }
         if ($config['scope'] === 'legajo' && in_array('usuario_id', $query->getModel()->getFillable(), true) && $section !== 'bitacora-accesos-legajo') {
             $query->where('usuario_id', $usuario);

@@ -44,6 +44,48 @@ class CierreLegajoTest extends TestCase
         $this->postJson($this->url.'/legajos/'.$legajo.'/cerrar')->assertOk()->assertJsonPath('data.estado_legajo', 'pasivo');
     }
 
+    public function test_historical_identity_remains_unchanged_after_new_incorporation_and_profile_edits(): void
+    {
+        $this->persona->update(['nombres' => 'NOMBRE ANTERIOR', 'domicilio' => 'DIRECCION ANTERIOR', 'email_institucional' => 'anterior@example.test']);
+        $id = $this->abrir();
+        $this->cerrar($id);
+        $this->abrir();
+        $this->patchJson($this->url, ['nombres' => 'NOMBRE NUEVO', 'domicilio' => 'DIRECCION NUEVA', 'email_institucional' => 'nuevo@example.test'])->assertOk();
+        $this->getJson($this->url.'/legajos/'.$id)->assertOk()
+            ->assertJsonPath('data.datos_al_cierre.nombres', 'NOMBRE ANTERIOR')
+            ->assertJsonPath('data.datos_al_cierre.domicilio', 'DIRECCION ANTERIOR')
+            ->assertJsonPath('data.datos_al_cierre.email_institucional', 'anterior@example.test');
+        $this->getJson($this->url)->assertOk()->assertJsonPath('data.usuario.values.nombres', 'NOMBRE NUEVO')
+            ->assertJsonMissingPath('data.legajos.0.values.datos_al_cierre');
+        $this->getJson('/api/v1/expedientes/legajos-pasivos')->assertOk()->assertJsonPath('data.0.persona.nombres', 'NOMBRE ANTERIOR');
+        $raw = Legajo::query()->findOrFail($id)->getRawOriginal('datos_al_cierre');
+        $this->assertStringNotContainsString('DIRECCION ANTERIOR', $raw);
+        $this->assertArrayNotHasKey('datos_al_cierre', Legajo::query()->findOrFail($id)->toArray());
+        $this->assertArrayNotHasKey('password', Legajo::query()->findOrFail($id)->datos_al_cierre);
+    }
+
+    public function test_historical_profile_respects_sensitive_data_permission_and_owner(): void
+    {
+        $this->persona->update(['domicilio' => 'DIRECCION PRIVADA', 'telefono' => '999111222', 'con_discapacidad' => true]);
+        $id = $this->abrir();
+        $this->cerrar($id);
+        config(['permisos.roles.consulta_historial' => ['legajo.ver']]);
+        $this->actuarComo(null, 'consulta_historial');
+        $this->getJson($this->url.'/legajos/'.$id)->assertOk()
+            ->assertJsonMissingPath('data.datos_al_cierre.domicilio')->assertJsonMissingPath('data.datos_al_cierre.telefono')
+            ->assertJsonMissingPath('data.datos_al_cierre.con_discapacidad')->assertJsonMissingPath('data.datos_al_cierre.fecha_nacimiento');
+        $otro = Usuario::factory()->create();
+        $this->getJson('/api/v1/expedientes/'.$otro->id.'/legajos/'.$id)->assertNotFound();
+        $this->actuarComo(null, 'rol_sin_permisos');
+        $this->getJson($this->url.'/legajos/'.$id)->assertForbidden();
+    }
+
+    public function test_legacy_passive_legajo_does_not_claim_current_data_as_historical(): void
+    {
+        $legajo = Legajo::factory()->create(['usuario_id' => $this->persona->id, 'estado_legajo' => 'pasivo']);
+        $this->getJson($this->url.'/legajos/'.$legajo->id)->assertOk()->assertJsonPath('data.datos_al_cierre', null);
+    }
+
     public function test_active_status_follows_opening_and_closing_and_is_not_manually_editable(): void
     {
         $this->getJson($this->url)->assertOk()->assertJsonPath('data.usuario.values.activo', false);
@@ -128,41 +170,27 @@ class CierreLegajoTest extends TestCase
         $this->assertNull(DocumentoUsuario::query()->findOrFail($documento)->fecha_recepcion);
     }
 
-    public function test_reopening_keeps_the_same_legajo_and_documents_and_resumes_edits_and_folios(): void
+    public function test_closed_legajo_stays_in_passive_archive_when_person_gets_a_new_legajo(): void
     {
         $id = $this->abrir();
-        $legajo = Legajo::query()->findOrFail($id);
+        $anterior = Legajo::query()->findOrFail($id);
         $tipo = TipoDocumento::query()->where('codigo', 'S01_A_FICHA_DATOS')->firstOrFail();
         $documento = $this->subir($this->persona, $this->metadatos($tipo, 1, 2))->assertCreated()->json('data.id');
         $this->cerrar($id);
-        $this->postJson($this->url.'/legajos/'.$id.'/reabrir')->assertOk()
-            ->assertJsonPath('data.id', $id)->assertJsonPath('data.numero_legajo', $legajo->numero_legajo)
-            ->assertJsonPath('data.estado_legajo', 'activo')->assertJsonPath('data.fecha_pasivo', null);
-        $this->assertDatabaseCount('legajos', 1);
-        $this->assertSame($legajo->fecha_apertura->toDateString(), $legajo->refresh()->fecha_apertura->toDateString());
-        $this->getJson($this->url)->assertOk()->assertJsonPath('data.usuario.values.activo', true);
-        $this->patchJson($this->url, ['nombres' => 'Servidor reincorporado'])->assertOk();
-        $this->postJson($this->url.'/documentos/'.$documento.'/recepcionar')->assertOk();
-        $this->subir($this->persona, $this->metadatos($tipo, 3, 4, ['subsana_a_documento_id' => $documento]))
-            ->assertCreated()->assertJsonPath('data.folio_inicio', 3);
+        $this->postJson($this->url.'/legajos/'.$id.'/reabrir')->assertNotFound();
+        $nuevo = $this->abrir();
+        $this->assertNotSame($id, $nuevo);
+        $this->assertNotSame($anterior->numero_legajo, Legajo::query()->findOrFail($nuevo)->numero_legajo);
+        $this->assertSame('pasivo', $anterior->refresh()->estado_legajo);
+        $this->assertNotNull($anterior->fecha_pasivo);
+        $this->assertSame($id, DocumentoUsuario::query()->findOrFail($documento)->legajo_id);
+        $this->assertSame(0, DocumentoUsuario::query()->where('legajo_id', $nuevo)->count());
         Storage::disk(config('legajo.disco_documentos'))->assertExists(DocumentoUsuario::query()->findOrFail($documento)->archivo->storage_path);
-        $this->assertDatabaseHas('auditoria_eventos', ['entidad_id' => $id, 'accion' => 'legajo.cerrar']);
-        $this->assertDatabaseHas('auditoria_eventos', ['entidad_id' => $id, 'accion' => 'legajo.reabrir']);
-    }
-
-    public function test_reopening_checks_owner_permission_and_prevents_two_active_legajos(): void
-    {
-        $id = $this->abrir();
-        $this->postJson($this->url.'/legajos/'.$id.'/reabrir')->assertConflict();
-        $this->cerrar($id);
-        $otro = Usuario::factory()->create();
-        $this->postJson('/api/v1/expedientes/'.$otro->id.'/legajos/'.$id.'/reabrir')->assertNotFound();
-        $this->actuarComo(null, 'asistente_legajo');
-        $this->postJson($this->url.'/legajos/'.$id.'/reabrir')->assertForbidden();
-        $this->actuarComo();
-        $this->abrir();
-        $this->postJson($this->url.'/legajos/'.$id.'/reabrir')->assertConflict();
-        $this->assertSame('pasivo', Legajo::query()->findOrFail($id)->estado_legajo);
-        $this->assertSame(1, Legajo::query()->where('usuario_id', $this->persona->id)->where('estado_legajo', 'activo')->count());
+        $this->getJson('/api/v1/expedientes/legajos-pasivos?'.http_build_query(['q' => $anterior->numero_legajo]))
+            ->assertOk()->assertJsonPath('total', 1)->assertJsonPath('data.0.id', $id);
+        $this->getJson('/api/v1/expedientes/legajos-pasivos/resumen')->assertOk()->assertJsonPath('data.total', 1);
+        $this->get($this->url.'/documentos/'.$documento.'/archivo?accion=ver')->assertOk();
+        $this->postJson($this->url.'/documentos/'.$documento.'/recepcionar')->assertConflict();
+        $this->assertDatabaseMissing('auditoria_eventos', ['entidad_id' => $id, 'accion' => 'legajo.reabrir']);
     }
 }

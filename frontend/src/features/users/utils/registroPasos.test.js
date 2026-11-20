@@ -45,7 +45,7 @@ test('step 1 uses the same person rules as the registration', () => {
 
 test('an existing DNI identifies the person instead of creating a duplicate', () => {
   const usuarios = [{ id: 'u-1', numero_doc_identidad: '71000001', nombres: 'Rosa', apellido_paterno: 'Previa', apellido_materno: '' }]
-  assert.deepEqual(personaExistente({ numero_doc_identidad: ' 71000001 ' }, usuarios), { id: 'u-1', nombre: 'Rosa Previa' })
+  assert.deepEqual(personaExistente({ numero_doc_identidad: ' 71000001 ' }, usuarios), { id: 'u-1', nombre: 'Rosa Previa', puedeIncorporar: false, tieneLegajoActivo: false, numeroIncorporacion: 1 })
   assert.equal(personaExistente({ numero_doc_identidad: '71000002' }, usuarios), null)
   assert.equal(personaExistente({ numero_doc_identidad: '' }, usuarios), null)
 })
@@ -112,4 +112,32 @@ test('the birth date cannot be in the future or impossible', () => {
   assert.deepEqual(erroresPersona({ ...base, fecha_nacimiento: '1980-03-15' }, { catalogo }), [])
   assert.match(erroresPersona({ ...base, fecha_nacimiento: '2999-01-01' }, { catalogo }).join(' '), /posterior a hoy/)
   assert.match(erroresPersona({ ...base, fecha_nacimiento: '1980-02-30' }, { catalogo }).join(' '), /fecha válida/)
+})
+
+test('passive files allow another incorporation and active files block it', () => {
+  const lista = personaDelPaso(persona, 'ley-30220')
+  const previa = { ...lista, id: 'u-1', tiene_legajo_pasivo: true, tiene_legajo_activo: false, legajos_count: 2 }
+  assert.deepEqual(erroresPersona(lista, { catalogo, usuarios: [previa] }), [])
+  assert.equal(personaExistente(lista, [previa]).numeroIncorporacion, 3)
+  assert.equal(personaExistente(lista, [previa]).puedeIncorporar, true)
+  assert.match(erroresPersona(lista, { catalogo, usuarios: [{ ...previa, tiene_legajo_activo: true }] }).join(' '), /ya está registrada/)
+})
+
+test('a person with an active file can be registered again only after confirming the new admission', () => {
+  const usuarios = [{ id: 'u-9', numero_doc_identidad: '71000009', nombres: 'Ana', apellido_paterno: 'Vuelve', email_institucional: 'ana@x.pe', tiene_legajo_activo: true, tiene_legajo_pasivo: false, legajos_count: 1 }]
+  const nueva = { ...persona, numero_doc_identidad: '71000009', email_institucional: 'ana@x.pe' }
+  const existente = personaExistente(nueva, usuarios)
+  assert.deepEqual([existente.puedeIncorporar, existente.tieneLegajoActivo, existente.numeroIncorporacion], [false, true, 2])
+  const bloqueo = 'Esta persona ya está registrada con ese DNI.'
+  assert.ok(erroresPersona(nueva, { usuarios }).includes(bloqueo))
+  assert.ok(!erroresPersona(nueva, { usuarios, nuevoIngreso: true }).includes(bloqueo))
+  const base = { persona: { ...nueva, tipo_personal: 'administrativo' }, catalogo: [], ubigeoId: '', condiciones: {}, puedeDiscapacidad: false, vinculo: {}, puestos: { administrativo: {} } }
+  assert.equal(armarRegistro({ ...base, nuevoIngreso: true }).cerrar_legajo_actual, true)
+  assert.equal('cerrar_legajo_actual' in armarRegistro(base), false)
+})
+
+test('el nuevo ingreso envía cuántos legajos tenía la persona', () => {
+  const base = { persona: { ...persona, tipo_personal: 'administrativo' }, catalogo: [], ubigeoId: '', condiciones: {}, puedeDiscapacidad: false, vinculo: {}, puestos: { administrativo: {} } }
+  assert.equal(armarRegistro({ ...base, nuevoIngreso: true, legajosPrevios: 1 }).legajos_previos, 1)
+  assert.equal('legajos_previos' in armarRegistro(base), false)
 })

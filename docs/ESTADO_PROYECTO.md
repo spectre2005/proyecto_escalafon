@@ -102,7 +102,12 @@ Documentos y sección 02 (TODO en el código):
 12. ¿Anular un vínculo debe anular sus adendas, inducciones y períodos de prueba? (`Seccion02Controller::anularRegistro`).
 13. Fin efectivo del vínculo: ¿la fecha de fin de la última adenda? (`Seccion02Controller::vinculo`).
 14. ¿El perfil docente o administrativo debe conservar historial? Hoy se corrige sobre el mismo registro.
-15. Apertura del legajo: formato (físico o digital), ubicación física, y si alguien con legajo pasivo puede abrir uno nuevo (`AperturaLegajoController`).
+15. Apertura del legajo: formato (físico o digital) y ubicación física (`AperturaLegajoController`). Reingreso
+    (20/11/2026, **implementado, pendiente de confirmar con el cliente**): quien tiene un legajo pasivo puede volver a
+    incorporarse con el mismo DNI. No se duplica la persona: se actualizan sus datos y se abre un legajo nuevo (número
+    nuevo, folios desde 1, sin heredar documentos ni registros); el anterior queda en «Legajos pasivos» con la ficha
+    cifrada al cierre (`legajos.datos_al_cierre`). Con el legajo aún activo, el registro pide confirmar que pase a
+    pasivo. Se quitó «Reabrir legajo». Portado de la rama feature/legajos-pasivos (sin sus catálogos del vínculo).
 
 Sección 01:
 16. ¿Manda el Anexo 01 o el Anexo 05? (antecedentes judiciales, DJ de intereses, policiales, Ley 31419, RNSSC/REDJUM, CONADIS del cónyuge).
@@ -184,7 +189,9 @@ Evaluación del alta de personal con pruebas reales (19/10/2026, en una copia de
     (a) Decidido dejarlo así por ahora: la aceptación directa también da por cumplido el fedateo de los tipos que lo
         exigen (título, certificado de trabajo) y no exige fiscalización (pend. 30 y 32).
     (b) Decidido dejarlo así por ahora: el legajo pasa a pasivo a mano aunque el vínculo siga vigente, y se puede abrir
-        un legajo sin vínculo (art. 4.1: la apertura va concluido el proceso de vinculación).
+        un legajo sin vínculo (art. 4.1: la apertura va concluido el proceso de vinculación). Desde el 20/11/2026 además
+        pasa a pasivo solo al registrar en la sección 11 el último cese efectivo (sin otro vínculo abierto); la fecha de
+        cese no puede ser futura. Pendiente de confirmar con el cliente.
     (c) Pendiente del cliente: las cuentas creadas desde Equipo cuentan como personal en el Dashboard y en Personal.
     (d) Requerimientos y compromisos de entrega (art. 4.3: 5 días hábiles + 5; art. 5.1: 30) solo existen en el CRUD
         genérico: en producción no se pueden crear.

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\PerteneceALegajo;
 use Database\Factories\VinculoLaboralFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,6 +16,7 @@ class VinculoLaboral extends Model
     use HasFactory;
 
     use HasUuids;
+    use PerteneceALegajo;
 
     protected $table = 'vinculos_laborales';
 

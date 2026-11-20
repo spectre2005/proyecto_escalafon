@@ -151,14 +151,14 @@ final class ConsultaVencimientos
         // Fin del contrato o de su última adenda vigente: próximos y ya vencidos mientras no haya cese registrado.
         $adenda = DB::table('vinculo_adendas')->select('fecha_fin')->whereColumn('vinculo_laboral_id', 'v.id')->where('anulado', false)
             ->orderByDesc('fecha_inicio')->orderByDesc('created_at')->orderByDesc('id')->limit(1);
-        $vinculos = DB::table('vinculos_laborales as v')->where('v.anulado', false)->whereNull('v.fecha_cese')
+        $vinculos = DB::table('vinculos_laborales as v')->whereIn('v.id', VinculoLaboral::query()->etapaActual()->select('id'))->where('v.anulado', false)->whereNull('v.fecha_cese')
             ->whereDate('v.fecha_inicio', '<=', $hoy->toDateString())->whereExists($legajoActivo('v.usuario_id'))
             ->selectRaw("v.usuario_id, v.id as alerta_id, 'contrato' as origen, COALESCE(({$adenda->toSql()}), v.fecha_fin_prevista) as fecha, v.nombre_puesto as detalle", $adenda->getBindings());
         $contratos = DB::query()->fromSub($vinculos, 'v')->whereNotNull('fecha')->whereDate('fecha', '<=', $hasta);
 
         // Requerimientos esperando a la persona (abierto u observado): próximos a su plazo y fuera de plazo. En revisión
         // espera a la ORH; aceptado y cancelado están cerrados.
-        $requerimientos = DB::table('requerimientos_documentos as r')->whereNull('r.cerrado_en')->whereIn('r.estado', ['abierto', 'observado'])
+        $requerimientos = DB::table('requerimientos_documentos as r')->whereIn('r.id', RequerimientoDocumento::query()->etapaActual()->select('id'))->whereNull('r.cerrado_en')->whereIn('r.estado', ['abierto', 'observado'])
             ->whereRaw('DATE(COALESCE(r.prorroga_hasta, r.fecha_limite)) <= ?', [$hasta])->whereExists($legajoActivo('r.usuario_id'))
             ->selectRaw("r.usuario_id, r.id as alerta_id, 'requerimiento' as origen, COALESCE(r.prorroga_hasta, r.fecha_limite) as fecha, r.descripcion as detalle");
 

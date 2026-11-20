@@ -39,22 +39,31 @@ export function personaDelPaso(draft, leyElegida) {
 }
 
 /** Comprobaciones del paso 1 que no cubre el formulario: las mismas del alta (validateUser), ubicación y duplicados. */
-export function erroresPersona(persona, { catalogo, usuarios = [], ubicacion = {}, ubigeoId = '' }) {
+// nuevoIngreso: se confirmó que su legajo activo pase a Legajos pasivos para registrarla otra vez con un legajo nuevo.
+export function erroresPersona(persona, { catalogo, usuarios = [], ubicacion = {}, ubigeoId = '', nuevoIngreso = false }) {
   const errores = validateUser(persona, catalogo)
   if (Object.values(ubicacion).some(Boolean) && !ubigeoId) errores.push('Selecciona región, provincia y distrito para completar la ubicación.')
-  // El DNI repetido se informa aparte con un enlace a la ficha (personaExistente): aquí solo bloquea el avance.
-  if (personaExistente(persona, usuarios)) errores.push('Esta persona ya está registrada con ese DNI.')
-  else if (usuarios.some(item => item.email_institucional?.toLowerCase() === persona.email_institucional.toLowerCase())) {
+  // El DNI repetido se informa aparte con un enlace a la ficha (personaExistente). Solo puede volver a incorporarse quien
+  // tiene un legajo pasivo y ninguno activo, o quien confirmó que su legajo activo pase a pasivo.
+  const existente = personaExistente(persona, usuarios)
+  if (existente && !existente.puedeIncorporar && !(nuevoIngreso && existente.tieneLegajoActivo)) errores.push('Esta persona ya está registrada con ese DNI.')
+  else if (usuarios.some(item => item.numero_doc_identidad !== persona.numero_doc_identidad && item.email_institucional?.toLowerCase() === persona.email_institucional.toLowerCase())) {
     errores.push('Ya existe un usuario con ese correo.')
   }
   return errores
 }
 
-/** Persona ya registrada con el mismo DNI ({ id, nombre }), o null. No se crea otra: se ofrece abrir su ficha. */
+/** Persona ya registrada con el mismo DNI y si puede incorporarse otra vez (nuevo legajo, misma persona), o null. */
 export function personaExistente(persona, usuarios = []) {
   const dni = String(persona.numero_doc_identidad || '').trim()
   const existente = dni ? usuarios.find(item => item.numero_doc_identidad === dni) : null
-  return existente ? { id: existente.id, nombre: [existente.nombres, existente.apellido_paterno, existente.apellido_materno].filter(Boolean).join(' ') } : null
+  return existente ? {
+    id: existente.id,
+    nombre: [existente.nombres, existente.apellido_paterno, existente.apellido_materno].filter(Boolean).join(' '),
+    puedeIncorporar: existente.tiene_legajo_pasivo === true && existente.tiene_legajo_activo === false,
+    tieneLegajoActivo: existente.tiene_legajo_activo === true,
+    numeroIncorporacion: (existente.legajos_count || 0) + 1,
+  } : null
 }
 
 /**
@@ -87,9 +96,13 @@ const recortar = datos => Object.fromEntries(Object.entries(datos).map(([clave, 
 // Campos opcionales que no se envían vacíos (así quien no ve datos sensibles nunca los manda).
 const sinVacios = (objeto, claves) => Object.fromEntries(Object.entries(objeto).filter(([clave, valor]) => !claves.includes(clave) || String(valor ?? '').trim() !== ''))
 
-export function armarRegistro({ persona, catalogo, ubigeoId, condiciones, puedeDiscapacidad, vinculo, puestos }) {
+export function armarRegistro({ persona, catalogo, ubigeoId, condiciones, puedeDiscapacidad, vinculo, puestos, nuevoIngreso = false, legajosPrevios = null }) {
   const docente = persona.tipo_personal === 'docente'
   return {
+    // Nuevo ingreso con su legajo aún activo: el backend lo pasa a pasivo (historial) y abre uno nuevo. Con cuántos legajos
+    // tenía al confirmarlo: si la solicitud llega dos veces, la segunda se rechaza en lugar de cerrar el legajo recién abierto.
+    ...(nuevoIngreso ? { cerrar_legajo_actual: true } : {}),
+    ...(Number.isInteger(legajosPrevios) ? { legajos_previos: legajosPrevios } : {}),
     usuarios: [conLey(catalogo, { ...sinVacios(persona, ['fecha_nacimiento', 'domicilio']), ubigeo_id: ubigeoId || null, tiene_derechohabientes: condiciones.tiene_derechohabientes, con_discapacidad: puedeDiscapacidad ? condiciones.con_discapacidad : null })],
     vinculo: recortar(vinculo),
     datos_puesto: limpiarDatosPuesto(docente, recortar(puestos[persona.tipo_personal] || {})),

@@ -11,8 +11,10 @@ use App\Models\RegimenNormativo;
 use App\Models\UnidadOrganica;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
+use App\Support\VigenciaLaboral;
 use Database\Seeders\SeccionesLegajoCatalogoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -245,5 +247,106 @@ class RegistroConVinculoTest extends TestCase
         $this->postJson(self::URL, $this->datos())->assertCreated()
             ->assertJsonPath('data.usuario.situacion', 'vinculo_vigente')->assertJsonPath('data.usuario.activo', false)
             ->assertJsonStructure(['data' => ['usuario' => ['id'], 'legajo' => ['id', 'numero_legajo', 'estado_legajo']]]);
+    }
+
+    public function test_registering_again_with_active_file_requires_confirmation_and_keeps_it_as_passive_history(): void
+    {
+        $this->actuarComo();
+        $primera = $this->postJson(self::URL, $this->datos())->assertCreated();
+        $persona = $primera->json('data.usuario.id');
+        $anterior = $primera->json('data.legajo.id');
+        // Sin confirmar, su legajo activo impide registrarla otra vez (se informa quién es para ir a su ficha).
+        $this->postJson(self::URL, $this->datos())->assertUnprocessable()->assertJsonPath('persona_existente.id', $persona);
+        // Con la confirmación: el legajo anterior pasa a pasivo (historial) y se abre uno nuevo con su vínculo.
+        $segunda = $this->postJson(self::URL, [...$this->datos(), 'cerrar_legajo_actual' => true])->assertCreated()
+            ->assertJsonPath('data.usuario.id', $persona)->assertJsonPath('data.numero_incorporacion', 2);
+        $nuevo = $segunda->json('data.legajo.id');
+        $this->assertNotSame($anterior, $nuevo);
+        $legajoAnterior = Legajo::query()->findOrFail($anterior);
+        $this->assertSame(['pasivo', VigenciaLaboral::hoy()], [$legajoAnterior->estado_legajo, $legajoAnterior->fecha_pasivo->toDateString()]);
+        $this->assertNotNull($legajoAnterior->datos_al_cierre);
+        $this->assertSame('activo', Legajo::query()->findOrFail($nuevo)->estado_legajo);
+        $this->assertSame(1, Usuario::query()->where('numero_doc_identidad', '71000001')->count());
+        $this->assertDatabaseHas('auditoria_eventos', ['accion' => 'legajo.cerrar_por_nuevo_ingreso', 'entidad_id' => $anterior]);
+        // El vínculo anterior se queda en su legajo; el nuevo, en el nuevo.
+        $this->assertDatabaseHas('vinculos_laborales', ['id' => $primera->json('data.vinculo.id'), 'legajo_id' => $anterior]);
+        $this->assertDatabaseHas('vinculos_laborales', ['id' => $segunda->json('data.vinculo.id'), 'legajo_id' => $nuevo]);
+        $this->getJson('/api/v1/expedientes/legajos-pasivos?q=71000001')->assertOk()->assertJsonPath('total', 1)->assertJsonPath('data.0.id', $anterior);
+    }
+
+    public function test_passive_person_can_be_incorporated_again_without_duplicating_identity(): void
+    {
+        $this->actuarComo();
+        $primera = $this->postJson(self::URL, $this->datos())->assertCreated()->assertJsonPath('data.numero_incorporacion', 1);
+        $persona = $primera->json('data.usuario.id');
+        $anterior = $primera->json('data.legajo.id');
+        $vinculo = $primera->json('data.vinculo.id');
+        $this->postJson('/api/v1/expedientes/'.$persona.'/legajos/'.$anterior.'/cerrar')->assertOk();
+        $this->getJson('/api/v1/usuarios')->assertOk()->assertJsonFragment([
+            'id' => $persona, 'legajos_count' => 1, 'tiene_legajo_pasivo' => true, 'tiene_legajo_activo' => false,
+        ]);
+        $segunda = $this->postJson(self::URL, $this->datos())->assertCreated()
+            ->assertJsonPath('data.usuario.id', $persona)->assertJsonPath('data.numero_incorporacion', 2);
+        $this->assertNotSame($anterior, $segunda->json('data.legajo.id'));
+        $this->assertDatabaseHas('legajos', ['id' => $anterior, 'estado_legajo' => 'pasivo']);
+        $this->assertDatabaseHas('vinculos_laborales', ['id' => $vinculo, 'legajo_id' => $anterior]);
+        $this->assertDatabaseHas('vinculos_laborales', ['id' => $segunda->json('data.vinculo.id'), 'legajo_id' => $segunda->json('data.legajo.id')]);
+        $this->assertSame(1, Usuario::query()->where('numero_doc_identidad', '71000001')->count());
+        $this->postJson(self::URL, $this->datos())->assertUnprocessable();
+        $this->assertDatabaseCount('legajos', 2);
+        $this->postJson('/api/v1/expedientes/'.$persona.'/legajos/'.$segunda->json('data.legajo.id').'/cerrar')->assertOk();
+        $this->postJson(self::URL, $this->datos())->assertCreated()->assertJsonPath('data.numero_incorporacion', 3);
+    }
+
+    public function test_sin_datos_sensibles_el_nuevo_ingreso_no_reemplaza_los_datos_personales(): void
+    {
+        $this->actuarComo();
+        $primera = $this->postJson(self::URL, $this->datos(persona: ['telefono' => '987654321']))->assertCreated();
+        $persona = $primera->json('data.usuario.id');
+        $this->postJson('/api/v1/expedientes/'.$persona.'/legajos/'.$primera->json('data.legajo.id').'/cerrar')->assertOk();
+
+        config()->set('permisos.roles.SIN_SENSIBLES', ['usuarios.gestionar', 'personal.ver', 'legajo.ver', 'legajo.abrir', 'legajo.editar']);
+        $this->actuarComo(null, 'SIN_SENSIBLES');
+        $this->postJson(self::URL, $this->datos(persona: ['telefono' => '911111111', 'tiene_derechohabientes' => true, 'nombres' => 'Rosa María']))
+            ->assertCreated()->assertJsonPath('data.numero_incorporacion', 2);
+
+        $guardada = Usuario::query()->findOrFail($persona);
+        // Lo que ya tenía se conserva; lo vacío se completa; los datos no sensibles se actualizan.
+        $this->assertSame(['987654321', true, 'Rosa María'], [$guardada->telefono, (bool) $guardada->tiene_derechohabientes, $guardada->nombres]);
+    }
+
+    public function test_una_solicitud_repetida_de_nuevo_ingreso_no_cierra_el_legajo_recien_abierto(): void
+    {
+        $this->actuarComo();
+        $this->postJson(self::URL, $this->datos())->assertCreated();
+        $confirmacion = [...$this->datos(), 'cerrar_legajo_actual' => true, 'legajos_previos' => 1];
+
+        $this->postJson(self::URL, $confirmacion)->assertCreated()->assertJsonPath('data.numero_incorporacion', 2);
+        // La misma solicitud otra vez (doble clic o reintento): se rechaza y no se abre un tercer legajo.
+        $this->postJson(self::URL, $confirmacion)->assertStatus(409);
+        $this->assertDatabaseCount('legajos', 2);
+        $this->assertSame(1, Legajo::query()->where('estado_legajo', 'activo')->count());
+    }
+
+    public function test_apertura_y_cierre_usan_la_fecha_de_lima(): void
+    {
+        $this->actuarComo();
+        // 20/11 a las 01:00 UTC es todavía el 19/11 en Lima.
+        $this->travelTo(Carbon::parse('2026-11-20 01:00:00', 'UTC'));
+        $primera = $this->postJson(self::URL, $this->datos())->assertCreated();
+        $this->postJson(self::URL, [...$this->datos(), 'cerrar_legajo_actual' => true])->assertCreated();
+
+        $this->assertSame('2026-11-19', Legajo::query()->findOrFail($primera->json('data.legajo.id'))->fecha_apertura->toDateString());
+        $this->assertSame('2026-11-19', Legajo::query()->findOrFail($primera->json('data.legajo.id'))->fecha_pasivo->toDateString());
+    }
+
+    public function test_el_nuevo_ingreso_audita_solo_lo_que_cambia(): void
+    {
+        $this->actuarComo();
+        $this->postJson(self::URL, $this->datos(persona: ['telefono' => '987654321']))->assertCreated();
+        $this->postJson(self::URL, [...$this->datos(persona: ['telefono' => '911111111']), 'cerrar_legajo_actual' => true])->assertCreated();
+
+        $evento = AuditoriaEvento::query()->where('accion', 'persona.editar')->sole();
+        $this->assertSame(['telefono'], array_keys(json_decode($evento->datos_despues, true)));
     }
 }

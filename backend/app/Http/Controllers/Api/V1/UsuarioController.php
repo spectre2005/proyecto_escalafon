@@ -15,6 +15,8 @@ use App\Support\CatalogosVinculo;
 use App\Support\ConfiguracionFuncionalidades;
 use App\Support\RegimenesLaborales;
 use App\Support\SituacionLaboral;
+use App\Support\VigenciaLaboral;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -30,9 +32,12 @@ use Illuminate\Validation\ValidationException;
 
 class UsuarioController extends Controller
 {
+    /** Datos personales que, en un nuevo ingreso, solo se completan si estaban vacíos cuando el actor no ve datos sensibles. */
+    private const SENSIBLES_REINGRESO = ['fecha_nacimiento', 'domicilio', 'telefono', 'ubigeo_id', 'tiene_derechohabientes', 'con_discapacidad', 'estado_civil', 'nacionalidad'];
+
     public function index(): AnonymousResourceCollection
     {
-        return UsuarioResource::collection(SituacionLaboral::cargar(Usuario::query()->with('regimenNormativo'))->orderByDesc('created_at')->orderByDesc('id')->paginate(100));
+        return UsuarioResource::collection(SituacionLaboral::cargar(Usuario::query()->with('regimenNormativo')->withCount('legajos')->withExists(['legajos as tiene_legajo_pasivo' => fn (Builder $query): Builder => $query->where('estado_legajo', 'pasivo')]))->orderByDesc('created_at')->orderByDesc('id')->paginate(100));
     }
 
     public function show(string $record): UsuarioResource
@@ -158,11 +163,18 @@ class UsuarioController extends Controller
             'Registrar a la persona con su vínculo requiere abrir legajos (legajo.abrir) y registrar vínculos (legajo.editar).');
         abort_unless(ConfiguracionFuncionalidades::activa('s02.vinculos'), 409,
             '«'.ConfiguracionFuncionalidades::definicion('s02.vinculos')['nombre'].'» está desactivada en la configuración de la institución.');
-        [$registro] = $this->registros($request->validated('usuarios'), $request);
-
-        [$legajo, $vinculo] = DB::transaction(function () use ($registro, $request, $actor): array {
-            $this->insertar([$registro], $request);
+        [$registro, $legajo, $vinculo, $incorporacion] = DB::transaction(function () use ($request, $actor): array {
+            $fila = $request->validated('usuarios')[0];
+            $persona = Usuario::query()->where('numero_doc_identidad', $fila['numero_doc_identidad'])->lockForUpdate()->first();
+            if ($persona) {
+                $registro = $this->reincorporar($request, $persona, $fila);
+            } else {
+                [$registro] = $this->registros([$fila], $request);
+                $this->insertar([$registro], $request);
+            }
+            $incorporacion = Usuario::query()->findOrFail($registro['id'])->legajos()->count() + 1;
             $legajo = AperturaLegajo::abrir($registro['id']);
+            abort_unless($legajo, 409, 'La persona ya tiene un legajo activo.');
             // El tipo de personal y la ley del vínculo son los de la persona; el tipo de vínculo, el que se indicó.
             // El puesto y la unidad escritos quedan en las listas de la institución si aún no estaban.
             $datosVinculo = CatalogosVinculo::aplicar($request->vinculo(), $registro['tipo_personal'], $actor->getAuthIdentifier(), null, 'vinculo.');
@@ -174,14 +186,67 @@ class UsuarioController extends Controller
             Auditoria::registrar($request, 'legajo.abrir', 'legajos', $legajo->id, $registro['id'], null, $legajo->getAttributes());
             Auditoria::registrar($request, 'vinculo.registrar', 'vinculos_laborales', $vinculo->id, $registro['id'], null, [...$vinculo->getAttributes(), 'datos_puesto' => $perfil?->getAttributes()]);
 
-            return [$legajo, $vinculo];
+            return [$registro, $legajo, $vinculo, $incorporacion];
         });
 
         return response()->json(['data' => [
             'usuario' => new UsuarioResource(SituacionLaboral::cargar(Usuario::query()->with('regimenNormativo'))->findOrFail($registro['id'])),
             'legajo' => $legajo->only(['id', 'numero_legajo', 'estado_legajo']),
             'vinculo' => $vinculo->only(['id', 'regimen_laboral', 'nombre_puesto']),
+            'numero_incorporacion' => $incorporacion,
         ]], 201);
+    }
+
+    /**
+     * Nuevo ingreso de una persona ya registrada: no se duplica su identidad. Se actualizan sus datos y el legajo nuevo
+     * lo abre storeConVinculo; el anterior queda en Legajos pasivos como historial.
+     *
+     * @param  array<string, mixed>  $fila
+     * @return array<string, mixed>
+     */
+    private function reincorporar(StoreUsuarioConVinculoRequest $request, Usuario $persona, array $fila): array
+    {
+        $actor = $request->user();
+        abort_if($request->has('legajos_previos') && $persona->legajos()->count() !== $request->integer('legajos_previos'), 409,
+            'Esta persona ya se registró de nuevo hace un momento (la solicitud llegó dos veces). Revisa su legajo antes de volver a intentarlo.');
+        // Con el legajo aún activo, solo si se confirmó pasarlo a pasivo. Se cierra igual que con «Cerrar legajo» (fecha de
+        // pase, ficha al cierre, auditoría) y queda en Legajos pasivos como historial.
+        $activo = $persona->legajos()->where('estado_legajo', 'activo')->lockForUpdate()->first();
+        if ($activo) {
+            abort_unless($request->boolean('cerrar_legajo_actual'), 409, "La persona tiene un legajo activo ({$activo->numero_legajo}). "
+                .'Para registrarla nuevamente, confirma que su legajo actual pase a Legajos pasivos.');
+            $antes = $activo->only(['estado_legajo', 'fecha_pasivo']);
+            $activo->update(['estado_legajo' => 'pasivo', 'fecha_pasivo' => VigenciaLaboral::hoy()]);
+            Auditoria::registrar($request, 'legajo.cerrar_por_nuevo_ingreso', 'legajos', $activo->id, $persona->id, $antes, $activo->only(['estado_legajo', 'fecha_pasivo']));
+        }
+        abort_unless($persona->legajos()->where('estado_legajo', 'pasivo')->exists(), 409,
+            'La persona ya está registrada. Solo puede incorporarse nuevamente si tiene un legajo pasivo y ninguno activo.');
+        if (Usuario::query()->whereKeyNot($persona->id)->whereRaw('LOWER(email_institucional) = ?', [strtolower($fila['email_institucional'])])->exists()) {
+            throw ValidationException::withMessages(['usuarios.0.email_institucional' => 'Este correo ya está registrado.']);
+        }
+        $antes = $persona->getAttributes();
+        // Sin datos_sensibles.ver no se ven los datos personales guardados: solo se completan los vacíos (art. 6.2).
+        $nuevos = array_filter($fila, fn (mixed $valor): bool => $valor !== null);
+        if (! $actor->can('datos_sensibles.ver')) {
+            $nuevos = array_filter($nuevos, fn (mixed $valor, string $campo): bool => ! in_array($campo, self::SENSIBLES_REINGRESO, true) || $persona->getAttribute($campo) === null, ARRAY_FILTER_USE_BOTH);
+        }
+        $discapacidad = CambioDiscapacidad::valor($nuevos['con_discapacidad'] ?? $persona->con_discapacidad);
+        CambioDiscapacidad::autorizar($actor, $persona->con_discapacidad, $discapacidad);
+        try {
+            $persona->update([...$nuevos, ...$this->ley($fila), 'email_institucional' => strtolower($fila['email_institucional'])]);
+        } catch (UniqueConstraintViolationException) {
+            // Otra alta tomó ese correo entre la comprobación y el guardado.
+            throw ValidationException::withMessages(['usuarios.0.email_institucional' => 'Este correo ya está registrado.']);
+        }
+        // Solo lo que cambió (como al editar la ficha): la auditoría no copia la ficha completa ni registra un evento vacío.
+        $sinAuditar = ['password', 'remember_token', CambioDiscapacidad::CAMPO, 'updated_at'];
+        [$previo, $nuevo] = Auditoria::diferencia(Arr::except($antes, $sinAuditar), Arr::except($persona->getAttributes(), $sinAuditar));
+        if ($nuevo !== []) {
+            Auditoria::registrar($request, 'persona.editar', 'usuarios', $persona->id, $persona->id, $previo, $nuevo);
+        }
+        CambioDiscapacidad::auditar($persona->id, $antes['con_discapacidad'], $discapacidad, $actor, $request);
+
+        return $persona->getAttributes();
     }
 
     /**

@@ -62,13 +62,34 @@ function Progreso({ paso, onIr, disabled }) {
   </ol>
 }
 
-// Persona ya registrada con ese DNI: no se crea otra. Con permiso para ver legajos, se ofrece abrir su ficha (el registro de
-// otro vínculo para un reingreso o una renovación sigue pendiente de confirmar con la universidad).
-function PersonaRegistrada({ persona, puedeVerFicha }) {
-  return <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#f1d9a6] bg-[#fff8e8] px-4 py-3 text-xs leading-relaxed text-[#7a5a17]">
-    <span><strong>{persona.nombre || 'Esta persona'}</strong> ya está registrada con ese DNI. No se creará otro registro.{puedeVerFicha ? ' Revisa su ficha para continuar con su legajo.' : ''}</span>
-    {puedeVerFicha && <Link to={rutaFicha(persona.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-[#e3c47f] bg-white px-3 py-1.5 font-semibold text-[#7a5a17] hover:bg-[#fff1cf]">Ir a su ficha <Icon name="arrow" size={14} /></Link>}
+// DNI ya registrado: nunca se crea otra persona. Con su legajo pasivo, se registra un nuevo ingreso con un legajo nuevo. Con
+// su legajo aún activo (dejó la institución y vuelve), se puede confirmar que ese legajo pase a Legajos pasivos como historial
+// y registrar el nuevo ingreso; sin confirmar, no se registra nada. Pendiente de confirmar con el cliente (pend. 15).
+function PersonaRegistrada({ persona, puedeVerFicha, puedeRegistrar, nuevoIngreso, onNuevoIngreso }) {
+  const ficha = puedeVerFicha && <Link to={rutaFicha(persona.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-[#e3c47f] bg-white px-3 py-1.5 font-semibold text-[#7a5a17] hover:bg-[#fff1cf]">Ir a su ficha <Icon name="arrow" size={14} /></Link>
+  const nombre = <strong>{persona.nombre || 'Esta persona'}</strong>
+  if (persona.puedeIncorporar || nuevoIngreso) return <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-xs leading-relaxed text-teal-800">
+    <span>Nuevo ingreso de {nombre}: se registrará su incorporación n.° {persona.numeroIncorporacion} con un legajo nuevo, sin duplicar a la persona.{nuevoIngreso ? ' Su legajo actual pasará a Legajos pasivos como historial, con sus documentos.' : ' Su legajo anterior se conserva en Legajos pasivos.'}</span>
+    {nuevoIngreso && <button type="button" onClick={() => onNuevoIngreso(false)} className="font-semibold underline">Deshacer</button>}
   </div>
+  if (persona.tieneLegajoActivo && puedeRegistrar) return <div role="alert" className="mb-4 grid gap-3 rounded-lg border border-[#f1d9a6] bg-[#fff8e8] px-4 py-3 text-xs leading-relaxed text-[#7a5a17]">
+    <span>{nombre} ya está registrada y tiene un legajo activo. Si dejó la institución y vuelve a ingresar, registra su nuevo ingreso: su legajo actual pasará a Legajos pasivos como historial y se abrirá uno nuevo.</span>
+    <span className="flex flex-wrap gap-2">
+      <button type="button" onClick={() => onNuevoIngreso(true)} className="rounded-lg bg-teal-700 px-3 py-1.5 font-semibold text-white hover:bg-teal-800">Registrar nuevo ingreso</button>
+      {ficha}
+    </span>
+  </div>
+  return <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#f1d9a6] bg-[#fff8e8] px-4 py-3 text-xs leading-relaxed text-[#7a5a17]">
+    <span>{nombre} ya está registrada con ese DNI. No se creará otro registro.{puedeVerFicha ? ' Revisa su ficha para continuar con su legajo.' : ''}</span>
+    {ficha}
+  </div>
+}
+
+// Al escribir un DNI ya registrado se completan los datos de la persona (así un reingreso no la duplica).
+function conPersonaPrevia(borrador, usuarios) {
+  const previa = usuarios.find(item => item.numero_doc_identidad === borrador.numero_doc_identidad)
+  if (!previa) return borrador
+  return { ...borrador, ...Object.fromEntries(Object.keys(personaVacia).filter(campo => campo !== 'numero_doc_identidad' && previa[campo] !== undefined).map(campo => [campo, previa[campo] ?? ''])) }
 }
 
 export default function RegistroManual({ usuarios, opciones, dominioCorreo = '', puedeDiscapacidad, puedeRegistrar, puedeVerFicha = false, saving, bloqueado, mensaje, onGuardar, onCancel }) {
@@ -89,6 +110,8 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   const [errores, setErrores] = useState({})
   // Persona existente informada por el backend al guardar (la lista local puede no estar al día).
   const [existenteBackend, setExistenteBackend] = useState(null)
+  // Se confirmó que el legajo activo de la persona pase a Legajos pasivos para registrar su nuevo ingreso.
+  const [nuevoIngreso, setNuevoIngreso] = useState(false)
   // Consulta de identidad por DNI (opcional): estado de la institución, una consulta a la vez y lo que se completó.
   const [estadoIdentidad, setEstadoIdentidad] = useState(null)
   const [identidad, setIdentidad] = useState(identidadInicial)
@@ -189,7 +212,7 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   // Validación del paso: los controles visibles (obligatorios, formatos y fechas) y, en el paso 1, las reglas del alta.
   function pasoValido() {
     if (!formRef.current.reportValidity()) return false
-    const lista = paso === 1 ? erroresPersona(personaDelPaso(draft, leyElegida), { catalogo, usuarios, ubicacion, ubigeoId }) : []
+    const lista = paso === 1 ? erroresPersona(personaDelPaso(draft, leyElegida), { catalogo, usuarios, ubicacion, ubigeoId, nuevoIngreso }) : []
     setAvisos(lista)
     return !lista.length
   }
@@ -199,10 +222,11 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
     if (saving || bloqueado || !pasoValido()) return
     if (paso < PASOS.length) return irA(paso + 1)
     const persona = personaDelPaso(draft, leyElegida)
-    const pendientes = erroresPersona(persona, { catalogo, usuarios, ubicacion, ubigeoId })
+    const pendientes = erroresPersona(persona, { catalogo, usuarios, ubicacion, ubigeoId, nuevoIngreso })
     if (pendientes.length) { setAvisos(pendientes); return irA(1) }
     setErrores({})
-    const resultado = await onGuardar(armarRegistro({ persona, catalogo, ubigeoId, condiciones, puedeDiscapacidad, vinculo, puestos }))
+    const resultado = await onGuardar(armarRegistro({ persona, catalogo, ubigeoId, condiciones, puedeDiscapacidad, vinculo, puestos, nuevoIngreso,
+      legajosPrevios: existente?.numeroIncorporacion ? existente.numeroIncorporacion - 1 : null }))
     if (!resultado.ok) {
       setExistenteBackend(resultado.existente ? { dni: persona.numero_doc_identidad, persona: resultado.existente } : null)
       setErrores(resultado.errors || {})
@@ -223,8 +247,8 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
         onChange={event => {
           const valor = numerico ? event.target.value.replace(/\D/g, '').slice(0, largo[key]) : event.target.value
           const cambiaDni = key === 'numero_doc_identidad' && valor !== draft.numero_doc_identidad
-          const siguiente = updateUserDraft(draft, key, valor, dominioCorreo)
-          if (cambiaDni) reiniciarIdentidad(valor)
+          let siguiente = updateUserDraft(draft, key, valor, dominioCorreo)
+          if (cambiaDni) { siguiente = conPersonaPrevia(siguiente, usuarios); reiniciarIdentidad(valor); setNuevoIngreso(false) }
           // El domicilio que trajo la consulta del DNI anterior no pasa a la persona nueva.
           setDraft(cambiaDni ? domicilioTrasCambioDni(siguiente, identidad.origen) : siguiente)
         }} />
@@ -271,7 +295,7 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
     <div ref={contenidoRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6">
       <h3 id="registro-paso-titulo" className="sr-only">Paso {paso} de {PASOS.length}: {PASOS[paso - 1].titulo}</h3>
       {mensaje?.error && <p role="alert" className="mb-4 rounded-lg bg-[#fff0ed] px-4 py-3 text-xs leading-relaxed text-[#ac4d3a]">{mensaje.text}</p>}
-      {paso === 1 && existente && <PersonaRegistrada persona={existente} puedeVerFicha={puedeVerFicha} />}
+      {paso === 1 && existente && <PersonaRegistrada persona={existente} puedeVerFicha={puedeVerFicha} puedeRegistrar={puedeRegistrar} nuevoIngreso={nuevoIngreso && !!existente.tieneLegajoActivo} onNuevoIngreso={valor => { setNuevoIngreso(valor); setAvisos([]) }} />}
       {general.length > 0 && <ul role="alert" className="mb-4 list-disc rounded-lg bg-[#fff0ed] px-8 py-3 text-xs leading-relaxed text-[#ac4d3a]">{general.map(texto => <li key={texto}>{texto}</li>)}</ul>}
       {!puedeRegistrar && <p role="alert" className="mb-4 rounded-lg bg-[#fff0ed] px-4 py-3 text-xs text-[#ac4d3a]">Tu rol no puede abrir legajos o registrar vínculos: no puedes registrar personal manualmente. La importación sigue disponible.</p>}
       <fieldset disabled={saving || bloqueado} className="grid min-w-0 gap-5">

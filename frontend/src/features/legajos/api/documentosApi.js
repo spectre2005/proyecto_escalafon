@@ -28,10 +28,6 @@ export function cerrarLegajo(usuario, legajo) {
   return api.post(`/expedientes/${usuario}/legajos/${legajo}/cerrar`)
 }
 
-export function reabrirLegajo(usuario, legajo) {
-  return api.post(`/expedientes/${usuario}/legajos/${legajo}/reabrir`)
-}
-
 // Enlazar más tarde un documento ya cargado que quedó sin registro (sin volver a subirlo). El backend valida el enlace.
 export function enlazarDocumento(usuario, documento, enlaceId) {
   return api.post(`/expedientes/${usuario}/documentos/${documento}/enlazar`, { enlace_id: enlaceId })

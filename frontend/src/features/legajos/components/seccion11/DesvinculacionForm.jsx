@@ -31,6 +31,7 @@ export default function DesvinculacionForm({ usuario, record, vinculos, motivos,
   const { busy, error, errors, guardar } = useGuardar(enviar, onSaved)
   return <Formulario titulo={record ? 'Corregir desvinculación' : 'Registrar desvinculación'} guardar="Guardar desvinculación" busy={busy} error={error} onSubmit={() => guardar(draft)} onCancel={onCancel}
     nota={record ? 'Se corrigen solo los campos que cambies. Un registro anulado ya no se corrige.' : 'No se elimina: si hay un error, se corrige o se anula con motivo (administración). El responsable se guarda con tu sesión.'}>
+    {!record && <p role="note" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 sm:col-span-2">Al guardar un cese efectivo, el legajo pasará a pasivo si no queda otro vínculo sin cesar. Incorpora primero los documentos de cierre: el legajo quedará en solo consulta. Si la persona regresa, abre un nuevo legajo para el mismo DNI.</p>}
     {documentoId && <p className="rounded-lg bg-teal-50 p-3 text-xs text-teal-800 sm:col-span-2">La desvinculación quedará acreditada por el documento que acabas de subir.</p>}
     <Campo label="Vínculo laboral que termina" required error={errors.vinculo_laboral_id} className="sm:col-span-2"><select required value={draft.vinculo_laboral_id} onChange={set('vinculo_laboral_id')}>
       <option value="">Selecciona</option>

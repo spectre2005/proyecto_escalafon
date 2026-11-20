@@ -17,6 +17,9 @@ class UsuarioResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'legajos_count' => $this->whenCounted('legajos'),
+            'tiene_legajo_activo' => $this->whenHas('tiene_legajo_activo', fn () => (bool) $this->tiene_legajo_activo),
+            'tiene_legajo_pasivo' => $this->whenHas('tiene_legajo_pasivo', fn () => (bool) $this->tiene_legajo_pasivo),
             'foto_path' => $this->foto_path,
             'numero_doc_identidad' => $this->numero_doc_identidad,
             'nombres' => $this->nombres,

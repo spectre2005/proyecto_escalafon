@@ -70,7 +70,7 @@ final class RecepcionGmail
         preg_match_all('/\[REQ-([a-f0-9-]{36})\]/i', $asunto, $referencias);
         $ids = array_unique($referencias[1] ?? []);
         $referencia = count($ids) === 1 ? strtolower(reset($ids)) : '';
-        $r = Str::isUuid($referencia) ? RequerimientoDocumento::query()->find($referencia) : null;
+        $r = Str::isUuid($referencia) ? RequerimientoDocumento::query()->etapaActual()->find($referencia) : null;
         try {
             $remitente = mb_strtolower(Address::create($headers['from'][0] ?? '')->getAddress());
         } catch (Throwable) {

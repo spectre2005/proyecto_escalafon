@@ -60,10 +60,10 @@ class Seccion01Controller extends Controller
         $perfil = PerfilDocumental::de($persona, VinculoLaboral::query()->where('usuario_id', $usuario)->where('anulado', false)->get());
         $legajo = Legajo::paraConsulta($usuario);
         $documentos = DocumentoUsuario::query()->where('usuario_id', $usuario)->where('seccion_legajo_id', Seccion01CatalogoSeeder::SECCION)
-            ->whereIn('legajo_id', Legajo::query()->where('usuario_id', $usuario)->select('id'))
+            ->where('legajo_id', $legajo?->id)
             ->with(['archivo', 'recepcionadoPor', 'createdBy', 'tipoDocumento:id,codigo'])->orderByDesc('created_at')->orderByDesc('id')->get();
         $familiares = Familiar::query()->where('usuario_id', $usuario)->with('registradoPor')->orderBy('apellidos_nombres')->orderBy('id')->get();
-        $declaraciones = DeclaracionVerificacion::query()->where('usuario_id', $usuario)->with('registradoPor')->orderByDesc('fecha')->orderBy('id')->get();
+        $declaraciones = DeclaracionVerificacion::query()->where('usuario_id', $usuario)->delLegajo($legajo?->id)->with('registradoPor')->orderByDesc('fecha')->orderBy('id')->get();
         $certificados = CertificadoDiscapacidad::query()->where('usuario_id', $usuario)->with(['registradoPor', 'familiar'])->orderByDesc('created_at')->orderBy('id')->get();
         $vigentes = $familiares->where('anulado', false)->values();
 
@@ -122,7 +122,7 @@ class Seccion01Controller extends Controller
 
     public function updateDeclaracion(Request $request, string $usuario, string $declaracion): JsonResponse
     {
-        $registro = DeclaracionVerificacion::query()->where('usuario_id', $usuario)->findOrFail($declaracion);
+        $registro = DeclaracionVerificacion::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id)->findOrFail($declaracion);
         $data = $this->validarDeclaracion($request, false);
         // Corregir una DJBR existente se permite; convertir otra declaración en DJBR con la condición en No, no.
         if (isset($data['tipo']) && $data['tipo'] !== $registro->tipo) {
