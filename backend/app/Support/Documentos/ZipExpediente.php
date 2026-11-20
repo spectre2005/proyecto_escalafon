@@ -18,8 +18,8 @@ use RuntimeException;
 use ZipArchive;
 
 /**
- * ZIP del expediente: secciones 01 a 04 siempre y, si el usuario los elige, los grupos de ExpedienteImprimible::OPCIONALES; los PDF originales que la vista previa marca «se imprime»,
- * con los nombres que ella propone, y un índice HTML imprimible. Se arma a partir de ExpedienteImprimible::vistaPrevia,
+ * ZIP del expediente de un legajo (activo o pasivo) con los grupos que elige quien descarga (ExpedienteImprimible::GRUPOS):
+ * los PDF originales que la vista previa marca «se imprime», con los nombres que ella propone, y un índice HTML imprimible. Se arma a partir de ExpedienteImprimible::vistaPrevia,
  * así que comparte sus reglas de alcance, configuración, permisos y folios.
  *
  * - Orden: por folio, de menor a mayor (pendiente de confirmar con la ORH el sentido de la carpeta física, num. 9.3).
@@ -33,7 +33,7 @@ final class ZipExpediente
     public const ORDEN = 'asc';
 
     /**
-     * @param  list<string>  $incluir  grupos opcionales elegidos (ExpedienteImprimible::OPCIONALES); por defecto, ninguno
+     * @param  list<string>  $incluir  grupos elegidos (ExpedienteImprimible::GRUPOS); vacío = ExpedienteImprimible::PREDETERMINADOS
      * @return array{ruta: string, nombre: string} archivo temporal (se borra al enviarlo) y nombre de descarga
      */
     public static function generar(Request $request, Usuario $persona, Legajo $legajo, array $incluir = []): array
@@ -52,14 +52,14 @@ final class ZipExpediente
                 $registros = DocumentoUsuario::query()->with('archivo')->whereKey($ids)->get()->keyBy('id');
                 foreach ($seccion['documentos'] ?? [] as $documento) {
                     if ($documento['inclusion'] === 'imprimible' && ($registro = $registros->get($documento['id']))) {
-                        $zip->addFromString($documento['nombre_zip'], self::leer($disco, $registro->archivo->storage_path));
+                        self::agregar($zip, $documento['nombre_zip'], $disco, $registro->archivo->storage_path);
                         $incluidos[] = ['documento_id' => $registro->id];
                     }
                 }
                 $antiguos = DeclaracionVerificacion::query()->whereKey(collect($seccion['sin_foliar'] ?? [])->where('inclusion', 'imprimible')->pluck('id'))->get()->keyBy('id');
                 foreach ($seccion['sin_foliar'] ?? [] as $documento) {
                     if ($documento['inclusion'] === 'imprimible' && ($antiguo = $antiguos->get($documento['id']))) {
-                        $zip->addFromString($documento['nombre_zip'], self::leer('local', $antiguo->pdf_path));
+                        self::agregar($zip, $documento['nombre_zip'], 'local', $antiguo->pdf_path);
                         $incluidos[] = ['documento_id' => null];
                     }
                 }
@@ -84,19 +84,29 @@ final class ZipExpediente
         });
 
         $nombre = Str::slug(($legajo->numero_legajo ?: 'legajo').' '.$vista['persona']['nombre'], '_');
+        $todos = array_diff(array_keys(ExpedienteImprimible::GRUPOS), $vista['incluidos']) === [];
+        $sufijo = $todos ? '_expediente_completo.zip' : ($vista['incluidos'] === ExpedienteImprimible::PREDETERMINADOS ? '_secciones_01-04.zip' : '_expediente_seleccion.zip');
 
-        return ['ruta' => $ruta, 'nombre' => $nombre.($vista['incluidos'] ? '_expediente_ampliado.zip' : '_secciones_01-04.zip')];
+        return ['ruta' => $ruta, 'nombre' => $nombre.$sufijo];
     }
 
-    /** Un archivo que la vista dio por disponible y ya no se puede leer detiene la copia: nunca se incluye vacío. */
-    private static function leer(string $disco, string $ruta): string
+    /**
+     * Copia un archivo al ZIP. En un disco local se agrega desde su ruta (ZipArchive lo lee al cerrar), así un legajo grande
+     * no se carga entero en memoria; en otro tipo de disco se lee su contenido. Un archivo que la vista dio por disponible y
+     * ya no se puede leer detiene la copia: nunca se incluye vacío.
+     */
+    private static function agregar(ZipArchive $zip, string $nombre, string $disco, string $ruta): void
     {
-        $contenido = Storage::disk($disco)->get($ruta);
-        if ($contenido === null || $contenido === '') {
+        $almacen = Storage::disk($disco);
+        if (! $almacen->exists($ruta) || (int) $almacen->size($ruta) === 0) {
             throw new RuntimeException('Un archivo dejó de estar disponible mientras se preparaba el ZIP. Vuelve a intentarlo.');
         }
-
-        return $contenido;
+        $agregado = config("filesystems.disks.{$disco}.driver") === 'local'
+            ? $zip->addFile($almacen->path($ruta), $nombre)
+            : $zip->addFromString($nombre, (string) $almacen->get($ruta));
+        if (! $agregado) {
+            throw new RuntimeException('No se pudo agregar un archivo al ZIP del expediente.');
+        }
     }
 
     private const MOTIVOS = ['por_confirmar' => 'No incluido: anulado (pendiente de confirmar con la ORH).', 'no_disponible' => 'No incluido: archivo no disponible.'];
@@ -131,16 +141,15 @@ final class ZipExpediente
             $secciones .= '<h2>'.e($titulo).'</h2><p class="nota">'.e($estadoSeccion).' · '.e((string) $seccion['folios']).' de '.e((string) $seccion['ultimo_folio']).' folio(s)</p>'
                 .($filas ? '<table><thead><tr><th>Folios</th><th>Documento</th><th>Datos del registro</th><th>Estado</th><th>Archivo en el ZIP</th></tr></thead><tbody>'.$filas.'</tbody></table>' : '');
         }
-        // Alcance según lo elegido al descargar: lo de siempre, lo añadido y lo que quedó fuera.
+        // Alcance según lo elegido al descargar: lo incluido y lo que quedó fuera.
         $nombreDe = fn (string $clave): string => ($numero = (int) substr($clave, 8)) && str_starts_with($clave, 'seccion_')
             ? sprintf('%02d. %s', $numero, collect($vista['secciones'])->firstWhere('id', $numero)['nombre'] ?? 'Sección '.$numero)
-            : ExpedienteImprimible::OPCIONALES[$clave][2];
-        $anadidos = array_map($nombreDe, $vista['incluidos']);
-        $fuera = array_map(fn (string $clave): string => str_starts_with($clave, 'seccion_') ? 'sección '.substr($clave, 8) : mb_strtolower(ExpedienteImprimible::OPCIONALES[$clave][2]),
-            array_values(array_diff(array_keys(ExpedienteImprimible::OPCIONALES), $vista['incluidos'])));
-        $alcance = 'Siempre incluye las secciones 01 a 04 (identidad, declaraciones, incorporación, formación y experiencia).'
-            .($anadidos ? ' Añadido al descargar: '.implode('; ', $anadidos).'.' : '')
-            .($fuera ? ' No se incluyó: '.implode(', ', $fuera).'. Por eso no representa necesariamente el legajo físico completo.' : '')
+            : ExpedienteImprimible::GRUPOS[$clave][2];
+        $incluidos = array_map($nombreDe, $vista['incluidos']);
+        $fuera = array_map(fn (string $clave): string => str_starts_with($clave, 'seccion_') ? 'sección '.substr($clave, 8) : mb_strtolower(ExpedienteImprimible::GRUPOS[$clave][2]),
+            array_values(array_diff(array_keys(ExpedienteImprimible::GRUPOS), $vista['incluidos'])));
+        $alcance = 'Incluye lo elegido al descargar: '.implode('; ', $incluidos).'.'
+            .($fuera ? ' No se incluyó: '.implode(', ', $fuera).'. Por eso no representa necesariamente el legajo físico completo.' : ' Se eligieron todos los grupos.')
             .' Los documentos de funcionalidades desactivadas en la institución no se incorporan.';
         $avisos = collect($vista['advertencias'])->map(fn (array $a): string => '<li>'.e($a['mensaje']).'</li>')->implode('');
         $acceso = $vista['acceso_completo'] ? 'Acceso completo: se incluyen todas las secciones de esta versión.' : 'Acceso parcial: el perfil que generó la copia no puede consultar todas las secciones; las omitidas no se incluyen.';
@@ -153,7 +162,7 @@ final class ZipExpediente
             .'th,td{border:1px solid #cbd5e1;padding:4px 6px;text-align:left;vertical-align:top}th{background:#f1f5f9}code{font-size:11px;word-break:break-all}'
             .'@media print{body{margin:0}h2{break-after:avoid}tr{break-inside:avoid}}</style></head><body>'
             .'<div class="caratula">'.($institucion !== '' ? '<p>'.e($institucion).'</p>' : '').'<h1>LEGAJO DE PERSONAL (CONFIDENCIAL)</h1>'
-            .'<p>'.e($vista['persona']['nombre']).($dni ? ' · DNI '.e($dni) : '').' · Legajo '.e((string) ($vista['legajo']['numero'] ?: 'sin número')).'</p>'
+            .'<p>'.e($vista['persona']['nombre']).($dni ? ' · DNI '.e($dni) : '').' · Legajo '.e((string) ($vista['legajo']['numero'] ?: 'sin número')).($vista['legajo']['estado'] === 'pasivo' ? ' (pasivo: etapa cerrada, solo consulta)' : '').'</p>'
             .'<p class="nota">Generado el '.e(now('America/Lima')->format('d/m/Y H:i')).' por '.e(trim($actor->nombres.' '.$actor->apellido_paterno)).'</p></div>'
             .'<p><strong>Alcance:</strong> '.e($alcance).'</p>'
             .'<p><strong>Acceso:</strong> '.e($acceso).'</p><p><strong>Integridad documental:</strong> '.e($integridad).'</p>'

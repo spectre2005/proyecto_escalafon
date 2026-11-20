@@ -1,6 +1,7 @@
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from '../../../shared/queries/useLiveQuery'
 import { usePuede } from '../../auth/session'
+import DescargarExpedienteZip from '../components/DescargarExpedienteZip'
 import Paginacion from '../../../shared/Paginacion'
 import { conPagina, conPorPagina, leerPaginacion } from '../../../shared/paginacionUrl'
 
@@ -61,6 +62,7 @@ export default function HistorialLegajoPage() {
     <h1 className="mt-4 text-2xl font-bold text-slate-800">Historial de legajos</h1>
     <p className="mt-2 text-sm text-slate-600">{ficha?.nombre} · {etapa ? `Legajo ${etapa.values.numero_legajo} (${etapa.values.estado_legajo})` : legajo === 'todos' ? 'Todas las etapas, incluidos los antecedentes sin legajo identificado' : 'Consultando legajo…'}</p>
     <p className="mt-2 text-xs text-slate-500">Vista de consulta. Estos registros no se incorporan automáticamente al nuevo legajo.</p>
+    {legajo !== 'todos' && <DescargarExpedienteZip usuario={usuario} legajo={legajo} etiqueta="Descargar ZIP de este legajo" className="mt-3 mr-3" />}
     {legajo !== 'todos' && <Link to={`/legajos/${usuario}?categoria=documentos&legajo_id=${legajo}`} className="mt-3 inline-block text-sm font-semibold text-teal-700 underline">Consultar documentos de este legajo</Link>}
     <section aria-label="Incorporaciones de la persona" className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {ficha?.legajos.map((item, index) => <Link key={item.id} to={`/legajos/${usuario}/historial/${item.id}`} aria-current={item.id === legajo ? 'page' : undefined} className={`rounded-xl border p-4 text-sm ${item.id === legajo ? 'border-teal-500 bg-teal-50' : 'border-slate-200 bg-white hover:border-teal-300'}`}>

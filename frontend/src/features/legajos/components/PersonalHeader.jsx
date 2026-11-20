@@ -64,6 +64,7 @@ export default function PersonalHeader({ data, usuario, compacto = false, onVerF
               </div>
               <Link to={`/legajos/${usuario}/historial/${legajo.id}`} className="font-semibold text-teal-800 underline">Consultar historial</Link>
               {legajo.values.estado_legajo === 'activo' && <CerrarLegajo usuario={usuario} legajo={legajo.id} />}
+              {legajo.values.estado_legajo === 'pasivo' && <DescargarExpedienteZip usuario={usuario} legajo={legajo.id} etiqueta="Descargar ZIP" className="bg-white" />}
             </li>)}
           </ul> : <p className="mt-2 text-sm text-slate-500">No hay legajos registrados para esta persona.</p>}
           {!data.legajos.some(legajo => legajo.values.estado_legajo === 'activo') && <AbrirLegajo nuevo={data.legajos.length > 0} usuario={usuario} className="mt-3" />}

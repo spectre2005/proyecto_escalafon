@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from '../../../shared/queries/useLiveQuery'
+import DescargarExpedienteZip from '../components/DescargarExpedienteZip'
 import Paginacion from '../../../shared/Paginacion'
 import { conPagina, conPorPagina, leerPaginacion } from '../../../shared/paginacionUrl'
 
@@ -44,6 +45,7 @@ export default function LegajosPasivosPage() {
             <Link to={`/legajos/${legajo.usuario_id}?categoria=documentos&legajo_id=${legajo.id}`} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700">
               <span className="block text-xs font-semibold text-slate-700">Documentos</span><span className="mt-0.5 block text-[11px] text-slate-500">Consultar archivos de este legajo</span>
             </Link>
+            <DescargarExpedienteZip usuario={legajo.usuario_id} legajo={legajo.id} etiqueta="Descargar ZIP de este legajo" className="" />
           </div></td>
         </tr>)}</tbody>
       </table></div>

@@ -17,10 +17,10 @@ use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * Vista previa del expediente imprimible (fase 1, secciones 01 a 04): qué documentos del legajo irían al índice y al
- * futuro ZIP, por sección y por folio (Directiva, num. 9.3). Solo lee: no toca archivos, folios ni estados.
+ * Vista previa del expediente imprimible: qué documentos del legajo irían al índice y al ZIP, por sección y por folio
+ * (Directiva, num. 9.3), según los grupos que elige quien descarga (GRUPOS). Solo lee: no toca archivos, folios ni estados.
  *
- * - Alcance: los tipos de las funcionalidades de FUNCIONALIDADES; se activan y desactivan con
+ * - Alcance: los tipos de las funcionalidades de los grupos elegidos; se activan y desactivan con
  *   ConfiguracionFuncionalidades::tipoActivo, como en el resto del legajo.
  * - Acceso: la regla del visor (DocumentoLegajoController::restriccion). Lo que el usuario no puede ver no se describe.
  * - Solo documentos del legajo con archivo; las entregas de Requerimientos, los datos de pantalla, la foto y los
@@ -29,17 +29,15 @@ use Throwable;
  */
 final class ExpedienteImprimible
 {
-    /** Secciones que siempre se incluyen. */
-    public const SECCIONES = [1, 2, 3, 4];
-
-    /** Funcionalidades que siempre se incluyen (secciones 01 a 04). */
-    public const FUNCIONALIDADES = ['s01.identidad', 's01.declaraciones', 's02.seleccion', 's02.vinculos', 's02.inducciones', 's03.formacion', 's04.experiencia'];
-
     /**
-     * Grupos que el usuario puede añadir a la copia; ninguno se incluye si no se pide.
+     * Grupos que quien descarga elige para la copia (todos opcionales).
      * clave => [sección, funcionalidades | null = toda la sección, incluidos sus «Otros documentos», nombre].
      */
-    public const OPCIONALES = [
+    public const GRUPOS = [
+        'identidad' => [1, ['s01.identidad', 's01.declaraciones'], '01. Identidad, ficha y declaraciones'],
+        'incorporacion' => [2, ['s02.seleccion', 's02.vinculos', 's02.inducciones'], '02. Incorporación'],
+        'formacion' => [3, ['s03.formacion'], '03. Formación académica y capacitación'],
+        'experiencia' => [4, ['s04.experiencia'], '04. Experiencia laboral'],
         'familiares' => [1, ['s01.familiares'], 'Familiares (DNI de cónyuge e hijos, partida de matrimonio)'],
         'discapacidad' => [1, ['s01.discapacidad'], 'Certificado de discapacidad'],
         'periodo_prueba' => [2, ['s02.periodos_prueba'], 'Período de prueba'],
@@ -48,21 +46,26 @@ final class ExpedienteImprimible
         'seccion_11' => [11, null, 'Sección 11'],
     ];
 
+    /** Grupos marcados al abrir la descarga (secciones 01 a 04) y los que se usan si no se indica ninguno. */
+    public const PREDETERMINADOS = ['identidad', 'incorporacion', 'formacion', 'experiencia'];
+
     /**
-     * @param  list<string>  $incluir  claves de OPCIONALES que se añaden a la copia
+     * @param  list<string>  $incluir  claves de GRUPOS que forman la copia; vacío = PREDETERMINADOS
      * @return array<string, mixed>
      */
     public static function vistaPrevia(Usuario $actor, Usuario $persona, Legajo $legajo, string $orden = 'asc', array $incluir = []): array
     {
         $disco = (string) config('legajo.disco_documentos');
-        $incluir = array_values(array_intersect(array_keys(self::OPCIONALES), $incluir));
-        $funcionalidades = self::FUNCIONALIDADES;
+        $incluir = array_values(array_intersect(array_keys(self::GRUPOS), $incluir)) ?: self::PREDETERMINADOS;
+        $funcionalidades = [];
         $seccionesCompletas = [];
+        $seccionesVista = [];
         foreach ($incluir as $clave) {
-            [$numero, $propias] = self::OPCIONALES[$clave];
+            [$numero, $propias] = self::GRUPOS[$clave];
+            $seccionesVista[] = $numero;
             $propias === null ? $seccionesCompletas[] = $numero : array_push($funcionalidades, ...$propias);
         }
-        $seccionesVista = array_values(array_unique([...self::SECCIONES, ...$seccionesCompletas]));
+        $seccionesVista = array_values(array_unique($seccionesVista));
         sort($seccionesVista);
         $nombres = SeccionLegajo::query()->whereIn('id', $seccionesVista)->pluck('nombre', 'id');
         $tipos = TipoDocumento::query()->with('subseccionLegajo:id,codigo,nombre')->where('activo', true)
@@ -108,7 +111,7 @@ final class ExpedienteImprimible
             if ($orden === 'desc') {
                 $documentos = $documentos->reverse()->values();
             }
-            $sinFoliar = $seccion === 1 ? self::sinFoliar($persona, $activos, $nombre, $advertencias) : [];
+            $sinFoliar = $seccion === 1 ? self::sinFoliar($persona, $legajo, $activos, $nombre, $advertencias) : [];
             $folios = (int) $documentos->sum('folios');
             $ultimo = Folios::ultimo($legajo, $seccion);
             // Folios de la sección que esta vista no cubre (tipos desactivados o fuera del alcance de la fase 1): se avisa,
@@ -215,7 +218,7 @@ final class ExpedienteImprimible
      * @param  list<array<string, mixed>>  $advertencias
      * @return list<array<string, mixed>>
      */
-    private static function sinFoliar(Usuario $persona, Collection $activos, string $nombreSeccion, array &$advertencias): array
+    private static function sinFoliar(Usuario $persona, Legajo $legajo, Collection $activos, string $nombreSeccion, array &$advertencias): array
     {
         $codigoDe = [];
         foreach (Seccion01::DECLARACIONES as $codigo => $tiposDeclaracion) {
@@ -224,7 +227,8 @@ final class ExpedienteImprimible
             }
         }
         $lista = [];
-        $declaraciones = DeclaracionVerificacion::query()->where('usuario_id', $persona->id)->where('anulado', false)
+        // Solo los del legajo que se copia: en un reingreso, los de la etapa anterior quedan en su propio legajo.
+        $declaraciones = DeclaracionVerificacion::query()->where('usuario_id', $persona->id)->delLegajo($legajo->id)->where('anulado', false)
             ->whereNotNull('pdf_path')->orderBy('fecha')->orderBy('id')->get();
         foreach ($declaraciones as $i => $declaracion) {
             $tipo = $activos->firstWhere('codigo', $codigoDe[$declaracion->tipo] ?? null);

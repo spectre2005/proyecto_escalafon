@@ -10,6 +10,7 @@ use App\Models\Legajo;
 use App\Models\RequerimientoDocumento;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
+use App\Support\Documentos\ExpedienteImprimible;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -86,7 +87,7 @@ class ZipExpedienteTest extends TestCase
         // Copia exacta del original.
         $this->assertSame("%PDF-1.4 S02_F_CONTRATO 1\n%%EOF", $archivos['02_incorporacion/F0001-0003_S02_F_CONTRATO.pdf']);
         $indice = $archivos['00_INDICE.html'];
-        foreach (['LEGAJO DE PERSONAL (CONFIDENCIAL)', 'ANA FICTICIA PRUEBA', 'DNI 00000001', 'LEG-PRUEBA-1', 'Siempre incluye las secciones 01 a 04', 'no representa necesariamente el legajo físico completo',
+        foreach (['LEGAJO DE PERSONAL (CONFIDENCIAL)', 'ANA FICTICIA PRUEBA', 'DNI 00000001', 'LEG-PRUEBA-1', 'Incluye lo elegido al descargar: 01. Identidad, ficha y declaraciones; 02. Incorporación', 'no representa necesariamente el legajo físico completo',
             'Acceso completo', 'Sin incidencias', 'num. 9.3', 'DNI vigente', 'CONTRATO-001', '02_incorporacion/F0001-0003_S02_F_CONTRATO.pdf'] as $texto) {
             $this->assertStringContainsString($texto, $indice);
         }
@@ -186,7 +187,7 @@ class ZipExpedienteTest extends TestCase
         $this->assertEqualsCanonicalizing([$dni->id, $titulo->id, null], DB::table('bitacora_accesos_legajo')->pluck('documento_id')->all());
         $evento = DB::table('auditoria_eventos')->where('accion', 'expediente.exportado')->sole();
         $this->assertSame($this->persona->id, $evento->usuario_titular_id);
-        $this->assertSame(['formato' => 'zip', 'secciones' => [1, 2, 3, 4], 'incluidos' => [], 'orden' => 'asc', 'documentos' => 3, 'acceso_completo' => true, 'integro' => true], json_decode($evento->datos_despues, true));
+        $this->assertSame(['formato' => 'zip', 'secciones' => [1, 2, 3, 4], 'incluidos' => ['identidad', 'incorporacion', 'formacion', 'experiencia'], 'orden' => 'asc', 'documentos' => 3, 'acceso_completo' => true, 'integro' => true], json_decode($evento->datos_despues, true));
     }
 
     public function test_optional_groups_are_only_included_when_chosen(): void
@@ -198,16 +199,17 @@ class ZipExpedienteTest extends TestCase
         $base = $this->contenido($this->get($this->url())->assertOk()->assertDownload('leg_prueba_1_ana_ficticia_prueba_secciones_01-04.zip'));
         $this->assertSame(['00_INDICE.html', '01_informacion_personal_y_familiar/F0001-0001_S01_B_DOCUMENTO_IDENTIDAD.pdf'], collect(array_keys($base))->sort()->values()->all());
         $this->assertStringContainsString('No se incluyó: familiares', $base['00_INDICE.html']);
-        // Elegidos: familiares y sección 05, con sus folios y sección propia.
-        $respuesta = $this->get($this->url().'?incluir[]=familiares&incluir[]=seccion_05')->assertOk()->assertDownload('leg_prueba_1_ana_ficticia_prueba_expediente_ampliado.zip');
+        // Elegidos: identidad, familiares y sección 05, con sus folios y sección propia.
+        $respuesta = $this->get($this->url().'?incluir[]=identidad&incluir[]=familiares&incluir[]=seccion_05')->assertOk()->assertDownload('leg_prueba_1_ana_ficticia_prueba_expediente_seleccion.zip');
         $ampliado = $this->contenido($respuesta);
         $this->assertArrayHasKey('01_informacion_personal_y_familiar/F0002-0002_S01_I_DNI_CONYUGE_CONCUBINO.pdf', $ampliado);
         $this->assertArrayHasKey('05_movimientos_del_personal/F0001-0001_S05_B_GOCE_VACACIONAL.pdf', $ampliado);
-        $this->assertStringContainsString('Añadido al descargar: Familiares (DNI de cónyuge e hijos, partida de matrimonio); 05. Movimientos del personal.', $ampliado['00_INDICE.html']);
+        $this->assertArrayHasKey('01_informacion_personal_y_familiar/F0001-0001_S01_B_DOCUMENTO_IDENTIDAD.pdf', $ampliado);
+        $this->assertStringContainsString('Incluye lo elegido al descargar: 01. Identidad, ficha y declaraciones; Familiares (DNI de cónyuge e hijos, partida de matrimonio); 05. Movimientos del personal.', $ampliado['00_INDICE.html']);
         $this->assertStringNotContainsString('folios_no_incluidos', $ampliado['00_INDICE.html']);
         $evento = DB::table('auditoria_eventos')->where('accion', 'expediente.exportado')->orderByDesc('created_at')->orderByDesc('id')->get()
-            ->map(fn ($e) => json_decode($e->datos_despues, true))->firstWhere('incluidos', ['familiares', 'seccion_05']);
-        $this->assertSame([1, 2, 3, 4, 5], $evento['secciones']);
+            ->map(fn ($e) => json_decode($e->datos_despues, true))->firstWhere('incluidos', ['identidad', 'familiares', 'seccion_05']);
+        $this->assertSame([1, 5], $evento['secciones']);
         $this->getJson($this->url().'?incluir[]=otra_cosa')->assertUnprocessable()->assertJsonValidationErrors('incluir.0');
     }
 
@@ -216,11 +218,55 @@ class ZipExpedienteTest extends TestCase
         $this->documento('S10_EXAMEN_OCUPACIONAL', 1, 1, ['nombre' => 'Examen reservado']);
         $this->documento('FORM_TITULO_GRADO_SUPERIOR', 1, 1);
         $this->actuarComo(codigo: 'asistente_legajo');
-        $archivos = $this->contenido($this->get($this->url().'?incluir[]=seccion_10')->assertOk());
+        $archivos = $this->contenido($this->get($this->url().'?incluir[]=formacion&incluir[]=seccion_10')->assertOk());
         $this->assertSame(['00_INDICE.html', '03_formacion_academica_y_capacitacion/F0001-0001_FORM_TITULO_GRADO_SUPERIOR.pdf'], collect(array_keys($archivos))->sort()->values()->all());
         $this->assertStringNotContainsString('Examen reservado', $archivos['00_INDICE.html']);
         $this->assertStringNotContainsString('S10_EXAMEN_OCUPACIONAL', $archivos['00_INDICE.html']);
         $this->assertStringContainsString('<h2>10. SST y bienestar</h2><p class="nota">Omitida por permisos', $archivos['00_INDICE.html']);
+    }
+
+    public function test_the_person_downloading_chooses_any_groups_and_can_choose_all(): void
+    {
+        $this->documento('S01_B_DOCUMENTO_IDENTIDAD', 1, 1);
+        $this->documento('S02_F_CONTRATO', 1, 1);
+        $this->documento('S05_B_GOCE_VACACIONAL', 1, 1);
+        // Solo la sección 05: sin las secciones 01 a 04.
+        $solo05 = $this->contenido($this->get($this->url().'?incluir[]=seccion_05')->assertOk());
+        $this->assertSame(['00_INDICE.html', '05_movimientos_del_personal/F0001-0001_S05_B_GOCE_VACACIONAL.pdf'], collect(array_keys($solo05))->sort()->values()->all());
+        $this->assertStringContainsString('No se incluyó: 01. identidad, ficha y declaraciones', $solo05['00_INDICE.html']);
+        // Todos los grupos: «expediente completo».
+        $todos = collect(array_keys(ExpedienteImprimible::GRUPOS))->map(fn (string $clave): string => 'incluir[]='.$clave)->implode('&');
+        $completo = $this->contenido($this->get($this->url().'?'.$todos)->assertOk()->assertDownload('leg_prueba_1_ana_ficticia_prueba_expediente_completo.zip'));
+        $this->assertCount(4, $completo);
+        $this->assertStringContainsString('Se eligieron todos los grupos.', $completo['00_INDICE.html']);
+        // Una lista vacía o repetida no es válida.
+        $this->getJson($this->url().'?incluir=')->assertUnprocessable();
+        $this->getJson($this->url().'?incluir[]=seccion_05&incluir[]=seccion_05')->assertUnprocessable()->assertJsonValidationErrors('incluir.0');
+    }
+
+    public function test_a_passive_legajo_can_be_downloaded_without_mixing_stages(): void
+    {
+        // Etapa anterior (pasiva) y reingreso con legajo nuevo (activo).
+        $this->documento('S02_F_CONTRATO', 1, 3, ['nombre' => 'CONTRATO ETAPA 1']);
+        Storage::disk('local')->put('declaraciones/vieja.pdf', "%PDF-1.4 ETAPA 1\n%%EOF");
+        DeclaracionVerificacion::factory()->create(['usuario_id' => $this->persona->id, 'legajo_id' => $this->legajo->id, 'tipo' => 'antecedente_penal', 'anulado' => false, 'pdf_path' => 'declaraciones/vieja.pdf']);
+        $this->legajo->update(['estado_legajo' => 'pasivo', 'fecha_pasivo' => '2025-12-31']);
+        $pasivo = $this->legajo;
+        $this->legajo = Legajo::factory()->create(['usuario_id' => $this->persona->id, 'estado_legajo' => 'activo', 'numero_legajo' => 'LEG-PRUEBA-2', 'fecha_apertura' => '2026-01-01']);
+        $this->documento('S02_F_CONTRATO', 1, 2, ['nombre' => 'CONTRATO ETAPA 2']);
+        // Por defecto, el legajo activo: sin nada de la etapa anterior (ni el PDF sin foliar).
+        $actual = $this->contenido($this->get($this->url())->assertOk()->assertDownload('leg_prueba_2_ana_ficticia_prueba_secciones_01-04.zip'));
+        $this->assertSame(['00_INDICE.html', '02_incorporacion/F0001-0002_S02_F_CONTRATO.pdf'], collect(array_keys($actual))->sort()->values()->all());
+        $this->assertStringNotContainsString('CONTRATO ETAPA 1', implode('', $actual));
+        // El pasivo, pidiéndolo: su contrato y su PDF sin foliar, con la carátula que indica que es pasivo.
+        $anterior = $this->contenido($this->get($this->url().'?legajo='.$pasivo->id)->assertOk()->assertDownload('leg_prueba_1_ana_ficticia_prueba_secciones_01-04.zip'));
+        $this->assertSame(['00_INDICE.html', '01_informacion_personal_y_familiar/SF01_S01_C_ANTECEDENTES_PENALES.pdf', '02_incorporacion/F0001-0003_S02_F_CONTRATO.pdf'], collect(array_keys($anterior))->sort()->values()->all());
+        $this->assertStringContainsString('LEG-PRUEBA-1 (pasivo: etapa cerrada, solo consulta)', $anterior['00_INDICE.html']);
+        $this->assertStringNotContainsString('CONTRATO ETAPA 2', implode('', $anterior));
+        $this->assertSame(1, DB::table('auditoria_eventos')->where('accion', 'expediente.exportado')->where('entidad_id', $pasivo->id)->count());
+        // Un legajo de otra persona no se descarga desde esta ficha.
+        $ajeno = Legajo::factory()->create(['usuario_id' => Usuario::factory()->create()->id, 'estado_legajo' => 'pasivo']);
+        $this->get($this->url().'?legajo='.$ajeno->id)->assertNotFound();
     }
 
     public function test_permissions_and_missing_legajo(): void
