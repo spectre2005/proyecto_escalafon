@@ -242,4 +242,47 @@ class CatalogosVinculoTest extends TestCase
         $this->postJson('/api/v1/catalogos-vinculo/niveles', ['regimen_normativo_id' => RegimenNormativo::query()->where('codigo', '276')->value('id'), 'grupo_ocupacional' => 'tecnico', 'codigo' => 'STG'])
             ->assertForbidden();
     }
+
+    public function test_un_vinculo_anterior_que_ya_no_corresponde_se_sigue_corrigiendo_en_lo_demas(): void
+    {
+        $this->actuarComo();
+        $alta = $this->postJson(self::ALTA, $this->alta(['modalidad_vinculo_id' => $this->modalidad('CAS (D.L. 1057)')->id, 'tipo_proceso_seleccion_id' => $this->proceso('Proceso CAS')->id]))->assertCreated();
+        $vinculo = VinculoLaboral::query()->findOrFail($alta->json('data.vinculo.id'));
+        // El catálogo cambió después: la modalidad y el proceso pasan a ser de otra ley.
+        $otraLey = RegimenNormativo::query()->where('codigo', '728')->value('id');
+        $this->modalidad('CAS (D.L. 1057)')->update(['regimen_normativo_id' => $otraLey]);
+        $this->proceso('Proceso CAS')->update(['regimen_normativo_id' => $otraLey]);
+        $url = '/api/v1/expedientes/'.$vinculo->usuario_id.'/vinculos-laborales/'.$vinculo->id;
+
+        // El formulario envía el vínculo completo: lo que no cambia de valor no se vuelve a exigir.
+        $this->patchJson($url, ['modalidad_vinculo_id' => $vinculo->modalidad_vinculo_id, 'tipo_proceso_seleccion_id' => $vinculo->tipo_proceso_seleccion_id,
+            'regimen_laboral' => 'plazo_determinado', 'fecha_fin_prevista' => '2026-12-31'])->assertOk();
+        // Elegir esa modalidad de nuevo en otro vínculo sí se rechaza.
+        $this->patchJson($url, ['modalidad_vinculo_id' => null])->assertOk();
+        $this->patchJson($url, ['modalidad_vinculo_id' => $this->modalidad('CAS (D.L. 1057)')->id])->assertJsonValidationErrors('modalidad_vinculo_id');
+    }
+
+    public function test_guardar_el_proceso_no_borra_el_escrito_antes_del_catalogo(): void
+    {
+        $this->actuarComo();
+        $alta = $this->postJson(self::ALTA, $this->alta())->assertCreated();
+        $vinculo = VinculoLaboral::query()->findOrFail($alta->json('data.vinculo.id'));
+        $vinculo->forceFill(['proceso_seleccion' => 'CONCURSO 2019', 'tipo_proceso_seleccion_id' => null])->save();
+        $url = '/api/v1/expedientes/'.$vinculo->usuario_id.'/vinculos-laborales/'.$vinculo->id;
+
+        $this->patchJson($url, ['tipo_proceso_seleccion_id' => '', 'fecha_resultado_seleccion' => '2019-05-02'])->assertOk();
+        $this->assertSame('CONCURSO 2019', $vinculo->fresh()->proceso_seleccion);
+        // Quitar un proceso del catálogo sí quita su texto.
+        $this->patchJson($url, ['tipo_proceso_seleccion_id' => $this->proceso('Proceso CAS')->id])->assertOk();
+        $this->patchJson($url, ['tipo_proceso_seleccion_id' => ''])->assertOk();
+        $this->assertNull($vinculo->fresh()->proceso_seleccion);
+    }
+
+    public function test_no_se_elige_una_unidad_organica_desactivada(): void
+    {
+        $this->actuarComo();
+        $unidad = UnidadOrganica::factory()->create(['activo' => false]);
+        $this->postJson(self::ALTA, $this->alta(['unidad_organica_id' => $unidad->id]))->assertJsonValidationErrors('vinculo.unidad_organica_id');
+        $this->assertSame(0, VinculoLaboral::query()->count());
+    }
 }

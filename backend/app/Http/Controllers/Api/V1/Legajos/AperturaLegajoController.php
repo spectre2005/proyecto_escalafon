@@ -8,6 +8,7 @@ use App\Models\Legajo;
 use App\Models\Usuario;
 use App\Support\AperturaLegajo;
 use App\Support\Auditoria;
+use App\Support\VigenciaLaboral;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -31,7 +32,7 @@ class AperturaLegajoController extends Controller
             $registro = Legajo::query()->where('usuario_id', $usuario)->lockForUpdate()->findOrFail($legajo);
             abort_unless($registro->estado_legajo === 'activo', 409, 'El legajo ya está cerrado.');
             $antes = $registro->only(['estado_legajo', 'fecha_pasivo']);
-            $registro->update(['estado_legajo' => 'pasivo', 'fecha_pasivo' => today()]);
+            $registro->update(['estado_legajo' => 'pasivo', 'fecha_pasivo' => VigenciaLaboral::hoy()]);
             $this->registrarCambio($request, $registro, 'legajo.cerrar', $antes);
 
             return $registro;

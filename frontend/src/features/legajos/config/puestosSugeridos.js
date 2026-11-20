@@ -1,3 +1,5 @@
+import { normalizar } from './catalogosVinculo.js'
+
 // Sugerencias PROVISIONALES para la denominación del puesto (vinculos_laborales.nombre_puesto, texto libre). No son un
 // catálogo oficial de la institución: quedan pendientes de que confirme sus denominaciones. Solo ayudan a rellenar el
 // campo; no se guardan en una tabla y no crean datos nuevos. El puesto no es la condición docente, la categoría, la
@@ -31,20 +33,24 @@ const gruposSugeridos = {
 
 /**
  * Grupos ocupacionales que admite el puesto, o null si admite cualquiera (puesto escrito antes, o del catálogo sin grupo).
- * Un puesto del catálogo manda con su grupo; si no está en el catálogo, se usa la denominación sugerida.
+ * El puesto elegido del catálogo (por su id) manda con su grupo; si no hay id, se busca por nombre entre los puestos
+ * activos del catálogo y, si no está, se usa la denominación sugerida.
  */
-export function gruposDelPuesto(nombrePuesto, puestosCatalogo = []) {
+export function gruposDelPuesto(nombrePuesto, puestosCatalogo = [], puestoId = '') {
+  const elegido = puestoId ? (puestosCatalogo || []).find(p => p.id === puestoId) : null
+  if (elegido) return elegido.grupo_ocupacional ? [elegido.grupo_ocupacional] : null
   const texto = String(nombrePuesto ?? '').trim()
   if (!texto) return null
-  const delCatalogo = (puestosCatalogo || []).filter(p => p.tipo_personal !== 'docente' && mismoTexto(p.nombre, texto))
+  const delCatalogo = (puestosCatalogo || []).filter(p => p.tipo_personal !== 'docente' && p.activo !== false && mismoTexto(p.nombre, texto))
   if (delCatalogo.length) return delCatalogo.every(p => p.grupo_ocupacional) ? [...new Set(delCatalogo.map(p => p.grupo_ocupacional))] : null
   const clave = Object.keys(gruposSugeridos).find(puesto => mismoTexto(puesto, texto))
   return clave ? gruposSugeridos[clave] : null
 }
 
 
-// Los puestos se escriben en mayúsculas (shared/forms/mayusculas.js): la coincidencia no distingue mayúsculas.
-const mismoTexto = (a, b) => a.toLocaleUpperCase('es-PE') === b.toLocaleUpperCase('es-PE')
+// Los puestos se escriben en mayúsculas (shared/forms/mayusculas.js) y a veces sin tilde: la coincidencia no distingue
+// mayúsculas, tildes ni espacios de más («TECNICO ADMINISTRATIVO» = «Técnico administrativo»).
+const mismoTexto = (a, b) => normalizar(a) === normalizar(b)
 
 // Equivalencias inequívocas puesto → datos del perfil docente (Ley 30220: condición y, en ordinarios, categoría). Los
 // demás puestos (p. ej. «Jefe de práctica» o «Docente investigador») no fijan esos datos y no se autocompletan.

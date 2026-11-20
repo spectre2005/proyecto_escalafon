@@ -44,7 +44,7 @@ export default function ResumenLateral({ persona, ley, codigoLey, vinculo, datos
     </div>
     <ul className="grid gap-2.5 text-sm">
       {avance.map(([texto, hecho]) => <li key={texto} className="flex items-center gap-2">
-        <span aria-hidden="true" className={hecho ? 'text-teal-700' : 'text-slate-300'}>{hecho ? <Icon name="check" size={16} /> : <span className="block size-4 rounded-full border-2 border-current" />}</span>
+        <span aria-hidden="true" className={hecho ? 'text-teal-700' : 'text-slate-400'}>{hecho ? <Icon name="check" size={16} /> : <span className="block size-4 rounded-full border-2 border-current" />}</span>
         <span className={hecho ? 'text-slate-700' : 'text-slate-500'}>{texto}</span>
         <span className="sr-only">{hecho ? '(completo)' : '(pendiente)'}</span>
       </li>)}

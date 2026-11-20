@@ -18,7 +18,7 @@ import { usePuede } from '../../auth/session'
 import { AVISO_SIMULACION, aplicarIdentidad, camposPorReemplazar, consultarAlCompletar, crearConsultaIdentidad, domicilioTrasCambioDni, ESPERA_CONSULTA_MS, mensajeErrorConsulta, modoConsulta, mensajeUbicacion, NO_DISPONIBLE, UBICACION_VACIA, ubicacionManual, ubicacionTrasCambioDni, ubicacionTrasConsulta, valoresIdentidad } from '../utils/consultaIdentidad'
 import ResumenLateral from './ResumenLateral'
 import ResumenRegistro from './ResumenRegistro'
-import { armarRegistro, condicionesSinResponder, DESCRIPCION_LEY, erroresDe, erroresPersona, PASOS, personaDelPaso, personaExistente, primerPasoConError, rutaFicha, sugerenciaTipoVinculo, tituloLey } from '../utils/registroPasos'
+import { armarRegistro, condicionesSinResponder, DESCRIPCION_LEY, erroresDe, erroresPersona, PASOS, pasoDeError, personaDelPaso, personaExistente, primerPasoConError, rutaFicha, sugerenciaTipoVinculo, tituloLey } from '../utils/registroPasos'
 
 // Registro manual en tres pasos dentro de la ventana «Agregar personal»: persona (el DNI primero; tipo y ley en tarjetas),
 // puesto y vínculo juntos, y revisión. Lo opcional va plegado y, en pantallas anchas, un resumen a la derecha muestra lo
@@ -41,6 +41,9 @@ const opcionesTipo = [
   { valor: 'docente', titulo: 'Docente', descripcion: 'Ordinario, contratado o extraordinario · Ley 30220' },
   { valor: 'administrativo', titulo: 'Administrativo', descripcion: 'Profesional, técnico o auxiliar' },
 ]
+// Claves de error del servidor que no tienen un campo donde mostrarse.
+const ERRORES_SIN_CAMPO = ['usuarios.0.ubigeo_id', 'usuarios.0.regimen_laboral', 'vinculo.regimen_normativo_id', 'vinculo.tipo_personal', 'vinculo.numero_documento_vinculo', 'cerrar_legajo_actual', 'legajos_previos']
+
 // Campos de los bloques plegables: si alguno trae un error, el bloque se abre solo.
 const enMasDatos = ['telefono', 'fecha_nacimiento', 'domicilio', 'ubigeo_id', 'tiene_derechohabientes', 'con_discapacidad']
 const etiquetas = { ...Object.fromEntries(camposPersona.map(([key, label]) => [key, label.toLowerCase()])), domicilio: 'domicilio' }
@@ -103,7 +106,7 @@ function PersonaRegistrada({ persona, puedeVerFicha, puedeRegistrar, nuevoIngres
   const ficha = puedeVerFicha && <Link to={rutaFicha(persona.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 font-semibold text-amber-800 hover:bg-amber-100">Ir a su ficha <Icon name="arrow" size={14} /></Link>
   const nombre = <strong>{persona.nombre || 'Esta persona'}</strong>
   if (persona.puedeIncorporar || nuevoIngreso) return <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-xs leading-relaxed text-teal-800">
-    <span>Nuevo ingreso de {nombre}: se creará su legajo n.° {persona.numeroIncorporacion}.{nuevoIngreso ? ' Su legajo actual pasará a Legajos pasivos como historial, con sus documentos.' : ' Su legajo anterior se conserva en Legajos pasivos.'}</span>
+    <span>Nuevo ingreso de {nombre}: se registrará su incorporación n.° {persona.numeroIncorporacion} con un legajo nuevo.{nuevoIngreso ? ' Su legajo actual pasará a Legajos pasivos como historial, con sus documentos.' : ' Su legajo anterior se conserva en Legajos pasivos.'}</span>
     {nuevoIngreso && <button type="button" onClick={() => onNuevoIngreso(false)} className="font-semibold underline">Deshacer</button>}
   </div>
   if (persona.tieneLegajoActivo && puedeRegistrar) return <div role="alert" className="mb-4 grid gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-800">
@@ -144,6 +147,7 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   // Listas obligatorias sin elegir al intentar avanzar: se marcan en rojo (los <select> nativos ya los marca el navegador).
   const [faltantes, setFaltantes] = useState({})
   const tituloRef = useRef(null)
+  const puestoIdRef = useRef('')
   const enfocarTituloRef = useRef(false)
   const [errores, setErrores] = useState({})
   const [notaPuesto, setNotaPuesto] = useState('')
@@ -172,6 +176,13 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   const modoIdentidad = modoConsulta({ dni: draft.numero_doc_identidad, existente, estado: estadoIdentidad, puedeRegistrar })
 
   useEffect(() => { draftRef.current = draft }, [draft])
+  // Al volver a mostrarse (p. ej. «Registrar otra persona»), el foco va al DNI en lugar de perderse. Con el diálogo
+  // cerrado el formulario no es visible y no se toca el foco.
+  useEffect(() => {
+    if (formRef.current?.getClientRects().length && (!document.activeElement || document.activeElement === document.body)) {
+      formRef.current.querySelector('input[name="numero_doc_identidad"]')?.focus()
+    }
+  }, [])
   // Al cambiar de paso (no al abrir), el foco va al título del paso: el lector de pantalla anuncia dónde está.
   useEffect(() => {
     if (!enfocarTituloRef.current) return
@@ -255,14 +266,16 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
 
   const ponerVinculo = key => valor => {
     setVinculo(previo => ({ ...previo, [key]: valor }))
-    if (key === 'nombre_puesto') { completarPerfil(valor); ajustarGrupoAlPuesto(valor) }
+    // El id del puesto llega justo antes que su nombre (aplicarCambios): se guarda para ubicar el puesto elegido.
+    if (key === 'puesto_id') puestoIdRef.current = valor
+    if (key === 'nombre_puesto') { completarPerfil(valor); ajustarGrupoAlPuesto(valor, puestoIdRef.current) }
   }
 
   // Puesto y grupo ocupacional se filtran entre sí. Al elegir un puesto: si el grupo elegido no le corresponde se vacía, y
   // si el puesto admite un solo grupo, se completa (con su nivel de carrera solo si sigue valiendo).
-  function ajustarGrupoAlPuesto(nombrePuesto) {
+  function ajustarGrupoAlPuesto(nombrePuesto, puestoId) {
     if (tipo !== 'administrativo') return
-    const grupos = gruposDelPuesto(nombrePuesto, opciones.data?.data?.puestos)
+    const grupos = gruposDelPuesto(nombrePuesto, opciones.data?.data?.puestos, puestoId)
     const actual = puestos.administrativo.grupo_ocupacional
     if (!grupos || grupos.includes(actual) && actual) return
     const grupo = grupos.length === 1 ? grupos[0] : ''
@@ -274,7 +287,10 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   }
   const setCampoPuesto = key => event => {
     const valor = event.target.type === 'checkbox' ? event.target.checked : event.target.value
-    setPuestos(previos => ({ ...previos, [tipo]: { ...previos[tipo], [key]: valor } }))
+    // La categoría es solo de ordinarios y el subtipo, de extraordinarios: al cambiar la condición se vacían si ya no valen
+    // (así el resumen muestra lo mismo que se envía).
+    const huerfanos = key === 'condicion_docente' ? { ...(valor !== 'ordinario' && { categoria: '' }), ...(valor !== 'extraordinario' && { subtipo_extraordinario: '' }) } : {}
+    setPuestos(previos => ({ ...previos, [tipo]: { ...previos[tipo], [key]: valor, ...huerfanos } }))
     // Elegido a mano: ya no sigue al puesto.
     setAutoPuesto(previos => previos.filter(campo => campo !== key))
     setNotaPuesto('')
@@ -306,7 +322,7 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   }
 
   function irA(numero) {
-    if (numero !== paso) enfocarTituloRef.current = true
+    if (numero !== paso) { enfocarTituloRef.current = true; setAvisos([]) }
     setPaso(numero)
     contenidoRef.current?.scrollTo({ top: 0 })
   }
@@ -315,7 +331,15 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   function elegirTipo(valor) {
     if (valor === tipo) return
     setDraft({ ...draft, tipo_personal: valor, regimen_normativo_id: '' })
-    setVinculo(previo => ({ ...previo, puesto_id: '', nombre_puesto: '', modalidad_vinculo_id: '', ...ajustesPorPersona(previo, opciones.data?.data, valor, '') }))
+    limpiarPorTipo(valor, '')
+  }
+
+  // Otro tipo de personal: el puesto y la modalidad eran del tipo anterior y se vacían; el proceso, si no corresponde a la
+  // ley que tendrá (la elegida o la única del tipo, que se completa sola).
+  function limpiarPorTipo(nuevoTipo, nuevaLey) {
+    const ley = nuevaLey || leyInicial(catalogo, nuevoTipo)
+    setVinculo(previo => ({ ...previo, puesto_id: '', nombre_puesto: '', modalidad_vinculo_id: '', ...ajustesPorPersona(previo, opciones.data?.data, nuevoTipo, ley) }))
+    puestoIdRef.current = ''
     setAutoPuesto([])
     setNotaPuesto('')
     setAvisos([])
@@ -333,13 +357,22 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
     const invalido = formRef.current.querySelector('input:invalid, select:invalid, textarea:invalid')
     const plegado = invalido?.closest('details')
     if (plegado && !plegado.open) plegado.open = true
+    // Las listas obligatorias se marcan a la vez que el navegador señala los demás campos (no en un segundo intento).
+    const faltan = paso === 1 ? { tipo: !tipo, ley: !!tipo && !leyElegida } : paso === 2 ? { regimen_laboral: !vinculo.regimen_laboral } : {}
+    setFaltantes(faltan)
     if (!formRef.current.reportValidity()) return false
-    setFaltantes(paso === 1 ? { tipo: !tipo, ley: !!tipo && !leyElegida } : paso === 2 ? { regimen_laboral: !vinculo.regimen_laboral } : {})
+    // El navegador no ve las listas propias: si falta una, el foco va a ella (y su error se anuncia por aria-describedby).
+    const listaFaltante = { tipo: 'alta-tipo', ley: 'alta-ley', regimen_laboral: 'alta-vinculo-tipo' }[Object.keys(faltan).find(clave => faltan[clave])]
+    if (listaFaltante) document.getElementById(listaFaltante)?.focus()
     const lista = paso === 1 ? erroresPersona(personaDelPaso(draft, leyElegida), { catalogo, usuarios, ubicacion, ubigeoId, nuevoIngreso })
       .map(texto => (!tipo && texto === 'El tipo debe ser docente o administrativo.' ? 'Elige el tipo de personal: docente o administrativo.' : texto))
       : paso === 2 ? [!vinculo.regimen_laboral && 'Elige el tipo de vínculo: carrera, plazo determinado o designado.',
         conflictosPuesto.length && `${mensajeConflicto} Ajusta la condición o la categoría, o elige otro puesto, para continuar.`].filter(Boolean) : []
     if (paso === 1 && Object.values(ubicacion).some(Boolean) && !ubigeoId) setMasDatos(true)
+    // El DNI repetido que informó el servidor también bloquea (la lista local puede no estar al día).
+    const repetido = 'Esta persona ya está registrada con ese DNI.'
+    if (paso === 1 && existenteBackend?.dni === draft.numero_doc_identidad.trim() && !existenteBackend.persona.puedeIncorporar
+      && !(nuevoIngreso && existenteBackend.persona.tieneLegajoActivo) && !lista.includes(repetido)) lista.push(repetido)
     setAvisos(lista)
     if (lista.length) contenidoRef.current?.scrollTo({ top: 0 })
     return !lista.length
@@ -348,12 +381,15 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   async function enviar(event) {
     event.preventDefault()
     if (saving || bloqueado || !pasoValido()) return
+    // Los errores del servidor de este paso ya se revisaron: no siguen en rojo (se vuelven a comprobar al registrar).
+    setErrores(previos => Object.fromEntries(Object.entries(previos).filter(([clave]) => pasoDeError(clave) !== paso)))
     if (paso < PASOS.length) return irA(paso + 1)
     const persona = personaDelPaso(draft, leyElegida)
     const pendientes = erroresPersona(persona, { catalogo, usuarios, ubicacion, ubigeoId, nuevoIngreso })
     if (pendientes.length) { setAvisos(pendientes); return irA(1) }
     setErrores({})
-    const resultado = await onGuardar(armarRegistro({ persona, catalogo, escalas, ubigeoId, condiciones, puedeDiscapacidad, vinculo, puestos, nuevoIngreso }))
+    const resultado = await onGuardar(armarRegistro({ persona, catalogo, escalas, ubigeoId, condiciones, puedeDiscapacidad, vinculo, puestos, nuevoIngreso,
+      legajosPrevios: existente?.numeroIncorporacion ? existente.numeroIncorporacion - 1 : null }))
     if (!resultado.ok) {
       setExistenteBackend(resultado.existente ? { dni: persona.numero_doc_identidad, persona: resultado.existente } : null)
       setErrores(resultado.errors || {})
@@ -378,6 +414,11 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
           let siguiente = updateUserDraft(draft, key, valor, dominioCorreo)
           if (cambiaDni) siguiente = conPersonaPrevia(siguiente, usuarios)
           if (cambiaDni) { reiniciarIdentidad(valor); setNuevoIngreso(false) }
+          // La persona ya registrada trae su tipo y su ley: lo elegido en el paso 2 que no les corresponde se vacía.
+          if (cambiaDni && siguiente.tipo_personal !== draft.tipo_personal) limpiarPorTipo(siguiente.tipo_personal, siguiente.regimen_normativo_id)
+          else if (cambiaDni && siguiente.regimen_normativo_id !== draft.regimen_normativo_id) {
+            setVinculo(previo => ({ ...previo, ...ajustesPorPersona(previo, opciones.data?.data, siguiente.tipo_personal, siguiente.regimen_normativo_id || leyInicial(catalogo, siguiente.tipo_personal)) }))
+          }
           // El domicilio que trajo la consulta del DNI anterior no pasa a la persona nueva.
           setDraft(cambiaDni ? domicilioTrasCambioDni(siguiente, identidad.origen) : siguiente)
         }} />
@@ -415,7 +456,9 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
   </div>
 
   // El DNI repetido se muestra con su enlace (PersonaRegistrada), no en la lista general.
-  const general = [...avisos, ...[].concat(errores.usuarios || [])].filter(texto => !(existente && /ya está registrada con ese DNI/.test(texto)))
+  // Errores del servidor sin campo en pantalla (p. ej. la ubicación o la ley del vínculo): van a la lista general.
+  const sinCampo = Object.entries(errores).filter(([clave]) => ERRORES_SIN_CAMPO.includes(clave)).flatMap(([, mensajes]) => [].concat(mensajes))
+  const general = [...avisos, ...[].concat(errores.usuarios || []), ...sinCampo].filter(texto => !(existente && /ya está registrada con ese DNI/.test(texto)))
   const leyes = leyesDelTipo(catalogo, tipo).map(ley => ({ valor: ley.id, titulo: tituloLey(ley), descripcion: DESCRIPCION_LEY[ley.codigo] || ley.nombre,
     ...(ley.codigo === '1057' && { etiqueta: 'Sin nivel', tono: 'aviso' }) }))
   const nombreLey = (catalogo || []).find(ley => ley.id === leyElegida)?.nombre
@@ -475,13 +518,13 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
                 <TresEstados name="alta-tiene_derechohabientes" label="¿Tiene derechohabientes?" ayuda="Cónyuge, concubino/a o hijos." error={erroresPersonaCampo.tiene_derechohabientes}
                   value={condiciones.tiene_derechohabientes} onChange={valor => setCondiciones(previas => ({ ...previas, tiene_derechohabientes: valor }))} />
                 <TresEstados name="alta-con_discapacidad" label="¿Discapacidad del servidor o de alguno de sus hijos?" error={erroresPersonaCampo.con_discapacidad}
-                  ayuda={puedeDiscapacidad ? 'Si no lo sabes, deja «Sin responder».' : 'Solo administración de la ORH puede registrarlo.'} disabled={!puedeDiscapacidad}
+                  ayuda={puedeDiscapacidad ? 'Si no lo sabes, deja «Sin responder».' : 'Tu rol no puede registrar este dato: lo registra quien tenga el permiso de discapacidad.'} disabled={!puedeDiscapacidad}
                   value={condiciones.con_discapacidad} onChange={valor => setCondiciones(previas => ({ ...previas, con_discapacidad: valor }))} />
               </div>
             </Plegable>
           </>}
           {paso === 2 && <>
-            <Seccion titulo="¿Dónde y en qué puesto trabajará?" ayuda="Elige de las listas. Si falta una unidad o un puesto, pide a la ORH que lo agregue al catálogo." columnas="sm:grid-cols-2">
+            <Seccion titulo="¿Dónde y en qué puesto trabajará?" ayuda="Elige de las listas. Si falta una unidad o un puesto, pide al administrador del sistema que lo agregue al catálogo." columnas="sm:grid-cols-2">
               <CamposUbicacionPuesto draft={vinculo} poner={ponerVinculo} errors={erroresVinculo} opciones={opciones.data?.data} tipoPersonal={tipo} nombre="alta-vinculo" />
             </Seccion>
             <Seccion titulo={tipo === 'docente' ? 'Condición y categoría docente' : 'Grupo y nivel de carrera'}
@@ -492,7 +535,7 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
                 <button type="button" className={botonSecundario} onClick={ajustarPerfilAlPuesto}>Ajustar al puesto</button>
               </div>}
               {!conflictosPuesto.length && notaPuesto && <p role="status" className={`col-span-full rounded-lg px-3 py-2 text-xs ${estilosMensaje.ok}`}>{notaPuesto}</p>}
-              <CamposDatosPuesto docente={tipo === 'docente'} draft={datosPuestoVisibles} set={setCampoPuesto} codigoLey={codigoLey} escalas={escalas} grupoEnLista gruposPermitidos={tipo === 'administrativo' ? gruposDelPuesto(vinculo.nombre_puesto, opciones.data?.data?.puestos) : null}
+              <CamposDatosPuesto docente={tipo === 'docente'} draft={datosPuestoVisibles} set={setCampoPuesto} codigoLey={codigoLey} escalas={escalas} grupoEnLista gruposPermitidos={tipo === 'administrativo' ? gruposDelPuesto(vinculo.nombre_puesto, opciones.data?.data?.puestos, vinculo.puesto_id) : null}
                 errors={{ ...erroresDe(errores, 'datos_puesto'), ...Object.fromEntries(conflictosPuesto.map(campo => [campo, ['No coincide con el puesto elegido.']])) }} />
             </Seccion>
             <Seccion titulo="Vínculo laboral" ayuda={`Tipo de vínculo, documento de ingreso y fechas${nombreLey ? ` · ${nombreLey}` : ''}. La sugerencia sale de la ley y del puesto; puedes elegir otro.`} columnas="">
@@ -521,13 +564,14 @@ export default function RegistroManual({ usuarios, opciones, dominioCorreo = '',
         </div>}
       </div>
     </div>
-    <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3.5 md:px-6">
-      <small className="text-[13px] text-slate-500">Paso {paso} de {PASOS.length} · * obligatorio · se guarda solo al registrar</small>
-      <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={onCancel} disabled={saving} className="rounded-xl border border-slate-300 bg-white px-4.5 py-3 text-sm font-semibold text-slate-700 hover:bg-teal-50">Cancelar</button>
-        {paso > 1 && <button type="button" onClick={() => { setAvisos([]); irA(paso - 1) }} disabled={saving} className="rounded-xl border border-slate-300 bg-white px-4.5 py-3 text-sm font-semibold text-slate-700 hover:bg-teal-50">Atrás</button>}
-        <button type="submit" disabled={saving || bloqueado || (paso === PASOS.length && !puedeRegistrar)} className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-5.5 py-3 text-sm font-semibold text-white hover:bg-teal-800">
-          {paso < PASOS.length ? <>{siguiente} <Icon name="arrow" size={15} /></> : <><Icon name="plus" size={16} /> {saving ? 'Registrando…' : 'Registrar personal'}</>}
+    <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3 md:px-6 md:py-3.5">
+      <small className="text-[13px] text-slate-500 max-sm:hidden">Paso {paso} de {PASOS.length} · * obligatorio · se guarda solo al registrar</small>
+      {/* En teléfono, los botones en una sola fila a todo el ancho (el texto de ayuda se oculta). */}
+      <div className="flex items-center gap-2 max-sm:w-full max-sm:[&>button]:flex-1 max-sm:[&>button]:justify-center">
+        <button type="button" onClick={onCancel} disabled={saving} className="rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm sm:px-4.5 font-semibold text-slate-700 hover:bg-teal-50">Cancelar</button>
+        {paso > 1 && <button type="button" onClick={() => { setAvisos([]); irA(paso - 1) }} disabled={saving} className="rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm font-semibold text-slate-700 hover:bg-teal-50 sm:px-4.5">Atrás</button>}
+        <button type="submit" disabled={saving || bloqueado || (paso === PASOS.length && !puedeRegistrar)} className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-3 py-3 text-sm font-semibold text-white hover:bg-teal-800 sm:px-5.5">
+          {paso < PASOS.length ? <><span className="max-sm:hidden">{siguiente}</span><span className="sm:hidden">Continuar</span> <Icon name="arrow" size={15} /></> : <><Icon name="plus" size={16} /> {saving ? 'Registrando…' : 'Registrar personal'}</>}
         </button>
       </div>
     </div>

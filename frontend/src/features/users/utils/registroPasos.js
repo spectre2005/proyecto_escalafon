@@ -127,11 +127,13 @@ function conNivelDeLaLey(docente, datos, catalogo, escalas, leyId) {
   return { ...datos, nivel_carrera: nivelTrasCambiarGrupo(escalas, datos.nivel_carrera, codigoLey, datos.grupo_ocupacional) }
 }
 
-export function armarRegistro({ persona, catalogo, escalas = [], ubigeoId, condiciones, puedeDiscapacidad, vinculo, puestos, nuevoIngreso = false }) {
+export function armarRegistro({ persona, catalogo, escalas = [], ubigeoId, condiciones, puedeDiscapacidad, vinculo, puestos, nuevoIngreso = false, legajosPrevios = null }) {
   const docente = persona.tipo_personal === 'docente'
   return {
-    // Nuevo ingreso con su legajo aún activo: el backend lo pasa a pasivo (historial) y abre uno nuevo.
+    // Nuevo ingreso con su legajo aún activo: el backend lo pasa a pasivo (historial) y abre uno nuevo. Con cuántos legajos
+    // tenía al confirmarlo: si la solicitud llega dos veces, la segunda se rechaza en lugar de cerrar el legajo recién abierto.
     ...(nuevoIngreso ? { cerrar_legajo_actual: true } : {}),
+    ...(Number.isInteger(legajosPrevios) ? { legajos_previos: legajosPrevios } : {}),
     usuarios: [conLey(catalogo, { ...sinVacios(persona, ['fecha_nacimiento', 'domicilio']), ubigeo_id: ubigeoId || null, tiene_derechohabientes: condiciones.tiene_derechohabientes, con_discapacidad: puedeDiscapacidad ? condiciones.con_discapacidad : null })],
     vinculo: recortar(vinculo),
     datos_puesto: limpiarDatosPuesto(docente, conNivelDeLaLey(docente, recortar(puestos[persona.tipo_personal] || {}), catalogo, escalas, persona.regimen_normativo_id)),
@@ -143,16 +145,18 @@ export function armarRegistro({ persona, catalogo, escalas = [], ubigeoId, condi
  * (proceso o modalidad de otro tipo de personal o de otra ley) ya no se puede elegir y el backend lo rechaza.
  * TODO pendiente de confirmar con el cliente: si alguno de estos casos debe impedir el registro.
  */
-export function avisosDeCoherencia({ vinculo, datosPuesto = {}, codigoLey = '', tipo = '', grupoDelPuesto = '' }) {
+export function avisosDeCoherencia({ vinculo, datosPuesto = {}, codigoLey = '', tipo = '', gruposPuesto = null }) {
   const condicion = tipo === 'docente' ? datosPuesto.condicion_docente : ''
-  const grupoEsperado = tipo === 'administrativo' ? (grupoDelPuesto || grupoPorNombre(vinculo.nombre_puesto)) : ''
+  // Grupos del puesto (catálogo o denominación sugerida); solo un puesto escrito a mano se deduce por su nombre.
+  const nombreDice = !vinculo.puesto_id && !gruposPuesto ? grupoPorNombre(vinculo.nombre_puesto) : ''
+  const esperados = tipo !== 'administrativo' ? null : gruposPuesto || (nombreDice ? [nombreDice] : null)
   return [
     condicion === 'ordinario' && vinculo.regimen_laboral && vinculo.regimen_laboral !== 'carrera'
       && 'Un docente ordinario es de carrera, pero el tipo de vínculo no es «Carrera». Si es un contrato temporal, la condición docente es «Contratado».',
     condicion === 'contratado' && vinculo.regimen_laboral === 'carrera'
       && 'Un docente contratado no es de carrera: su tipo de vínculo suele ser «Plazo determinado».',
-    grupoEsperado && datosPuesto.grupo_ocupacional && datosPuesto.grupo_ocupacional !== grupoEsperado
-      && `El puesto «${vinculo.nombre_puesto}» es del grupo ${GRUPOS[grupoEsperado]}, pero elegiste el grupo ${GRUPOS[datosPuesto.grupo_ocupacional] || datosPuesto.grupo_ocupacional}: revisa el grupo y el nivel de carrera.`,
+    esperados && datosPuesto.grupo_ocupacional && !esperados.includes(datosPuesto.grupo_ocupacional)
+      && `El puesto «${vinculo.nombre_puesto}» es del grupo ${esperados.map(g => GRUPOS[g]).join(' o ')}, pero elegiste el grupo ${GRUPOS[datosPuesto.grupo_ocupacional] || datosPuesto.grupo_ocupacional}: revisa el grupo y el nivel de carrera.`,
     vinculo.regimen_laboral === 'carrera' && vinculo.fecha_fin_prevista
       && `Un vínculo de carrera (nombrado u ordinario) normalmente no tiene fecha de fin, y este termina el ${vinculo.fecha_fin_prevista.split('-').reverse().join('/')}. Si es un contrato temporal, el tipo de vínculo es «Plazo determinado».`,
     codigoLey === '1057' && vinculo.regimen_laboral === 'carrera'
@@ -166,9 +170,12 @@ export function avisosDeCoherencia({ vinculo, datosPuesto = {}, codigoLey = '', 
 
 const GRUPOS = { profesional: 'Profesional', tecnico: 'Técnico', auxiliar: 'Auxiliar' }
 
-/** Grupo ocupacional que el nombre del puesto dice expresamente («Técnico administrativo» → técnico), o ''. */
+/**
+ * Grupo ocupacional que el nombre del puesto dice al empezar («Técnico administrativo», «Técnica en enfermería» →
+ * técnico), o ''. Solo al inicio: «Secretaria de Escuela Profesional» no es del grupo profesional.
+ */
 export function grupoPorNombre(nombrePuesto = '') {
-  const texto = String(nombrePuesto || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  const grupos = Object.keys(GRUPOS).filter(grupo => new RegExp(`\\b${grupo.toUpperCase()}\\b`).test(texto))
-  return grupos.length === 1 ? grupos[0] : ''
+  const texto = String(nombrePuesto || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+  const inicio = { profesional: /^PROFESIONAL\b/, tecnico: /^TECNIC[OA]S?\b/, auxiliar: /^AUXILIAR(ES)?\b/ }
+  return Object.keys(inicio).find(grupo => inicio[grupo].test(texto)) || ''
 }

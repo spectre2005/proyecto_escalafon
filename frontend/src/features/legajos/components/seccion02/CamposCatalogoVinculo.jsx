@@ -1,7 +1,6 @@
 import { useState } from 'react'
-import { aplicarModalidad, aplicarPuesto, CON_PROCESO, modalidadElegida, modalidadesDe, notaCompletado, opcionesUnidad, procesosDe, puestosDe } from '../../config/catalogosVinculo'
+import { aplicarModalidad, aplicarPuesto, CON_PROCESO, modalidadElegida, modalidadesDe, normalizar, notaCompletado, opcionesUnidad, procesosDe, puestosDe } from '../../config/catalogosVinculo'
 import { sugerenciasPuesto } from '../../config/puestosSugeridos'
-import { regimenesLaborales } from '../../config/seccion02'
 import Campo from '../seccion01/Campo'
 import { hoy } from '../seccion01/useGuardar'
 
@@ -45,8 +44,10 @@ export function CampoPuestoCatalogo({ draft, poner, errors, opciones, tipoPerson
   const catalogo = puestosDe((opciones?.puestos || []).filter(p => p.activo !== false || p.id === draft.puesto_id), tipoPersonal, unidad)
   const deUnidad = catalogo.filter(p => unidad && p.unidad_organica_id === unidad)
   const generales = catalogo.filter(p => !p.unidad_organica_id)
-  const enCatalogo = new Set(catalogo.map(p => p.nombre.toLocaleUpperCase('es-PE')))
-  const sugeridos = sugerenciasPuesto(tipoPersonal).filter(texto => !enCatalogo.has(texto.toLocaleUpperCase('es-PE')))
+  // Una denominación sugerida se oculta solo si el mismo puesto se ofrece en la lista (de esta unidad o general), sin
+  // distinguir mayúsculas ni tildes; un puesto de otra unidad no la reemplaza.
+  const enCatalogo = new Set([...deUnidad, ...generales].map(p => normalizar(p.nombre)))
+  const sugeridos = sugerenciasPuesto(tipoPersonal).filter(texto => !enCatalogo.has(normalizar(texto)))
   // Un puesto ya registrado que no está en las listas (escrito a mano o de otra unidad) se conserva como opción.
   const enLista = [...deUnidad, ...generales].some(p => p.id === draft.puesto_id)
   const valor = draft.puesto_id && enLista ? draft.puesto_id : draft.nombre_puesto ? `texto:${draft.nombre_puesto}` : ''
@@ -82,6 +83,8 @@ export function CampoModalidad({ draft, poner, errors, opciones, tipoPersonal, n
   const [nota, setNota] = useState('')
   const lista = modalidadesDe(opciones?.modalidades, draft.regimen_laboral, tipoPersonal, draft.regimen_normativo_id).filter(m => m.activo !== false || m.id === draft.modalidad_vinculo_id)
   const elegida = modalidadElegida(opciones, draft)
+  // La guardada que ya no corresponde (registros anteriores) se sigue viendo, marcada, en lugar de aparentar «Sin modalidad».
+  const guardada = elegida && !lista.some(m => m.id === elegida.id) ? elegida : null
   function elegir(modalidad) {
     const { draft: siguiente, completados } = aplicarModalidad(draft, modalidad)
     aplicarCambios(poner, { modalidad_vinculo_id: siguiente.modalidad_vinculo_id, tiene_periodo_prueba: siguiente.tiene_periodo_prueba })
@@ -92,11 +95,10 @@ export function CampoModalidad({ draft, poner, errors, opciones, tipoPersonal, n
       <select name={`${nombre}-modalidad`} value={draft.modalidad_vinculo_id || ''} disabled={!draft.regimen_laboral || !opciones}
         onChange={event => elegir(lista.find(m => m.id === event.target.value) || null)}>
         <option value="">{draft.regimen_laboral ? 'Sin modalidad' : 'Primero elige el tipo de vínculo'}</option>
+        {guardada && <option value={guardada.id}>{guardada.nombre} (no corresponde: elige otra)</option>}
         {lista.map(m => <option key={m.id} value={m.id}>{m.nombre}{m.activo === false ? ' (desactivada)' : ''}</option>)}
       </select>
     </Campo>
-    {elegida?.exige_fin_previsto && !draft.fecha_fin_prevista && <p role="note" className="col-span-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-      La modalidad «{elegida.nombre}» exige la fecha de fin prevista del vínculo.</p>}
     <Nota texto={nota} />
   </>
 }
@@ -135,8 +137,8 @@ export function CamposIngreso({ draft, poner, errors, opciones, tipoPersonal, nu
   const regimen = draft.regimen_laboral
   return <>
     {!regimen && <p className="col-span-full text-xs text-slate-500">Elige primero el tipo de vínculo: un designado no pasa por proceso de selección.</p>}
-    {regimen === 'designado' && <p role="note" className="col-span-full rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
-      Un {regimenesLaborales.designado.toLowerCase()} no pasa por concurso: ingresa con su resolución de designación.</p>}
+    {regimen === 'designado' && <p role="note" className="col-span-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+      Un designado en cargo de confianza no pasa por concurso: ingresa con su resolución de designación.</p>}
     {CON_PROCESO.includes(regimen) && <CampoProcesoSeleccion draft={draft} poner={poner} errors={errors} opciones={opciones} tipoPersonal={tipoPersonal || draft.tipo_personal} nombre={nombre} />}
     {numeroLegajo && <div className="grid min-w-0 content-start gap-1">
       <Campo label="N.° de legajo"><input name={`${nombre}-legajo`} value={numeroLegajo} readOnly className="bg-slate-50 font-semibold tabular-nums text-slate-700" /></Campo>

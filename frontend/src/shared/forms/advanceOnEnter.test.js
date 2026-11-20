@@ -20,7 +20,8 @@ function crearFormulario(definiciones) {
     },
   }))
   const form = {
-    querySelectorAll: () => elementos.filter(el => ['input', 'select', 'textarea'].includes(el.tag)),
+    // tag 'combobox' simula una lista desplegable propia (botón con role="combobox").
+    querySelectorAll: () => elementos.filter(el => ['input', 'select', 'textarea', 'combobox'].includes(el.tag)),
     querySelector: () => elementos.find(el => el.tag === 'button' && el.type === 'submit' && !el.disabled) || null,
   }
   return { form, elementos }
@@ -86,4 +87,10 @@ test('ignora otras teclas, la composición IME, los textarea y los botones', () 
     assert.equal(e.prevenido, false)
   }
   assert.equal(siguiente.enfocado, false)
+})
+
+test('Enter no se salta una lista desplegable propia (role=combobox)', () => {
+  const { form, elementos: [correo, tipo] } = crearFormulario([{ tag: 'input' }, { tag: 'combobox' }, { tag: 'button', type: 'submit' }])
+  advanceOnEnter(evento(form, correo))
+  assert.equal(tipo.enfocado, true)
 })

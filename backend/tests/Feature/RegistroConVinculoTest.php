@@ -14,6 +14,7 @@ use App\Models\VinculoLaboral;
 use App\Support\VigenciaLaboral;
 use Database\Seeders\SeccionesLegajoCatalogoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -329,5 +330,40 @@ class RegistroConVinculoTest extends TestCase
         $guardada = Usuario::query()->findOrFail($persona);
         // Lo que ya tenía se conserva; lo vacío se completa; los datos no sensibles se actualizan.
         $this->assertSame(['987654321', true, 'Rosa María'], [$guardada->telefono, (bool) $guardada->tiene_derechohabientes, $guardada->nombres]);
+    }
+
+    public function test_una_solicitud_repetida_de_nuevo_ingreso_no_cierra_el_legajo_recien_abierto(): void
+    {
+        $this->actuarComo();
+        $this->postJson(self::URL, $this->datos())->assertCreated();
+        $confirmacion = [...$this->datos(), 'cerrar_legajo_actual' => true, 'legajos_previos' => 1];
+
+        $this->postJson(self::URL, $confirmacion)->assertCreated()->assertJsonPath('data.numero_incorporacion', 2);
+        // La misma solicitud otra vez (doble clic o reintento): se rechaza y no se abre un tercer legajo.
+        $this->postJson(self::URL, $confirmacion)->assertStatus(409);
+        $this->assertDatabaseCount('legajos', 2);
+        $this->assertSame(1, Legajo::query()->where('estado_legajo', 'activo')->count());
+    }
+
+    public function test_apertura_y_cierre_usan_la_fecha_de_lima(): void
+    {
+        $this->actuarComo();
+        // 20/11 a las 01:00 UTC es todavía el 19/11 en Lima.
+        $this->travelTo(Carbon::parse('2026-11-20 01:00:00', 'UTC'));
+        $primera = $this->postJson(self::URL, $this->datos())->assertCreated();
+        $this->postJson(self::URL, [...$this->datos(), 'cerrar_legajo_actual' => true])->assertCreated();
+
+        $this->assertSame('2026-11-19', Legajo::query()->findOrFail($primera->json('data.legajo.id'))->fecha_apertura->toDateString());
+        $this->assertSame('2026-11-19', Legajo::query()->findOrFail($primera->json('data.legajo.id'))->fecha_pasivo->toDateString());
+    }
+
+    public function test_el_nuevo_ingreso_audita_solo_lo_que_cambia(): void
+    {
+        $this->actuarComo();
+        $this->postJson(self::URL, $this->datos(persona: ['telefono' => '987654321']))->assertCreated();
+        $this->postJson(self::URL, [...$this->datos(persona: ['telefono' => '911111111']), 'cerrar_legajo_actual' => true])->assertCreated();
+
+        $evento = AuditoriaEvento::query()->where('accion', 'persona.editar')->sole();
+        $this->assertSame(['telefono'], array_keys(json_decode($evento->datos_despues, true)));
     }
 }

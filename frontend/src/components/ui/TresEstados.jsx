@@ -21,7 +21,7 @@ export default function TresEstados({ name, label, ayuda, value, onChange, disab
   return <div className="min-w-0">
     <p id={`${id}-pregunta`} className="text-sm text-slate-700">{label}</p>
     {ayuda && <p id={`${id}-ayuda`} className="mt-1 text-xs text-slate-500">{ayuda}</p>}
-    <div role="radiogroup" data-bandera={name} aria-labelledby={`${id}-pregunta`} aria-describedby={ayuda ? `${id}-ayuda` : undefined} aria-invalid={error ? true : undefined}
+    <div role="radiogroup" data-bandera={name} aria-labelledby={`${id}-pregunta`} aria-describedby={[ayuda && `${id}-ayuda`, error && `${id}-error`].filter(Boolean).join(' ') || undefined} aria-invalid={error ? true : undefined}
       className="mt-2 inline-flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
       {opciones.map(([valor, texto], indice) => {
         const elegida = actual === valor
@@ -31,6 +31,6 @@ export default function TresEstados({ name, label, ayuda, value, onChange, disab
           className={`rounded-lg px-3 py-1.5 text-xs font-medium focus-visible:outline-2 focus-visible:outline-teal-600 disabled:cursor-not-allowed disabled:opacity-60 ${clase}`}>{texto}</button>
       })}
     </div>
-    {error && <p className="mt-1 text-xs text-rose-700">{[].concat(error).join(' ')}</p>}
+    {error && <p id={`${id}-error`} className="mt-1 text-xs text-rose-700">{[].concat(error).join(' ')}</p>}
   </div>
 }

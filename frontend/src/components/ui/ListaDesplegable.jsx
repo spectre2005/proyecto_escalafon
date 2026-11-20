@@ -53,18 +53,28 @@ export default function ListaDesplegable({ id, etiqueta, requerido = false, opci
       if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) { event.preventDefault(); abrir() }
       return
     }
+    if (event.key.length === 1 && event.key !== ' ' && /\S/.test(event.key)) { event.preventDefault(); buscarPorLetra(event.key); return }
     const ultimo = opciones.length - 1
     const mover = { ArrowDown: Math.min(activa + 1, ultimo), ArrowUp: Math.max(activa - 1, 0), Home: 0, End: ultimo }[event.key]
     if (mover !== undefined) { event.preventDefault(); setActiva(mover); return }
     if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); elegir(activa); return }
     if (event.key === 'Escape') { event.preventDefault(); setAbierta(false); return }
-    if (event.key === 'Tab') setAbierta(false)
+    // Tab elige la opción activa y sigue al campo siguiente (patrón «select-only combobox» de WAI-ARIA).
+    if (event.key === 'Tab') elegir(activa)
+  }
+  // Escribir una letra salta a la siguiente opción que empieza con ella («P» → «Plazo determinado»).
+  function buscarPorLetra(letra) {
+    const inicial = letra.toLocaleLowerCase('es-PE')
+    const orden = [...opciones.keys()].map(i => (activa + 1 + i) % opciones.length)
+    const siguiente = orden.find(i => opciones[i].titulo.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es-PE').startsWith(inicial))
+    if (siguiente !== undefined) setActiva(siguiente)
   }
 
   return <div ref={caja} className="relative grid min-w-0 content-start gap-1.5">
     <p id={`${id}-etiqueta`} onClick={() => boton.current?.focus()} className="text-[13px] font-semibold text-slate-700">{etiqueta}{requerido && ' *'}</p>
-    <button ref={boton} type="button" role="combobox" aria-haspopup="listbox" aria-expanded={visible} aria-controls={`${id}-lista`} aria-labelledby={`${id}-etiqueta ${id}-valor`}
+    <button ref={boton} id={id} type="button" role="combobox" aria-haspopup="listbox" aria-expanded={visible} aria-controls={`${id}-lista`} aria-labelledby={`${id}-etiqueta ${id}-valor`}
       aria-activedescendant={visible && activa >= 0 ? `${id}-opcion-${activa}` : undefined} aria-invalid={error ? true : undefined} aria-required={requerido || undefined}
+      aria-describedby={[ayuda && `${id}-ayuda`, error && `${id}-error`].filter(Boolean).join(' ') || undefined}
       disabled={disabled} onClick={() => (visible ? setAbierta(false) : abrir())} onKeyDown={teclado}
       className={`flex min-w-0 items-center justify-between gap-2.5 rounded-xl bg-white px-3.5 py-2.5 text-left text-[15px] disabled:cursor-not-allowed disabled:bg-slate-50 ${visible ? 'border-2 border-teal-700 text-teal-700' : error ? 'border border-rose-400 text-slate-500' : 'border border-slate-300 text-slate-500'}`}>
       <span id={`${id}-valor`} className="min-w-0 truncate">
@@ -92,7 +102,7 @@ export default function ListaDesplegable({ id, etiqueta, requerido = false, opci
         </li>
       })}
     </ul>}
-    {ayuda && <small className="text-xs font-normal text-slate-500">{ayuda}</small>}
-    {error && <span className="text-xs font-normal text-rose-700">{[].concat(error).join(' ')}</span>}
+    {ayuda && <small id={`${id}-ayuda`} className="text-xs font-normal text-slate-500">{ayuda}</small>}
+    {error && <span id={`${id}-error`} className="text-xs font-normal text-rose-700">{[].concat(error).join(' ')}</span>}
   </div>
 }

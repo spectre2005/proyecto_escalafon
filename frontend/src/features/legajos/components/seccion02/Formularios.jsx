@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ajustesPorPersona, elegirTipoVinculo } from '../../config/catalogosVinculo'
+import { gruposDelPuesto } from '../../config/puestosSugeridos'
 import { useLiveQuery } from '../../../../shared/queries/useLiveQuery'
 import { saveDatosPuesto, saveSeccion02 } from '../../api/seccion02Api'
 import { etiquetaVinculo, regimenesLaborales, resultadosPeriodo, tiposInduccion, tiposPersonal } from '../../config/seccion02'
@@ -81,14 +82,17 @@ export function VinculoForm({ usuario, record, documentoId, onSaved, onCancel })
 // envían el proceso y la fecha del resultado. Un designado no pasa por proceso de selección.
 export function SeleccionForm({ usuario, record, onSaved, onCancel }) {
   const opciones = useLiveQuery('/expediente-opciones').data?.data
-  const [draft, , poner] = useBorrador(vinculoInicial(record.values))
+  // Con la ley del vínculo: la lista ofrece solo los procesos de su tipo de personal y su ley.
+  const [draft, , poner] = useBorrador({ ...vinculoInicial(record.values), regimen_normativo_id: record.values.regimen_normativo_id || '' })
+  // El proceso solo se envía si cambió: así un proceso escrito antes del catálogo no se borra al guardar la fecha.
+  const procesoCambio = data => (data.tipo_proceso_seleccion_id || '') !== (record.values.tipo_proceso_seleccion_id || '')
   const { busy, error, errors, guardar } = useGuardar(data => saveSeccion02(usuario, 'vinculos-laborales', record.id,
-    { tipo_proceso_seleccion_id: data.tipo_proceso_seleccion_id, fecha_resultado_seleccion: data.fecha_resultado_seleccion }), onSaved)
+    { ...(procesoCambio(data) && { tipo_proceso_seleccion_id: data.tipo_proceso_seleccion_id }), fecha_resultado_seleccion: data.fecha_resultado_seleccion }), onSaved)
   return <Formulario titulo={`Proceso de selección: ${record.values.nombre_puesto}`} guardar="Guardar" busy={busy} error={error} onSubmit={() => guardar(draft)} onCancel={onCancel}
     nota="Se guarda en el vínculo laboral. Solo se corrige mientras el vínculo no tenga fecha de cese.">
     {record.values.regimen_laboral === 'designado'
-      ? <p className="rounded-lg bg-sky-50 p-3 text-xs text-sky-900 sm:col-span-2">Un vínculo designado no pasa por proceso de selección.</p>
-      : <CampoProcesoSeleccion draft={draft} poner={poner} errors={errors} opciones={opciones} />}
+      ? <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-700 sm:col-span-2">Un vínculo designado no pasa por proceso de selección.</p>
+      : <CampoProcesoSeleccion draft={draft} poner={poner} errors={errors} opciones={opciones} tipoPersonal={record.values.tipo_personal} />}
   </Formulario>
 }
 
@@ -96,13 +100,16 @@ export function SeleccionForm({ usuario, record, onSaved, onCancel }) {
 // en el mismo registro mientras el vínculo no tenga fecha de cese ni esté anulado.
 export function DatosPuestoForm({ usuario, vinculo, onSaved, onCancel }) {
   const docente = vinculo.values.tipo_personal === 'docente'
-  const escalas = useLiveQuery('/expediente-opciones').data?.data?.niveles
+  const opciones = useLiveQuery('/expediente-opciones').data?.data
+  const escalas = opciones?.niveles
+  // Como en el registro de personal: el grupo ocupacional se limita a los que admite el puesto del vínculo.
+  const gruposPermitidos = docente ? null : gruposDelPuesto(vinculo.values.nombre_puesto, opciones?.puestos, vinculo.values.puesto_id)
   const v = vinculo.datos_puesto[0]?.values || {}
   const [draft, set] = useBorrador(datosPuestoInicial(docente, v))
   const { busy, error, errors, guardar } = useGuardar(data => saveDatosPuesto(usuario, vinculo.id, limpiarDatosPuesto(docente, data)), onSaved)
   return <Formulario titulo={`Datos del puesto: ${vinculo.values.nombre_puesto}`} guardar="Guardar datos del puesto" busy={busy} error={error} onSubmit={() => guardar(draft)} onCancel={onCancel}
     nota="Se corrigen mientras el vínculo no tenga fecha de cese. El responsable se guarda con tu sesión.">
-    <CamposDatosPuesto docente={docente} draft={draft} set={set} errors={errors} codigoLey={vinculo.regimen_normativo_codigo} escalas={escalas} />
+    <CamposDatosPuesto docente={docente} draft={draft} set={set} errors={errors} codigoLey={vinculo.regimen_normativo_codigo} escalas={escalas} gruposPermitidos={gruposPermitidos} />
   </Formulario>
 }
 

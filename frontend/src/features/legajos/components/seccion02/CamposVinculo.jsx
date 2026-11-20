@@ -61,7 +61,7 @@ export function CamposVigencia({ draft, poner, errors, opciones, conCese = false
   return <>
     <div className="grid min-w-0 content-start gap-1">
       <Campo label="Fecha de inicio" required error={errors.fecha_inicio}><input name={`${nombre}-inicio`} type="date" required value={draft.fecha_inicio} onChange={valor('fecha_inicio')} /></Campo>
-      {draft.fecha_inicio > hoy() && <small className="text-xs text-sky-800">Empieza el {draft.fecha_inicio.split('-').reverse().join('/')}: hasta entonces figurará como «por iniciar».</small>}
+      {draft.fecha_inicio > hoy() && <small className="text-xs text-teal-800">Empieza el {draft.fecha_inicio.split('-').reverse().join('/')}: hasta entonces figurará como «por iniciar».</small>}
     </div>
     <div className="grid min-w-0 content-start gap-1">
       <Campo label="Fecha de fin prevista" required={finObligatorio} error={errors.fecha_fin_prevista}><input name={`${nombre}-fin`} type="date" required={finObligatorio} min={draft.fecha_inicio || undefined} value={draft.fecha_fin_prevista} onChange={valor('fecha_fin_prevista')} /></Campo>
@@ -143,7 +143,11 @@ export function CamposDatosPuesto({ docente, draft, set, errors, codigoLey, esca
       ? <ListaDesplegable id="grupo-ocupacional" etiqueta="Grupo ocupacional" opciones={opcionesGrupo} valor={draft.grupo_ocupacional || ''} vacio="Seleccionar grupo ocupacional"
         error={errors.grupo_ocupacional} onElegir={elegirGrupo}
         ayuda={gruposPermitidos ? `El puesto elegido es del grupo ${gruposPermitidos.map(g => gruposOcupacionales[g].toLowerCase()).join(' o ')}.` : undefined} />
-      : <Campo label="Grupo ocupacional" error={errors.grupo_ocupacional}><select value={draft.grupo_ocupacional} onChange={evento => elegirGrupo(evento.target.value)}><Opciones lista={gruposOcupacionales} actual={draft.grupo_ocupacional} vacio="Sin registrar" /></select></Campo>}
+      : <div className="grid min-w-0 content-start gap-1">
+        <Campo label="Grupo ocupacional" error={errors.grupo_ocupacional}><select value={draft.grupo_ocupacional} onChange={evento => elegirGrupo(evento.target.value)}>
+          <Opciones lista={Object.fromEntries(opcionesGrupo.filter(o => o.valor).map(o => [o.valor, o.titulo]))} actual={draft.grupo_ocupacional} vacio="Sin registrar" /></select></Campo>
+        {gruposPermitidos && <small className="text-xs text-slate-500">El puesto es del grupo {gruposPermitidos.map(g => gruposOcupacionales[g].toLowerCase()).join(' o ')}.</small>}
+      </div>}
     <Campo label="Nivel de carrera" error={errors.nivel_carrera}><select disabled={Boolean(motivoSinNivel(escalas, codigoLey, draft.grupo_ocupacional)) && !draft.nivel_carrera} value={draft.nivel_carrera} onChange={set('nivel_carrera')}>
       <Opciones lista={opcionesNivelCarrera(escalas, codigoLey, draft.grupo_ocupacional, draft.nivel_carrera)} actual={draft.nivel_carrera} vacio={motivoSinNivel(escalas, codigoLey, draft.grupo_ocupacional) || 'Sin registrar'} />
     </select></Campo>

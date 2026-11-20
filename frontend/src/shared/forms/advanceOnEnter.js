@@ -4,7 +4,8 @@ export function advanceOnEnter(event) {
   if (!field.matches('input, select') || field.matches('input[type="submit"], input[type="button"]')) return
   event.preventDefault()
   const form = event.currentTarget
-  const fields = Array.from(form.querySelectorAll('input, select, textarea')).filter(element =>
+  // Las listas desplegables propias (botón con role="combobox") también son campos: Enter no se las salta.
+  const fields = Array.from(form.querySelectorAll('input, select, textarea, [role="combobox"]')).filter(element =>
     !element.matches(':disabled, [readonly], [type="hidden"]') && element.getClientRects().length > 0,
   )
   const index = fields.indexOf(field)

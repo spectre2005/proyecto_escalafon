@@ -185,7 +185,10 @@ export default function UsersPage() {
     let creado = null
     const resultado = await persist(async () => {
       creado = await saveUserWithLink(payload)
-      return { saved: [creado.usuario], text: `Persona incorporada por ${creado.numero_incorporacion || 1}.ª vez. Se abrió su nuevo legajo ${creado.legajo.numero_legajo}.` }
+      const vez = creado.numero_incorporacion || 1
+      return { saved: [creado.usuario], text: vez > 1
+        ? `Nuevo ingreso registrado (incorporación n.° ${vez}). Se abrió su legajo ${creado.legajo.numero_legajo}.`
+        : `Persona registrada. Se abrió su legajo ${creado.legajo.numero_legajo}.` }
     })
     if (resultado.ok) {
       setRegistroKey(key => key + 1)
@@ -221,7 +224,7 @@ export default function UsersPage() {
             aria-live="polite"
           >
             {loadError && (
-              <p role="alert" className="text-xs text-red-700">
+              <p role="alert" className="text-xs text-rose-700">
                 {loadError}
               </p>
             )}
@@ -378,7 +381,7 @@ export default function UsersPage() {
             onClose={() => { setRegistrationOpen(false); setRegistrado(null) }}
           >
             {loading && <p role="status" className="px-6 pt-4 text-xs text-slate-600">Cargando usuarios para comprobar duplicados…</p>}
-            {loadError && <p role="alert" className="px-6 pt-4 text-xs text-red-700">{loadError}</p>}
+            {loadError && <p role="alert" className="px-6 pt-4 text-xs text-rose-700">{loadError}</p>}
             {/* Cabecera fija (título y método de carga); el contenido de cada método tiene su propio desplazamiento. */}
             <section id="carga" className="shrink-0 border-b border-slate-200 bg-white">
               <div className="flex items-center gap-3 px-4 py-4 md:px-6 [&_p]:mt-1.5 [&_p]:text-xs [&_p]:leading-relaxed [&_p]:text-slate-500">
@@ -394,6 +397,7 @@ export default function UsersPage() {
                 </button>
               </div>
               <div
+                role="group"
                 className="flex gap-6 px-6"
                 aria-label="Método de carga"
               >

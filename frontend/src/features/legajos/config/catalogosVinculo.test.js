@@ -84,3 +84,10 @@ test('al cambiar la ley o el tipo se vacía lo que deja de corresponder', () => 
   // Lo que sigue correspondiendo no se toca.
   assert.deepEqual(ajustesPorPersona({ modalidad_vinculo_id: 'contrato_cas', tipo_proceso_seleccion_id: 'publico' }, catalogo, 'administrativo', 'ley1057'), {})
 })
+
+test('al pasar a administrativo se vacía un puesto docente escrito sin catálogo', () => {
+  assert.deepEqual(ajustesPorPersona({ puesto_id: '', nombre_puesto: 'DOCENTE CONTRATADO' }, catalogo, 'administrativo', 'ley276'), { puesto_id: '', nombre_puesto: '' })
+  // Un puesto propio escrito antes (no sugerido) se conserva.
+  assert.deepEqual(ajustesPorPersona({ puesto_id: '', nombre_puesto: 'Jefe de imagen' }, catalogo, 'administrativo', 'ley276'), {})
+})
+

@@ -1,3 +1,5 @@
+import { sugerenciasPuesto } from './puestosSugeridos.js'
+
 // Catálogos del vínculo: unidades orgánicas, puestos, modalidades y procesos de selección. Los datos vienen de
 // /expediente-opciones (App\Support\CatalogosVinculo::opciones); aquí solo se busca, se ordena y se completa el borrador.
 // Mantener las listas en sincronía con backend/app/Support/CatalogosVinculo.php.
@@ -73,6 +75,9 @@ export function ajustesPorPersona(draft, opciones, tipoPersonal, leyId) {
   const cambios = {}
   const puesto = buscar(opciones?.puestos, draft.puesto_id)
   if (puesto && tipoPersonal && puesto.tipo_personal !== tipoPersonal) Object.assign(cambios, { puesto_id: '', nombre_puesto: '' })
+  // Un puesto escrito sin catálogo que es una denominación sugerida del otro tipo de personal (p. ej. «Docente contratado»).
+  const delOtroTipo = tipo => sugerenciasPuesto(tipo === 'docente' ? 'administrativo' : 'docente').some(texto => normalizar(texto) === normalizar(draft.nombre_puesto))
+  if (!draft.puesto_id && draft.nombre_puesto && tipoPersonal && delOtroTipo(tipoPersonal)) Object.assign(cambios, { puesto_id: '', nombre_puesto: '' })
   const modalidad = buscar(opciones?.modalidades, draft.modalidad_vinculo_id)
   if (modalidad && !deLaPersona(modalidad, tipoPersonal, leyId)) cambios.modalidad_vinculo_id = ''
   const proceso = buscar(opciones?.procesos, draft.tipo_proceso_seleccion_id)

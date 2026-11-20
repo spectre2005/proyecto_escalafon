@@ -184,16 +184,33 @@ test('casos de las capturas: docente ordinario contratado y técnico en el grupo
   const tecnico = avisosDeCoherencia({ tipo: 'administrativo', datosPuesto: { grupo_ocupacional: 'profesional' }, vinculo: { nombre_puesto: 'Técnico administrativo', regimen_laboral: 'plazo_determinado' } })
   assert.match(tecnico[0], /es del grupo Técnico, pero elegiste el grupo Profesional/)
   // El grupo del puesto del catálogo manda sobre el nombre.
-  assert.deepEqual(avisosDeCoherencia({ tipo: 'administrativo', grupoDelPuesto: 'profesional', datosPuesto: { grupo_ocupacional: 'profesional' }, vinculo: { nombre_puesto: 'Técnico administrativo' } }), [])
+  assert.deepEqual(avisosDeCoherencia({ tipo: 'administrativo', gruposPuesto: ['profesional'], datosPuesto: { grupo_ocupacional: 'profesional' }, vinculo: { nombre_puesto: 'Técnico administrativo' } }), [])
   // Lo coherente no avisa.
   assert.deepEqual(avisosDeCoherencia({ tipo: 'docente', datosPuesto: { condicion_docente: 'ordinario' }, vinculo: { regimen_laboral: 'carrera' } }), [])
 })
 
-test('el grupo se deduce del nombre solo si lo dice una vez y como palabra', () => {
+test('el grupo se deduce del nombre solo si empieza con él', () => {
   assert.equal(grupoPorNombre('Técnico administrativo'), 'tecnico')
   assert.equal(grupoPorNombre('AUXILIAR DE ARCHIVO'), 'auxiliar')
   assert.equal(grupoPorNombre('Profesional en contabilidad'), 'profesional')
   assert.equal(grupoPorNombre('Secretaria'), '')
-  assert.equal(grupoPorNombre('Técnico o auxiliar'), '')
-  assert.equal(grupoPorNombre('Tecnicos varios'), '')
+  assert.equal(grupoPorNombre('Técnica en enfermería'), 'tecnico')
+  assert.equal(grupoPorNombre('TECNICOS DE LABORATORIO'), 'tecnico')
+  // Solo al empezar: «Escuela Profesional» es el nombre de la unidad, no el grupo.
+  assert.equal(grupoPorNombre('SECRETARIA DE ESCUELA PROFESIONAL'), '')
+  assert.equal(grupoPorNombre('Jefe técnico'), '')
+})
+
+test('el aviso de grupo usa los grupos del puesto elegido y no deduce nada de un puesto del catálogo', () => {
+  // Puesto del catálogo sin grupo: admite cualquiera, aunque el nombre diga «profesional».
+  assert.deepEqual(avisosDeCoherencia({ tipo: 'administrativo', datosPuesto: { grupo_ocupacional: 'tecnico' }, vinculo: { puesto_id: 'p1', nombre_puesto: 'PROFESIONAL I' } }), [])
+  // Puesto que admite dos grupos: cualquiera de los dos vale.
+  assert.deepEqual(avisosDeCoherencia({ tipo: 'administrativo', gruposPuesto: ['tecnico', 'auxiliar'], datosPuesto: { grupo_ocupacional: 'auxiliar' }, vinculo: { nombre_puesto: 'Secretario' } }), [])
+  assert.match(avisosDeCoherencia({ tipo: 'administrativo', gruposPuesto: ['tecnico', 'auxiliar'], datosPuesto: { grupo_ocupacional: 'profesional' }, vinculo: { nombre_puesto: 'Secretario' } })[0], /grupo Técnico o Auxiliar/)
+})
+
+test('el nuevo ingreso envía cuántos legajos tenía la persona', () => {
+  const base = { persona: { ...persona, tipo_personal: 'administrativo' }, catalogo: [], ubigeoId: '', condiciones: {}, puedeDiscapacidad: false, vinculo: {}, puestos: { administrativo: {} } }
+  assert.equal(armarRegistro({ ...base, nuevoIngreso: true, legajosPrevios: 1 }).legajos_previos, 1)
+  assert.equal('legajos_previos' in armarRegistro(base), false)
 })

@@ -90,3 +90,17 @@ test('el puesto del catálogo manda con su grupo; sin grupo admite cualquiera', 
   assert.deepEqual(gruposDelPuesto('Técnico administrativo', catalogo), ['profesional'])
   assert.equal(gruposDelPuesto('Chofer', catalogo), null)
 })
+
+test('el puesto elegido por su id manda; por nombre solo cuentan los activos y no importan las tildes', () => {
+  const catalogo = [
+    { id: 'a1', nombre: 'ANALISTA', tipo_personal: 'administrativo', grupo_ocupacional: 'profesional' },
+    { id: 'a2', nombre: 'ANALISTA', tipo_personal: 'administrativo', grupo_ocupacional: 'tecnico' },
+    { id: 'x', nombre: 'ASISTENTE ADMINISTRATIVO', tipo_personal: 'administrativo', grupo_ocupacional: 'profesional', activo: false },
+  ]
+  assert.deepEqual(gruposDelPuesto('ANALISTA', catalogo, 'a2'), ['tecnico'])
+  assert.deepEqual(gruposDelPuesto('ANALISTA', catalogo).sort(), ['profesional', 'tecnico'])
+  // Un puesto desactivado del mismo nombre no reemplaza a la denominación sugerida.
+  assert.deepEqual(gruposDelPuesto('Asistente administrativo', catalogo), ['tecnico'])
+  assert.deepEqual(gruposDelPuesto('TECNICO ADMINISTRATIVO'), ['tecnico'])
+})
+

@@ -66,29 +66,34 @@ final class CatalogosVinculo
         $regimen = $valor('regimen_laboral');
         $ley = $valor('regimen_normativo_id');
         $tipos = RegimenesLaborales::TIPOS_VINCULO;
-        // Al corregir, solo se comprueba la coherencia de lo que cambia: un vínculo anterior se sigue corrigiendo en lo demás.
-        $cambia = fn (string ...$campos): bool => $actual === null || array_intersect($campos, array_keys($data)) !== [];
+        // Al corregir, solo se comprueba la coherencia de lo que cambia de valor (el formulario envía el vínculo completo): un
+        // vínculo anterior cuya modalidad, proceso o puesto ya no corresponde se sigue corrigiendo en lo demás.
+        $cambia = fn (string ...$campos): bool => $actual === null || collect($campos)->contains(fn (string $campo): bool => array_key_exists($campo, $data)
+            && (string) ($data[$campo] ?? '') !== (string) ($actual->getAttribute($campo) ?? ''));
         $nombreLey = fn (?string $id): string => RegimenNormativo::query()->whereKey($id)->value('nombre') ?? 'otra ley';
 
         $modalidad = self::elemento(ModalidadVinculo::class, 'modalidad_vinculo_id', $data, $actual, $errores);
         if ($modalidad) {
-            if ($regimen && $modalidad->regimen_laboral !== $regimen) {
+            if ($regimen && $modalidad->regimen_laboral !== $regimen && $cambia('modalidad_vinculo_id', 'regimen_laboral')) {
                 $errores['modalidad_vinculo_id'] = "La modalidad «{$modalidad->nombre}» es de ".mb_strtolower($tipos[$modalidad->regimen_laboral])
                     .'. Elige una modalidad de '.mb_strtolower($tipos[$regimen] ?? $regimen).' o cambia el tipo de vínculo.';
-            } elseif ($modalidad->tipo_personal && $tipoPersonal && $modalidad->tipo_personal !== $tipoPersonal) {
+            } elseif ($modalidad->tipo_personal && $tipoPersonal && $modalidad->tipo_personal !== $tipoPersonal && $cambia('modalidad_vinculo_id', 'tipo_personal')) {
                 $errores['modalidad_vinculo_id'] = "La modalidad «{$modalidad->nombre}» es solo para personal {$modalidad->tipo_personal}.";
             } elseif ($modalidad->regimen_normativo_id && $ley && (string) $modalidad->regimen_normativo_id !== (string) $ley && $cambia('modalidad_vinculo_id', 'regimen_normativo_id')) {
                 $errores['modalidad_vinculo_id'] = "La modalidad «{$modalidad->nombre}» es de la ley {$nombreLey($modalidad->regimen_normativo_id)}, no de la del vínculo. Elige otra modalidad.";
             }
-            if ($modalidad->exige_fin_previsto && ! $valor('fecha_fin_prevista') && ! $valor('fecha_cese')) {
+            if ($modalidad->exige_fin_previsto && ! $valor('fecha_fin_prevista') && ! $valor('fecha_cese') && $cambia('modalidad_vinculo_id', 'fecha_fin_prevista', 'fecha_cese')) {
                 $errores['fecha_fin_prevista'] = "La modalidad «{$modalidad->nombre}» exige la fecha de fin prevista.";
             }
         }
 
+        // Unidad orgánica: como los demás catálogos, una desactivada solo vale si ya estaba guardada.
+        self::elemento(UnidadOrganica::class, 'unidad_organica_id', $data, $actual, $errores);
+
         $puesto = self::elemento(Puesto::class, 'puesto_id', $data, $actual, $errores);
         if ($puesto) {
             $unidad = $valor('unidad_organica_id');
-            if ($tipoPersonal && $puesto->tipo_personal !== $tipoPersonal) {
+            if ($tipoPersonal && $puesto->tipo_personal !== $tipoPersonal && $cambia('puesto_id', 'tipo_personal')) {
                 $errores['puesto_id'] = "El puesto «{$puesto->nombre}» es de personal {$puesto->tipo_personal}.";
             } elseif ($puesto->unidad_organica_id && $unidad && (string) $puesto->unidad_organica_id !== (string) $unidad && $cambia('puesto_id', 'unidad_organica_id')) {
                 $errores['puesto_id'] = "El puesto «{$puesto->nombre}» es de otra unidad orgánica: elige un puesto de la unidad del vínculo o un puesto general.";
@@ -98,7 +103,7 @@ final class CatalogosVinculo
 
         $proceso = self::elemento(TipoProcesoSeleccion::class, 'tipo_proceso_seleccion_id', $data, $actual, $errores);
         if ($proceso) {
-            if ($regimen && ! in_array($regimen, self::CON_PROCESO, true)) {
+            if ($regimen && ! in_array($regimen, self::CON_PROCESO, true) && $cambia('tipo_proceso_seleccion_id', 'regimen_laboral')) {
                 $errores['tipo_proceso_seleccion_id'] = 'Un vínculo designado no pasa por proceso de selección: deja el proceso vacío.';
             } elseif ($proceso->tipo_personal && $tipoPersonal && $proceso->tipo_personal !== $tipoPersonal && $cambia('tipo_proceso_seleccion_id', 'tipo_personal')) {
                 $errores['tipo_proceso_seleccion_id'] = "«{$proceso->nombre}» es un proceso para personal {$proceso->tipo_personal}: elige uno del personal {$tipoPersonal}.";
@@ -108,7 +113,9 @@ final class CatalogosVinculo
             if (array_key_exists('tipo_proceso_seleccion_id', $data)) {
                 $data['proceso_seleccion'] = $proceso->nombre;
             }
-        } elseif (array_key_exists('tipo_proceso_seleccion_id', $data) && ! array_key_exists('proceso_seleccion', $data)) {
+        } elseif (array_key_exists('tipo_proceso_seleccion_id', $data) && ! array_key_exists('proceso_seleccion', $data)
+            && ($actual === null || $actual->tipo_proceso_seleccion_id)) {
+            // Se quitó el proceso del catálogo: su texto también. Un proceso escrito a mano antes del catálogo (sin id) se conserva.
             $data['proceso_seleccion'] = null;
         }
 

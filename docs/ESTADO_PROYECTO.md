@@ -265,6 +265,17 @@ Coherencia del vínculo con la persona (19/11/2026):
     Pendiente de confirmar con el cliente: (a) el alcance de cada proceso (¿el concurso público vale para docentes?);
     (b) si alguno de los avisos debe impedir el registro.
 
+Revisión del registro con agentes (20/11/2026):
+40. Corregidos 26 hallazgos. Backend: al corregir un vínculo solo se valida lo que cambia de valor; el proceso escrito
+    antes del catálogo no se borra; un nuevo ingreso repetido (doble envío) se rechaza con 409 (legajos_previos); no se
+    elige una unidad orgánica desactivada; apertura y cierre del legajo con la fecha de Lima; el reingreso audita solo lo
+    que cambia. Frontend: 2.1 filtra procesos por tipo y ley; 2.2 limita el grupo al puesto; el puesto se ubica por su
+    id; comparaciones sin tildes; limpieza al cambiar tipo, ley o DNI; resumen igual a lo enviado; foco, errores
+    anunciados, Enter y letras en las listas; textos y colores del panel; pie y resumen en teléfono.
+    Pendiente de confirmar con el cliente: (a) si en un nuevo ingreso se puede pasar de docente a administrativo; (b) si
+    el teléfono es dato sensible (hoy se protege en el reingreso pero se muestra con personal.ver); (c) si el backend
+    debe impedir un grupo que no corresponde al puesto.
+
 ## Hoja de ruta del sistema institucional (por definir, analizado el 13/10/2026)
 
 Funcionalidades que faltan, con su base en la directiva. Orden propuesto, sin decidir:

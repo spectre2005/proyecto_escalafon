@@ -167,6 +167,8 @@ class UsuarioController extends Controller
             $fila = $request->validated('usuarios')[0];
             $persona = Usuario::query()->where('numero_doc_identidad', $fila['numero_doc_identidad'])->lockForUpdate()->first();
             if ($persona) {
+                abort_if($request->has('legajos_previos') && $persona->legajos()->count() !== $request->integer('legajos_previos'), 409,
+                    'Esta persona ya se registró de nuevo hace un momento (la solicitud llegó dos veces). Revisa su legajo antes de volver a intentarlo.');
                 // Nuevo ingreso con el legajo aún activo: solo si se confirmó pasarlo a pasivo. Se cierra igual que con
                 // «Cerrar legajo» (fecha de pase, ficha al cierre, auditoría) y queda en Legajos pasivos como historial.
                 $activo = $persona->legajos()->where('estado_legajo', 'activo')->lockForUpdate()->first();
@@ -191,9 +193,18 @@ class UsuarioController extends Controller
                 }
                 $discapacidad = CambioDiscapacidad::valor($nuevos['con_discapacidad'] ?? $persona->con_discapacidad);
                 CambioDiscapacidad::autorizar($actor, $persona->con_discapacidad, $discapacidad);
-                $persona->update([...$nuevos, ...$this->ley($fila), 'email_institucional' => strtolower($fila['email_institucional'])]);
-                Auditoria::registrar($request, 'persona.editar', 'usuarios', $persona->id, $persona->id,
-                    Arr::except($antes, ['password', 'remember_token']), Arr::except($persona->getAttributes(), ['password', 'remember_token']));
+                try {
+                    $persona->update([...$nuevos, ...$this->ley($fila), 'email_institucional' => strtolower($fila['email_institucional'])]);
+                } catch (UniqueConstraintViolationException) {
+                    // Otra alta tomó ese correo entre la comprobación y el guardado.
+                    throw ValidationException::withMessages(['usuarios.0.email_institucional' => 'Este correo ya está registrado.']);
+                }
+                // Solo lo que cambió (como al editar la ficha): la auditoría no copia la ficha completa ni registra un evento vacío.
+                $sinAuditar = ['password', 'remember_token', CambioDiscapacidad::CAMPO, 'updated_at'];
+                [$previo, $nuevo] = Auditoria::diferencia(Arr::except($antes, $sinAuditar), Arr::except($persona->getAttributes(), $sinAuditar));
+                if ($nuevo !== []) {
+                    Auditoria::registrar($request, 'persona.editar', 'usuarios', $persona->id, $persona->id, $previo, $nuevo);
+                }
                 CambioDiscapacidad::auditar($persona->id, $antes['con_discapacidad'], $discapacidad, $actor, $request);
                 $registro = $persona->getAttributes();
             } else {

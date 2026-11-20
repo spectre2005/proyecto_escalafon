@@ -1,4 +1,5 @@
 import { CON_PROCESO, modalidadElegida, rutaUnidad } from '../../legajos/config/catalogosVinculo'
+import { gruposDelPuesto } from '../../legajos/config/puestosSugeridos'
 import { avisosDeCoherencia } from '../utils/registroPasos'
 import { categoriasDocente, condicionesDocente, dedicacionesDocente, gruposOcupacionales, regimenesLaborales } from '../../legajos/config/seccion02'
 
@@ -15,7 +16,7 @@ function Bloque({ titulo, paso, onIr, filas }) {
       <h4 className="text-base font-semibold text-slate-800">{titulo}</h4>
       <button type="button" onClick={() => onIr(paso)} className="text-xs font-semibold text-teal-700 hover:underline" aria-label={`Cambiar ${titulo.toLowerCase()}`}>Cambiar</button>
     </div>
-    <dl className="grid grid-cols-[minmax(0,9.5rem)_minmax(0,1fr)] gap-x-3 gap-y-2.5 px-4 py-4 text-sm sm:px-5">
+    <dl className="grid grid-cols-1 gap-x-3 gap-y-1 sm:grid-cols-[minmax(0,9.5rem)_minmax(0,1fr)] sm:gap-y-2.5 px-4 py-4 text-sm sm:px-5">
       {filas.filter(Boolean).map(([etiqueta, valor]) => <div key={etiqueta} className="contents">
         <dt className="text-slate-500">{etiqueta}</dt>
         <dd className={`m-0 break-words ${valor ? 'text-slate-800' : 'text-slate-500'}`}>{valor || 'Sin indicar'}</dd>
@@ -32,7 +33,7 @@ export default function ResumenRegistro({ nuevoIngreso = false, persona, ley, co
     nuevoIngreso && 'Nuevo ingreso: su legajo actual pasará a Legajos pasivos como historial, con sus documentos, y se abrirá un legajo nuevo.',
     modalidad?.exige_fin_previsto && !vinculo.fecha_fin_prevista && `La modalidad «${modalidad.nombre}» exige la fecha de fin prevista: complétala en el paso 2.`,
     CON_PROCESO.includes(vinculo.regimen_laboral) && !vinculo.proceso_seleccion && 'Aún no se indica el proceso de selección. Puedes registrarlo ahora en el paso 2 o después en la sección 02.',
-    ...avisosDeCoherencia({ vinculo, datosPuesto, codigoLey, tipo, grupoDelPuesto: (opciones?.puestos || []).find(p => p.id === vinculo.puesto_id)?.grupo_ocupacional }),
+    ...avisosDeCoherencia({ vinculo, datosPuesto, codigoLey, tipo, gruposPuesto: gruposDelPuesto(vinculo.nombre_puesto, opciones?.puestos, vinculo.puesto_id) }),
   ].filter(Boolean)
   const puesto = tipo === 'docente'
     ? [['Condición docente', condicionesDocente[datosPuesto.condicion_docente]], ['Categoría', categoriasDocente[datosPuesto.categoria]], ['Dedicación', dedicacionesDocente[datosPuesto.dedicacion]]]
@@ -54,7 +55,7 @@ export default function ResumenRegistro({ nuevoIngreso = false, persona, ley, co
       ['Unidad orgánica', rutaUnidad(opciones?.unidades, vinculo.unidad_organica_id).join(' › ')],
       ['Puesto', vinculo.nombre_puesto],
       ...puesto,
-      ['DJBR', sinRespuesta(vinculo.obligado_djbr)], ['Exige colegiatura', sinRespuesta(vinculo.exige_colegiatura)],
+      ['Declaración jurada de bienes y rentas', sinRespuesta(vinculo.obligado_djbr)], ['Exige colegiatura', sinRespuesta(vinculo.exige_colegiatura)],
       ['Estudios básicos', sinRespuesta(vinculo.exige_estudios_basicos)], ['Período de prueba', sinRespuesta(vinculo.tiene_periodo_prueba)],
     ]} />
     <Bloque titulo="Vínculo laboral" paso={2} onIr={onIr} filas={[

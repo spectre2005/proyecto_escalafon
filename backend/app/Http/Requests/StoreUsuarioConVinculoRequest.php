@@ -44,6 +44,9 @@ class StoreUsuarioConVinculoRequest extends StoreUsuariosRequest
             // Puede venir vacío (los datos del puesto administrativo son todos opcionales); el docente exige su condición.
             'datos_puesto' => ['present', 'array'],
             'cerrar_legajo_actual' => ['sometimes', 'boolean'],
+            // Cuántos legajos tenía la persona cuando se confirmó el nuevo ingreso: evita cerrar también el recién abierto
+            // si la misma petición llega dos veces (doble clic o reintento).
+            'legajos_previos' => ['sometimes', 'integer', 'min:0'],
         ];
     }
 
@@ -51,7 +54,7 @@ class StoreUsuarioConVinculoRequest extends StoreUsuariosRequest
     {
         parent::withValidator($validator);
         $validator->after(function (Validator $validator): void {
-            foreach (array_diff(array_keys($this->all()), ['usuarios', 'vinculo', 'datos_puesto', 'cerrar_legajo_actual']) as $campo) {
+            foreach (array_diff(array_keys($this->all()), ['usuarios', 'vinculo', 'datos_puesto', 'cerrar_legajo_actual', 'legajos_previos']) as $campo) {
                 $validator->errors()->add($campo, 'Campo no permitido.');
             }
             $this->vinculo = $this->parte($validator, 'vinculo', array_diff_key(ReglasVinculo::VINCULO, array_flip(ReglasVinculo::NO_EN_ALTA)));
