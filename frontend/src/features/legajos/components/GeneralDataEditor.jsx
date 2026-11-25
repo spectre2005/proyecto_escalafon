@@ -4,7 +4,7 @@ import Icon from '../../../components/ui/Icon'
 import { advanceOnEnter } from '../../../shared/forms/advanceOnEnter'
 import api, { apiErrorMessage } from '../../../axios'
 import { useLiveQuery } from '../../../shared/queries/useLiveQuery'
-import { estadosCiviles, tiposDocIdentidad } from '../config/seccion01'
+import { estadosCiviles, regimenesPensionarios, tiposDocIdentidad } from '../config/seccion01'
 import { leyesDelTipo } from '../../users/utils/leyes'
 import { Opciones } from './seccion01/Campo'
 import UbigeoFields from '../../../components/ui/UbigeoFields'
@@ -27,10 +27,20 @@ const fields = [
   ['email_institucional', 'Correo electrónico', 'email', 255, true],
   // Dato histórico de la persona: el puesto y la unidad actuales se toman del vínculo vigente (sección 02).
   ['nombre_puesto', 'Puesto registrado en la persona', 'text', 150],
+  ['contacto_emergencia_nombre', 'Contacto de emergencia', 'text', 120],
+  ['contacto_emergencia_parentesco', 'Parentesco del contacto', 'text', 40],
+  ['contacto_emergencia_telefono', 'Teléfono del contacto', 'tel', 9],
+  ['regimen_pensionario', 'Régimen pensionario', 'text', 15],
+  ['afp_nombre', 'AFP', 'text', 60],
+  ['cuspp', 'CUSPP', 'text', 12],
+  ['fecha_afiliacion_pension', 'Fecha de afiliación al régimen', 'date'],
 ]
 
+// Teléfonos de 9 dígitos (los valida el backend con el mismo patrón).
+const telefonos = ['telefono', 'contacto_emergencia_telefono']
+
 // Listas cerradas que valida el backend.
-const listas = { tipo_doc_identidad: tiposDocIdentidad, estado_civil: estadosCiviles }
+const listas = { tipo_doc_identidad: tiposDocIdentidad, estado_civil: estadosCiviles, regimen_pensionario: regimenesPensionarios }
 
 // Banderas de la persona: Sí / No / Sin responder. Las del puesto (DJBR, colegiatura, estudios básicos y período de
 // prueba) se registran en el vínculo laboral; el backend las rechaza aquí.
@@ -44,7 +54,8 @@ export default function GeneralDataEditor({ usuario, data, onSaved, onCancel, on
   const puedeDiscapacidad = usePuede('discapacidad.editar')
   // Con vínculo vigente, el puesto y la unidad se corrigen en el vínculo (2.2): no se editan aquí.
   const conVinculo = data.puesto_actual?.origen === 'vinculo'
-  const campos = conVinculo ? fields.filter(([key]) => key !== 'nombre_puesto') : fields
+  // AFP y CUSPP solo con régimen AFP (si ya tenían dato, se siguen mostrando para poder corregirlo).
+  const campos = (conVinculo ? fields.filter(([key]) => key !== 'nombre_puesto') : fields)
   const [original] = useState(() => ({ ...data.usuario.values, ...data.edit_values }))
   const [version] = useState(data.version)
   const [draft, setDraft] = useState(() => ({
@@ -99,9 +110,9 @@ export default function GeneralDataEditor({ usuario, data, onSaved, onCancel, on
     <div className="mb-6 flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-lg font-semibold text-slate-800">Editar información personal</h2><p className="mt-2 text-xs text-slate-500">Los cambios se mostrarán al guardar.</p></div><div className="flex flex-wrap items-center gap-3">{onUploadFicha && <button type="button" disabled={saving} onClick={onUploadFicha} className="inline-flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-100"><Icon name="upload" size={17} />Subir ficha personal</button>}<button type="button" disabled={saving} onClick={onCancel} className="text-sm text-slate-500 hover:text-slate-800">Cancelar</button></div></div>
     {error && <p role="alert" className="mb-5 rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{error}</p>}
     <fieldset disabled={saving} className="grid gap-5 sm:grid-cols-2">
-      {campos.map(([key, title, type, maxLength, required]) => {
+      {campos.filter(([key]) => !['afp_nombre', 'cuspp'].includes(key) || draft.regimen_pensionario === 'afp' || original[key]).map(([key, title, type, maxLength, required]) => {
         const isDni = key === 'numero_doc_identidad' && draft.tipo_doc_identidad === 'dni'
-        const digits = isDni ? 8 : key === 'telefono' ? 9 : null
+        const digits = isDni ? 8 : telefonos.includes(key) ? 9 : null
         const props = { name: key, className: inputClass, required, value: draft[key], inputMode: digits ? 'numeric' : undefined, pattern: digits ? `[0-9]{${digits}}` : undefined, title: digits ? `Debe contener ${digits} dígitos.` : undefined, onChange: event => setDraft(previous => ({ ...previous, [key]: digits ? event.target.value.replace(/\D/g, '').slice(0, digits) : event.target.value })), 'aria-invalid': !!fieldErrors[key] }
         const lista = listas[key]
         return <div key={key} className="flex flex-col gap-2 text-xs font-medium text-slate-600">

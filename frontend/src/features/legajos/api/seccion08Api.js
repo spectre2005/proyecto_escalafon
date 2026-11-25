@@ -9,6 +9,10 @@ export function agregarDocumento08(usuario, datos, pdf) {
   return api.post(`/expedientes/${usuario}/seccion-08/documentos`, form)
 }
 
+export function rehabilitarSancion08(usuario, sancion, datos) {
+  return api.post(`/expedientes/${usuario}/seccion-08/sanciones/${sancion}/rehabilitar`, datos)
+}
+
 export function revisarDocumento08(usuario, documento, datos) {
   return api.post(`/expedientes/${usuario}/seccion-08/documentos/${documento}/estado`, datos)
 }

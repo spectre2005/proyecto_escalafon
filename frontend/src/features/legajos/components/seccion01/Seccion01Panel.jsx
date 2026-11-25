@@ -231,6 +231,7 @@ function Familia({ usuario, data }) {
         ['Documento', v => v.numero_doc_identidad ? `${etiqueta(tiposDocIdentidad, v.tipo_doc_identidad)} ${v.numero_doc_identidad}` : 'No registrado'],
         ['Fecha de nacimiento', (v, record) => v.fecha_nacimiento ? `${fecha(v.fecha_nacimiento)} · ${record.edad} años${record.menor_de_edad ? ' (menor de edad)' : ''}` : 'No registrada: no se puede calcular la edad'],
         ['Derechohabiente', v => v.es_derechohabiente ? 'Sí' : 'No'],
+        ...(data.familiares.some(record => record.values.fecha_fallecimiento) ? [['Fallecimiento', v => v.fecha_fallecimiento ? fecha(v.fecha_fallecimiento) : '—']] : []),
       ]}
       detalle={record => record.exigencias.length > 0 && <ul className="mt-4 space-y-2">{record.exigencias.map(item => {
         const [texto, clase] = exigencia[String(item.exigido)]

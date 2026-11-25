@@ -7,8 +7,10 @@ use App\Models\Capacitacion;
 use App\Models\Colegiatura;
 use App\Models\DocumentoUsuario;
 use App\Models\FormacionAcademica;
+use App\Models\Idioma;
 use App\Models\Legajo;
 use App\Models\ObservacionDocumento;
+use App\Models\ProduccionIntelectual;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
 use App\Support\Documentos\ArchivoPdf;
@@ -27,6 +29,21 @@ use Illuminate\Validation\ValidationException;
 
 class Seccion03Controller extends Controller
 {
+    /** Modalidad de dictado de una capacitación (capacitaciones.modalidad_dictado). */
+    public const MODALIDADES_DICTADO = ['presencial', 'semipresencial', 'virtual'];
+
+    /**
+     * Literal h) «Otros documentos relacionados a la formación académica y capacitación»: además de un documento sin
+     * más datos, puede acreditar un idioma o una producción intelectual, con su propio registro.
+     */
+    public const CLASES_OTROS = ['otro', 'idioma', 'produccion'];
+
+    public const TIPOS_IDIOMA = ['extranjero', 'originaria'];
+
+    public const NIVELES_IDIOMA = ['basico', 'intermedio', 'avanzado', 'nativo'];
+
+    public const TIPOS_PRODUCCION = ['libro', 'capitulo', 'articulo', 'investigacion', 'innovacion', 'otro'];
+
     public function show(Request $request, string $usuario): JsonResponse
     {
         $persona = Usuario::query()->with('vinculosLaborales')->findOrFail($usuario);
@@ -38,7 +55,7 @@ class Seccion03Controller extends Controller
             $tipos->where('es_dato_sensible', false)->where('es_dato_salud', false);
         }
         $documentos = $legajo ? DocumentoUsuario::query()->where('legajo_id', $legajo->id)->where('seccion_legajo_id', 3)
-            ->with(['archivo', 'observacionesDocumentoPorDocumento', 'documentosUsuarioPorSubsanaADocumento', 'formacionAcademica', 'colegiaturas', 'capacitaciones'])->orderByDesc('fecha_emision')->orderByDesc('id')->get() : collect();
+            ->with(['archivo', 'observacionesDocumentoPorDocumento', 'documentosUsuarioPorSubsanaADocumento', 'formacionAcademica', 'colegiaturas', 'capacitaciones', 'idiomas', 'produccionesIntelectuales'])->orderByDesc('fecha_emision')->orderByDesc('id')->get() : collect();
         $items = $tipos->orderBy('orden')->get()->map(function (TipoDocumento $tipo) use ($perfil, $documentos, $request): array {
             $exigencia = $perfil->exigencia($tipo);
             if ($exigencia['exigido'] === true) {
@@ -102,6 +119,18 @@ class Seccion03Controller extends Controller
         if (in_array($letra, ['f', 'g'], true)) {
             $reglas['tipo_capacitacion'] = ['required', Rule::in($letra === 'f' ? ['curso', 'programa_especializacion'] : ['congreso', 'seminario', 'taller'])];
             $reglas['horas'] = 'nullable|integer|min:1|max:100000';
+            $reglas['creditos'] = 'nullable|numeric|min:0.5|max:999';
+            $reglas['modalidad_dictado'] = ['nullable', Rule::in(self::MODALIDADES_DICTADO)];
+        }
+        if ($letra === 'h') {
+            $clase = $request->input('clase_registro') ?: 'otro';
+            $reglas['clase_registro'] = ['nullable', Rule::in(self::CLASES_OTROS)];
+            if ($clase === 'idioma') {
+                $reglas += ['idioma' => 'required|string|max:60', 'tipo_idioma' => ['required', Rule::in(self::TIPOS_IDIOMA)], 'nivel_idioma' => ['required', Rule::in(self::NIVELES_IDIOMA)]];
+            } elseif ($clase === 'produccion') {
+                $reglas += ['tipo_produccion' => ['required', Rule::in(self::TIPOS_PRODUCCION)], 'editorial_revista' => 'nullable|string|max:200',
+                    'identificador' => 'nullable|string|max:80', 'registro_indecopi' => 'nullable|string|max:60'];
+            }
         }
         $this->rechazarDesconocidos($request, $reglas);
         $datos = $request->validate($reglas, [
@@ -145,10 +174,26 @@ class Seccion03Controller extends Controller
             'nivel' => $formacion?->nivel, 'numero_registro' => $formacion?->numero_registro_sunedu,
             'numero_colegiatura' => $colegiatura?->numero_colegiatura, 'vigente_hasta' => $colegiatura?->vigente_hasta?->format('Y-m-d'),
             'tipo_capacitacion' => $capacitacion?->tipo, 'horas' => $capacitacion?->horas,
+            'creditos' => $capacitacion?->creditos, 'modalidad_dictado' => $capacitacion?->modalidad_dictado,
+            ...self::datosOtros($doc),
         ], fn (mixed $valor): bool => $valor !== null);
     }
 
-    /** @return array{formacion: list<array<string, mixed>>, colegiaturas: list<array<string, mixed>>, capacitaciones: list<array<string, mixed>>} */
+    /** Datos del idioma o de la producción intelectual que acredita un documento del literal h). */
+    private static function datosOtros(DocumentoUsuario $doc): array
+    {
+        $idioma = $doc->relationLoaded('idiomas') ? $doc->idiomas->first() : null;
+        $produccion = $doc->relationLoaded('produccionesIntelectuales') ? $doc->produccionesIntelectuales->first() : null;
+
+        return match (true) {
+            $idioma !== null => ['clase_registro' => 'idioma', 'idioma' => $idioma->idioma, 'tipo_idioma' => $idioma->tipo, 'nivel_idioma' => $idioma->nivel],
+            $produccion !== null => ['clase_registro' => 'produccion', 'tipo_produccion' => $produccion->tipo, 'editorial_revista' => $produccion->editorial_revista,
+                'identificador' => $produccion->identificador, 'registro_indecopi' => $produccion->registro_indecopi],
+            default => [],
+        };
+    }
+
+    /** @return array{formacion: list<array<string, mixed>>, colegiaturas: list<array<string, mixed>>, capacitaciones: list<array<string, mixed>>, idiomas: list<array<string, mixed>>, producciones: list<array<string, mixed>>} */
     private function registros(DocumentoUsuario $doc): array
     {
         $fecha = fn (?CarbonInterface $valor): ?string => $valor?->format('Y-m-d');
@@ -163,8 +208,12 @@ class Seccion03Controller extends Controller
                 'fecha_colegiatura' => $fecha($c->fecha_colegiatura), 'fecha_verificacion' => $fecha($c->fecha_verificacion), 'vigente_hasta' => $fecha($c->vigente_hasta),
             ])->values()->all(),
             'capacitaciones' => $doc->capacitaciones->map(fn (Capacitacion $c): array => [
-                ...$c->only(['id', 'tipo', 'nombre', 'entidad', 'horas', 'anulado']),
+                ...$c->only(['id', 'tipo', 'nombre', 'entidad', 'horas', 'creditos', 'modalidad_dictado', 'anulado']),
                 'fecha_inicio' => $fecha($c->fecha_inicio), 'fecha_fin' => $fecha($c->fecha_fin),
+            ])->values()->all(),
+            'idiomas' => $doc->idiomas->map(fn (Idioma $i): array => [...$i->only(['id', 'idioma', 'tipo', 'nivel', 'institucion', 'anulado']), 'fecha' => $fecha($i->fecha)])->values()->all(),
+            'producciones' => $doc->produccionesIntelectuales->map(fn (ProduccionIntelectual $p): array => [
+                ...$p->only(['id', 'tipo', 'titulo', 'editorial_revista', 'identificador', 'registro_indecopi', 'anulado']), 'fecha_publicacion' => $fecha($p->fecha_publicacion),
             ])->values()->all(),
         ];
     }
@@ -183,9 +232,17 @@ class Seccion03Controller extends Controller
                 'numero_colegiatura' => trim($datos['numero_colegiatura']), 'fecha_colegiatura' => $doc->fecha_emision,
                 'vigente_hasta' => $datos['vigente_hasta'] ?? null, 'habilitado' => false,
             ]);
+        } elseif ($letra === 'h' && ($datos['clase_registro'] ?? 'otro') === 'idioma') {
+            Idioma::query()->create([...$base, 'idioma' => trim($datos['idioma']), 'tipo' => $datos['tipo_idioma'], 'nivel' => $datos['nivel_idioma'],
+                'institucion' => $doc->emisor, 'fecha' => $doc->fecha_emision]);
+        } elseif ($letra === 'h' && ($datos['clase_registro'] ?? 'otro') === 'produccion') {
+            ProduccionIntelectual::query()->create([...$base, 'tipo' => $datos['tipo_produccion'], 'titulo' => mb_substr($doc->nombre, 0, 300),
+                'fecha_publicacion' => $doc->fecha_emision, 'editorial_revista' => $datos['editorial_revista'] ?? null,
+                'identificador' => $datos['identificador'] ?? null, 'registro_indecopi' => $datos['registro_indecopi'] ?? null]);
         } else {
             Capacitacion::query()->create([...$base, 'nombre' => $doc->nombre, 'entidad' => $doc->emisor,
                 'tipo' => $datos['tipo_capacitacion'] ?? 'otro', 'horas' => $datos['horas'] ?? null, 'fecha_fin' => $doc->fecha_emision,
+                'creditos' => $datos['creditos'] ?? null, 'modalidad_dictado' => $datos['modalidad_dictado'] ?? null,
             ]);
         }
     }

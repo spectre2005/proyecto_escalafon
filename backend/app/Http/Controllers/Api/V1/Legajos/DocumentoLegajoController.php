@@ -19,6 +19,7 @@ use App\Support\Documentos\FormulariosDatos;
 use App\Support\Parametros;
 use App\Support\ResumenSeccion04;
 use App\Support\ResumenSeccion06;
+use App\Support\Sanciones;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -280,7 +281,7 @@ class DocumentoLegajoController extends Controller
      */
     public static function restriccion(Usuario $usuario, int $seccion, ?TipoDocumento $tipo = null): ?string
     {
-        if ($seccion === 8 && in_array($tipo?->codigo, ['SAN_RESOLUCION_SANCION', 'SAN_RESOLUCION_RECURSO'], true)
+        if ($seccion === 8 && in_array($tipo?->codigo, Sanciones::CODIGOS_DOCUMENTO, true)
             && ! $usuario->can('seccion08.sanciones.ver') && ! $usuario->can('seccion08.sanciones.revisar')) {
             return 'Tu perfil no tiene acceso a documentos de sanciones.';
         }

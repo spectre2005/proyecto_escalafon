@@ -6,7 +6,7 @@ import { useBorrador, useGuardar } from '../seccion01/useGuardar'
 import { agregarDocumento08 } from '../../api/seccion08Api'
 import { modalidadesPresentacion, folios, modalidadRecordada, recordarModalidad } from '../../config/documentos'
 import { SugerenciaFolio } from '../documentos/AyudasCarga'
-import { resultadoRecurso08, tipoSancion08 } from '../../config/seccion08'
+import { resultadoRecurso08, sancionConSeparacion08, tipoSancion08 } from '../../config/seccion08'
 import { conValor, reemplazarPropuesta } from '../../config/acreditacion'
 
 // Datos del documento que se subsana y de su registro (reconocimiento, tiempo reconocido o sanción): se proponen para
@@ -19,7 +19,8 @@ function datosDe(doc) {
     motivo: doc.motivo, tipo: doc.tipo_sancion,
     ...(tiempo ? { anios: String(tiempo.anios ?? ''), meses: String(tiempo.meses ?? ''), dias: String(tiempo.dias ?? '') } : {}),
     ...(doc.registro_sancion_id ? { dias_suspension: doc.dias_suspension === null ? '' : String(doc.dias_suspension), registrada_en_rnssc: doc.registrada_en_rnssc ? '1' : '0',
-      fecha_registro_rnssc: doc.fecha_registro_rnssc, referencia_rnssc: doc.referencia_rnssc, referencia_procedimiento: doc.referencia_procedimiento } : {}),
+      fecha_registro_rnssc: doc.fecha_registro_rnssc, referencia_rnssc: doc.referencia_rnssc, referencia_procedimiento: doc.referencia_procedimiento,
+      fecha_notificacion: doc.fecha_notificacion, fecha_inicio: doc.fecha_inicio_sancion, fecha_fin: doc.fecha_fin_sancion } : {}),
   })
 }
 
@@ -32,7 +33,7 @@ export default function Documento08Form({ usuario, item, datos, onSaved, onCance
   const [errorPdf, setErrorPdf] = useState('')
   const [paginas, setPaginas] = useState(null)
   const vacios = { nombre: '', emisor: '', fecha_emision: '', num_resolucion: '', motivo: '', anios: '', meses: '', dias: '', tipo: '', dias_suspension: '',
-    registrada_en_rnssc: '0', fecha_registro_rnssc: '', referencia_rnssc: '', referencia_procedimiento: '', sancion_id: '', resultado: '', modalidad_presentacion: modalidadRecordada() }
+    registrada_en_rnssc: '0', fecha_registro_rnssc: '', referencia_rnssc: '', referencia_procedimiento: '', fecha_notificacion: '', fecha_inicio: '', fecha_fin: '', sancion_id: '', resultado: '', modalidad_presentacion: modalidadRecordada() }
   const documento = id => item.documentos.find(doc => doc.id === id)
   const [propuesta, setPropuesta] = useState(() => datosDe(documento(subsana)))
   const [draft, set, poner] = useBorrador({ ...vacios, ...propuesta, folio_inicio: datos.folio_sugerido, folio_fin: datos.folio_sugerido, subsana_a_documento_id: subsana })
@@ -49,8 +50,10 @@ export default function Documento08Form({ usuario, item, datos, onSaved, onCance
     modalidad_presentacion: values.modalidad_presentacion, subsana_a_documento_id: values.subsana_a_documento_id,
     ...(item.codigo.startsWith('REC_') ? { tipo: item.codigo === 'REC_CARTA_FELICITACION' ? 'carta' : item.codigo === 'REC_LABOR_DOCENTE' ? 'labor_docente' : 'tiempo_servicios', motivo: values.motivo } : {}),
     ...(item.codigo === 'REC_TIEMPO_SERVICIOS' ? { anios: values.anios, meses: values.meses, dias: values.dias } : {}),
-    ...(item.codigo === 'SAN_RESOLUCION_SANCION' ? { tipo: values.tipo, dias_suspension: values.dias_suspension, registrada_en_rnssc: values.registrada_en_rnssc,
-      fecha_registro_rnssc: values.fecha_registro_rnssc, referencia_rnssc: values.referencia_rnssc, referencia_procedimiento: values.referencia_procedimiento } : {}),
+    ...(item.codigo === 'SAN_RESOLUCION_SANCION' ? { tipo: values.tipo, registrada_en_rnssc: values.registrada_en_rnssc, fecha_notificacion: values.fecha_notificacion,
+      fecha_registro_rnssc: values.fecha_registro_rnssc, referencia_rnssc: values.referencia_rnssc, referencia_procedimiento: values.referencia_procedimiento,
+      // Días y periodo solo en las sanciones que separan del cargo (el backend rechaza el resto).
+      ...(sancionConSeparacion08.includes(values.tipo) ? { dias_suspension: values.dias_suspension, fecha_inicio: values.fecha_inicio, fecha_fin: values.fecha_fin } : {}) } : {}),
     ...(item.codigo === 'SAN_RESOLUCION_RECURSO' ? { sancion_id: values.sancion_id, resultado: values.resultado } : {}),
   }, pdf), () => { recordarModalidad(draft.modalidad_presentacion); onSaved() })
   const vigentes = item.documentos.filter(doc => !doc.subsanado && doc.estado !== 'anulado')
@@ -73,7 +76,13 @@ export default function Documento08Form({ usuario, item, datos, onSaved, onCance
       </>}
       {item.codigo === 'SAN_RESOLUCION_SANCION' && <>
         <Campo label="Tipo de sanción" required error={errors.tipo}><select required value={draft.tipo} onChange={set('tipo')}><Opciones lista={tipoSancion08} vacio="Selecciona" /></select></Campo>
-        {draft.tipo === 'SUSPENSION' && <Campo label="Días de suspensión" required error={errors.dias_suspension}><input type="number" required min="1" step="1" value={draft.dias_suspension} onChange={set('dias_suspension')} /></Campo>}
+        <Campo label="Fecha de notificación" error={errors.fecha_notificacion}><input type="date" min={draft.fecha_emision || undefined} max={datos.fecha_actual} value={draft.fecha_notificacion} onChange={set('fecha_notificacion')} /></Campo>
+        {sancionConSeparacion08.includes(draft.tipo) && <>
+          <Campo label="Días de separación" required error={errors.dias_suspension}><input type="number" required min="1" step="1" value={draft.dias_suspension} onChange={set('dias_suspension')} /></Campo>
+          <Campo label="Inicio de la separación" error={errors.fecha_inicio}><input type="date" required={!!draft.fecha_fin} value={draft.fecha_inicio} onChange={set('fecha_inicio')} /></Campo>
+          <Campo label="Fin de la separación" error={errors.fecha_fin}><input type="date" required={!!draft.fecha_inicio} min={draft.fecha_inicio || undefined} value={draft.fecha_fin} onChange={set('fecha_fin')} /></Campo>
+          <p className="col-span-full text-xs text-slate-500">El periodo es opcional. Con él, la institución puede descontar la separación del tiempo de servicio si activa esa regla.</p>
+        </>}
         <Campo label="Consta en el RNSSC" required error={errors.registrada_en_rnssc}><select required value={draft.registrada_en_rnssc} onChange={set('registrada_en_rnssc')}><option value="0">No</option><option value="1">Sí</option></select></Campo>
         {draft.registrada_en_rnssc === '1' && <>
           <Campo label="Fecha de registro en el RNSSC" error={errors.fecha_registro_rnssc}><input type="date" max={datos.fecha_actual} value={draft.fecha_registro_rnssc} onChange={set('fecha_registro_rnssc')} /></Campo>

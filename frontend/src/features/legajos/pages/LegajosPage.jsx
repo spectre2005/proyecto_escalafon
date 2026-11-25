@@ -31,6 +31,7 @@ import { CATEGORIA_DOCUMENTOS, categoriaVigente, legajoSections, subseccionesSec
 import Icon from '../../../components/ui/Icon'
 import Paginacion from '../../../shared/Paginacion'
 import { conPagina, conPorPagina, leerPaginacion, paginaCorregida } from '../../../shared/paginacionUrl'
+import { regimenesPensionarios } from '../config/seccion01'
 import { banderasPuesto, esBandera, textoBandera } from '../../../shared/banderas'
 
 const control = 'rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-teal-600 disabled:opacity-40'
@@ -57,6 +58,8 @@ const titles = {
   tamano_bytes: 'Tamaño en bytes', mime_type: 'Tipo de archivo', num_paginas: 'Páginas',
   es_dato_sensible: 'Dato sensible', es_dato_salud: 'Dato de salud',
   obligado_djbr: 'Obligación de declaración jurada de bienes y rentas',
+  contacto_emergencia_nombre: 'Contacto de emergencia', contacto_emergencia_parentesco: 'Parentesco del contacto', contacto_emergencia_telefono: 'Teléfono del contacto',
+  regimen_pensionario: 'Régimen pensionario', afp_nombre: 'AFP', cuspp: 'CUSPP', fecha_afiliacion_pension: 'Fecha de afiliación al régimen',
 }
 
 function label(key) {
@@ -66,6 +69,7 @@ function label(key) {
 function valueText(value, key) {
   // Banderas del perfil: Sí / No / Sin responder (null no es No).
   if (esBandera(key)) return textoBandera(value)
+  if (key === 'regimen_pensionario' && regimenesPensionarios[value]) return regimenesPensionarios[value]
   if (value === null || value === undefined || value === '') return 'No registrado'
   if (typeof value === 'boolean') return value ? 'Sí' : 'No'
   if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return String(value).split('-').reverse().join('/')

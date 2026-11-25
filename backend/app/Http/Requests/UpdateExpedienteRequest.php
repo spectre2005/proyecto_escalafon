@@ -38,6 +38,13 @@ class UpdateExpedienteRequest extends FormRequest
             'estado_civil' => ['sometimes', 'nullable', Rule::in(Catalogos::ESTADOS_CIVILES)],
             'domicilio' => 'sometimes|nullable|string|max:250',
             'telefono' => ['sometimes', 'nullable', 'string', 'regex:/^[0-9]{9}$/'],
+            'contacto_emergencia_nombre' => 'sometimes|nullable|string|max:120',
+            'contacto_emergencia_parentesco' => 'sometimes|nullable|string|max:40',
+            'contacto_emergencia_telefono' => ['sometimes', 'nullable', 'string', 'regex:/^[0-9]{9}$/'],
+            'regimen_pensionario' => ['sometimes', 'nullable', Rule::in(Catalogos::REGIMENES_PENSIONARIOS)],
+            'afp_nombre' => 'sometimes|nullable|string|max:60',
+            'cuspp' => ['sometimes', 'nullable', 'string', 'regex:/^[A-Za-z0-9]{12}$/'],
+            'fecha_afiliacion_pension' => 'sometimes|nullable|date_format:Y-m-d|before_or_equal:today',
             'email_institucional' => 'sometimes|required|string|email:rfc|max:255',
             'tipo_personal' => 'sometimes|required|in:docente,administrativo',
             // La ley se edita en regimen_normativo_id; regimen_laboral queda como respaldo de lectura. El tipo de
@@ -67,7 +74,8 @@ class UpdateExpedienteRequest extends FormRequest
     {
         $puesto = 'Las condiciones del puesto se registran en el vínculo laboral (sección 02).';
 
-        return ['telefono.regex' => 'El teléfono debe contener 9 dígitos.', 'obligado_djbr.prohibited' => $puesto,
+        return ['telefono.regex' => 'El teléfono debe contener 9 dígitos.', 'contacto_emergencia_telefono.regex' => 'El teléfono debe contener 9 dígitos.',
+            'cuspp.regex' => 'El CUSPP tiene 12 caracteres (letras y números).', 'obligado_djbr.prohibited' => $puesto,
             'regimen_laboral.prohibited' => 'La ley se registra en «Régimen normativo»; el tipo de vínculo, en el vínculo laboral (sección 02).',
             'exige_colegiatura.prohibited' => $puesto, 'exige_estudios_basicos.prohibited' => $puesto, 'tiene_periodo_prueba.prohibited' => $puesto];
     }

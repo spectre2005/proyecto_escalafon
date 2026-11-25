@@ -24,6 +24,8 @@ class Capacitacion extends Model
         'nombre',
         'entidad',
         'horas',
+        'creditos',
+        'modalidad_dictado',
         'fecha_inicio',
         'fecha_fin',
         'registrado_por',
@@ -36,6 +38,7 @@ class Capacitacion extends Model
     {
         return [
             'horas' => 'integer',
+            'creditos' => 'decimal:1',
             'fecha_inicio' => 'date',
             'fecha_fin' => 'date',
             'anulado' => 'boolean',

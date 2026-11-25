@@ -9,6 +9,7 @@ use App\Models\RecursoImpugnatorio;
 use App\Models\Sancion;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
+use App\Support\EmisionesPersonales;
 use Database\Seeders\Seccion08CatalogoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -58,8 +59,10 @@ class Seccion08ApiTest extends TestCase
             }, 'motivo' => 'Mérito ficticio para prueba automatizada'];
         } elseif ($codigo === 'SAN_RESOLUCION_SANCION') {
             $datos += ['tipo' => 'SUSPENSION', 'num_resolucion' => 'RES-FICT-001', 'dias_suspension' => 3, 'registrada_en_rnssc' => 0];
-        } else {
+        } elseif ($codigo === 'SAN_RESOLUCION_RECURSO') {
             $datos += ['num_resolucion' => 'RES-REC-FICT-001', 'sancion_id' => $cambios['sancion_id'] ?? '', 'resultado' => 'FUNDADO'];
+        } else {
+            $datos += ['num_resolucion' => 'RES-PAD-FICT-001'];
         }
 
         return $this->post($this->url('/documentos'), [...$datos, ...$cambios], ['Accept' => 'application/json']);
@@ -138,6 +141,71 @@ class Seccion08ApiTest extends TestCase
         $this->assertNotSame($this->autor->id, $revisor->id);
         $this->postJson($this->url('/documentos/'.$id.'/estado'), ['estado' => 'aceptado', 'estado_anterior' => 'pendiente', 'recepcion_confirmada' => true])->assertOk();
         $this->assertDatabaseHas('historial_estados_documento', ['documento_usuario_id' => $id, 'estado_nuevo' => 'aceptado']);
+    }
+
+    public function test_separation_sanctions_take_days_period_and_notification_and_others_reject_them(): void
+    {
+        $this->cargar('SAN_RESOLUCION_SANCION', ['tipo' => 'CESE_TEMPORAL', 'dias_suspension' => null])->assertUnprocessable()->assertJsonValidationErrors('dias_suspension');
+        $this->cargar('SAN_RESOLUCION_SANCION', ['tipo' => 'AMONESTACION_VERBAL', 'dias_suspension' => null, 'fecha_inicio' => '2026-10-02', 'fecha_fin' => '2026-10-05'])
+            ->assertUnprocessable()->assertJsonValidationErrors(['fecha_inicio', 'fecha_fin']);
+        $this->cargar('SAN_RESOLUCION_SANCION', ['fecha_inicio' => '2026-10-05', 'fecha_fin' => '2026-10-02'])->assertUnprocessable()->assertJsonValidationErrors('fecha_fin');
+        $this->cargar('SAN_RESOLUCION_SANCION', ['fecha_inicio' => '2026-10-02'])->assertUnprocessable()->assertJsonValidationErrors('fecha_fin');
+        // La notificación no puede ser anterior al documento ni futura.
+        $this->cargar('SAN_RESOLUCION_SANCION', ['fecha_notificacion' => '2026-09-30'])->assertUnprocessable()->assertJsonValidationErrors('fecha_notificacion');
+        $this->cargar('SAN_RESOLUCION_SANCION', ['fecha_notificacion' => '2026-10-07'])->assertUnprocessable()->assertJsonValidationErrors('fecha_notificacion');
+        $this->cargar('SAN_RESOLUCION_SANCION', ['tipo' => 'NO_EXISTE'])->assertUnprocessable()->assertJsonValidationErrors('tipo');
+        $this->assertDatabaseCount('sanciones', 0);
+
+        $id = $this->cargar('SAN_RESOLUCION_SANCION', ['tipo' => 'CESE_TEMPORAL', 'dias_suspension' => 30, 'fecha_inicio' => '2026-10-02', 'fecha_fin' => '2026-10-31', 'fecha_notificacion' => '2026-10-02'])
+            ->assertCreated()->json('data.id');
+        $sancion = Sancion::query()->where('documento_id', $id)->firstOrFail();
+        $this->assertSame(['CESE_TEMPORAL', '2026-10-02', '2026-10-31', '2026-10-02'], [$sancion->tipo, $sancion->fecha_inicio->toDateString(), $sancion->fecha_fin->toDateString(), $sancion->fecha_notificacion->toDateString()]);
+        $this->cargar('SAN_RESOLUCION_SANCION', ['tipo' => 'AMONESTACION_VERBAL', 'dias_suspension' => null])->assertCreated();
+        $this->getJson($this->url())->assertOk()->assertJsonPath('data.grupos.sanciones.0.documentos.0.fecha_notificacion', '2026-10-02')
+            ->assertJsonPath('data.grupos.sanciones.0.documentos.0.fecha_fin_sancion', '2026-10-31');
+    }
+
+    public function test_rehabilitation_is_recorded_once_keeps_the_sanction_and_hides_it_from_the_report(): void
+    {
+        $id = $this->cargar('SAN_RESOLUCION_SANCION')->assertCreated()->json('data.id');
+        $sancion = Sancion::query()->where('documento_id', $id)->firstOrFail();
+        $url = $this->url('/sanciones/'.$sancion->id.'/rehabilitar');
+        $this->postJson($url, ['fecha' => '2026-09-30', 'numero_resolucion' => 'RES-REHAB-01'])->assertUnprocessable()->assertJsonValidationErrors('fecha');
+        $this->postJson($url, ['fecha' => '2026-10-07', 'numero_resolucion' => 'RES-REHAB-01'])->assertUnprocessable()->assertJsonValidationErrors('fecha');
+        $this->postJson($url, ['fecha' => '2026-10-05', 'numero_resolucion' => '   '])->assertUnprocessable()->assertJsonValidationErrors('numero_resolucion');
+        // Una sanción de otra persona no se encuentra por esta ruta.
+        $otra = Usuario::factory()->create();
+        $this->postJson('/api/v1/expedientes/'.$otra->id.'/seccion-08/sanciones/'.$sancion->id.'/rehabilitar', ['fecha' => '2026-10-05', 'numero_resolucion' => 'X'])->assertNotFound();
+
+        $this->postJson($url, ['fecha' => '2026-10-05', 'numero_resolucion' => 'RES-REHAB-01'])->assertOk()->assertJsonPath('data.rehabilitada_el', '2026-10-05');
+        $this->postJson($url, ['fecha' => '2026-10-05', 'numero_resolucion' => 'RES-REHAB-02'])->assertConflict();
+        $this->assertDatabaseHas('sanciones', ['id' => $sancion->id, 'resolucion_rehabilitacion' => 'RES-REHAB-01', 'rehabilitada_por' => $this->autor->id, 'anulado' => false]);
+        $this->assertDatabaseHas('auditoria_eventos', ['entidad_id' => $sancion->id, 'accion' => 'seccion08.sancion.rehabilitada']);
+        $this->assertDatabaseHas('documentos_usuario', ['id' => $id, 'estado' => 'aceptado']);
+        $this->getJson($this->url())->assertOk()->assertJsonPath('data.grupos.sanciones.0.documentos.0.rehabilitada_el', '2026-10-05')->assertJsonPath('data.resumen.rehabilitadas', 1);
+
+        $informe = EmisionesPersonales::emitir($this->autor, $this->persona, $this->legajo, 'informe-escalafonario');
+        $this->assertSame([], $informe['sanciones']);
+        $this->assertSame(1, $informe['sanciones_rehabilitadas']);
+
+        config(['permisos.roles.SOLO_VER' => ['legajo.ver', 'seccion08.sanciones.ver']]);
+        $this->actuarComo(null, 'SOLO_VER');
+        $this->postJson($url, ['fecha' => '2026-10-05', 'numero_resolucion' => 'RES-REHAB-03'])->assertForbidden();
+    }
+
+    public function test_disciplinary_procedure_documents_are_sanction_documents_but_not_sanctions(): void
+    {
+        $id = $this->cargar('SAN_INICIO_PAD')->assertCreated()->json('data.id');
+        $this->cargar('SAN_MEDIDA_CAUTELAR')->assertCreated();
+        $this->assertDatabaseCount('sanciones', 0);
+        $this->assertDatabaseHas('auditoria_eventos', ['entidad_id' => $id, 'accion' => 'seccion08.documento.creado']);
+        $datos = $this->getJson($this->url())->assertOk()->assertJsonPath('data.resumen.sanciones', 0)->json('data.grupos.sanciones');
+        $this->assertContains('SAN_INICIO_PAD', array_column($datos, 'codigo'));
+        // Quien no ve sanciones no los ve ni puede cargarlos.
+        config(['permisos.roles.LECTOR' => ['legajo.ver', 'documento.subir']]);
+        $this->actuarComo(null, 'LECTOR');
+        $this->getJson($this->url())->assertOk()->assertJsonPath('data.grupos.sanciones', null);
+        $this->cargar('SAN_MEDIDA_CAUTELAR')->assertForbidden();
     }
 
     public function test_opening_sanction_pdf_is_denied_without_permission_and_logged_when_authorized(): void

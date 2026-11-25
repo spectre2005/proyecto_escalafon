@@ -2,6 +2,9 @@
 // aquí solo se agregan las etiquetas para mostrar.
 export const tiposDocIdentidad = { dni: 'DNI', ce: 'Carné de extranjería', pasaporte: 'Pasaporte', otro: 'Otro' }
 
+// usuarios.regimen_pensionario (Catalogos::REGIMENES_PENSIONARIOS). Dato de consulta; planillas lleva el detalle.
+export const regimenesPensionarios = { onp: 'ONP (D.L. 19990)', afp: 'AFP (Sistema Privado de Pensiones)', dl_20530: 'D.L. 20530', otro: 'Otro', ninguno: 'Ninguno' }
+
 export const estadosCiviles = { soltero: 'Soltero(a)', casado: 'Casado(a)', conviviente: 'Conviviente', divorciado: 'Divorciado(a)', viudo: 'Viudo(a)' }
 
 export const parentescos = { conyuge: 'Cónyuge', concubino: 'Concubino(a)', hijo: 'Hijo(a)', otro: 'Otro' }

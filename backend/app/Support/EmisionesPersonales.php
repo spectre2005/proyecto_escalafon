@@ -7,6 +7,7 @@ use App\Models\Legajo;
 use App\Models\Usuario;
 use App\Models\VinculoLaboral;
 use App\Support\Documentos\EstadoDocumento;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -16,7 +17,8 @@ use Illuminate\Support\Collection;
  * Datos del informe escalafonario y de las constancias de trabajo y de tiempo de servicios de una persona (el PDF se arma
  * en el frontend). Campos explícitos, nunca modelos completos ni identificadores internos. Solo lee: no cambia registros.
  *
- * - Informe escalafonario: lo registrado en el legajo, con el sustento de cada dato; no es una certificación.
+ * - Informe escalafonario (hoja de vida): lo registrado en el legajo, sección por sección, con el sustento de cada dato y
+ *   el tiempo de servicio calculado con los vínculos (TiempoServicio); no es una certificación.
  * - Constancia de trabajo: solo vínculos no anulados sustentados con un documento aceptado de la sección 02.
  * - Constancia de tiempo de servicios: solo las resoluciones de reconocimiento de la sección 06 con documento aceptado.
  *   No suma resoluciones (pueden solaparse) ni calcula tiempo con vínculos, licencias, suspensiones o estudios: esas
@@ -34,8 +36,6 @@ final class EmisionesPersonales
 
     /** Etiquetas visibles de los tipos que valida la sección 08 (las de sanciones, como en su pantalla); el valor guardado no cambia. */
     private const TIPOS_RECONOCIMIENTO = ['carta' => 'Felicitación', 'labor_docente' => 'Reconocimiento por labor docente', 'tiempo_servicios' => 'Reconocimiento por tiempo de servicios'];
-
-    private const TIPOS_SANCION = ['AMONESTACION_ESCRITA' => 'Amonestación escrita', 'SUSPENSION' => 'Suspensión', 'DESTITUCION' => 'Destitución'];
 
     private const TIPOS_DOC_IDENTIDAD = ['dni' => 'DNI', 'ce' => 'Carné de extranjería', 'pasaporte' => 'Pasaporte', 'otro' => 'Otro'];
 
@@ -66,6 +66,7 @@ final class EmisionesPersonales
         $sanciones = $actor->can('seccion08.sanciones.ver');
         $evaluaciones = $actor->can('seccion07.ver');
         $conDocumento = fn (Builder|Relation $q): Builder|Relation => $q->where('anulado', false)->with(['documento.tipoDocumento', 'documento.archivo', 'documento.legajo:id,usuario_id', 'documento.documentosUsuarioPorSubsanaADocumento:id,subsana_a_documento_id']);
+        $porFecha = fn (string $campo): \Closure => fn ($q) => $conDocumento($q)->orderBy($campo)->orderBy('id');
         $persona->load(array_filter([
             'formacionAcademicaPorUsuario' => fn ($q) => $conDocumento($q)->orderBy('fecha_obtencion')->orderBy('id'),
             'capacitacionesPorUsuario' => fn ($q) => $conDocumento($q)->orderBy('fecha_inicio')->orderBy('id'),
@@ -73,6 +74,14 @@ final class EmisionesPersonales
             'licenciasPermisosPorUsuario' => fn ($q) => $conDocumento($q)->whereNotIn('tipo', Seccion05::DATOS_SALUD)->orderBy('fecha_inicio')->orderBy('id'),
             'sancionesPorUsuario' => $sanciones ? fn ($q) => $conDocumento($q)->orderBy('fecha_resolucion')->orderBy('id') : null,
             'evaluacionesDesempenoPorUsuario' => $evaluaciones ? fn ($q) => $conDocumento($q)->orderBy('ciclo_anio')->orderBy('id') : null,
+            'colegiaturasPorUsuario' => $porFecha('fecha_colegiatura'),
+            'idiomasPorUsuario' => $porFecha('fecha'),
+            'produccionesIntelectualesPorUsuario' => $porFecha('fecha_publicacion'),
+            'experienciaLaboralPorUsuario' => $porFecha('fecha_inicio'),
+            'desplazamientosPorUsuario' => $evaluaciones ? fn ($q) => $conDocumento($q)->with(['unidadOrigen:id,nombre', 'unidadDestino:id,nombre'])->orderBy('fecha_inicio')->orderBy('id') : null,
+            'progresionesCarreraPorUsuario' => $evaluaciones ? $porFecha('fecha_efectiva') : null,
+            'ratificacionesDocentesPorUsuario' => $evaluaciones ? $porFecha('fecha_inicio_periodo') : null,
+            'desvinculacionesPorUsuario' => $porFecha('fecha_cese'),
         ]));
         $filas = fn (Collection $registros, \Closure $fila): array => $registros->filter(fn ($r): bool => self::visible($actor, $r->documento, $persona))
             ->map(fn ($r): array => [...$fila($r), 'sustento' => self::sustento($r->documento, $persona)['texto']])->values()->all();
@@ -84,19 +93,66 @@ final class EmisionesPersonales
                 'institucion' => $r->institucion, 'fecha_obtencion' => self::fecha($r->fecha_obtencion), 'registro_sunedu' => $r->numero_registro_sunedu ?: null]),
             'capacitaciones' => $filas($persona->capacitacionesPorUsuario, fn ($r): array => ['nombre' => $r->nombre, 'entidad' => $r->entidad ?: null,
                 'modalidad' => ConsultaReportes::etiqueta($r->tipo), 'horas' => $r->horas !== null && $r->horas >= 0 ? $r->horas : null,
+                'creditos' => $r->creditos !== null ? (string) (float) $r->creditos : null, 'dictado' => $r->modalidad_dictado ? ConsultaReportes::etiqueta($r->modalidad_dictado) : null,
                 'inicio' => self::fecha($r->fecha_inicio), 'fin' => self::fecha($r->fecha_fin)]),
             'reconocimientos' => $filas($persona->reconocimientosPorUsuario, fn ($r): array => ['tipo' => self::TIPOS_RECONOCIMIENTO[$r->tipo] ?? ConsultaReportes::etiqueta($r->tipo), 'motivo' => $r->motivo,
                 'otorgado_por' => $r->otorgado_por ?: null, 'numero_documento' => $r->numero_documento ?: null, 'fecha' => self::fecha($r->fecha)]),
-            'sanciones' => $sanciones ? $filas($persona->sancionesPorUsuario, fn ($r): array => ['tipo' => self::TIPOS_SANCION[$r->tipo] ?? ConsultaReportes::etiqueta($r->tipo),
-                'numero_resolucion' => $r->numero_resolucion, 'fecha_resolucion' => self::fecha($r->fecha_resolucion), 'inicio' => self::fecha($r->fecha_inicio),
-                'fin' => self::fecha($r->fecha_fin), 'dias_suspension' => $r->dias_suspension]) : null,
+            // Las rehabilitadas no se muestran (siguen registradas en la sección 08); solo se informa cuántas hay.
+            'sanciones' => $sanciones ? $filas($persona->sancionesPorUsuario->whereNull('rehabilitada_el'), fn ($r): array => ['tipo' => Sanciones::etiqueta($r->tipo),
+                'numero_resolucion' => $r->numero_resolucion, 'fecha_resolucion' => self::fecha($r->fecha_resolucion), 'notificacion' => self::fecha($r->fecha_notificacion),
+                'inicio' => self::fecha($r->fecha_inicio), 'fin' => self::fecha($r->fecha_fin), 'dias_suspension' => $r->dias_suspension]) : null,
+            'sanciones_rehabilitadas' => $sanciones ? $persona->sancionesPorUsuario->whereNotNull('rehabilitada_el')->count() : null,
             'licencias' => $filas($persona->licenciasPermisosPorUsuario, fn ($r): array => ['tipo' => ConsultaReportes::etiqueta($r->tipo),
                 'goce' => $r->con_goce === null ? null : ($r->con_goce ? 'Con goce' : 'Sin goce'), 'inicio' => self::fecha($r->fecha_inicio),
                 'fin' => self::fecha($r->fecha_fin), 'dias' => $r->dias, 'numero_documento' => $r->numero_documento ?: null]),
             'evaluaciones' => $evaluaciones ? $filas($persona->evaluacionesDesempenoPorUsuario, fn ($r): array => ['ciclo' => $r->ciclo_anio,
                 'fecha' => self::fecha($r->fecha_evaluacion), 'plan_mejora' => $r->plan_mejora ? 'Sí' : 'No']) : null,
-            'omitidas' => array_values(array_filter([$sanciones ? null : 'Sanciones disciplinarias', $evaluaciones ? null : 'Evaluaciones de desempeño'])),
+            'colegiaturas' => $filas($persona->colegiaturasPorUsuario, fn ($r): array => ['colegio' => $r->colegio_profesional, 'numero' => $r->numero_colegiatura,
+                'fecha' => self::fecha($r->fecha_colegiatura), 'habilitado' => $r->habilitado === null ? null : ($r->habilitado ? 'Sí' : 'No'), 'vigente_hasta' => self::fecha($r->vigente_hasta)]),
+            'idiomas' => $filas($persona->idiomasPorUsuario, fn ($r): array => ['idioma' => $r->idioma, 'tipo' => $r->tipo === 'originaria' ? 'Lengua originaria' : 'Extranjero',
+                'nivel' => ConsultaReportes::etiqueta($r->nivel), 'institucion' => $r->institucion ?: null, 'fecha' => self::fecha($r->fecha)]),
+            'produccion' => $filas($persona->produccionesIntelectualesPorUsuario, fn ($r): array => ['tipo' => ConsultaReportes::etiqueta($r->tipo), 'titulo' => $r->titulo,
+                'editorial' => $r->editorial_revista ?: null, 'identificador' => $r->identificador ?: null, 'registro_indecopi' => $r->registro_indecopi ?: null, 'fecha' => self::fecha($r->fecha_publicacion)]),
+            'experiencia' => $filas($persona->experienciaLaboralPorUsuario, fn ($r): array => ['entidad' => $r->entidad_empresa, 'sector' => ConsultaReportes::etiqueta($r->sector),
+                'cargo' => $r->cargo, 'inicio' => self::fecha($r->fecha_inicio), 'fin' => self::fecha($r->fecha_fin)]),
+            'desplazamientos' => $evaluaciones ? $filas($persona->desplazamientosPorUsuario, fn ($r): array => ['tipo' => ConsultaReportes::etiqueta($r->tipo),
+                'origen' => $r->unidadOrigen?->nombre, 'destino' => $r->unidadDestino?->nombre ?? $r->puesto_destino, 'inicio' => self::fecha($r->fecha_inicio),
+                'fin' => self::fecha($r->fecha_fin), 'numero_documento' => $r->numero_documento ?: null]) : null,
+            'carrera' => $evaluaciones ? [
+                ...$filas($persona->ratificacionesDocentesPorUsuario, fn ($r): array => ['tipo' => ConsultaReportes::etiqueta($r->tipo), 'anterior' => $r->categoria_anterior ? ucfirst($r->categoria_anterior) : null,
+                    'nueva' => ucfirst((string) $r->categoria_nueva), 'resultado' => ConsultaReportes::etiqueta($r->resultado), 'numero_resolucion' => $r->numero_resolucion, 'fecha' => self::fecha($r->fecha_inicio_periodo)]),
+                ...$filas($persona->progresionesCarreraPorUsuario, fn ($r): array => ['tipo' => 'Progresión', 'anterior' => $r->nivel_anterior ?: null, 'nueva' => $r->nivel_nuevo,
+                    'resultado' => null, 'numero_resolucion' => $r->numero_resolucion, 'fecha' => self::fecha($r->fecha_efectiva)]),
+            ] : null,
+            'ceses' => $filas($persona->desvinculacionesPorUsuario, fn ($r): array => ['motivo' => ConsultaReportes::etiqueta($r->motivo_cese), 'fecha' => self::fecha($r->fecha_cese),
+                'numero_resolucion' => $r->numero_resolucion ?: null, 'entrega_cargo' => self::fecha($r->fecha_entrega_cargo)]),
+            'tiempo_servicio' => self::tiempoServicio($actor, $persona),
+            'omitidas' => array_values(array_filter([$sanciones ? null : 'Sanciones disciplinarias',
+                $evaluaciones ? null : 'Evaluaciones de desempeño, desplazamientos y progresión'])),
         ];
+    }
+
+    /**
+     * Tiempo de servicio calculado con los vínculos (TiempoServicio), con las reglas de la institución. Si el cálculo
+     * descuenta suspensiones y quien emite no ve sanciones, no se consultan y se indica que no se consideraron.
+     */
+    private static function tiempoServicio(Usuario $actor, Usuario $persona): ?array
+    {
+        $config = TiempoServicio::configuracion();
+        // Copia aparte: no reemplaza las relaciones ya filtradas del informe (licencias sin datos de salud, etc.).
+        $copia = Usuario::query()->with(TiempoServicio::relaciones($config, $actor->can('seccion08.sanciones.ver')))->findOrFail($persona->id);
+        $tiempo = TiempoServicio::paraPersona($copia, null, $config);
+        if ($tiempo['ingreso'] === null) {
+            return null;
+        }
+        $reglas = array_filter([$config['restar_licencias_sin_goce'] ? 'licencias sin goce' : null, $config['restar_suspensiones'] ? 'suspensiones' : null]);
+
+        return ['fecha_corte' => self::fecha(CarbonImmutable::parse($tiempo['fecha_corte'])), 'primer_ingreso' => self::fecha(CarbonImmutable::parse($tiempo['ingreso'])),
+            'total' => $tiempo['total']['texto'],
+            'por_tipo' => collect($tiempo['por_tipo'])->map(fn (array $d, string $tipo): string => TiempoServicio::TIPOS[$tipo].': '.$d['texto'])->implode(' · ') ?: null,
+            'descuentos' => $reglas ? $tiempo['descuento_dias'].' días ('.implode(' y ', $reglas).')'.($tiempo['sanciones_omitidas'] ? '; sin las sanciones, que el perfil de quien emite no ve' : '') : 'No aplicados',
+            'categoria' => $tiempo['categoria'] ? $tiempo['categoria']['nombre'].' desde el '.$tiempo['categoria']['desde'].' ('.$tiempo['categoria']['tiempo']['texto'].')' : null,
+            'vencidos_sin_cese' => $tiempo['vencidos_sin_cese']];
     }
 
     private static function constanciaTrabajo(Usuario $persona): array
@@ -206,7 +262,7 @@ final class EmisionesPersonales
         $tipo = $documento?->usuario_id === $persona->id ? $documento->tipoDocumento : null;
 
         return ! $tipo || (! $tipo->es_dato_salud && ($actor->veDatosSensibles() || ! $tipo->es_dato_sensible)
-            && ($actor->can('seccion08.sanciones.ver') || ! in_array($tipo->codigo, ['SAN_RESOLUCION_SANCION', 'SAN_RESOLUCION_RECURSO'], true)));
+            && ($actor->can('seccion08.sanciones.ver') || ! in_array($tipo->codigo, Sanciones::CODIGOS_DOCUMENTO, true)));
     }
 
     private static function fecha(?CarbonInterface $fecha): ?string

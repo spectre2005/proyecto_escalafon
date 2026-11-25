@@ -45,6 +45,11 @@ final class ExigenciasSeccion01
      */
     public static function documentoDeFamiliar(Familiar $familiar, CarbonInterface $hoy): ?array
     {
+        // Un familiar fallecido se conserva en el registro, pero ya no se le exige el DNI.
+        if ($familiar->fecha_fallecimiento !== null && $familiar->fecha_fallecimiento->format('Y-m-d') <= $hoy->format('Y-m-d')) {
+            return ['codigo' => in_array($familiar->parentesco, Seccion01::CONYUGES, true) ? Seccion01::DNI_CONYUGE : Seccion01::DNI_HIJOS,
+                'exigido' => false, 'motivo' => 'No se exige: familiar fallecido el '.$familiar->fecha_fallecimiento->format('d/m/Y').'. El documento registrado se conserva.'];
+        }
         if (in_array($familiar->parentesco, Seccion01::CONYUGES, true)) {
             return ['codigo' => Seccion01::DNI_CONYUGE, 'exigido' => true, 'motivo' => 'Se exige: cónyuge o concubino/a registrado/a.'];
         }

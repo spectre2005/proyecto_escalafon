@@ -61,12 +61,20 @@ class Usuario extends Authenticatable
         'con_discapacidad',
         'activo',
         'ultimo_acceso',
+        'contacto_emergencia_nombre',
+        'contacto_emergencia_parentesco',
+        'contacto_emergencia_telefono',
+        'regimen_pensionario',
+        'afp_nombre',
+        'cuspp',
+        'fecha_afiliacion_pension',
     ];
 
     /** @return array<string, string> */
     protected function casts(): array
     {
         return [
+            'fecha_afiliacion_pension' => 'date',
             'fecha_nacimiento' => 'date',
             'password' => 'hashed',
             'obligado_djbr' => 'boolean',
@@ -368,6 +376,18 @@ class Usuario extends Authenticatable
     public function capacitacionesPorUsuario(): HasMany
     {
         return $this->hasMany(Capacitacion::class, 'usuario_id', 'id');
+    }
+
+    /** @return HasMany<Idioma, $this> */
+    public function idiomasPorUsuario(): HasMany
+    {
+        return $this->hasMany(Idioma::class, 'usuario_id', 'id');
+    }
+
+    /** @return HasMany<ProduccionIntelectual, $this> */
+    public function produccionesIntelectualesPorUsuario(): HasMany
+    {
+        return $this->hasMany(ProduccionIntelectual::class, 'usuario_id', 'id');
     }
 
     /** @return HasMany<Capacitacion, $this> */

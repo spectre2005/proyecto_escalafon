@@ -639,6 +639,25 @@ de la institución. Código en `app/Support/Antivirus/`, configuración en `conf
 - **No cubierto:** los adjuntos de requerimientos guardados antes de hoy (están en `seguimiento`, no en
   `archivos_documento`) no los revisa el comando.
 
+## Mejoras del escalafón (25/11/2026, rama feature/mejoras-escalafon)
+
+Tiempo de servicio, hoja de vida completa, sanciones y datos de ficha y formación. Las reglas sin respuesta del cliente
+quedan en la tabla de decisiones provisionales.
+- Reporte «Tiempo de servicio del personal»: tiempo de cada persona según sus vínculos (todas las etapas, sin contar dos
+  veces los superpuestos), con fecha de corte, tiempo por tipo de vínculo y tiempo en la categoría docente o nivel actual.
+- Hoja de vida: el informe escalafonario suma el tiempo de servicio calculado, colegiatura, experiencia previa,
+  desplazamientos, progresión y ratificación, idiomas, producción intelectual y ceses.
+- Sanciones: catálogo ampliado (amonestación verbal, cese temporal, inhabilitación), periodo de la separación, fecha de
+  notificación y rehabilitación (se conserva; deja de salir en el informe). Inicio del PAD y medida cautelar como
+  documentos de sanciones (no cuentan como sanción). Los códigos se leen de `Sanciones::CODIGOS_DOCUMENTO`.
+- Licencias: estudios, motivos particulares, cargo público y año sabático docente.
+- Ficha: contacto de emergencia y régimen pensionario (datos sensibles). Familiares: fecha de fallecimiento (deja de
+  exigir su DNI; no se anula).
+- Sección 03: créditos y modalidad de dictado en capacitaciones; el literal h) puede acreditar un idioma o una
+  producción intelectual, con su registro.
+- Preguntas para el cliente (nuevas): qué se descuenta del tiempo de servicio y si cuenta el tiempo CAS; tipos de sanción
+  por régimen; si registran idiomas y producción o lo lleva otra oficina; si necesitan la AFP/ONP en el escalafón.
+
 ## Decisiones provisionales en el código (23/11/2026)
 
 Lo que el código marca como «Pendiente del cliente» (antes «TODO pendiente de confirmar»): funciona con una decisión
@@ -670,6 +689,12 @@ provisional y espera la respuesta del cliente. No es trabajo sin terminar. Se bu
 | Aviso de vencimiento del vínculo | 30 días calendario | `config/legajo.php` |
 | Tamaño máximo del PDF | 2048 KB | `config/legajo.php` |
 | Número de legajo | `LEG-{año}-` + 6 dígitos, reinicia cada año | `config/legajo.php` |
+| Tiempo de servicio: descuentos | No se restan licencias sin goce ni suspensiones (`ts_restar_licencias_sin_goce`, `ts_restar_suspensiones` = 0) | `config/legajo.php`, `Support/TiempoServicio.php` |
+| Tiempo de servicio: plazo vencido sin cese | Cuenta hasta el fin previsto y se avisa (`ts_vencido_hasta_corte` = 0; pendiente 13) | `config/legajo.php`, `Support/TiempoServicio.php` |
+| Tiempo de servicio: días por mes y año | 30/360, los mismos de la experiencia (pendiente 25) | `config/legajo.php` |
+| Tipos de sanción | Se ofrecen todos (Ley 30057 y Ley 30220); sin separar por régimen | `Support/Sanciones.php` |
+| Rehabilitación de sanciones | Exige número de resolución; la sanción deja de salir en el informe | `Seccion08Controller::rehabilitar` |
+| Régimen pensionario | Dato de la ficha (01), solo de consulta; no reemplaza a planillas | `Support/Catalogos.php`, `UpdateExpedienteRequest` |
 
 Ya no están pendientes (decididos al aceptar los documentos ya validados, 27/10/2026): si «completa» exige
 verificación (no) y si un documento observado cuenta como aprobado (no: `EstadoDocumento::aprobado` lo excluye

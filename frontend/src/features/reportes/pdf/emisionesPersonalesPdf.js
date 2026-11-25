@@ -132,35 +132,66 @@ const notaDiscreta = { tamano: 7.5, color: 90 }
 
 const COLUMNAS_TIEMPO = [['numero_resolucion', 'N.º de resolución', 2.2], ['fecha_resolucion', 'Fecha', 1.3], ['anios', 'Años', 0.9], ['meses', 'Meses', 0.9], ['dias', 'Días', 0.9]]
 
+// Hoja de vida: el orden sigue las secciones del legajo. El número se asigna al emitir, solo a las secciones incluidas
+// (una sección sin permiso llega en null y no se muestra). 'tiempo_servicio' es un resumen calculado, no una tabla.
 const SECCIONES_INFORME = [
-  ['vinculos', '1. Vínculos laborales, cargos y régimen', null],
-  ['tiempos_reconocidos', '2. Tiempo de servicios reconocido por resolución', [...COLUMNAS_TIEMPO, ['sustento', 'Sustento', 2.6]]],
-  ['formacion', '3. Formación académica', [['nivel', 'Nivel', 1.6], ['denominacion', 'Denominación', 3], ['institucion', 'Institución', 2.6], ['fecha_obtencion', 'Obtención', 1.3],
+  ['vinculos', 'Vínculos laborales, cargos y régimen', null],
+  ['tiempo_servicio', 'Tiempo de servicio calculado', 'resumen'],
+  ['tiempos_reconocidos', 'Tiempo de servicios reconocido por resolución', [...COLUMNAS_TIEMPO, ['sustento', 'Sustento', 2.6]]],
+  ['formacion', 'Formación académica', [['nivel', 'Nivel', 1.6], ['denominacion', 'Denominación', 3], ['institucion', 'Institución', 2.6], ['fecha_obtencion', 'Obtención', 1.3],
     ['registro_sunedu', 'Registro SUNEDU (declarado)', 1.6], ['sustento', 'Sustento', 2]]],
-  ['capacitaciones', '4. Capacitaciones', [['nombre', 'Capacitación', 3.2], ['entidad', 'Entidad', 2.4], ['modalidad', 'Modalidad', 1.4], ['horas', 'Horas', 0.9],
-    ['inicio', 'Inicio', 1.3], ['fin', 'Fin', 1.3], ['sustento', 'Sustento', 2]]],
-  ['reconocimientos', '5. Reconocimientos', [['tipo', 'Tipo', 1.6], ['motivo', 'Motivo', 3.4], ['otorgado_por', 'Otorgado por', 2.2], ['numero_documento', 'N.º de documento', 1.6],
-    ['fecha', 'Fecha', 1.3], ['sustento', 'Sustento', 2]]],
-  ['sanciones', '6. Sanciones', [['tipo', 'Tipo', 1.8], ['numero_resolucion', 'N.º de resolución', 2], ['fecha_resolucion', 'Fecha', 1.3], ['inicio', 'Inicio', 1.3],
-    ['fin', 'Fin', 1.3], ['dias_suspension', 'Días de suspensión', 1.2], ['sustento', 'Sustento', 2]]],
-  ['licencias', '7. Licencias y permisos', [['tipo', 'Tipo', 2], ['goce', 'Goce', 1.2, 'Sin definir'], ['inicio', 'Inicio', 1.3], ['fin', 'Fin', 1.3], ['dias', 'Días', 0.9],
+  ['colegiaturas', 'Colegiatura y habilitación', [['colegio', 'Colegio profesional', 3], ['numero', 'N.º de colegiatura', 1.6], ['fecha', 'Colegiatura', 1.3],
+    ['habilitado', 'Habilitado', 1, 'Sin dato'], ['vigente_hasta', 'Vigente hasta', 1.3], ['sustento', 'Sustento', 2]]],
+  ['capacitaciones', 'Capacitaciones', [['nombre', 'Capacitación', 3.2], ['entidad', 'Entidad', 2.4], ['modalidad', 'Tipo', 1.4], ['dictado', 'Dictado', 1.2, '—'], ['horas', 'Horas', 0.9],
+    ['creditos', 'Créditos', 0.9, '—'], ['inicio', 'Inicio', 1.3], ['fin', 'Fin', 1.3], ['sustento', 'Sustento', 2]]],
+  ['idiomas', 'Idiomas y lenguas originarias', [['idioma', 'Idioma', 1.8], ['tipo', 'Tipo', 1.5], ['nivel', 'Nivel', 1.2], ['institucion', 'Acreditado por', 2.6], ['fecha', 'Fecha', 1.3],
+    ['sustento', 'Sustento', 2]]],
+  ['produccion', 'Producción intelectual', [['tipo', 'Tipo', 1.3], ['titulo', 'Título', 3.4], ['editorial', 'Editorial / revista', 2.2], ['identificador', 'ISBN / ISSN / DOI', 1.6],
+    ['registro_indecopi', 'INDECOPI', 1.3], ['fecha', 'Publicación', 1.3], ['sustento', 'Sustento', 2]]],
+  ['experiencia', 'Experiencia laboral previa', [['entidad', 'Entidad / empresa', 3], ['sector', 'Sector', 1.1], ['cargo', 'Cargo', 2.4], ['inicio', 'Inicio', 1.3],
+    ['fin', 'Fin', 1.3, 'Sin fecha'], ['sustento', 'Sustento', 2]]],
+  ['licencias', 'Licencias y permisos', [['tipo', 'Tipo', 2], ['goce', 'Goce', 1.2, 'Sin definir'], ['inicio', 'Inicio', 1.3], ['fin', 'Fin', 1.3], ['dias', 'Días', 0.9],
     ['numero_documento', 'N.º de documento', 1.8], ['sustento', 'Sustento', 2]]],
-  ['evaluaciones', '8. Evaluaciones de desempeño', [['ciclo', 'Ciclo', 1], ['fecha', 'Fecha de evaluación', 1.5], ['plan_mejora', 'Plan de mejora', 1.3], ['sustento', 'Sustento', 2]]],
+  ['desplazamientos', 'Desplazamientos y encargos', [['tipo', 'Tipo', 1.6], ['origen', 'Unidad de origen', 2.4], ['destino', 'Destino', 2.4], ['inicio', 'Inicio', 1.3],
+    ['fin', 'Fin', 1.3], ['numero_documento', 'N.º de documento', 1.6], ['sustento', 'Sustento', 2]]],
+  ['carrera', 'Progresión, ratificación y promoción', [['tipo', 'Acto', 1.5], ['anterior', 'Anterior', 1.4], ['nueva', 'Nueva', 1.4], ['resultado', 'Resultado', 1.4],
+    ['numero_resolucion', 'N.º de resolución', 1.8], ['fecha', 'Desde', 1.3], ['sustento', 'Sustento', 2]]],
+  ['evaluaciones', 'Evaluaciones de desempeño', [['ciclo', 'Ciclo', 1], ['fecha', 'Fecha de evaluación', 1.5], ['plan_mejora', 'Plan de mejora', 1.3], ['sustento', 'Sustento', 2]]],
+  ['reconocimientos', 'Reconocimientos', [['tipo', 'Tipo', 1.6], ['motivo', 'Motivo', 3.4], ['otorgado_por', 'Otorgado por', 2.2], ['numero_documento', 'N.º de documento', 1.6],
+    ['fecha', 'Fecha', 1.3], ['sustento', 'Sustento', 2]]],
+  ['sanciones', 'Sanciones', [['tipo', 'Tipo', 1.8], ['numero_resolucion', 'N.º de resolución', 2], ['fecha_resolucion', 'Fecha', 1.3], ['notificacion', 'Notificación', 1.3, 'Sin dato'], ['inicio', 'Inicio', 1.3],
+    ['fin', 'Fin', 1.3], ['dias_suspension', 'Días de separación', 1.2], ['sustento', 'Sustento', 2]]],
+  ['ceses', 'Ceses y desvinculación', [['motivo', 'Motivo', 2], ['fecha', 'Fecha de cese', 1.3], ['numero_resolucion', 'N.º de resolución', 2], ['entrega_cargo', 'Entrega de cargo', 1.4],
+    ['sustento', 'Sustento', 2]]],
 ]
+
+/** Pares del resumen de tiempo de servicio, sin los datos que no vinieron. */
+function paresTiempo(tiempo) {
+  return [['Fecha de corte', tiempo.fecha_corte], ['Primer ingreso', tiempo.primer_ingreso], ['Tiempo de servicio', tiempo.total], ['Por tipo de vínculo', tiempo.por_tipo],
+    ['Descuentos', tiempo.descuentos], ['Categoría o nivel actual', tiempo.categoria]].filter(([, valor]) => valor)
+}
 
 export function createInformeEscalafonarioPdf(data, institution) {
   const { pdf, base, parrafo, titulo, tabla, datos, fichas, identificacion } = documentoPdf(data, institution, 'Informe escalafonario del legajo')
   parrafo('Informe del expediente: reproduce los datos registrados en el legajo a la fecha de emisión, con el estado del documento que sustenta cada uno. No constituye una certificación de los datos.', { tamano: 8, color: 80 })
-  const muestraAceptado = SECCIONES_INFORME.some(([clave]) => (data[clave] || []).some(fila => /^Documento (de vinculación )?aceptado$/.test(fila.sustento || '')))
+  const muestraAceptado = SECCIONES_INFORME.some(([clave, , columnas]) => columnas !== 'resumen' && (data[clave] || []).some(fila => /^Documento (de vinculación )?aceptado$/.test(fila.sustento || '')))
   if (muestraAceptado) parrafo(NOTA_ACEPTADO, notaDiscreta)
   titulo('Identificación')
   datos([...identificacion(), ['Tipo de personal', data.persona.tipo_personal], ['Apertura del legajo', data.persona.fecha_apertura]])
+  let numero = 0
   for (const [clave, nombre, columnas] of SECCIONES_INFORME) {
     if (data[clave] === null || data[clave] === undefined) continue
-    titulo(nombre)
+    titulo(`${++numero}. ${nombre}`)
+    if (columnas === 'resumen') {
+      datos(paresTiempo(data[clave]))
+      parrafo('Calculado con los vínculos registrados (los días en que se superponen se cuentan una vez), a la fecha de corte. No reemplaza una resolución de reconocimiento de tiempo de servicios.', notaDiscreta)
+      if (data[clave].vencidos_sin_cese) parrafo(`Hay ${data[clave].vencidos_sin_cese === 1 ? 'un vínculo' : `${data[clave].vencidos_sin_cese} vínculos`} con plazo vencido sin cese registrado.`, notaDiscreta)
+      continue
+    }
     if (data[clave].length && !columnas) fichas([...CAMPOS_VINCULO, ['sustento', 'Sustento']], data[clave], encabezadoVinculo)
     else if (data[clave].length) tabla(columnas, data[clave])
     else parrafo('Sin registros en el legajo.', { color: 90 })
+    if (clave === 'sanciones' && data.sanciones_rehabilitadas) parrafo(`${data.sanciones_rehabilitadas === 1 ? 'Una sanción rehabilitada no se muestra' : `${data.sanciones_rehabilitadas} sanciones rehabilitadas no se muestran`}; siguen registradas en el legajo.`, notaDiscreta)
     if (clave === 'tiempos_reconocidos' && data[clave].length) parrafo('Cada fila es una resolución de reconocimiento tal como se registró; el informe no suma resoluciones ni calcula tiempo a partir de vínculos, licencias o estudios.', { tamano: 7.5, color: 90 })
   }
   if (data.omitidas?.length) parrafo(`No incluido por los permisos de quien emite: ${data.omitidas.join(', ')}.`, { tamano: 7.5, color: 90 })

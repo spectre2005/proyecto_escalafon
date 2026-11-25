@@ -27,6 +27,7 @@ class Familiar extends Model
         'apellidos_nombres',
         'fecha_nacimiento',
         'es_derechohabiente',
+        'fecha_fallecimiento',
         'registrado_por',
         'anulado',
         'motivo_anulacion',
@@ -37,6 +38,7 @@ class Familiar extends Model
     {
         return [
             'fecha_nacimiento' => 'date',
+            'fecha_fallecimiento' => 'date',
             'es_derechohabiente' => 'boolean',
             'anulado' => 'boolean',
             'created_at' => 'datetime',

@@ -16,6 +16,9 @@ class Seccion08CatalogoSeeder extends Seeder
         ['REC_TIEMPO_SERVICIOS', 'Certificados o constancias de reconocimientos por tiempo de servicios.', 'Literal 8.1.c de la Directiva.', []],
         ['SAN_RESOLUCION_SANCION', 'Documentos que formalizan y comunican las sanciones de amonestación escrita, suspensión y destitución.', 'Literal 8.2.a de la Directiva.', ['requiere_num_resolucion' => true, 'es_dato_sensible' => true]],
         ['SAN_RESOLUCION_RECURSO', 'Documentos por los que se declare fundado, infundado o improcedente los recursos impugnatorios relativos a las sanciones impuestas.', 'Literal 8.2.b de la Directiva.', ['requiere_num_resolucion' => true, 'es_dato_sensible' => true]],
+        // Documentos de la universidad (no son literales de la Directiva): actos del procedimiento disciplinario previos a la sanción.
+        ['SAN_INICIO_PAD', 'Acto de inicio del procedimiento administrativo disciplinario.', 'Documento del procedimiento disciplinario; no es una sanción.', ['requiere_num_resolucion' => true, 'es_dato_sensible' => true]],
+        ['SAN_MEDIDA_CAUTELAR', 'Medida cautelar o preventiva dictada durante el procedimiento disciplinario.', 'Documento del procedimiento disciplinario; no es una sanción.', ['requiere_num_resolucion' => true, 'es_dato_sensible' => true]],
     ];
 
     public static function id(int $orden): string

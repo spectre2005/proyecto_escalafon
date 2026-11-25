@@ -12,6 +12,8 @@ final class ResumenSeccion08
         'REC_TIEMPO_SERVICIOS' => ['c', 'reconocimientos'],
         'SAN_RESOLUCION_SANCION' => ['a', 'sanciones'],
         'SAN_RESOLUCION_RECURSO' => ['b', 'sanciones'],
+        'SAN_INICIO_PAD' => ['+', 'sanciones'],
+        'SAN_MEDIDA_CAUTELAR' => ['+', 'sanciones'],
     ];
 
     public static function estado(Collection $documentos, bool $noAplica = false): string
@@ -57,6 +59,7 @@ final class ResumenSeccion08
             'sanciones' => $puedeVerSanciones ? $sanciones->where('tipo_documento_codigo', 'SAN_RESOLUCION_SANCION')->count() : null,
             'vigentes' => $puedeVerSanciones ? $sanciones->where('estado_sancion', 'vigente')->count() : null,
             'dejadas_sin_efecto' => $puedeVerSanciones ? $sanciones->where('estado_sancion', 'dejada_sin_efecto')->count() : null,
+            'rehabilitadas' => $puedeVerSanciones ? $sanciones->whereNotNull('rehabilitada_el')->count() : null,
             'pendientes' => $docs->where('estado', 'pendiente')->count(),
             'observados' => $docs->where('estado', 'observado')->count(),
         ];

@@ -66,6 +66,9 @@ final class ConsultaReportes
         'vencimientos' => ['pregunta' => '¿Qué documentos, contratos o requerimientos vencen pronto?', 'titulo' => 'Vencimientos', 'descripcion' => 'Documentos, contratos, requerimientos y otros datos con fecha que necesitan seguimiento.', 'icono' => 'clock',
             'fecha' => 'Fecha de vencimiento', 'estados' => ['vencido' => 'Vencido', 'fuera_de_plazo' => 'Requerimiento fuera de plazo', 'por_vencer' => 'Por vencer'],
             'ayuda' => 'Se reutiliza la consulta de Vencimientos: DNI, contratos y adendas (también vencidos sin cese), requerimientos, colegiatura, período de prueba y, según tus permisos, certificado de discapacidad, examen médico ocupacional, ratificación docente y encargos o destaques.'],
+        'tiempo_servicio_personal' => ['pregunta' => '¿Cuánto tiempo de servicio lleva cada persona en la institución?', 'titulo' => 'Tiempo de servicio del personal', 'descripcion' => 'Tiempo de servicio de cada persona según sus vínculos laborales, a una fecha de corte, y tiempo en su categoría o nivel actual.', 'icono' => 'clock',
+            'fecha' => null, 'estados' => ['vigente' => 'Con vínculo vigente', 'sin_vigente' => 'Sin vínculo vigente'],
+            'ayuda' => 'Un resultado por persona con al menos un vínculo no anulado que empezó antes de la fecha de corte (hoy, si no se elige). Suma todos sus vínculos, también los de etapas anteriores, y cuenta una sola vez los días en que se superponen. Cada vínculo cuenta hasta su cese o hasta la fecha de corte; si su plazo venció sin cese registrado, se indica en «Observación». Los descuentos (licencias sin goce, suspensiones) solo se aplican si la institución los activó en su configuración. Es un cálculo con lo registrado, no una certificación ni una resolución de reconocimiento de tiempo de servicios.'],
         'personal' => ['pregunta' => '¿Quiénes tienen legajo y en qué situación laboral están?', 'titulo' => 'Padrón del personal con legajo', 'descripcion' => 'Personal docente y administrativo, unidad, puesto y situación laboral.', 'icono' => 'users',
             'fecha' => null, 'estados' => ['con_vinculo' => 'Con vínculo abierto', 'sin_vinculo' => 'Sin vínculo abierto'],
             'ayuda' => 'Un resultado por persona. El puesto y la unidad proceden del vínculo abierto más reciente; sin vínculo, se identifica el dato histórico de la ficha. Solo incluye personas con al menos un legajo; excluye cuentas técnicas.'],
@@ -81,7 +84,7 @@ final class ConsultaReportes
      * Desactivada, el reporte no se ofrece y su consulta responde 409. Sin entrada: no depende de ninguna.
      */
     public const FUNCIONALIDADES = [
-        'dotacion' => 's02.vinculos', 'plana_docente' => 's02.vinculos', 'contratos' => 's02.vinculos', 'movimientos' => 's02.vinculos',
+        'dotacion' => 's02.vinculos', 'plana_docente' => 's02.vinculos', 'tiempo_servicio_personal' => 's02.vinculos', 'contratos' => 's02.vinculos', 'movimientos' => 's02.vinculos',
         'formacion' => 's03.formacion', 'capacitaciones' => 's03.formacion', 'vacaciones' => 's05.vacaciones', 'licencias' => 's05.licencias',
         'evaluaciones' => 's07.evaluaciones',
         'ficha_personal' => 's01.identidad', 'familiares' => 's01.familiares', 'antecedentes' => 's01.declaraciones', 'discapacidad' => 's01.discapacidad',
@@ -114,7 +117,7 @@ final class ConsultaReportes
      * Los reportes de una sola sección que no están aquí van al final, en CONSULTAS_SECCION, por número de sección.
      */
     public const PROPOSITOS = [
-        'Personal y dotación' => ['dotacion', 'personal', 'plana_docente', 'movimientos'],
+        'Personal y dotación' => ['dotacion', 'personal', 'tiempo_servicio_personal', 'plana_docente', 'movimientos'],
         'Contratos y plazos' => ['contratos'],
         'Control documental' => ['pendientes'],
         'Formación y desarrollo' => ['formacion', 'capacitaciones', 'evaluaciones'],
@@ -253,6 +256,11 @@ final class ConsultaReportes
         }
         if ($tipo === 'vencimientos') {
             yield from self::vencimientos($actor, $filtros);
+
+            return;
+        }
+        if ($tipo === 'tiempo_servicio_personal') {
+            yield from self::tiempoServicio($actor, $filtros);
 
             return;
         }
@@ -405,6 +413,38 @@ final class ConsultaReportes
                     'estado' => self::catalogo()['pendientes']['estados'][$estado], 'motivo' => 'El documento fue marcado como observado y requiere subsanación.'];
             }
         }
+    }
+
+    /**
+     * Una fila por persona con vínculos computables, de más a menos tiempo de servicio (los datos de unidad, puesto y
+     * régimen son los de su vínculo abierto más reciente, como en el padrón).
+     */
+    private static function tiempoServicio(Usuario $actor, array $filtros): Generator
+    {
+        $config = TiempoServicio::configuracion();
+        $filas = [];
+        foreach (self::personas($filtros)->with(TiempoServicio::relaciones($config, $actor->can('seccion08.sanciones.ver')))->lazy(100) as $persona) {
+            /** @var Usuario $persona */
+            $base = self::contexto($persona);
+            if (! empty($filtros['unidad_id']) && $base['unidad_id'] !== $filtros['unidad_id']) {
+                continue;
+            }
+            $tiempo = TiempoServicio::paraPersona($persona, $filtros['corte'] ?? null, $config);
+            if ($tiempo['ingreso'] === null) {
+                continue;
+            }
+            $estado = $tiempo['vigente'] ? 'vigente' : 'sin_vigente';
+            $porTipo = collect($tiempo['por_tipo'])->map(fn (array $d, string $tipo): string => TiempoServicio::TIPOS[$tipo].': '.$d['texto'])->implode(' · ');
+            $filas[] = [...$base, 'id' => $persona->id, 'fecha' => $tiempo['ingreso'], 'corte' => $tiempo['fecha_corte'],
+                'tiempo' => $tiempo['total']['texto'], 'dias_totales' => $tiempo['total']['dias_totales'], 'por_tipo' => $porTipo,
+                'descuentos' => ($tiempo['descuento_dias'] ? $tiempo['descuento_dias'].' d' : (($config['restar_licencias_sin_goce'] || $config['restar_suspensiones']) ? 'Ninguno' : 'No aplicados'))
+                    .($tiempo['sanciones_omitidas'] ? ' (sin sanciones: tu perfil no las ve)' : ''),
+                'categoria' => $tiempo['categoria']['nombre'] ?? 'Sin registro', 'tiempo_categoria' => $tiempo['categoria']['tiempo']['texto'] ?? null,
+                'observacion' => $tiempo['vencidos_sin_cese'] ? ($tiempo['vencidos_sin_cese'] === 1 ? 'Un vínculo con plazo vencido sin cese registrado' : $tiempo['vencidos_sin_cese'].' vínculos con plazo vencido sin cese registrado') : null,
+                'estado_codigo' => $estado, 'estado' => self::REPORTES['tiempo_servicio_personal']['estados'][$estado]];
+        }
+        usort($filas, fn (array $a, array $b): int => [$b['dias_totales'], $a['nombre']] <=> [$a['dias_totales'], $b['nombre']]);
+        yield from $filas;
     }
 
     private static function vencimientos(Usuario $actor, array $filtros): Generator
@@ -634,7 +674,7 @@ final class ConsultaReportes
     {
         return self::seccionVisible($actor, $tipo->seccion_legajo_id)
             && ($actor->veDatosSensibles() || (! $tipo->es_dato_sensible && ! $tipo->es_dato_salud))
-            && ($actor->can('seccion08.sanciones.ver') || ! in_array($tipo->codigo, ['SAN_RESOLUCION_SANCION', 'SAN_RESOLUCION_RECURSO'], true));
+            && ($actor->can('seccion08.sanciones.ver') || ! in_array($tipo->codigo, Sanciones::CODIGOS_DOCUMENTO, true));
     }
 
     private static function seccionVisible(Usuario $actor, int $seccion): bool
@@ -660,6 +700,7 @@ final class ConsultaReportes
             'vacaciones' => ['puesto' => 'Puesto del vínculo', 'periodo' => 'Período', 'derecho' => 'Días de derecho registrados', 'goce' => 'Días de goce registrados', 'adelanto' => 'Días adelantados', 'postergacion' => 'Días postergados', 'estado' => 'Movimientos'],
             'licencias' => ['detalle' => 'Tipo de licencia / permiso', 'fecha' => 'Inicio', 'fin' => 'Fin', 'dias' => 'Días registrados completos', 'estado' => 'Goce', 'numero' => 'Documento de autorización'],
             'evaluaciones' => ['periodo' => 'Ciclo', 'fecha' => 'Evaluación', 'estado' => 'Plan de mejora', 'sustento' => 'Estado del sustento'],
+            'tiempo_servicio_personal' => ['puesto' => 'Puesto actual', 'ley' => 'Ley / régimen', 'fecha' => 'Primer ingreso', 'tiempo' => 'Tiempo de servicio', 'por_tipo' => 'Por tipo de vínculo', 'descuentos' => 'Descuentos', 'categoria' => 'Categoría / nivel actual', 'tiempo_categoria' => 'Tiempo en la categoría', 'observacion' => 'Observación', 'estado' => 'Situación'],
             'personal' => ['puesto' => 'Puesto', 'origen_puesto' => 'Fuente del puesto', 'ley' => 'Ley / régimen', 'tipo_vinculo' => 'Tipo de vínculo', 'vinculos' => 'Vínculos abiertos', 'estado' => 'Situación laboral'],
             'plana_docente' => ['condicion' => 'Condición', 'categoria' => 'Categoría', 'estado' => 'Dedicación', 'grado' => 'Grado más alto', 'renacyt' => 'RENACYT', 'ley' => 'Ley / régimen'],
             'pendientes' => ['legajo' => 'Legajo', 'seccion' => 'Sección', 'detalle' => 'Documento / requisito', 'estado' => 'Pendiente', 'motivo' => 'Motivo'],

@@ -41,9 +41,24 @@ test('the report shows identification, each section and what is missing without 
 test('sections hidden by permissions are left out and declared', () => {
   const texto = textoPdf(createInformeEscalafonarioPdf({ titulo: 'Informe escalafonario', emitido_en: '22/10/2026', persona, ...vacio, vinculos: [], tiempos_reconocidos: [],
     sanciones: null, evaluaciones: null, omitidas: ['Sanciones disciplinarias', 'Evaluaciones de desempeño'] }, institution))
-  assert.ok(!texto.includes('6. SANCIONES'))
+  assert.ok(!/\d+\. SANCIONES/.test(texto))
   assert.ok(texto.includes('Sanciones disciplinarias'))
-  assert.ok(texto.includes('5. RECONOCIMIENTOS'))
+  // La numeración se asigna solo a las secciones incluidas: no quedan huecos.
+  assert.ok(texto.includes('6. RECONOCIMIENTOS'))
+})
+
+test('the life record includes the calculated service time and the new sections in order', () => {
+  const texto = textoPdf(createInformeEscalafonarioPdf({ titulo: 'Informe escalafonario', emitido_en: '25/11/2026', persona, ...vacio, vinculos: [], tiempos_reconocidos: [],
+    tiempo_servicio: { fecha_corte: '25/11/2026', primer_ingreso: '01/03/2012', total: '14 a 8 m 25 d', por_tipo: 'Carrera: 14 a 8 m 25 d', descuentos: 'No aplicados', categoria: null, vencidos_sin_cese: 1 },
+    colegiaturas: [], experiencia: [{ entidad: 'EMPRESA PREVIA', sector: 'Privado', cargo: 'ANALISTA', inicio: '01/01/2010', fin: '31/12/2011', sustento: 'Documento aceptado' }],
+    desplazamientos: [], carrera: [], ceses: [] }, institution))
+  assert.ok(texto.includes('2. TIEMPO DE SERVICIO CALCULADO'))
+  assert.ok(texto.includes('14 a 8 m 25 d'))
+  assert.ok(texto.includes('plazo vencido sin cese'))
+  assert.ok(texto.includes('EXPERIENCIA LABORAL PREVIA'))
+  assert.ok(texto.includes('EMPRESA PREVIA'))
+  assert.ok(texto.includes('CESES Y DESVINCULACI'))
+  assert.ok(texto.indexOf('EXPERIENCIA LABORAL PREVIA') < texto.indexOf('CESES Y DESVINCULACI'))
 })
 
 test('the work certificate needs supported links and states the situation given by the backend', () => {

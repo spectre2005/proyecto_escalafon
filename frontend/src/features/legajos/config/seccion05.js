@@ -21,6 +21,10 @@ export const tiposLicencia = {
   comite_sst: 'Comité SST',
   asistencia_medica_familiar: 'Asistencia médica a un familiar',
   bombero_voluntario: 'Bombero voluntario',
+  estudios: 'Estudios o capacitación',
+  motivos_particulares: 'Motivos particulares',
+  cargo_publico: 'Cargo público, político o de confianza',
+  anio_sabatico: 'Año sabático (docente)',
   otra: 'Otra licencia',
 }
 
@@ -41,7 +45,7 @@ export const tiposGoce = { goce: 'Goce vacacional', adelanto: 'Adelanto de vacac
 export const formulariosSeccion05 = { licencias_permisos: 'Licencia o permiso', goces_vacacionales: 'Goce, adelanto o postergación' }
 
 // Literal e): licencias otorgadas. Segundo selector del formulario cuando el movimiento es "Licencia".
-export const licenciasOtorgadas = ['licencia_maternidad', 'licencia_paternidad', 'lactancia', 'adopcion', 'sindical', 'familiar_grave', 'comite_sst', 'asistencia_medica_familiar', 'bombero_voluntario', 'otra']
+export const licenciasOtorgadas = ['licencia_maternidad', 'licencia_paternidad', 'lactancia', 'adopcion', 'sindical', 'familiar_grave', 'comite_sst', 'asistencia_medica_familiar', 'bombero_voluntario', 'estudios', 'motivos_particulares', 'cargo_publico', 'anio_sabatico', 'otra']
 
 // Primer selector del formulario (solo de interfaz: al backend se envía licencias_permisos.tipo).
 // conGoce: si se muestra la casilla "Con goce de remuneraciones". En la suspensión no se muestra ni se marca hasta que

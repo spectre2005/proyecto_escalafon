@@ -5,8 +5,11 @@ namespace Tests\Feature;
 use App\Models\ArchivoDocumento;
 use App\Models\AuditoriaEvento;
 use App\Models\Capacitacion;
+use App\Models\Desplazamiento;
+use App\Models\Desvinculacion;
 use App\Models\DocumentoUsuario;
 use App\Models\EvaluacionDesempeno;
+use App\Models\ExperienciaLaboral;
 use App\Models\FormacionAcademica;
 use App\Models\Legajo;
 use App\Models\LicenciaPermiso;
@@ -36,6 +39,35 @@ class EmisionesPersonalesTest extends TestCase
         parent::setUp();
         $this->seed(SeccionesLegajoCatalogoSeeder::class);
         $this->travelTo(now('America/Lima')->setDate(2026, 10, 22)->setTime(10, 0));
+    }
+
+    public function test_life_record_adds_calculated_service_time_previous_experience_moves_and_exits(): void
+    {
+        $this->actuarComo();
+        [$persona, $legajo] = $this->persona();
+        $this->vinculoAcreditado($persona, $legajo, ['fecha_inicio' => '2021-01-04', 'fecha_fin_prevista' => null, 'fecha_cese' => '2025-12-31']);
+        ExperienciaLaboral::factory()->create(['usuario_id' => $persona->id, 'documento_id' => $this->documento($legajo, 4)->id, 'entidad_empresa' => 'EMPRESA PREVIA SAC',
+            'sector' => 'privado', 'cargo' => 'ANALISTA', 'fecha_inicio' => '2018-01-01', 'fecha_fin' => '2020-12-31', 'anulado' => false]);
+        Desplazamiento::factory()->create(['usuario_id' => $persona->id, 'documento_id' => $this->documento($legajo, 7)->id, 'tipo' => 'rotacion',
+            'fecha_inicio' => '2022-01-01', 'fecha_fin' => null, 'numero_documento' => 'MEMO-ROTACION-01', 'anulado' => false]);
+        Desvinculacion::factory()->create(['usuario_id' => $persona->id, 'documento_id' => $this->documento($legajo, 11)->id, 'motivo_cese' => 'renuncia',
+            'fecha_cese' => '2025-12-31', 'numero_resolucion' => 'RES-CESE-01', 'anulado' => false]);
+
+        $datos = $this->getJson(self::URL.$persona->id.'/informe-escalafonario')->assertOk()->json('data');
+        // 04/01/2021 al 31/12/2025: 1823 días, con 360/30 son 5 a 0 m 23 d.
+        $this->assertSame('5 a 23 d', $datos['tiempo_servicio']['total']);
+        $this->assertSame('04/01/2021', $datos['tiempo_servicio']['primer_ingreso']);
+        $this->assertSame('No aplicados', $datos['tiempo_servicio']['descuentos']);
+        $this->assertSame('EMPRESA PREVIA SAC', $datos['experiencia'][0]['entidad']);
+        $this->assertSame('MEMO-ROTACION-01', $datos['desplazamientos'][0]['numero_documento']);
+        $this->assertSame(['Renuncia', '31/12/2025', 'RES-CESE-01'], [$datos['ceses'][0]['motivo'], $datos['ceses'][0]['fecha'], $datos['ceses'][0]['numero_resolucion']]);
+        $this->assertSame('Documento aceptado', $datos['ceses'][0]['sustento']);
+
+        // Sin seccion07.ver: desplazamientos y progresión no salen, el resto sí.
+        config(['permisos.roles.prueba_sin_s07' => ['sistema.administrar', 'legajo.ver']]);
+        $this->actuarComo(codigo: 'prueba_sin_s07');
+        $this->getJson(self::URL.$persona->id.'/informe-escalafonario')->assertOk()->assertJsonPath('data.desplazamientos', null)
+            ->assertJsonPath('data.carrera', null)->assertJsonPath('data.experiencia.0.entidad', 'EMPRESA PREVIA SAC');
     }
 
     private function persona(): array
@@ -246,7 +278,7 @@ class EmisionesPersonalesTest extends TestCase
         config(['permisos.roles.prueba_sin_sanciones' => ['sistema.administrar', 'legajo.ver']]);
         $this->actuarComo(codigo: 'prueba_sin_sanciones');
         $respuesta = $this->getJson(self::URL.$persona->id.'/informe-escalafonario')->assertOk()->assertJsonPath('data.sanciones', null)
-            ->assertJsonPath('data.evaluaciones', null)->assertJsonPath('data.omitidas', ['Sanciones disciplinarias', 'Evaluaciones de desempeño']);
+            ->assertJsonPath('data.evaluaciones', null)->assertJsonPath('data.omitidas', ['Sanciones disciplinarias', 'Evaluaciones de desempeño, desplazamientos y progresión']);
         $this->assertStringNotContainsString('RS-OCULTA', $respuesta->getContent());
     }
 

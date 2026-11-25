@@ -240,6 +240,18 @@ class DocumentoUsuario extends Model
         return $this->hasMany(Capacitacion::class, 'documento_id', 'id');
     }
 
+    /** @return HasMany<Idioma, $this> */
+    public function idiomas(): HasMany
+    {
+        return $this->hasMany(Idioma::class, 'documento_id', 'id');
+    }
+
+    /** @return HasMany<ProduccionIntelectual, $this> */
+    public function produccionesIntelectuales(): HasMany
+    {
+        return $this->hasMany(ProduccionIntelectual::class, 'documento_id', 'id');
+    }
+
     /** @return HasMany<ExperienciaLaboral, $this> */
     public function experienciaLaboral(): HasMany
     {

@@ -42,6 +42,7 @@ class ReporteController extends Controller
             'dias' => 'sometimes|integer|min:1|max:365',
             'origen' => ['nullable', Rule::in(array_keys(ConsultaVencimientos::ORIGENES))],
             'anio' => 'nullable|integer|between:1900,2200',
+            'corte' => 'nullable|date_format:Y-m-d|after_or_equal:1900-01-01|before_or_equal:2200-12-31',
             'page' => 'sometimes|integer|min:1',
             // Tabla: 10, 15 y 20 (PorPagina); 50 y 100 se siguen aceptando por compatibilidad con la API.
             'por_pagina' => PorPagina::regla([...PorPagina::OPCIONES, 50, 100]),

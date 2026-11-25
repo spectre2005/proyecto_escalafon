@@ -42,7 +42,7 @@ final class ReportesSecciones
         'reconocimientos' => ['descripcion' => 'Felicitaciones, distinciones y reconocimientos registrados.', 'titulo' => 'Reconocimientos y distinciones', 'seccion' => 8, 'relacion' => 'reconocimientosPorUsuario', 'campo_fecha' => 'fecha',
             'campos' => ['tipo' => 'Reconocimiento', 'fecha' => 'Fecha', 'motivo' => 'Motivo', 'otorgado_por' => 'Otorgado por', 'numero_documento' => 'Documento']],
         'sanciones' => ['descripcion' => 'Sanciones registradas y resultado de sus recursos.', 'titulo' => 'Sanciones y situación disciplinaria registrada', 'seccion' => 8, 'relacion' => 'sancionesPorUsuario', 'campo_fecha' => 'fecha_resolucion',
-            'campos' => ['tipo' => 'Tipo de sanción', 'numero_resolucion' => 'Resolución', 'fecha_resolucion' => 'Fecha de resolución', 'fecha_inicio' => 'Inicio', 'fecha_fin' => 'Fin', 'dias_suspension' => 'Días de suspensión', 'resultado_recurso' => 'Resultado del recurso registrado', 'registrada_en_rnssc' => 'Registro RNSSC declarado']],
+            'campos' => ['tipo' => 'Tipo de sanción', 'numero_resolucion' => 'Resolución', 'fecha_resolucion' => 'Fecha de resolución', 'fecha_inicio' => 'Inicio', 'fecha_fin' => 'Fin', 'dias_suspension' => 'Días de separación', 'fecha_notificacion' => 'Notificación', 'resultado_recurso' => 'Resultado del recurso registrado', 'registrada_en_rnssc' => 'Registro RNSSC declarado', 'rehabilitada_el' => 'Rehabilitada el']],
         // Sección 09 (Relaciones laborales), como en el catálogo y la Directiva: exige datos sensibles.
         'controversias' => ['descripcion' => 'Controversias individuales y colectivas, con su instancia y resultado.', 'titulo' => 'Controversias y resoluciones', 'seccion' => 9, 'relacion' => 'controversiasPorUsuario', 'campo_fecha' => 'fecha_inicio',
             'campos' => ['tipo' => 'Tipo de controversia', 'instancia' => 'Instancia', 'materia' => 'Materia', 'fecha_inicio' => 'Inicio', 'estado' => 'Situación registrada', 'fecha_resolucion' => 'Resolución', 'resultado' => 'Resultado registrado']],
@@ -85,7 +85,7 @@ final class ReportesSecciones
         }
 
         return collect($campos)->map(fn (string $nombre, string $campo): array => ['key' => $campo, 'label' => $nombre,
-            'type' => str_starts_with($campo, 'fecha') || $campo === 'vigente_hasta' ? 'date' : (in_array($campo, ['edad', 'anio', 'anios', 'meses', 'dias', 'dias_suspension'], true) ? 'number' : 'text')])->values()->all();
+            'type' => str_starts_with($campo, 'fecha') || in_array($campo, ['vigente_hasta', 'rehabilitada_el'], true) ? 'date' : (in_array($campo, ['edad', 'anio', 'anios', 'meses', 'dias', 'dias_suspension'], true) ? 'number' : 'text')])->values()->all();
     }
 
     public static function filas(Usuario $actor, string $tipo, Builder $consulta, Closure $contexto, array $filtros): Generator

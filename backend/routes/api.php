@@ -293,6 +293,7 @@ Route::prefix('v1')->middleware([ApiHabilitada::class, 'auth:sanctum', ExigeCamb
         Route::post('expedientes/{usuario}/documentos/{documento}/enlazar', [DocumentoLegajoController::class, 'enlazar'])->whereUuid(['usuario', 'documento']);
     });
     Route::post('expedientes/{usuario}/seccion-08/documentos', [Seccion08Controller::class, 'store'])->whereUuid('usuario');
+    Route::post('expedientes/{usuario}/seccion-08/sanciones/{sancion}/rehabilitar', [Seccion08Controller::class, 'rehabilitar'])->whereUuid(['usuario', 'sancion']);
     Route::post('expedientes/{usuario}/seccion-06/documentos/{documento}/estado', [Seccion06Controller::class, 'cambiarEstado'])
         ->middleware('can:documento.revisar')->whereUuid(['usuario', 'documento']);
     Route::post('expedientes/{usuario}/seccion-08/documentos/{documento}/estado', [Seccion08Controller::class, 'cambiarEstado'])

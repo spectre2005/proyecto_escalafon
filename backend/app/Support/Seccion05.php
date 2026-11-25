@@ -14,9 +14,14 @@ final class Seccion05
 {
     public const SECCION = 5;
 
-    /** Literal e): licencias otorgadas (maternidad, paternidad, lactancia, adopción, sindical, etc. u otros). */
+    /**
+     * Literal e): licencias otorgadas (maternidad, paternidad, lactancia, adopción, sindical, etc. u otros). Estudios,
+     * motivos particulares, cargo público y año sabático docente (Ley 30220) tienen tipo propio para poder filtrarlas y,
+     * si la institución lo activa, descontar las que sean sin goce del tiempo de servicio. «otra» sigue para el resto.
+     */
     public const LICENCIAS_OTORGADAS = ['licencia_maternidad', 'licencia_paternidad', 'lactancia', 'adopcion', 'sindical',
-        'familiar_grave', 'comite_sst', 'asistencia_medica_familiar', 'bombero_voluntario', 'otra'];
+        'familiar_grave', 'comite_sst', 'asistencia_medica_familiar', 'bombero_voluntario', 'estudios', 'motivos_particulares',
+        'cargo_publico', 'anio_sabatico', 'otra'];
 
     /** licencias_permisos.tipo: permisos, suspensión y descanso médico (párrafo general) y licencias (literal e). */
     public const TIPOS_LICENCIA = ['permiso', 'suspension', 'descanso_medico', ...self::LICENCIAS_OTORGADAS];

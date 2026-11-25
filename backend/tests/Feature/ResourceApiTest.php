@@ -16,6 +16,7 @@ use App\Models\EvaluacionDesempeno;
 use App\Models\Familiar;
 use App\Models\GoceVacacional;
 use App\Models\HistorialEstadoDocumento;
+use App\Models\Idioma;
 use App\Models\Induccion;
 use App\Models\Legajo;
 use App\Models\LegajoSeccion;
@@ -24,6 +25,7 @@ use App\Models\PerfilAdministrativo;
 use App\Models\PerfilDocente;
 use App\Models\PeriodoPrueba;
 use App\Models\PeriodoVacacional;
+use App\Models\ProduccionIntelectual;
 use App\Models\ProgresionCarrera;
 use App\Models\Puesto;
 use App\Models\RatificacionDocente;
@@ -81,7 +83,8 @@ class ResourceApiTest extends TestCase
      * en su lugar, test_models_without_generic_crud_have_no_endpoint verifica que no exista ningún endpoint genérico.
      * Siguen cubiertos por ModelPersistenceTest.
      */
-    private const SIN_CRUD_GENERICO = [RecursoImpugnatorio::class, ConfiguracionFuncionalidad::class, ConexionCorreo::class, Puesto::class];
+    // Idioma y ProduccionIntelectual: solo se registran con su documento del literal h) de la sección 03 (Seccion03Controller).
+    private const SIN_CRUD_GENERICO = [RecursoImpugnatorio::class, ConfiguracionFuncionalidad::class, ConexionCorreo::class, Puesto::class, Idioma::class, ProduccionIntelectual::class];
 
     /** Sección 10: igual, se registran desde Legajos\Seccion10Controller (el CRUD genérico exige además datos_sensibles.ver). */
     private const SECCION_10 = [RegistroSstBienestar::class];

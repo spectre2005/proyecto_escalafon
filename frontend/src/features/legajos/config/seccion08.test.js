@@ -10,6 +10,6 @@ test('Section 08 displays only the requested document and optional item states',
 })
 
 test('sanction and appeal labels cover the values accepted by the API', () => {
-  assert.deepEqual(Object.keys(tipoSancion08), ['AMONESTACION_ESCRITA', 'SUSPENSION', 'DESTITUCION'])
+  assert.deepEqual(Object.keys(tipoSancion08), ['AMONESTACION_VERBAL', 'AMONESTACION_ESCRITA', 'SUSPENSION', 'CESE_TEMPORAL', 'DESTITUCION', 'INHABILITACION'])
   assert.deepEqual(Object.keys(resultadoRecurso08), ['FUNDADO', 'INFUNDADO', 'IMPROCEDENTE'])
 })

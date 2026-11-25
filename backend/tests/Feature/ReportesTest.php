@@ -54,7 +54,7 @@ class ReportesTest extends TestCase
         $grupos = $reportes->pluck('grupo')->unique()->values()->all();
         $this->assertSame(['Personal y dotación', 'Contratos y plazos', 'Control documental', 'Formación y desarrollo', 'Vacaciones y licencias',
             'Consultas por sección del legajo'], $grupos);
-        $this->assertSame(['dotacion', 'personal', 'plana_docente', 'movimientos', 'contratos', 'pendientes', 'formacion', 'capacitaciones', 'vacaciones', 'licencias'],
+        $this->assertSame(['dotacion', 'personal', 'tiempo_servicio_personal', 'plana_docente', 'movimientos', 'contratos', 'pendientes', 'formacion', 'capacitaciones', 'vacaciones', 'licencias'],
             $reportes->where('grupo', '!=', 'Consultas por sección del legajo')->pluck('id')->values()->all());
         // Las consultas por sección, por número de sección; ningún reporte se pierde al reagrupar.
         $secciones = $reportes->where('grupo', 'Consultas por sección del legajo')->pluck('seccion_origen')->values()->all();

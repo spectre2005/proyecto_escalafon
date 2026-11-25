@@ -8,7 +8,7 @@ const apruebaLicenciaPermiso = ['permiso', ...licenciasOtorgadas]
 test('the 13 schema types split into 4 movements without loss', () => {
   assert.deepEqual(Object.keys(tiposLicencia).map(movimientoDe).filter(m => !m), [])
   assert.deepEqual(Object.keys(tiposLicencia).filter(tipo => movimientoDe(tipo) === 'licencia'), licenciasOtorgadas)
-  assert.equal(licenciasOtorgadas.length, 10)
+  assert.equal(licenciasOtorgadas.length, 14)
   assert.equal(movimientoDe('vacaciones'), null)
 })
 

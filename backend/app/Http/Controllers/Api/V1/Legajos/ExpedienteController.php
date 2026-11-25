@@ -26,6 +26,7 @@ use App\Models\Familiar;
 use App\Models\FormacionAcademica;
 use App\Models\GoceVacacional;
 use App\Models\HistorialEstadoDocumento;
+use App\Models\Idioma;
 use App\Models\Induccion;
 use App\Models\Legajo;
 use App\Models\LegajoSeccion;
@@ -38,6 +39,7 @@ use App\Models\PerfilDocente;
 use App\Models\PeriodoPrueba;
 use App\Models\PeriodoVacacional;
 use App\Models\ProcesoFiscalizacion;
+use App\Models\ProduccionIntelectual;
 use App\Models\ProgresionCarrera;
 use App\Models\Puesto;
 use App\Models\RatificacionDocente;
@@ -65,6 +67,7 @@ use App\Support\PerfilPendiente;
 use App\Support\PorPagina;
 use App\Support\PuestoActual;
 use App\Support\RegimenesLaborales;
+use App\Support\Sanciones;
 use App\Support\Seccion05;
 use App\Support\VigenciaLaboral;
 use Illuminate\Database\Eloquent\Builder;
@@ -89,6 +92,8 @@ class ExpedienteController extends Controller
         'capacitaciones' => ['model' => Capacitacion::class, 'label' => 'Capacitaciones', 'group' => 'Trayectoria', 'field' => 'usuario_id', 'scope' => 'persona'],
         'experiencia-laboral' => ['model' => ExperienciaLaboral::class, 'label' => 'Experiencia laboral', 'group' => 'Trayectoria', 'field' => 'usuario_id', 'scope' => 'persona'],
         'colegiaturas' => ['model' => Colegiatura::class, 'label' => 'Colegiaturas', 'group' => 'Trayectoria', 'field' => 'usuario_id', 'scope' => 'persona'],
+        'idiomas' => ['model' => Idioma::class, 'label' => 'Idiomas', 'group' => 'Trayectoria', 'field' => 'usuario_id', 'scope' => 'persona'],
+        'producciones-intelectuales' => ['model' => ProduccionIntelectual::class, 'label' => 'Producción intelectual', 'group' => 'Trayectoria', 'field' => 'usuario_id', 'scope' => 'persona'],
         'reconocimientos' => ['model' => Reconocimiento::class, 'label' => 'Reconocimientos', 'group' => 'Trayectoria', 'field' => 'usuario_id', 'scope' => 'persona'],
         'vinculos-laborales' => ['model' => VinculoLaboral::class, 'label' => 'Vínculos laborales', 'group' => 'Situación laboral', 'field' => 'usuario_id', 'scope' => 'persona'],
         'perfil-docente' => ['model' => PerfilDocente::class, 'label' => 'Perfil docente', 'group' => 'Situación laboral', 'field' => 'vinculo_laboral_id', 'scope' => 'vinculo'],
@@ -136,7 +141,8 @@ class ExpedienteController extends Controller
     private const SECCIONES_SENSIBLES = [1, 9, 10];
 
     /** Datos de la ficha general (sección 01) que se ocultan sin datos_sensibles.ver. */
-    private const DATOS_PERSONALES_SENSIBLES = ['fecha_nacimiento', 'nacionalidad', 'estado_civil', 'domicilio', 'region', 'provincia', 'distrito', 'telefono', 'con_discapacidad', 'tiene_derechohabientes'];
+    private const DATOS_PERSONALES_SENSIBLES = ['fecha_nacimiento', 'nacionalidad', 'estado_civil', 'domicilio', 'region', 'provincia', 'distrito', 'telefono', 'con_discapacidad', 'tiene_derechohabientes',
+        'contacto_emergencia_nombre', 'contacto_emergencia_parentesco', 'contacto_emergencia_telefono', 'regimen_pensionario', 'afp_nombre', 'cuspp', 'fecha_afiliacion_pension'];
 
     private const RELATIONS = [
         'Legajo' => ['usuario_id' => 'usuario'],
@@ -146,6 +152,8 @@ class ExpedienteController extends Controller
         'TipoDocumento' => ['seccion_legajo_id' => 'seccionLegajo', 'subseccion_legajo_id' => 'subseccionLegajo'],
         'FormacionAcademica' => ['usuario_id' => 'usuario', 'documento_id' => 'documento', 'registrado_por' => 'registradoPor'],
         'Capacitacion' => ['usuario_id' => 'usuario', 'documento_id' => 'documento', 'registrado_por' => 'registradoPor'],
+        'Idioma' => ['usuario_id' => 'usuario', 'documento_id' => 'documento', 'registrado_por' => 'registradoPor'],
+        'ProduccionIntelectual' => ['usuario_id' => 'usuario', 'documento_id' => 'documento', 'registrado_por' => 'registradoPor'],
         'ExperienciaLaboral' => ['usuario_id' => 'usuario', 'documento_id' => 'documento', 'registrado_por' => 'registradoPor'],
         'Colegiatura' => ['usuario_id' => 'usuario', 'documento_id' => 'documento', 'registrado_por' => 'registradoPor'],
         'Reconocimiento' => ['usuario_id' => 'usuario', 'documento_id' => 'documento', 'registrado_por' => 'registradoPor'],
@@ -423,7 +431,7 @@ class ExpedienteController extends Controller
         }
         if (! $request->user()->can('seccion08.sanciones.ver') && ! $request->user()->can('seccion08.sanciones.registrar')
             && ! $request->user()->can('seccion08.sanciones.revisar')) {
-            $documents->whereDoesntHave('tipoDocumento', fn ($tipo) => $tipo->whereIn('codigo', ['SAN_RESOLUCION_SANCION', 'SAN_RESOLUCION_RECURSO']));
+            $documents->whereDoesntHave('tipoDocumento', fn ($tipo) => $tipo->whereIn('codigo', Sanciones::CODIGOS_DOCUMENTO));
         }
         $config = self::SECTIONS[$section];
         $query = $config['model']::query();

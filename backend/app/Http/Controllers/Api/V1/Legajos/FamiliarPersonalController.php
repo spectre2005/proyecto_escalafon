@@ -35,6 +35,8 @@ class FamiliarPersonalController extends ResourceController
         'numero_doc_identidad' => 'nullable|string|max:20|required_with:tipo_doc_identidad',
         'fecha_nacimiento' => 'nullable|date|before_or_equal:today',
         'es_derechohabiente' => 'required|boolean',
+        // El familiar fallecido no se anula (anular es para errores): se registra la fecha y deja de exigirse su DNI.
+        'fecha_fallecimiento' => 'nullable|date|before_or_equal:today',
         'documento_id' => 'nullable|uuid',
     ];
 

@@ -6,7 +6,7 @@ import { hoy, useBorrador, useGuardar } from '../seccion01/useGuardar'
 import { agregarDocumento03 } from '../../api/seccion03Api'
 import { modalidadesPresentacion, folios, modalidadRecordada, recordarModalidad } from '../../config/documentos'
 import { SugerenciaFolio } from '../documentos/AyudasCarga'
-import { niveles03, capacitaciones03 } from '../../config/seccion03'
+import { niveles03, capacitaciones03, clasesOtros03, modalidadesDictado03, nivelesIdioma03, tiposIdioma03, tiposProduccion03 } from '../../config/seccion03'
 import { conValor, reemplazarPropuesta } from '../../config/acreditacion'
 
 // Datos del documento que se subsana y de su registro (formación, colegiatura o capacitación, en doc.datos): se proponen
@@ -18,6 +18,9 @@ function datosDe(doc) {
     nombre: doc.nombre, emisor: doc.emisor, fecha_emision: doc.fecha_emision, modalidad_presentacion: doc.modalidad_presentacion,
     nivel: registro.nivel, numero_registro: registro.numero_registro, numero_colegiatura: registro.numero_colegiatura, vigente_hasta: registro.vigente_hasta,
     tipo_capacitacion: registro.tipo_capacitacion, horas: registro.horas === undefined || registro.horas === null ? '' : String(registro.horas),
+    creditos: registro.creditos === undefined || registro.creditos === null ? '' : String(registro.creditos), modalidad_dictado: registro.modalidad_dictado,
+    clase_registro: registro.clase_registro, idioma: registro.idioma, tipo_idioma: registro.tipo_idioma, nivel_idioma: registro.nivel_idioma,
+    tipo_produccion: registro.tipo_produccion, editorial_revista: registro.editorial_revista, identificador: registro.identificador, registro_indecopi: registro.registro_indecopi,
   })
 }
 
@@ -58,6 +61,16 @@ export default function Documento03Form({
     vigente_hasta: '',
     tipo_capacitacion: '',
     horas: '',
+    creditos: '',
+    modalidad_dictado: '',
+    clase_registro: 'otro',
+    idioma: '',
+    tipo_idioma: '',
+    nivel_idioma: '',
+    tipo_produccion: '',
+    editorial_revista: '',
+    identificador: '',
+    registro_indecopi: '',
   }
   // Un tipo de un solo documento con uno vigente solo se subsana: se elige ese documento y se proponen sus datos.
   const inicial = subsana || (!item.permite_multiples && vigentes.length === 1 ? vigentes[0].id : '')
@@ -95,8 +108,10 @@ export default function Documento03Form({
       : item.letra === 'c'
         ? ['numero_colegiatura', 'vigente_hasta']
         : ['f', 'g'].includes(item.letra)
-          ? ['tipo_capacitacion', 'horas']
-          : []
+          ? ['tipo_capacitacion', 'horas', 'creditos', 'modalidad_dictado']
+          : item.letra === 'h'
+            ? ['clase_registro', ...({ idioma: ['idioma', 'tipo_idioma', 'nivel_idioma'], produccion: ['tipo_produccion', 'editorial_revista', 'identificador', 'registro_indecopi'] }[values.clase_registro] || [])]
+            : []
 
     const payload = Object.fromEntries(
       [...comunes, ...especificos].map(key => [
@@ -284,8 +299,32 @@ export default function Documento03Form({
                 className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
             </Campo>
+            <Campo label="Créditos (si figuran)" error={errors.creditos}>
+              <input type="number" min="0.5" max="999" step="0.5" value={draft.creditos} onChange={set('creditos')} />
+            </Campo>
+            <Campo label="Modalidad de dictado" error={errors.modalidad_dictado}>
+              <select value={draft.modalidad_dictado} onChange={set('modalidad_dictado')}><Opciones lista={modalidadesDictado03} actual={draft.modalidad_dictado} vacio="No indicada" /></select>
+            </Campo>
           </>
         )}
+
+        {item.letra === 'h' && <>
+          <Campo label="¿Qué acredita el documento?" required error={errors.clase_registro}>
+            <select required value={draft.clase_registro} onChange={set('clase_registro')}><Opciones lista={clasesOtros03} actual={draft.clase_registro} /></select>
+          </Campo>
+          {draft.clase_registro === 'idioma' && <>
+            <Campo label="Idioma o lengua" required error={errors.idioma}><input required maxLength={60} value={draft.idioma} onChange={set('idioma')} /></Campo>
+            <Campo label="Tipo" required error={errors.tipo_idioma}><select required value={draft.tipo_idioma} onChange={set('tipo_idioma')}><Opciones lista={tiposIdioma03} actual={draft.tipo_idioma} vacio="Selecciona" /></select></Campo>
+            <Campo label="Nivel acreditado" required error={errors.nivel_idioma}><select required value={draft.nivel_idioma} onChange={set('nivel_idioma')}><Opciones lista={nivelesIdioma03} actual={draft.nivel_idioma} vacio="Selecciona" /></select></Campo>
+          </>}
+          {draft.clase_registro === 'produccion' && <>
+            <Campo label="Tipo de producción" required error={errors.tipo_produccion}><select required value={draft.tipo_produccion} onChange={set('tipo_produccion')}><Opciones lista={tiposProduccion03} actual={draft.tipo_produccion} vacio="Selecciona" /></select></Campo>
+            <Campo label="Editorial o revista" error={errors.editorial_revista}><input maxLength={200} value={draft.editorial_revista} onChange={set('editorial_revista')} /></Campo>
+            <Campo label="ISBN, ISSN o DOI" error={errors.identificador}><input maxLength={80} value={draft.identificador} onChange={set('identificador')} /></Campo>
+            <Campo label="Registro INDECOPI o depósito legal" error={errors.registro_indecopi}><input maxLength={60} value={draft.registro_indecopi} onChange={set('registro_indecopi')} /></Campo>
+            <p className="col-span-full text-xs text-slate-500">El título es el nombre del documento y la fecha de publicación, su fecha de emisión.</p>
+          </>}
+        </>}
 
         {/* FOLIO INICIAL SIN FLECHITAS */}
         <Campo

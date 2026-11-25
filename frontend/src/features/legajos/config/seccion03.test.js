@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { resumenFormacion } from './seccion03.js'
 
-const vacios = { formacion: [], colegiaturas: [], capacitaciones: [] }
+const vacios = { formacion: [], colegiaturas: [], capacitaciones: [], idiomas: [], producciones: [] }
 
 test('the training summary lists what current documents certify, newest first, with total hours', () => {
   const items = [

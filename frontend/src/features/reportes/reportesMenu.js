@@ -5,7 +5,7 @@ export const CONSULTAS_SECCION = 'Consultas por sección del legajo'
 export const OTROS_REPORTES = 'Otros reportes'
 
 // Con su nombre corto para el botón; el título completo va en la cabecera del reporte elegido.
-export const CLAVE = { personal: 'Padrón', plana_docente: 'Plana docente', dotacion: 'Dotación', contratos: 'Contratos', movimientos: 'Ingresos y ceses', pendientes: 'Pendientes' }
+export const CLAVE = { personal: 'Padrón', tiempo_servicio_personal: 'Tiempo de servicio', plana_docente: 'Plana docente', dotacion: 'Dotación', contratos: 'Contratos', movimientos: 'Ingresos y ceses', pendientes: 'Pendientes' }
 
 /** Los clave disponibles (en el orden de CLAVE), los demás reportes y las consultas por sección. */
 export function separarReportes(reportes) {
@@ -26,7 +26,7 @@ export function etiquetaReporte(reporte) {
 
 // Filtros: se editan juntos en el panel «Filtros» y se aplican con «Aplicar»; quitar una etiqueta o «Limpiar» se aplica
 // al instante. Mismos valores por defecto que el backend: 30 días en Vencimientos y el año actual en Evaluaciones.
-export const FILTROS = ['q', 'tipo_personal', 'unidad_id', 'estado', 'seccion', 'desde', 'hasta', 'dias', 'anio', 'regimen_id', 'nivel', 'modalidad', 'contenido']
+export const FILTROS = ['q', 'tipo_personal', 'unidad_id', 'estado', 'seccion', 'desde', 'hasta', 'dias', 'anio', 'regimen_id', 'nivel', 'modalidad', 'contenido', 'corte']
 
 /** Valores que muestran los filtros: los aplicados en la URL o los de por defecto. */
 export function valoresIniciales(params, reporteId, anioActual = new Date().getFullYear()) {
@@ -71,6 +71,7 @@ export function filtrosActivos(params, reporte, opciones) {
     nivel: valor => nombre(opciones.niveles, valor)?.nombre || valor,
     modalidad: valor => nombre(opciones.modalidades, valor)?.nombre || valor,
     contenido: valor => `Texto: ${valor}`,
+    corte: valor => `Al ${fecha(valor)}`,
   }
   return FILTROS.filter(clave => params.get(clave)).map(clave => ({ clave, etiqueta: texto[clave](params.get(clave)) }))
 }

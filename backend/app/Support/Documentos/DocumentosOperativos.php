@@ -4,6 +4,7 @@ namespace App\Support\Documentos;
 
 use App\Models\DocumentoUsuario;
 use App\Models\TipoDocumento;
+use App\Support\Sanciones;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
@@ -27,7 +28,7 @@ final class DocumentosOperativos
     {
         return TipoDocumento::query()->whereNotIn('seccion_legajo_id', self::seccionesOcultas($request))
             ->when(! $request->user()->veDatosSensibles(), fn ($q) => $q->where('es_dato_sensible', false)->where('es_dato_salud', false))
-            ->when(! $request->user()->can('seccion08.sanciones.ver'), fn ($q) => $q->whereNotIn('codigo', ['SAN_RESOLUCION_SANCION', 'SAN_RESOLUCION_RECURSO']));
+            ->when(! $request->user()->can('seccion08.sanciones.ver'), fn ($q) => $q->whereNotIn('codigo', Sanciones::CODIGOS_DOCUMENTO));
     }
 
     private static function seccionesOcultas(Request $request): array

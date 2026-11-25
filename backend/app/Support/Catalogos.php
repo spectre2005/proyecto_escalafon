@@ -10,6 +10,12 @@ final class Catalogos
 {
     public const TIPOS_DOC_IDENTIDAD = ['dni', 'ce', 'pasaporte', 'otro'];
 
+    /**
+     * usuarios.regimen_pensionario: ONP (D.L. 19990), AFP (Sistema Privado de Pensiones), D.L. 20530 (cédula viva) u otro.
+     * Dato de consulta de la ficha; no reemplaza la información de planillas.
+     */
+    public const REGIMENES_PENSIONARIOS = ['onp', 'afp', 'dl_20530', 'otro', 'ninguno'];
+
     public const ESTADOS_CIVILES = ['soltero', 'casado', 'conviviente', 'divorciado', 'viudo'];
 
     public const PARENTESCOS = ['conyuge', 'concubino', 'hijo', 'otro'];

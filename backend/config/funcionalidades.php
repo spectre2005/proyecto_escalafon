@@ -143,7 +143,7 @@ return [
             'menu' => ['seccion-03', 'formacion-academica', 'capacitaciones', 'colegiaturas', 'documentos-03'],
             'documentos' => ['*'],
             'rutas_escritura' => ["POST {$expediente}/seccion-03/documentos", ...$crud('formacion-academica'), ...$crud('capacitaciones'), ...$crud('colegiaturas')],
-            'tablas' => ['formacion_academica', 'capacitaciones', 'colegiaturas'],
+            'tablas' => ['formacion_academica', 'capacitaciones', 'colegiaturas', 'idiomas', 'producciones_intelectuales'],
         ],
 
         // Sección 04
@@ -222,7 +222,7 @@ return [
         's08.sanciones' => [
             'nombre' => 'Sanciones disciplinarias', 'seccion' => 8, 'implementada' => true, 'esencial' => null,
             'depende_de' => [], 'bloqueo' => null, 'menu' => ['sanciones'],
-            'documentos' => ['SAN_RESOLUCION_SANCION', 'SAN_RESOLUCION_RECURSO'],
+            'documentos' => ['SAN_RESOLUCION_SANCION', 'SAN_RESOLUCION_RECURSO', 'SAN_INICIO_PAD', 'SAN_MEDIDA_CAUTELAR'],
             'rutas_escritura' => [], 'tablas' => ['sanciones'],
         ],
 

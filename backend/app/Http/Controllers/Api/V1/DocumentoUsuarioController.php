@@ -7,6 +7,7 @@ use App\Models\TipoDocumento;
 use App\Support\ResumenSeccion04;
 use App\Support\ResumenSeccion06;
 use App\Support\ResumenSeccion08;
+use App\Support\Sanciones;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -56,7 +57,7 @@ class DocumentoUsuarioController extends ResourceController
         }
         if (! request()->user()->can('seccion08.sanciones.ver') && ! request()->user()->can('seccion08.sanciones.registrar')
             && ! request()->user()->can('seccion08.sanciones.revisar')) {
-            $query->whereDoesntHave('tipoDocumento', fn ($tipo) => $tipo->whereIn('codigo', ['SAN_RESOLUCION_SANCION', 'SAN_RESOLUCION_RECURSO']));
+            $query->whereDoesntHave('tipoDocumento', fn ($tipo) => $tipo->whereIn('codigo', Sanciones::CODIGOS_DOCUMENTO));
         }
 
         return $query;

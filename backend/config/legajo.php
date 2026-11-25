@@ -12,6 +12,13 @@ return [
     'exp_dias_por_anio' => 360,
     'exp_hueco_largo_dias' => 90,
 
+    // Pendiente del cliente: reglas del tiempo de servicio (App\Support\TiempoServicio), 1 = sí, 0 = no. Por defecto no
+    // se resta nada y un plazo vencido sin cese cuenta hasta su fin previsto (pendiente 13), así que el reporte dice
+    // «según vínculos registrados». Días por mes y por año: exp_dias_por_mes y exp_dias_por_anio (pendiente 25).
+    'ts_restar_licencias_sin_goce' => 0,
+    'ts_restar_suspensiones' => 0,
+    'ts_vencido_hasta_corte' => 0,
+
     // Pendiente del cliente: días de anticipación para avisar que un vínculo
     // laboral (o su última adenda) está por vencer. Días calendario, no hábiles.
     'dias_aviso_vencimiento_vinculo' => (int) env('LEGAJO_DIAS_AVISO_VENCIMIENTO', 30),

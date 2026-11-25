@@ -11,6 +11,7 @@ use App\Models\Sancion;
 use App\Models\TiempoServicioReconocido;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
+use App\Support\Auditoria;
 use App\Support\Documentos\ArchivoPdf;
 use App\Support\Documentos\AuditoriaDocumento;
 use App\Support\Documentos\CargaDocumento;
@@ -20,9 +21,11 @@ use App\Support\Parametros;
 use App\Support\PerfilDocumental;
 use App\Support\ResumenSeccion03;
 use App\Support\ResumenSeccion08;
+use App\Support\Sanciones;
 use App\Support\TiempoExperiencia;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -30,7 +33,7 @@ class Seccion08Controller extends Controller
 {
     private const TIPOS_RECONOCIMIENTO = ['REC_CARTA_FELICITACION', 'REC_LABOR_DOCENTE', 'REC_TIEMPO_SERVICIOS'];
 
-    private const TIPOS_SANCION = ['SAN_RESOLUCION_SANCION', 'SAN_RESOLUCION_RECURSO'];
+    private const TIPOS_SANCION = Sanciones::CODIGOS_DOCUMENTO;
 
     public function show(Request $request, string $usuario): JsonResponse
     {
@@ -59,6 +62,8 @@ class Seccion08Controller extends Controller
                     'REC_LABOR_DOCENTE' => 'Opcional; se registra cuando existe un reconocimiento excepcional por labor docente.',
                     'REC_TIEMPO_SERVICIOS' => 'Opcional; se registra cuando existe un reconocimiento por tiempo de servicios.',
                     'SAN_RESOLUCION_SANCION' => 'Opcional; se registra cuando existe documentación de una sanción disciplinaria.',
+                    'SAN_INICIO_PAD' => 'Opcional; acto que inicia el procedimiento disciplinario. No es una sanción ni se cuenta como tal.',
+                    'SAN_MEDIDA_CAUTELAR' => 'Opcional; medida cautelar o preventiva dictada durante el procedimiento. No es una sanción.',
                     default => 'Opcional; se registra cuando existe una decisión sobre un recurso impugnatorio.',
                 },
                 'estado' => ResumenSeccion08::estado($filas, $noAplica),
@@ -117,8 +122,13 @@ class Seccion08Controller extends Controller
             }
         }
         if ($codigo === 'SAN_RESOLUCION_SANCION') {
-            $reglas += ['tipo' => ['required', Rule::in(['AMONESTACION_ESCRITA', 'SUSPENSION', 'DESTITUCION'])],
-                'dias_suspension' => ['required_if:tipo,SUSPENSION', 'prohibited_unless:tipo,SUSPENSION', 'nullable', 'integer', 'between:1,2147483647'],
+            $separacion = implode(',', Sanciones::CON_SEPARACION);
+            $reglas += ['tipo' => ['required', Rule::in(array_keys(Sanciones::TIPOS))],
+                'dias_suspension' => ['required_if:tipo,'.$separacion, 'prohibited_unless:tipo,'.$separacion, 'nullable', 'integer', 'between:1,2147483647'],
+                // Periodo de la separación: opcional, pero con él se puede descontar del tiempo de servicio si la institución lo activa.
+                'fecha_inicio' => ['prohibited_unless:tipo,'.$separacion, 'nullable', 'date_format:Y-m-d', 'required_with:fecha_fin'],
+                'fecha_fin' => ['prohibited_unless:tipo,'.$separacion, 'nullable', 'date_format:Y-m-d', 'required_with:fecha_inicio', 'after_or_equal:fecha_inicio'],
+                'fecha_notificacion' => 'nullable|date_format:Y-m-d|before_or_equal:'.$hoy.'|after_or_equal:fecha_emision',
                 'registrada_en_rnssc' => 'required|boolean', 'fecha_registro_rnssc' => 'nullable|date_format:Y-m-d|before_or_equal:'.$hoy,
                 'referencia_rnssc' => 'nullable|string', 'referencia_procedimiento' => 'nullable|string'];
         }
@@ -187,8 +197,10 @@ class Seccion08Controller extends Controller
                         'dias_suspension' => $datos['dias_suspension'] ?? null, 'registrada_en_rnssc' => $datos['registrada_en_rnssc'],
                         'fecha_registro_rnssc' => $datos['fecha_registro_rnssc'] ?? null, 'referencia_rnssc' => $datos['referencia_rnssc'] ?? null,
                         'referencia_procedimiento' => $datos['referencia_procedimiento'] ?? null,
+                        'fecha_inicio' => $datos['fecha_inicio'] ?? null, 'fecha_fin' => $datos['fecha_fin'] ?? null,
+                        'fecha_notificacion' => $datos['fecha_notificacion'] ?? null,
                         'registrado_por' => $request->user()->getAuthIdentifier()]);
-                } else {
+                } elseif ($codigo === 'SAN_RESOLUCION_RECURSO') {
                     $sancion = Sancion::query()->where('usuario_id', $doc->usuario_id)->lockForUpdate()->findOrFail($datos['sancion_id']);
                     RecursoImpugnatorio::query()->create(['sancion_id' => $sancion->id, 'documento_id' => $doc->id,
                         'fecha' => $doc->fecha_emision, 'resultado' => $datos['resultado'], 'registrado_por' => $request->user()->getAuthIdentifier()]);
@@ -197,6 +209,37 @@ class Seccion08Controller extends Controller
             });
 
         return response()->json(['data' => $documento->only(['id', 'nombre', 'estado', 'folio_inicio', 'folio_fin'])], 201);
+    }
+
+    /**
+     * Rehabilitación de una sanción: se anota una vez, con la resolución que la dispone, y desde entonces la sanción no
+     * sale en el informe escalafonario. La sanción y su documento no se borran ni se editan. Pendiente del cliente: si
+     * la rehabilitación procede por plazo cumplido o requiere siempre una resolución (hoy se exige el número).
+     */
+    public function rehabilitar(Request $request, string $usuario, string $sancion): JsonResponse
+    {
+        abort_unless($request->user()->can('seccion08.sanciones.registrar'), 403, 'Tu perfil no tiene permiso para registrar sanciones.');
+        $hoy = now('America/Lima')->toDateString();
+        $datos = $request->validate(['fecha' => 'required|date_format:Y-m-d|before_or_equal:'.$hoy, 'numero_resolucion' => 'required|string|max:60']);
+        $datos['numero_resolucion'] = trim($datos['numero_resolucion']);
+        if ($datos['numero_resolucion'] === '') {
+            throw ValidationException::withMessages(['numero_resolucion' => 'Completa este dato antes de guardar.']);
+        }
+        $registro = DB::transaction(function () use ($usuario, $sancion, $datos, $request): Sancion {
+            $registro = Sancion::query()->where('usuario_id', $usuario)->where('anulado', false)->lockForUpdate()->findOrFail($sancion);
+            abort_if($registro->rehabilitada_el !== null, 409, 'Esta sanción ya tiene una rehabilitación registrada.');
+            if ($datos['fecha'] < $registro->fecha_resolucion->format('Y-m-d')) {
+                throw ValidationException::withMessages(['fecha' => 'La rehabilitación no puede ser anterior a la resolución de la sanción.']);
+            }
+            $registro->forceFill(['rehabilitada_el' => $datos['fecha'], 'resolucion_rehabilitacion' => $datos['numero_resolucion'],
+                'rehabilitada_por' => $request->user()->getAuthIdentifier()])->save();
+            Auditoria::registrar($request, 'seccion08.sancion.rehabilitada', 'sanciones', $registro->id, $usuario, null,
+                ['fecha' => $datos['fecha'], 'numero_resolucion' => $datos['numero_resolucion']]);
+
+            return $registro;
+        });
+
+        return response()->json(['data' => ['id' => $registro->id, 'rehabilitada_el' => $registro->rehabilitada_el->format('Y-m-d'), 'resolucion_rehabilitacion' => $registro->resolucion_rehabilitacion]]);
     }
 
     public function cambiarEstado(Request $request, string $usuario, string $documento): JsonResponse
@@ -235,6 +278,9 @@ class Seccion08Controller extends Controller
             'registrada_en_rnssc' => $sancion?->registrada_en_rnssc,
             'fecha_registro_rnssc' => $sancion?->fecha_registro_rnssc?->format('Y-m-d'), 'referencia_rnssc' => $sancion?->referencia_rnssc,
             'referencia_procedimiento' => $sancion?->referencia_procedimiento,
+            'fecha_notificacion' => $sancion?->fecha_notificacion?->format('Y-m-d'),
+            'fecha_inicio_sancion' => $sancion?->fecha_inicio?->format('Y-m-d'), 'fecha_fin_sancion' => $sancion?->fecha_fin?->format('Y-m-d'),
+            'rehabilitada_el' => $sancion?->rehabilitada_el?->format('Y-m-d'), 'resolucion_rehabilitacion' => $sancion?->resolucion_rehabilitacion,
             'recursos' => $recursos->map(fn (RecursoImpugnatorio $recurso): array => [
                 'id' => $recurso->id, 'fecha' => $recurso->fecha->format('Y-m-d'), 'resultado' => $recurso->resultado,
                 'documento_id' => $recurso->documento_id, 'nombre_documento' => $recurso->documento?->nombre,

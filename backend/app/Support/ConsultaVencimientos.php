@@ -145,7 +145,7 @@ final class ConsultaVencimientos
             $documentos->where('d.seccion_legajo_id', '!=', 7);
         }
         if (! $actor->can('seccion08.sanciones.ver')) {
-            $documentos->whereNotIn('t.codigo', ['SAN_RESOLUCION_SANCION', 'SAN_RESOLUCION_RECURSO']);
+            $documentos->whereNotIn('t.codigo', Sanciones::CODIGOS_DOCUMENTO);
         }
 
         // Fin del contrato o de su última adenda vigente: próximos y ya vencidos mientras no haya cese registrado.

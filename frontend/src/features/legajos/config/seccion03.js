@@ -33,6 +33,13 @@ export const nivelesFormacion = {
   educacion_basica: 'Educación básica', tecnico: 'Técnico', bachiller: 'Bachiller', titulo_profesional: 'Título profesional',
   diplomado_especializacion: 'Diplomado o especialización', maestria: 'Maestría', doctorado: 'Doctorado',
 }
+// Mismos valores que Seccion03Controller (modalidad de dictado y literal h: idioma o producción intelectual).
+export const modalidadesDictado03 = { presencial: 'Presencial', semipresencial: 'Semipresencial', virtual: 'Virtual' }
+export const clasesOtros03 = { otro: 'Otro documento de formación', idioma: 'Idioma o lengua originaria', produccion: 'Producción intelectual' }
+export const tiposIdioma03 = { extranjero: 'Idioma extranjero', originaria: 'Lengua originaria' }
+export const nivelesIdioma03 = { basico: 'Básico', intermedio: 'Intermedio', avanzado: 'Avanzado', nativo: 'Nativo' }
+export const tiposProduccion03 = { libro: 'Libro', capitulo: 'Capítulo de libro', articulo: 'Artículo', investigacion: 'Investigación', innovacion: 'Innovación educativa', otro: 'Otro' }
+
 export const tiposCapacitacion = { ...capacitaciones03.f, ...capacitaciones03.g, otro: 'Otro' }
 
 const recientes = campo => (a, b) => String(b[campo] || '').localeCompare(String(a[campo] || ''))
@@ -42,7 +49,7 @@ const recientes = campo => (a, b) => String(b[campo] || '').localeCompare(String
  * anulados). Cada fila lleva el tipo y el documento de origen para abrir su detalle.
  */
 export function resumenFormacion(items) {
-  const filas = { formacion: [], colegiaturas: [], capacitaciones: [] }
+  const filas = { formacion: [], colegiaturas: [], capacitaciones: [], idiomas: [], producciones: [] }
   for (const item of items || []) {
     for (const documento of item.documentos || []) {
       if (documento.subsanado || documento.estado === 'anulado') continue
@@ -56,5 +63,7 @@ export function resumenFormacion(items) {
   filas.formacion.sort(recientes('fecha_obtencion'))
   filas.colegiaturas.sort(recientes('fecha_colegiatura'))
   filas.capacitaciones.sort(recientes('fecha_fin'))
+  filas.idiomas.sort(recientes('fecha'))
+  filas.producciones.sort(recientes('fecha_publicacion'))
   return { ...filas, horas: filas.capacitaciones.reduce((total, fila) => total + (Number(fila.horas) || 0), 0) }
 }
