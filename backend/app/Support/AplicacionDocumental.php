@@ -55,7 +55,7 @@ final class AplicacionDocumental
 
     /**
      * g, i y j de la sección 01 dependen de tiene_derechohabientes, salvo que ya haya familiares registrados.
-     * TODO PENDIENTE de confirmar con el cliente (ESTADO_PROYECTO.md, pregunta 18): la directiva no ata estos
+     * Pendiente del cliente (ESTADO_PROYECTO.md, pregunta 18): la directiva no ata estos
      * documentos a la bandera; antes dependían solo de los familiares registrados.
      */
     public const DE_DERECHOHABIENTES = [Seccion01::PARTIDA_MATRIMONIO, Seccion01::DNI_CONYUGE, Seccion01::DNI_HIJOS];

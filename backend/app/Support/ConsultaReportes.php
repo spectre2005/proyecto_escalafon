@@ -259,7 +259,7 @@ final class ConsultaReportes
         $consulta = self::personas($filtros);
         if ($tipo !== 'personal') {
             $consulta->with(['legajos' => fn ($q) => $q->orderByDesc('fecha_apertura')->orderBy('id'),
-                'documentosUsuarioPorUsuario' => fn ($q) => $q->where('estado', '!=', 'anulado')->with('tipoDocumento')]);
+                'documentosUsuarioPorUsuario' => fn ($q) => $q->noAnulados()->with('tipoDocumento')]);
         }
         if ($tipo === 'pendientes') {
             $consulta->whereHas('legajos', fn ($q) => $q->where('estado_legajo', 'activo'))->with(['familiaresPorUsuario' => fn ($q) => $q->where('anulado', false)]);
@@ -451,16 +451,16 @@ final class ConsultaReportes
             $consulta->with('periodosVacacionalesPorUsuario.gocesVacacionales', 'periodosVacacionalesPorUsuario.vinculoLaboral.unidadOrganica', 'periodosVacacionalesPorUsuario.vinculoLaboral.regimenNormativo');
         }
         if (in_array($tipo, ['contratos', 'movimientos'], true)) {
-            $consulta->with(['vinculosLaborales.vinculoAdendas' => fn (Builder|Relation $q): Builder|Relation => $q->where('anulado', false)->orderByDesc('fecha_inicio')->orderByDesc('id'),
-                'vinculosLaborales.desvinculaciones' => fn (Builder|Relation $q): Builder|Relation => $q->where('anulado', false)->orderByDesc('fecha_cese')->orderByDesc('id'),
-                'desvinculacionesPorUsuario' => fn (Builder|Relation $q): Builder|Relation => $q->where('anulado', false)->whereNull('vinculo_laboral_id')->orderBy('fecha_cese')->orderBy('id')]);
+            $consulta->with(['vinculosLaborales.vinculoAdendas' => fn (Relation $q): Relation => $q->where('anulado', false)->orderByDesc('fecha_inicio')->orderByDesc('id'),
+                'vinculosLaborales.desvinculaciones' => fn (Relation $q): Relation => $q->where('anulado', false)->orderByDesc('fecha_cese')->orderByDesc('id'),
+                'desvinculacionesPorUsuario' => fn (Relation $q): Relation => $q->where('anulado', false)->whereNull('vinculo_laboral_id')->orderBy('fecha_cese')->orderBy('id')]);
         }
-        $consulta->with(['vinculosLaborales' => fn (Builder|Relation $q): Builder|Relation => $q->where('anulado', false)->with(['unidadOrganica', 'regimenNormativo'])->orderByDesc('fecha_inicio')->orderByDesc('id')]);
+        $consulta->with(['vinculosLaborales' => fn (Relation $q): Relation => $q->where('anulado', false)->with(['unidadOrganica', 'regimenNormativo'])->orderByDesc('fecha_inicio')->orderByDesc('id')]);
         if ($tipo === 'plana_docente') {
-            $consulta->with(['vinculosLaborales.perfilDocente', 'formacionAcademicaPorUsuario' => fn (Builder|Relation $q): Builder|Relation => $q->where('anulado', false)]);
+            $consulta->with(['vinculosLaborales.perfilDocente', 'formacionAcademicaPorUsuario' => fn (Relation $q): Relation => $q->where('anulado', false)]);
         }
         if ($relacion) {
-            $consulta->with([$relacion => fn (Builder|Relation $q): Builder|Relation => $q->where('anulado', false)->with('documento.tipoDocumento')->orderBy('id')]);
+            $consulta->with([$relacion => fn (Relation $q): Relation => $q->where('anulado', false)->with('documento.tipoDocumento')->orderBy('id')]);
         }
         $grupos = [];
         foreach ($consulta->lazy(100) as $persona) {

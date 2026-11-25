@@ -116,11 +116,11 @@ class VencimientosPanelTest extends TestCase
         $cerrado->update(['estado_legajo' => 'pasivo']);
         $activo = $this->legajo();
         $antiguo = $this->documento($activo, -1);
-        $this->documento($activo, 365)->update(['subsana_a_documento_id' => $antiguo->id]);
+        DocumentoUsuario::query()->whereKey($this->documento($activo, 365)->id)->update(['subsana_a_documento_id' => $antiguo->id]);
         foreach (['anulado', 'falso', 'pendiente'] as $estado) {
             $this->documento($activo, -1)->update(['estado' => $estado]);
         }
-        $this->documento($activo, 1)->update(['archivo_id' => null]);
+        DocumentoUsuario::query()->whereKey($this->documento($activo, 1)->id)->update(['archivo_id' => null]); // dato antiguo simulado
         $this->documento($activo, 1)->update(['fecha_caducidad' => null]);
         $this->getJson('/api/v1/vencimientos')->assertOk()->assertJsonPath('total', 0);
     }

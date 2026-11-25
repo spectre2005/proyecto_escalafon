@@ -86,7 +86,7 @@ class Seccion08Controller extends Controller
     {
         $persona = Usuario::query()->with('vinculosLaborales')->findOrFail($usuario);
         $legajo = Legajo::query()->where('usuario_id', $usuario)->where('estado_legajo', 'activo')->orderByDesc('fecha_apertura')->first();
-        abort_unless($legajo, 409, 'Primero abre el legajo para agregar documentos.');
+        abort_unless($legajo !== null, 409, 'Primero abre el legajo para agregar documentos.');
         $base = ['tipo_documento_id' => ['required', 'uuid', Rule::exists('tipos_documento', 'id')->where('seccion_legajo_id', 8)->where('activo', true)]];
         $id = $request->validate($base)['tipo_documento_id'];
         $tipo = TipoDocumento::query()->findOrFail($id);

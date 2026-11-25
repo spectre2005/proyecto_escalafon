@@ -36,6 +36,7 @@ class PerfilAdministrativo extends Model
         ];
     }
 
+    /** @return BelongsTo<VinculoLaboral, $this> */
     public function vinculoLaboral(): BelongsTo
     {
         return $this->belongsTo(VinculoLaboral::class, 'vinculo_laboral_id', 'id');

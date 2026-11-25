@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Support\Antivirus\ClamAv;
+use App\Support\Antivirus\EscanerAntivirus;
 use App\Support\Plataforma\AlmacenamientoUnica;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
@@ -63,6 +65,12 @@ class VerificarProduccion extends Command
             'IDENTIDAD_PROVEEDOR=factiliza exige FACTILIZA_TOKEN: sin él la consulta por DNI no funciona. Usa ninguno o define el token.');
         if (trim((string) config('identidad.proveedor')) === 'factiliza') {
             $this->avisar('IDENTIDAD_PROVEEDOR=factiliza: el DNI consultado se envía a un servicio externo de pago, no oficial (no es RENIEC).');
+        }
+        $this->exigir(config('antivirus.driver') !== 'ninguno',
+            'ANTIVIRUS_DRIVER no puede ser ninguno: en producción todo archivo se revisa con ClamAV (en producción se usa igual).');
+        $motor = app(EscanerAntivirus::class);
+        if ($motor instanceof ClamAv && ! $motor->enLinea()) {
+            $this->avisar('El antivirus (ClamAV) no responde todavía: mientras tanto se rechazan las subidas de archivos. Al arrancar tarda unos minutos en cargar sus firmas.');
         }
         $this->almacenamientoUnica();
         if (config('app.crud_generico_escritura')) {

@@ -48,16 +48,19 @@ class MovimientoCustodiaLegajo extends Model
         ];
     }
 
+    /** @return BelongsTo<Legajo, $this> */
     public function legajo(): BelongsTo
     {
         return $this->belongsTo(Legajo::class, 'legajo_id', 'id');
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function autorizadoPor(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'autorizado_por', 'id');
     }
 
+    /** @return BelongsTo<ArchivoDocumento, $this> */
     public function sustentoArchivo(): BelongsTo
     {
         return $this->belongsTo(ArchivoDocumento::class, 'sustento_archivo_id', 'id');

@@ -42,26 +42,31 @@ class CompromisoEntregaOriginal extends Model
         ];
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'usuario_id', 'id');
     }
 
+    /** @return BelongsTo<Legajo, $this> */
     public function legajo(): BelongsTo
     {
         return $this->belongsTo(Legajo::class, 'legajo_id', 'id');
     }
 
+    /** @return BelongsTo<ArchivoDocumento, $this> */
     public function archivo(): BelongsTo
     {
         return $this->belongsTo(ArchivoDocumento::class, 'archivo_id', 'id');
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function registradoPor(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'registrado_por', 'id');
     }
 
+    /** @return HasMany<CompromisoDocumento, $this> */
     public function compromisoDocumentos(): HasMany
     {
         return $this->hasMany(CompromisoDocumento::class, 'compromiso_id', 'id');

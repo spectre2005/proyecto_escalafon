@@ -2,10 +2,17 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Usuario;
 use App\Support\SituacionLaboral;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/**
+ * @mixin Usuario
+ *
+ * @property-read bool|null $tiene_legajo_activo withExists de la consulta del listado
+ * @property-read bool|null $tiene_legajo_pasivo withExists de la consulta del listado
+ */
 class UsuarioResource extends JsonResource
 {
     /**

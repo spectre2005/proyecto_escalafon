@@ -38,11 +38,13 @@ class PerfilDocente extends Model
         ];
     }
 
+    /** @return BelongsTo<VinculoLaboral, $this> */
     public function vinculoLaboral(): BelongsTo
     {
         return $this->belongsTo(VinculoLaboral::class, 'vinculo_laboral_id', 'id');
     }
 
+    /** @return HasMany<RatificacionDocente, $this> */
     public function ratificacionesDocentes(): HasMany
     {
         return $this->hasMany(RatificacionDocente::class, 'perfil_docente_id', 'id');

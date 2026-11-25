@@ -34,11 +34,13 @@ class RegimenNormativo extends Model
         ];
     }
 
+    /** @return HasMany<Usuario, $this> */
     public function usuarios(): HasMany
     {
         return $this->hasMany(Usuario::class, 'regimen_normativo_id', 'id');
     }
 
+    /** @return HasMany<VinculoLaboral, $this> */
     public function vinculosLaborales(): HasMany
     {
         return $this->hasMany(VinculoLaboral::class, 'regimen_normativo_id', 'id');

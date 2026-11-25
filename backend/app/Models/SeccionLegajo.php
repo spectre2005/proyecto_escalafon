@@ -36,21 +36,25 @@ class SeccionLegajo extends Model
         ];
     }
 
+    /** @return HasMany<SubseccionLegajo, $this> */
     public function subseccionesLegajo(): HasMany
     {
         return $this->hasMany(SubseccionLegajo::class, 'seccion_legajo_id', 'id');
     }
 
+    /** @return HasMany<TipoDocumento, $this> */
     public function tiposDocumento(): HasMany
     {
         return $this->hasMany(TipoDocumento::class, 'seccion_legajo_id', 'id');
     }
 
+    /** @return HasMany<LegajoSeccion, $this> */
     public function legajoSecciones(): HasMany
     {
         return $this->hasMany(LegajoSeccion::class, 'seccion_legajo_id', 'id');
     }
 
+    /** @return HasMany<DocumentoUsuario, $this> */
     public function documentosUsuario(): HasMany
     {
         return $this->hasMany(DocumentoUsuario::class, 'seccion_legajo_id', 'id');

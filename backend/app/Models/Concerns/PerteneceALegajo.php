@@ -28,25 +28,26 @@ trait PerteneceALegajo
                 if ($registro->getAttribute($campo)) {
                     $padre = $modelo::query()->find($registro->getAttribute($campo));
                     if ($campo === 'perfil_docente_id') {
-                        $padre = $padre?->vinculoLaboral;
+                        $padre = $padre?->getRelationValue('vinculoLaboral');
                     }
-                    if ($actual && $padre && ($padre->usuario_id !== $registro->usuario_id
-                        || ($padre->legajo_id === null && Legajo::query()->where('usuario_id', $registro->usuario_id)->count() > 1))) {
+                    if ($actual && $padre && ($padre->getAttribute('usuario_id') !== $registro->getAttribute('usuario_id')
+                        || ($padre->getAttribute('legajo_id') === null && Legajo::query()->where('usuario_id', $registro->getAttribute('usuario_id'))->count() > 1))) {
                         throw ValidationException::withMessages([$campo => 'El antecedente no pertenece a esta etapa o no tiene un legajo identificado. Consúltalo en el historial.']);
                     }
-                    if ($padre?->legajo_id && $padre->usuario_id === $registro->usuario_id) {
-                        $padres[] = $padre->legajo_id;
+                    if ($padre?->getAttribute('legajo_id') && $padre->getAttribute('usuario_id') === $registro->getAttribute('usuario_id')) {
+                        $padres[] = (string) $padre->getAttribute('legajo_id');
                     }
                 }
             }
-            $legajo = $registro->legajo_id ?? $actual ?? ($padres[0] ?? Legajo::query()->where('usuario_id', $registro->usuario_id)->where('estado_legajo', 'activo')->value('id'));
-            if ($actual && (($registro->legajo_id && $registro->legajo_id !== $actual) || collect($padres)->contains(fn (string $id): bool => $id !== $actual))) {
+            $legajo = $registro->getAttribute('legajo_id') ?? $actual ?? ($padres[0] ?? Legajo::query()->where('usuario_id', $registro->getAttribute('usuario_id'))->where('estado_legajo', 'activo')->value('id'));
+            if ($actual && (($registro->getAttribute('legajo_id') && $registro->getAttribute('legajo_id') !== $actual) || collect($padres)->contains(fn (string $id): bool => $id !== $actual))) {
                 throw ValidationException::withMessages(['legajo' => 'El registro o su documento pertenece a otra etapa. Consulta el legajo anterior desde el historial.']);
             }
-            $registro->legajo_id = $legajo;
+            $registro->setAttribute('legajo_id', $legajo);
         });
     }
 
+    /** @return BelongsTo<Legajo, $this> */
     public function legajo(): BelongsTo
     {
         return $this->belongsTo(Legajo::class);

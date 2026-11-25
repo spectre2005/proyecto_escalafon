@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Support\Antivirus\Antivirus;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -98,8 +99,10 @@ class InstitutionSettingsController extends Controller
         $image = @imagecreatefromstring($bytes);
         if ($image === false) {
             $fail('No se pudo leer la imagen del logo.');
-        } else {
-            imagedestroy($image);
+
+            return;
         }
+        imagedestroy($image);
+        Antivirus::revisarContenido($bytes, $attribute);
     }
 }

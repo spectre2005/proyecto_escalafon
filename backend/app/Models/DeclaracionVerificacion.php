@@ -48,16 +48,19 @@ class DeclaracionVerificacion extends Model
         ];
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'usuario_id', 'id');
     }
 
+    /** @return BelongsTo<DocumentoUsuario, $this> */
     public function documento(): BelongsTo
     {
         return $this->belongsTo(DocumentoUsuario::class, 'documento_id', 'id');
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function registradoPor(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'registrado_por', 'id');

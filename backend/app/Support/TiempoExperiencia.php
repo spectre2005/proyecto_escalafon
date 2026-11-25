@@ -44,7 +44,7 @@ final class TiempoExperiencia
         $config = self::configuracion();
         $periodos = ExperienciaLaboral::query()->where('usuario_id', $usuario)->where('anulado', false)
             ->whereHas('documento', fn ($q) => $q->where('usuario_id', $usuario)->where('seccion_legajo_id', 4)
-                ->where('estado', '!=', 'anulado')->whereDoesntHave('documentosUsuarioPorSubsanaADocumento')
+                ->noAnulados()->sinSubsanar()
                 ->when(! $permitirSensibles, fn ($q) => $q->whereHas('tipoDocumento', fn ($t) => $t->where('es_dato_sensible', false)->where('es_dato_salud', false)))
                 ->whereHas('archivo', fn ($archivo) => $archivo->where('estado_antivirus', '!=', 'infectado')))
             ->with('documento')->orderBy('fecha_inicio')->orderBy('id')->get()->map(fn (ExperienciaLaboral $p): array => [

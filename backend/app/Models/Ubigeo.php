@@ -26,6 +26,7 @@ class Ubigeo extends Model
         'descripcion',
     ];
 
+    /** @return HasMany<Usuario, $this> */
     public function usuarios(): HasMany
     {
         return $this->hasMany(Usuario::class, 'ubigeo_id', 'id');

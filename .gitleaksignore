@@ -1,0 +1,8 @@
+# Hallazgos de gitleaks revisados (23/11/2026): hashes SHA de archivos en documentos ya borrados
+# (docs/api-contract.json y docs/codigo-backlog.md del commit 5ccf965), no claves.
+5ccf9657ba158adadb66b88ab048b3396fa3206b:docs/api-contract.json:generic-api-key:5517
+5ccf9657ba158adadb66b88ab048b3396fa3206b:docs/api-contract.json:generic-api-key:5597
+5ccf9657ba158adadb66b88ab048b3396fa3206b:docs/api-contract.json:generic-api-key:5641
+5ccf9657ba158adadb66b88ab048b3396fa3206b:docs/codigo-backlog.md:generic-api-key:13730
+5ccf9657ba158adadb66b88ab048b3396fa3206b:docs/codigo-backlog.md:generic-api-key:13810
+5ccf9657ba158adadb66b88ab048b3396fa3206b:docs/codigo-backlog.md:generic-api-key:13854

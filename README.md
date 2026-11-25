@@ -194,9 +194,10 @@ Conserva las variables de cuentas demo, sesiones y plataforma de la plantilla. L
 
 ```sh
 docker compose up -d --build --wait db app nginx
+docker compose up -d clamav
 ```
 
-Este comando espera a que PostgreSQL y PHP estén preparados. La primera ejecución descarga imágenes e instala dependencias y puede tardar varios minutos.
+El primer comando espera a que PostgreSQL y PHP estén preparados. La primera ejecución descarga imágenes e instala dependencias y puede tardar varios minutos. El segundo inicia el antivirus (ClamAV), que revisa cada PDF antes de guardarlo: tarda unos minutos en cargar sus firmas y usa ~1,5 GB de RAM; mientras no esté listo, las subidas se rechazan. Si tu equipo no tiene memoria suficiente, pon `ANTIVIRUS_DRIVER=ninguno` en `backend/.env` (los archivos quedan sin revisar; solo para desarrollo).
 
 Después, confirma las dependencias y limpia la configuración:
 
@@ -359,6 +360,7 @@ Después de incorporar cambios del equipo, revisa las modificaciones de los `.en
 
 ```sh
 docker compose up -d --build --wait db app nginx
+docker compose up -d clamav
 docker compose exec -e COMPOSER_HOME=/tmp/composer app composer install --no-interaction --prefer-dist
 docker compose exec app php artisan config:clear --no-interaction
 docker compose exec app php artisan migrate --no-interaction

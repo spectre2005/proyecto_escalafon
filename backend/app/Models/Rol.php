@@ -36,6 +36,7 @@ class Rol extends Model
         ];
     }
 
+    /** @return HasMany<UsuarioRol, $this> */
     public function usuarioRoles(): HasMany
     {
         return $this->hasMany(UsuarioRol::class, 'rol_id', 'id');

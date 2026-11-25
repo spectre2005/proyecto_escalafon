@@ -56,7 +56,7 @@ class ExpedienteImprimibleController extends Controller
             return Legajo::query()->where('usuario_id', $persona->id)->findOrFail($id);
         }
         $legajo = Legajo::paraConsulta($persona->id);
-        abort_unless($legajo, 409, $sinLegajo);
+        abort_unless($legajo !== null, 409, $sinLegajo);
 
         return $legajo;
     }

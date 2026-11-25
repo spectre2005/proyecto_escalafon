@@ -33,14 +33,19 @@ final class EstadoDocumento
         return $documento->estado;
     }
 
-    /** TODO pendiente de confirmar con el cliente: si un documento "observado" cuenta como presente. */
+    /** Lo marcado expresamente como observado o falso, y lo anulado, nunca cuenta como aprobado (CLAUDE.md, «Documentos ya validados»). */
+    public const ESTADOS_NO_APROBADOS = ['pendiente', 'observado', 'falso', 'anulado'];
+
     public static function aprobado(DocumentoUsuario $documento, TipoDocumento $tipo): bool
     {
         if ($documento->estado === 'aceptado') {
             return $documento->archivo !== null && $documento->archivo->estado_antivirus !== 'infectado';
         }
+        if (in_array($documento->estado, self::ESTADOS_NO_APROBADOS, true)) {
+            return false;
+        }
 
-        $presente = $documento->archivo_id !== null && ! in_array($documento->estado, ['pendiente', 'falso'], true);
+        $presente = $documento->archivo_id !== null && $documento->archivo?->estado_antivirus !== 'infectado';
         $fiscalizado = ! $tipo->acredita_perfil_puesto || ($documento->fiscalizado && $documento->estado === 'verificado');
 
         return $presente && self::recepcionado($documento) && $fiscalizado;

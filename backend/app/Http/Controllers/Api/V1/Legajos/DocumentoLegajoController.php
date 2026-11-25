@@ -187,10 +187,10 @@ class DocumentoLegajoController extends Controller
     }
 
     /**
-     * Recepción del documento (Directiva, art. 4.5): quién la registra y la fecha. Una sola vez; el estado del
-     * documento no cambia (sigue "cargado") y sin recepción no cuenta como aprobado.
-     * TODO pendiente de confirmar con el cliente: el sello y la firma del art. 4.5 son físicos (en el documento
-     * o el cargo); si quien sube puede recepcionar su propia carga (hoy se permite).
+     * Recepción del documento (Directiva, art. 4.5): quién la registra y la fecha. Una sola vez y opcional: los
+     * documentos llegan ya validados y cuentan como aprobados sin ella (CLAUDE.md); solo los del flujo anterior
+     * (estado "cargado") la necesitan. El sello y la firma son físicos (en el documento o el cargo).
+     * Pendiente del cliente: si quien sube puede recepcionar su propia carga (hoy se permite).
      */
     public function recepcionar(Request $request, string $usuario, string $documento): JsonResponse
     {
@@ -262,7 +262,7 @@ class DocumentoLegajoController extends Controller
     {
         Usuario::query()->findOrFail($usuario);
         $legajo = Legajo::query()->where('usuario_id', $usuario)->where('estado_legajo', 'activo')->orderByDesc('fecha_apertura')->first();
-        abort_unless($legajo, 409, 'La persona no tiene un legajo abierto. Primero se debe abrir su legajo.');
+        abort_unless($legajo !== null, 409, 'La persona no tiene un legajo abierto. Primero se debe abrir su legajo.');
 
         return $legajo;
     }

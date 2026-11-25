@@ -108,7 +108,7 @@ class TiempoExperienciaTest extends TestCase
         $this->assertSame(10, TiempoExperiencia::paraPersona($persona->id, '2024-12-31')['total']['dias_totales']);
         $doc->update(['estado' => 'anulado']);
         $this->assertSame(0, TiempoExperiencia::paraPersona($persona->id, '2024-12-31')['total']['dias_totales']);
-        $doc->update(['estado' => 'aceptado']);
+        DocumentoUsuario::query()->whereKey($doc->id)->update(['estado' => 'aceptado']); // el modelo no deja reactivar un anulado
         $p->update(['anulado' => true]);
         $this->assertSame(0, TiempoExperiencia::paraPersona($persona->id, '2024-12-31')['total']['dias_totales']);
         $p->update(['anulado' => false]);
@@ -116,9 +116,9 @@ class TiempoExperienciaTest extends TestCase
         $this->assertSame(0, TiempoExperiencia::paraPersona($persona->id, '2024-12-31')['total']['dias_totales']);
         $doc->archivo->update(['estado_antivirus' => 'pendiente']);
         $otro = Usuario::factory()->create();
-        $doc->update(['usuario_id' => $otro->id]);
+        DocumentoUsuario::query()->whereKey($doc->id)->update(['usuario_id' => $otro->id]); // dato inconsistente simulado
         $this->assertSame(0, TiempoExperiencia::paraPersona($persona->id, '2024-12-31')['total']['dias_totales']);
-        $doc->update(['usuario_id' => $persona->id]);
+        DocumentoUsuario::query()->whereKey($doc->id)->update(['usuario_id' => $persona->id]);
         DocumentoUsuario::factory()->create(['subsana_a_documento_id' => $doc->id]);
         $this->assertSame(0, TiempoExperiencia::paraPersona($persona->id, '2024-12-31')['total']['dias_totales']);
         $p->update(['documento_id' => null]);

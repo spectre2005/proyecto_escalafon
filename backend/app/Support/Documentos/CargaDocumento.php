@@ -8,6 +8,7 @@ use App\Models\HistorialEstadoDocumento;
 use App\Models\Legajo;
 use App\Models\ObservacionDocumento;
 use App\Models\TipoDocumento;
+use App\Support\Antivirus\Antivirus;
 use App\Support\AplicacionDocumental;
 use Closure;
 use Illuminate\Http\UploadedFile;
@@ -39,16 +40,18 @@ final class CargaDocumento
         if ($noAplica !== null) {
             throw ValidationException::withMessages(['tipo_documento_id' => "Este tipo de documento no corresponde a la persona. {$noAplica}"]);
         }
+        // Antes de tocar el disco: un archivo infectado no se guarda nunca (App\Support\Antivirus\Antivirus).
+        $estadoAntivirus = Antivirus::revisarArchivo((string) $pdf->getRealPath());
         $disco = (string) config('legajo.disco_documentos');
         $ruta = sprintf('legajos/%s/seccion-%02d/%s.pdf', $legajo->id, $tipo->seccion_legajo_id, Str::uuid());
         $archivo = [
             'almacenamiento' => $disco, 'storage_path' => $ruta, 'nombre_original' => mb_substr($pdf->getClientOriginalName(), 0, 255),
             'mime_type' => 'application/pdf', 'tamano_bytes' => $pdf->getSize(), 'hash_sha256' => ArchivoPdf::hash($pdf),
             'num_paginas' => ArchivoPdf::paginas($pdf),
-            // TODO pendiente de confirmar con el cliente: cifrado en reposo. Hoy el archivo no se cifra.
+            // Cifrado en reposo: pendiente de decisión (docs/ESTADO_PROYECTO.md, pendiente 9). Mientras tanto el PDF va
+            // a un disco privado, sin URL pública, y solo se entrega por la API con sesión y permiso.
             'cifrado' => false,
-            // TODO: sin antivirus integrado todavía; queda pendiente de revisión.
-            'estado_antivirus' => 'pendiente',
+            'estado_antivirus' => $estadoAntivirus,
             'subido_por' => $autor,
         ];
         if ($foliosAutomaticos && (! $archivo['num_paginas'] || $archivo['num_paginas'] < 1)) {
@@ -67,7 +70,7 @@ final class CargaDocumento
                     $metadatos['folio_inicio'] = Folios::ultimo($legajo, $tipo->seccion_legajo_id) + 1;
                     $metadatos['folio_fin'] = $metadatos['folio_inicio'] + $archivo['num_paginas'] - 1;
                     $subsanaA = DocumentoUsuario::query()->where('legajo_id', $legajo->id)->where('tipo_documento_id', $tipo->id)
-                        ->whereDoesntHave('documentosUsuarioPorSubsanaADocumento')->orderByDesc('folio_fin')->value('id');
+                        ->sinSubsanar()->orderByDesc('folio_fin')->value('id');
                 }
                 Folios::reservar($legajo, $tipo->seccion_legajo_id, $metadatos['folio_inicio'], $metadatos['folio_fin']);
                 self::validarSubsanacion($legajo, $tipo, $subsanaA);
@@ -112,8 +115,8 @@ final class CargaDocumento
     private static function validarSubsanacion(Legajo $legajo, TipoDocumento $tipo, ?string $subsanaA): void
     {
         $vigentes = DocumentoUsuario::query()->where('legajo_id', $legajo->id)->where('tipo_documento_id', $tipo->id)
-            ->when(in_array($tipo->seccion_legajo_id, [3, 4, 6, 10], true), fn ($query) => $query->where('estado', '!=', 'anulado'))
-            ->whereDoesntHave('documentosUsuarioPorSubsanaADocumento')->lockForUpdate()->pluck('id');
+            ->when(in_array($tipo->seccion_legajo_id, [3, 4, 6, 10], true), fn ($query) => $query->noAnulados())
+            ->sinSubsanar()->lockForUpdate()->pluck('id');
         if ($subsanaA !== null && ! $vigentes->contains($subsanaA)) {
             throw ValidationException::withMessages(['subsana_a_documento_id' => 'El documento a subsanar debe ser de este legajo y tipo, y no estar ya subsanado.']);
         }

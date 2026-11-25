@@ -19,7 +19,7 @@ use Illuminate\Support\Str;
  * 12 secciones normativas (art. 3.1; legajo_secciones, con ultimo_folio = 0) en una sola transacción. Un solo
  * legajo activo por persona. La sección adicional de legajos pasivos (art. 3.2, "13") es optativa y no se
  * inicializa aquí, aunque exista en el catálogo: si llega a usarse, Folios::reservar crea su fila.
- * TODO pendiente de confirmar con el cliente: formato_legajo (hoy el valor por defecto del esquema, digital),
+ * Pendiente del cliente: formato_legajo (hoy el valor por defecto del esquema, digital),
  * ubicación física. Un reingreso abre un nuevo legajo y conserva el anterior como pasivo.
  */
 class AperturaLegajoController extends Controller

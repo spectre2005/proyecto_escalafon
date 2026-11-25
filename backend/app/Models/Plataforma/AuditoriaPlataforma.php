@@ -25,11 +25,13 @@ class AuditoriaPlataforma extends Model
         return ['datos_antes' => 'array', 'datos_despues' => 'array', 'created_at' => 'datetime'];
     }
 
+    /** @return BelongsTo<AdministradorPlataforma, $this> */
     public function administrador(): BelongsTo
     {
         return $this->belongsTo(AdministradorPlataforma::class, 'administrador_id');
     }
 
+    /** @return BelongsTo<Institucion, $this> */
     public function institucion(): BelongsTo
     {
         return $this->belongsTo(Institucion::class, 'institucion_id');

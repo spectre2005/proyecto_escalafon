@@ -42,7 +42,7 @@ class DocumentoRecepcionVisorTest extends TestCase
         $this->assertNull($documento->fecha_recepcion);
         $documento->archivo->update(['estado_antivirus' => 'infectado']);
         $this->assertFalse(EstadoDocumento::aprobado($documento->fresh(), $documento->tipoDocumento));
-        $documento->update(['archivo_id' => null]);
+        DocumentoUsuario::query()->whereKey($documento->id)->update(['archivo_id' => null]); // dato antiguo: sin pasar por el modelo
         $this->assertFalse(EstadoDocumento::aprobado($documento->fresh(), $documento->tipoDocumento));
     }
 

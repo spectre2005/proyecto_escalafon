@@ -36,11 +36,13 @@ class SubseccionLegajo extends Model
         ];
     }
 
+    /** @return BelongsTo<SeccionLegajo, $this> */
     public function seccionLegajo(): BelongsTo
     {
         return $this->belongsTo(SeccionLegajo::class, 'seccion_legajo_id', 'id');
     }
 
+    /** @return HasMany<TipoDocumento, $this> */
     public function tiposDocumento(): HasMany
     {
         return $this->hasMany(TipoDocumento::class, 'subseccion_legajo_id', 'id');

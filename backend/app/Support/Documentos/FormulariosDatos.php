@@ -75,7 +75,7 @@ final class FormulariosDatos
 
     /**
      * formulario_datos del tipo => otros formularios que su documento también puede acreditar.
-     * TODO pendiente de confirmar con el cliente: la ratificación o promoción docente se acredita con el tipo de 7.2 a).
+     * Pendiente del cliente: la ratificación o promoción docente se acredita con el tipo de 7.2 a).
      */
     private const ALTERNATIVOS = ['progresiones_carrera' => ['ratificaciones_docentes']];
 

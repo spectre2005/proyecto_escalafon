@@ -44,7 +44,7 @@ class DocumentoLegajoApiTest extends TestCase
         $archivo = ArchivoDocumento::query()->findOrFail($documento->archivo_id);
         $this->assertSame([$persona->id, 2, 1, 2, $autor->id], [$documento->usuario_id, $documento->seccion_legajo_id, $documento->folio_inicio, $documento->folio_fin, $documento->created_by]);
         $this->assertSame('servidor', $documento->relacion_titular);
-        $this->assertSame([2, 'pendiente', 'application/pdf', $autor->id, false], [$archivo->num_paginas, $archivo->estado_antivirus, $archivo->mime_type, $archivo->subido_por, $archivo->cifrado]);
+        $this->assertSame([2, 'limpio', 'application/pdf', $autor->id, false], [$archivo->num_paginas, $archivo->estado_antivirus, $archivo->mime_type, $archivo->subido_por, $archivo->cifrado]);
         $this->assertSame('documento.pdf', $archivo->nombre_original);
         // Disco privado, nombre interno aleatorio y hash del contenido real.
         $disco = Storage::disk(config('legajo.disco_documentos'));

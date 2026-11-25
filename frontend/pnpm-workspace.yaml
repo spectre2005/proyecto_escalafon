@@ -1,7 +1,13 @@
+# No instalar versiones publicadas hace menos de 7 días (en minutos): da tiempo a que se detecte un paquete malicioso.
+minimumReleaseAge: 10080
 allowBuilds:
   core-js: false
 # Versiones corregidas de dependencias indirectas (avisos de seguridad de pnpm audit): jspdf trae dompurify y exceljs trae
-# uuid en versiones con fallas conocidas, y aún no publican una versión que las actualice.
+# uuid en versiones con fallas conocidas, y aún no publican una versión que las actualice. source-map-js (postcss),
+# zod (eslint-plugin-react-hooks) y minimatch (eslint): avisos del 23/11/2026, solo en herramientas de desarrollo.
 overrides:
   dompurify: ^3.4.17
   uuid: ^11.1.1
+  source-map-js: ^1.2.2
+  zod: ^4.6.6
+  minimatch: ^11.0.1

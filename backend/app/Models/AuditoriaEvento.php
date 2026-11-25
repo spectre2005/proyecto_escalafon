@@ -43,11 +43,13 @@ class AuditoriaEvento extends Model
         ];
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function actorUsuario(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'actor_usuario_id', 'id');
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function usuarioTitular(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'usuario_titular_id', 'id');

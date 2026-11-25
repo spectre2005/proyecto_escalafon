@@ -152,7 +152,7 @@ class CompletarLegajosDemo extends Command
 
     private function tiene(Legajo $legajo, TipoDocumento $tipo): bool
     {
-        return DocumentoUsuario::query()->where('legajo_id', $legajo->id)->where('tipo_documento_id', $tipo->id)->where('estado', '!=', 'anulado')->exists();
+        return DocumentoUsuario::query()->where('legajo_id', $legajo->id)->where('tipo_documento_id', $tipo->id)->noAnulados()->exists();
     }
 
     private function vinculo(Usuario $persona): void

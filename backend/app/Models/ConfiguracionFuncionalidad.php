@@ -50,6 +50,7 @@ class ConfiguracionFuncionalidad extends Model
         ];
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function updatedBy(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'updated_by', 'id');

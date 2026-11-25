@@ -45,21 +45,25 @@ class NotificacionUsuario extends Model
         ];
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'usuario_id', 'id');
     }
 
+    /** @return BelongsTo<DocumentoUsuario, $this> */
     public function documento(): BelongsTo
     {
         return $this->belongsTo(DocumentoUsuario::class, 'documento_id', 'id');
     }
 
+    /** @return BelongsTo<ObservacionDocumento, $this> */
     public function observacion(): BelongsTo
     {
         return $this->belongsTo(ObservacionDocumento::class, 'observacion_id', 'id');
     }
 
+    /** @return BelongsTo<RequerimientoDocumento, $this> */
     public function requerimiento(): BelongsTo
     {
         return $this->belongsTo(RequerimientoDocumento::class, 'requerimiento_id', 'id');

@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
+use Tests\Fixtures\AntivirusFalso;
 use Tests\TestCase;
 
 class RecepcionGmailTest extends TestCase
@@ -246,5 +247,35 @@ class RecepcionGmailTest extends TestCase
         $this->assertDatabaseHas('correos_recibidos', ['mensaje_id' => 'repetida', 'estado' => 'importado', 'requerimiento_id' => $this->requerimiento->id]);
         $this->assertSame([], $otro->fresh()->seguimiento);
         $this->assertCount(0, Storage::disk(config('legajo.disco_documentos'))->allFiles());
+    }
+
+    public function test_infected_attachment_is_not_stored_and_the_response_stays_visible(): void
+    {
+        $this->pdf .= "\n%".AntivirusFalso::EICAR;
+        $this->mensajes['respuesta1'] = $this->mensaje();
+        $this->assertSame(1, RecepcionGmail::sincronizar());
+        $evento = $this->requerimiento->fresh()->seguimiento[0];
+        $this->assertCount(0, $evento['archivos']);
+        $this->assertStringContainsString('el antivirus detectó una amenaza', $evento['avisos_adjuntos'][0]);
+        $this->assertCount(0, Storage::disk(config('legajo.disco_documentos'))->allFiles());
+    }
+
+    public function test_when_the_antivirus_is_down_nothing_is_imported_and_the_message_is_retried(): void
+    {
+        $this->mensajes['respuesta1'] = $this->mensaje();
+        $this->antivirus->caido = true;
+        try {
+            RecepcionGmail::sincronizar();
+            $this->fail('Sin antivirus la recepción debe fallar.');
+        } catch (\RuntimeException) {
+            $this->assertStringContainsString('antivirus no está disponible', $this->conexion->fresh()->recepcion_error);
+        }
+        $this->assertDatabaseCount('correos_recibidos', 0);
+        $this->assertSame([], $this->requerimiento->fresh()->seguimiento);
+        $this->assertCount(0, Storage::disk(config('legajo.disco_documentos'))->allFiles());
+
+        $this->antivirus->caido = false;
+        $this->assertSame(1, RecepcionGmail::sincronizar());
+        $this->assertCount(1, $this->requerimiento->fresh()->seguimiento[0]['archivos']);
     }
 }

@@ -85,31 +85,37 @@ class TipoDocumento extends Model
         ];
     }
 
+    /** @return BelongsTo<SeccionLegajo, $this> */
     public function seccionLegajo(): BelongsTo
     {
         return $this->belongsTo(SeccionLegajo::class, 'seccion_legajo_id', 'id');
     }
 
+    /** @return BelongsTo<SubseccionLegajo, $this> */
     public function subseccionLegajo(): BelongsTo
     {
         return $this->belongsTo(SubseccionLegajo::class, 'subseccion_legajo_id', 'id');
     }
 
+    /** @return HasMany<DocumentoUsuario, $this> */
     public function documentosUsuario(): HasMany
     {
         return $this->hasMany(DocumentoUsuario::class, 'tipo_documento_id', 'id');
     }
 
+    /** @return HasMany<ReferenciaLegajoPasivo, $this> */
     public function referenciasLegajoPasivo(): HasMany
     {
         return $this->hasMany(ReferenciaLegajoPasivo::class, 'tipo_documento_id', 'id');
     }
 
+    /** @return HasMany<CompromisoDocumento, $this> */
     public function compromisoDocumentos(): HasMany
     {
         return $this->hasMany(CompromisoDocumento::class, 'tipo_documento_id', 'id');
     }
 
+    /** @return HasMany<RequerimientoDocumento, $this> */
     public function requerimientosDocumentos(): HasMany
     {
         return $this->hasMany(RequerimientoDocumento::class, 'tipo_documento_id', 'id');

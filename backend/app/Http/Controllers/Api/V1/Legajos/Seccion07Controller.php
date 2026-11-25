@@ -93,7 +93,7 @@ class Seccion07Controller extends Controller
             'avisos' => [
                 'ciclo_en_curso' => $ciclo,
                 'evaluacion_ciclo_en_curso' => $evaluaciones->contains(fn (array $fila): bool => $fila['values']['ciclo_anio'] === $ciclo),
-                // TODO pendiente de confirmar con el cliente: el acta (7.1 b) no se enlaza a una evaluación; se avisa si hay
+                // Pendiente del cliente: el acta (7.1 b) no se enlaza a una evaluación; se avisa si hay
                 // evaluaciones con plan de mejora y ningún acta cargada.
                 'planes_mejora_sin_acta' => ($actas['cargado'] ?? false) ? 0 : $evaluaciones->where('values.plan_mejora', true)->count(),
                 'dias_aviso_ratificacion' => Seccion07::DIAS_AVISO_RATIFICACION,
@@ -137,7 +137,7 @@ class Seccion07Controller extends Controller
 
     /**
      * Corrección de un registro vigente (solo los campos enviados). Un registro anulado no se corrige.
-     * TODO pendiente de confirmar con el cliente: si un registro con documento verificado debe dejar de corregirse.
+     * Pendiente del cliente: si un registro con documento verificado debe dejar de corregirse.
      */
     public function update(Request $request, string $usuario, string $tipo, string $registro): JsonResource|JsonResponse
     {
@@ -268,6 +268,7 @@ class Seccion07Controller extends Controller
                 'fecha_fin' => "nullable|{$fecha}|after_or_equal:fecha_inicio",
                 'numero_documento' => 'nullable|string|max:60',
             ],
+            default => abort(404),
         };
     }
 
@@ -329,7 +330,7 @@ class Seccion07Controller extends Controller
         return $tipo === 'evaluaciones-desempeno' ? $this->ocultarCalificacion($fila, $request->user()->can('seccion07.ver_calificacion')) : $fila;
     }
 
-    /** TODO pendiente de decisión del cliente: sin seccion07.ver_calificacion la calificación y el puntaje no se envían. */
+    /** Pendiente del cliente: sin seccion07.ver_calificacion la calificación y el puntaje no se envían. */
     private function ocultarCalificacion(array $fila, bool $veCalificacion): array
     {
         if (! $veCalificacion) {
@@ -358,7 +359,7 @@ class Seccion07Controller extends Controller
     private function exigirLegajo(string $usuario): Usuario
     {
         $persona = Usuario::query()->findOrFail($usuario);
-        abort_unless($this->legajoAbierto($usuario), 409, 'La persona no tiene un legajo abierto. Primero se debe abrir su legajo.');
+        abort_unless($this->legajoAbierto($usuario) !== null, 409, 'La persona no tiene un legajo abierto. Primero se debe abrir su legajo.');
 
         return $persona;
     }

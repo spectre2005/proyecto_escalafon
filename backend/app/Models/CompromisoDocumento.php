@@ -35,16 +35,19 @@ class CompromisoDocumento extends Model
         ];
     }
 
+    /** @return BelongsTo<CompromisoEntregaOriginal, $this> */
     public function compromiso(): BelongsTo
     {
         return $this->belongsTo(CompromisoEntregaOriginal::class, 'compromiso_id', 'id');
     }
 
+    /** @return BelongsTo<TipoDocumento, $this> */
     public function tipoDocumento(): BelongsTo
     {
         return $this->belongsTo(TipoDocumento::class, 'tipo_documento_id', 'id');
     }
 
+    /** @return BelongsTo<DocumentoUsuario, $this> */
     public function documento(): BelongsTo
     {
         return $this->belongsTo(DocumentoUsuario::class, 'documento_id', 'id');

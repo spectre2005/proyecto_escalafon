@@ -43,6 +43,7 @@ Backend:
     docker compose exec app php artisan test --filter=ExampleTest         # single test class/method
     docker compose exec app php artisan test tests/Feature/ExampleTest.php
     docker compose exec app ./vendor/bin/pint                             # format (Laravel Pint)
+    docker compose exec app ./vendor/bin/phpstan analyse --memory-limit=2G   # análisis estático (Larastan nivel 5)
     docker compose exec app php artisan migrate
 
 Tests use PHPUnit (not Pest) and run against in-memory SQLite (`phpunit.xml`), not the Postgres container.
@@ -98,8 +99,9 @@ Sistema de Escalafón y Expediente Digital Universitario: gestiona el legajo (ex
 
 ## Reglas que no se rompen
 
-- Documentos validados: no se eliminan ni se editan. Se anulan (`anulado = true` con motivo) o se subsana con un documento nuevo.
-- Folios correlativos por sección (sugerido: `ultimo_folio + 1`). Todo listado y contador excluye `anulado = true`.
+- Documentos validados: no se eliminan ni se editan. Se anulan o se subsana con un documento nuevo. Los documentos se anulan con `estado = 'anulado'`; los registros de datos (vínculos, experiencia, etc.) con `anulado = true` y motivo.
+- Los modelos `DocumentoUsuario` y `ArchivoDocumento` lo hacen cumplir: no se borran y su identidad (folios, archivo, legajo, tipo) no cambia (`DocumentoProtegido`).
+- Folios correlativos por sección (sugerido: `ultimo_folio + 1`). Todo listado y contador excluye los anulados (`DocumentoUsuario::noAnulados()`, `anulado = false` en los registros).
 - Permisos: el backend manda una lista (ej. `documento.subir`) y el frontend pregunta "¿puede hacer esto?". Nunca se programa por nombre de rol. El backend valida siempre.
 - No hay verificación posterior: quien sube un documento lo deja aceptado, porque los documentos llegan ya validados.
 - Secciones 01, 09 y 10 se bloquean si el rol no tiene `ve_datos_sensibles`.

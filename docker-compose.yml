@@ -97,6 +97,15 @@ services:
     cpus: 2
     restart: unless-stopped
 
+  # Antivirus de los archivos que entran al sistema (config/antivirus.php). Sin puerto publicado: solo la aplicación
+  # llega a él. Al arrancar baja y carga sus firmas (unos minutos y ~1,5 GB de RAM); mientras tanto las subidas se
+  # rechazan. Sin este contenedor, en desarrollo se puede poner ANTIVIRUS_DRIVER=ninguno en backend/.env.
+  clamav:
+    image: clamav/clamav:1.4.3
+    volumes:
+      - clamav_firmas:/var/lib/clamav
+    restart: unless-stopped
+
   db:
     image: postgres:16-alpine
     healthcheck:
@@ -119,6 +128,7 @@ networks:
     internal: true
 
 volumes:
+  clamav_firmas:
   ollama_data:
   dbdata:
   vendor:

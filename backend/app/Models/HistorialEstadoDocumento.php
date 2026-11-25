@@ -38,16 +38,19 @@ class HistorialEstadoDocumento extends Model
         ];
     }
 
+    /** @return BelongsTo<DocumentoUsuario, $this> */
     public function documentoUsuario(): BelongsTo
     {
         return $this->belongsTo(DocumentoUsuario::class, 'documento_usuario_id', 'id');
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function cambiadoPor(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'cambiado_por', 'id');
     }
 
+    /** @return BelongsTo<ObservacionDocumento, $this> */
     public function observacion(): BelongsTo
     {
         return $this->belongsTo(ObservacionDocumento::class, 'observacion_id', 'id');

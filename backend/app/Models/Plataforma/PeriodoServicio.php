@@ -23,11 +23,13 @@ class PeriodoServicio extends Model
         return ['desde' => 'date:Y-m-d', 'hasta' => 'date:Y-m-d', 'monto' => 'decimal:2', 'anulado' => 'boolean', 'anulado_en' => 'datetime'];
     }
 
+    /** @return BelongsTo<AdministradorPlataforma, $this> */
     public function registradoPor(): BelongsTo
     {
         return $this->belongsTo(AdministradorPlataforma::class, 'registrado_por');
     }
 
+    /** @return BelongsTo<AdministradorPlataforma, $this> */
     public function anuladoPor(): BelongsTo
     {
         return $this->belongsTo(AdministradorPlataforma::class, 'anulado_por');

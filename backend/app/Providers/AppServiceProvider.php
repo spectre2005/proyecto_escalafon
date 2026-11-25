@@ -3,6 +3,9 @@
 namespace App\Providers;
 
 use App\Models\Usuario;
+use App\Support\Antivirus\ClamAv;
+use App\Support\Antivirus\EscanerAntivirus;
+use App\Support\Antivirus\SinAntivirus;
 use App\Support\Plataforma\AlmacenamientoUnica;
 use App\Support\Plataforma\ColasInstitucion;
 use Illuminate\Support\Facades\Gate;
@@ -16,7 +19,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // En producción siempre clamav: ANTIVIRUS_DRIVER=ninguno solo vale en desarrollo (config/antivirus.php).
+        $this->app->bind(EscanerAntivirus::class, fn (): EscanerAntivirus => config('antivirus.driver') === 'ninguno' && ! $this->app->isProduction()
+            ? new SinAntivirus
+            : new ClamAv((string) config('antivirus.clamav.host'), (int) config('antivirus.clamav.puerto'),
+                (int) config('antivirus.clamav.tiempo_conexion'), (int) config('antivirus.clamav.tiempo_respuesta')));
     }
 
     /**

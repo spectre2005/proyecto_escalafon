@@ -122,7 +122,7 @@ class Seccion09Controller extends Controller
 
     /**
      * Campos del esquema: tipo, instancia, materia y fecha_inicio son NOT NULL; estado tiene valor por defecto (en_tramite).
-     * TODO pendiente de confirmar con el cliente: si se gestiona el estado (hoy es un dato opcional, sin reglas de transición).
+     * Pendiente del cliente: si se gestiona el estado (hoy es un dato opcional, sin reglas de transición).
      */
     private static function reglasControversia(): array
     {
@@ -198,7 +198,7 @@ class Seccion09Controller extends Controller
     private function exigirLegajo(string $usuario): void
     {
         Usuario::query()->findOrFail($usuario);
-        abort_unless($this->legajoAbierto($usuario), 409, 'La persona no tiene un legajo abierto. Primero se debe abrir su legajo.');
+        abort_unless($this->legajoAbierto($usuario) !== null, 409, 'La persona no tiene un legajo abierto. Primero se debe abrir su legajo.');
     }
 
     /** Valida y rechaza campos que no son del formulario (autor, anulación, tipo de afiliación, persona, etc.). */

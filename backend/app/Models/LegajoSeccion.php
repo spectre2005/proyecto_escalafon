@@ -36,11 +36,13 @@ class LegajoSeccion extends Model
         ];
     }
 
+    /** @return BelongsTo<Legajo, $this> */
     public function legajo(): BelongsTo
     {
         return $this->belongsTo(Legajo::class, 'legajo_id', 'id');
     }
 
+    /** @return BelongsTo<SeccionLegajo, $this> */
     public function seccionLegajo(): BelongsTo
     {
         return $this->belongsTo(SeccionLegajo::class, 'seccion_legajo_id', 'id');

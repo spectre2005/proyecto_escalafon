@@ -96,8 +96,10 @@ Generales:
 
 Documentos y sección 02 (TODO en el código):
 8. Recepción (art. 4.5): el sello y la firma son físicos; ¿quien sube puede recepcionar su propia carga? Hoy se permite (`DocumentoLegajoController::recepcionar`).
-9. Cifrado en reposo y antivirus de los PDF (`CargaDocumento`).
-10. ¿Un documento "observado" cuenta como presente o cargado? (`EstadoDocumento`, `ResumenSeccion02`).
+9. Cifrado en reposo de los PDF (`CargaDocumento`): ¿cifrado propio de la aplicación o del disco del servidor? El
+   antivirus ya está hecho (23/11/2026, ClamAV).
+10. ~~¿Un documento "observado" cuenta como presente o cargado?~~ Decidido: está en el legajo («cargado») pero no
+    cuenta como aprobado y los reportes lo listan como pendiente (CLAUDE.md, «Documentos ya validados»).
 11. Qué documento de formalización (c a g) corresponde a cada régimen, y si b) aplica a todo el personal de confianza (`Seccion02CatalogoSeeder`).
 12. ¿Anular un vínculo debe anular sus adendas, inducciones y períodos de prueba? (`Seccion02Controller::anularRegistro`).
 13. Fin efectivo del vínculo: ¿la fecha de fin de la última adenda? (`Seccion02Controller::vinculo`).
@@ -212,6 +214,27 @@ Consulta de identidad por DNI en el registro manual (20/10/2026, rama `feature/c
     21/10/2026: el equipo acepta **Factiliza** (servicio externo de pago, no oficial) como proveedor, solo en el registro
     manual (`IDENTIDAD_PROVEEDOR=factiliza` + `FACTILIZA_TOKEN`), sin guardar las respuestas. Pendiente: confirmar con el
     cliente el envío del DNI a ese tercero (Ley 29733), quién paga el plan y su cuota.
+
+Revisión del compañero con agentes sobre main f257142 (23/11/2026). Verificado en el código, **pendiente de ejecutar**
+hasta que el usuario lo confirme:
+35. Urgentes, en este orden:
+    (a) Fuga de datos sensibles (art. 6.2): `GET /expedientes/{u}/{sección}` (`ExpedienteController::section`) devuelve
+        requerimientos-documentos, notificaciones-usuario, bitacora-accesos-legajo y auditoria-eventos sin filtrar a
+        quien tiene `legajo.ver` sin `datos_sensibles.ver` (asistente_legajo y suplente_legajo). El frontend no pide
+        esas pestañas, pero la API sí responde.
+    (b) Contador y lista «Documentos» del directorio (`ExpedienteController::index`): cuentan anulados, documentos de
+        legajos pasivos y tipos sensibles de otras secciones (p. ej. descanso médico de la 05).
+    (c) Quien sube no puede observar ni anular su carga en 03, 04, 06 y 08 (`RevisionDocumento.php:45`), y el botón
+        «Aceptar» (409, pide «recepción, sello y folios») sigue en pantalla: restos del flujo anterior que contradicen
+        la aceptación directa del 27/10 (con una sola persona en la ORH no se podrían anular nunca).
+    (d) El frontend consulta la API cada segundo por lista visible (`useLiveQuery.js`) y reintenta sin pausa.
+    (e) Marca UNIQ en el repositorio (`frontend/src/assets/uniq-logo.png`, `uniq_logo.jpg`, `campus-uniq.webp`,
+        `.env.example`, fábricas y seeders), contra la regla de producto sin marcas de entidad.
+    Después: índices en la base, restricciones únicas (número de legajo, un legajo activo por persona, sección por
+    legajo) y revisar la cadena de hashes de la auditoría (no verificado aún).
+    Ninguna decisión tomada (aceptación directa, módulos desactivables, requerimientos por correo) vuelve innecesarios
+    (a)–(e). El «composer audit» con 9 avisos del informe es del `vendor/` desactualizado del compañero: en main está
+    limpio.
 
 ## Hoja de ruta del sistema institucional (por definir, analizado el 13/10/2026)
 
@@ -597,3 +620,57 @@ Decisiones pendientes del cliente que salieron de la revisión (no se tocaron):
   régimen. Mientras tanto todos aplican a todos y los requerimientos automáticos los piden a la vez.
 - (c) Quién entrega cada tipo de documento (servidor, entidad u ORH por consulta): hoy Requerimientos ofrece los 87
   tipos, incluidos los que emite la propia institución (resoluciones, contrato, informe de ORH, liquidación).
+
+## Antivirus de los archivos (23/11/2026, rama feature/endurecimiento-revision)
+
+Todo archivo que entra se revisa con ClamAV (contenedor `clamav`) **antes** de guardarse: PDF del legajo
+(`CargaDocumento`), PDF de las entregas manuales de requerimientos, adjuntos de Gmail, PDF del escáner con IA y logo
+de la institución. Código en `app/Support/Antivirus/`, configuración en `config/antivirus.php`.
+- Infectado: se rechaza (422 con el nombre de la amenaza), no toca el disco y queda en el log. En Gmail, el adjunto
+  no se incorpora y la respuesta muestra el aviso.
+- Antivirus caído: la subida se rechaza (503); ningún archivo entra sin revisar. Gmail no registra el correo y lo
+  reintenta en la siguiente revisión.
+- `archivos_documento.estado_antivirus` pasa a `limpio`. Las vistas ya bloqueaban ver y descargar los `infectado`.
+- `php artisan antivirus:escanear` revisa los PDF guardados que siguen `pendiente` (cada día a las 02:30) y
+  `--todos` vuelve a revisar todos con las firmas nuevas (domingos 03:30). Solo cambia el estado del antivirus.
+- `ANTIVIRUS_DRIVER=ninguno` solo para desarrollo sin el contenedor (los archivos quedan `pendiente`); en producción
+  se ignora y `produccion:verificar` lo rechaza.
+- ClamAV necesita ~1,5 GB de RAM: el servidor pasa a 4 GB como mínimo.
+- **No cubierto:** los adjuntos de requerimientos guardados antes de hoy (están en `seguimiento`, no en
+  `archivos_documento`) no los revisa el comando.
+
+## Decisiones provisionales en el código (23/11/2026)
+
+Lo que el código marca como «Pendiente del cliente» (antes «TODO pendiente de confirmar»): funciona con una decisión
+provisional y espera la respuesta del cliente. No es trabajo sin terminar. Se buscan con
+`grep -rn "Pendiente del cliente" backend frontend/src`.
+
+| Tema | Decisión provisional | Dónde |
+|---|---|---|
+| Vigencia del vínculo | Un vínculo vencido sin cese sigue vigente | `Support/SituacionLaboral.php` |
+| Ratificaciones docentes (7.2) | Se enlazan a «Resolución de progresión en la carrera» | `Support/Seccion07.php`, `Documentos/FormulariosDatos.php` |
+| Aviso de ratificación | 90 días antes | `Support/Seccion07.php` |
+| Ciclo de evaluación | El del año en curso | `Support/Seccion07.php` |
+| Acta 7.1 b) | No se enlaza a una evaluación; se avisa si hay planes de mejora sin acta | `Seccion07Controller` |
+| Corregir registros de la 07 | Se permite aunque el documento esté aceptado | `Seccion07Controller::update` |
+| Calificación (07) | Sin `seccion07.ver_calificacion` no se envían calificación ni puntaje | `Seccion07Controller` |
+| Afiliaciones EPS / seguro social / otro | La sección 09 solo gestiona sindicato | `Support/Seccion09.php` |
+| Controversias (09) | Un documento por registro, colectivas solo en un legajo, estado opcional | `Support/Seccion09.php`, `Seccion09Controller` |
+| Desvinculación (11) | g) exige plazo determinado; c) admite cualquier motivo; f) no se enlaza con 06 d); no se registra con legajo pasivo | `Support/Seccion11.php`, `Seccion11Controller` |
+| Datos de salud (05) | Solo el descanso médico | `Support/Seccion05.php` |
+| Rol de vacaciones (05) | Solo documento | `Support/Seccion05.php` |
+| Anexo 01 o 05 (01) | Las declaraciones solo del Anexo 05 se muestran aparte | `Support/Seccion01.php`, `Seccion01Panel.jsx` |
+| Documentos g, i, j (01) | Dependen de la bandera de derechohabientes (pregunta 18) | `ExigenciasSeccion01.php`, `AplicacionDocumental.php` |
+| Cambio de tipo de personal (02) | No exige vínculo nuevo | `Seccion02Controller` |
+| Perfil del puesto (02) | Se corrige en el mismo registro, sin historial | `Seccion02Controller` |
+| Anular vínculo (02) | No anula adendas, inducciones ni períodos de prueba | `Seccion02Controller` |
+| Fin efectivo del vínculo | `fecha_fin` de la última adenda o `fecha_fin_prevista` | `Seccion02Controller` |
+| Recepción propia | Quien sube puede recepcionar su carga (la recepción es opcional) | `DocumentoLegajoController::recepcionar` |
+| Apertura del legajo | Formato digital, sin ubicación física | `AperturaLegajoController` |
+| Aviso de vencimiento del vínculo | 30 días calendario | `config/legajo.php` |
+| Tamaño máximo del PDF | 2048 KB | `config/legajo.php` |
+| Número de legajo | `LEG-{año}-` + 6 dígitos, reinicia cada año | `config/legajo.php` |
+
+Ya no están pendientes (decididos al aceptar los documentos ya validados, 27/10/2026): si «completa» exige
+verificación (no) y si un documento observado cuenta como aprobado (no: `EstadoDocumento::aprobado` lo excluye
+desde el 23/11/2026, junto con falso y anulado; antes, uno observado con recepción registrada salía aprobado).

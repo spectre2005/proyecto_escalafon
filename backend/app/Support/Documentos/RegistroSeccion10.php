@@ -26,8 +26,8 @@ final class RegistroSeccion10
             $anterior = null;
             if ($subsana) {
                 $anterior = DocumentoUsuario::query()->where('usuario_id', $persona->id)->where('legajo_id', $legajo->id)
-                    ->where('seccion_legajo_id', 10)->where('tipo_documento_id', $tipo->id)->where('estado', '!=', 'anulado')
-                    ->whereDoesntHave('documentosUsuarioPorSubsanaADocumento')->lockForUpdate()->find($subsana);
+                    ->where('seccion_legajo_id', 10)->where('tipo_documento_id', $tipo->id)->noAnulados()
+                    ->sinSubsanar()->lockForUpdate()->find($subsana);
                 if (! $anterior || ($datos['pendiente'] ?? false)) {
                     throw ValidationException::withMessages(['subsana_a_documento_id' => 'Adjunta un PDF para completar o subsanar un documento vigente de esta persona y tipo.']);
                 }
@@ -115,7 +115,7 @@ final class RegistroSeccion10
     {
         $legajo = Legajo::query()->where('usuario_id', $usuario)->where('estado_legajo', 'activo')
             ->orderByDesc('fecha_apertura')->orderByDesc('id')->lockForUpdate()->first();
-        abort_unless($legajo, 409, 'Primero abre el legajo de esta persona.');
+        abort_unless($legajo !== null, 409, 'Primero abre el legajo de esta persona.');
 
         return $legajo;
     }

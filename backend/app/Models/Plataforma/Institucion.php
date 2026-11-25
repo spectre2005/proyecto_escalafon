@@ -68,6 +68,7 @@ class Institucion extends Model
         return ['modulos_sistema' => 'array', 'aprovisionada_en' => 'datetime', 'suspendida_en' => 'datetime', 'dias_gracia' => 'integer', 'contrato_inicio' => 'date:Y-m-d', 'sunat_consultado_en' => 'datetime'];
     }
 
+    /** @return HasMany<Respaldo, $this> */
     public function respaldos(): HasMany
     {
         return $this->hasMany(Respaldo::class, 'institucion_id');
@@ -95,6 +96,7 @@ class Institucion extends Model
             'atrasado' => $this->aprovisionada() && ($correcto === null || $correcto->lt(now()->subHours(Respaldo::HORAS_AVISO)))];
     }
 
+    /** @return HasMany<PeriodoServicio, $this> */
     public function periodos(): HasMany
     {
         return $this->hasMany(PeriodoServicio::class, 'institucion_id');

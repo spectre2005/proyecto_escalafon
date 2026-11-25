@@ -462,8 +462,8 @@ class ExpedienteController extends Controller
         }
         if (in_array($section, ['compensaciones-beneficios', 'tiempo-servicios-reconocidos'], true)) {
             $query->where(fn ($datos) => $datos->whereNull('documento_id')->orWhereHas('documento',
-                fn ($doc) => $doc->where('seccion_legajo_id', '!=', 6)->orWhere(fn ($actual) => $actual->where('estado', '!=', 'anulado')
-                    ->whereDoesntHave('documentosUsuarioPorSubsanaADocumento'))));
+                fn ($doc) => $doc->where('seccion_legajo_id', '!=', 6)->orWhere(fn ($actual) => $actual->noAnulados()
+                    ->sinSubsanar())));
         }
         // Vínculos y adendas anulados no salen en los listados (se ven aparte, en la sección 02).
         if (in_array($section, ['vinculos-laborales', 'vinculo-adendas'], true)) {

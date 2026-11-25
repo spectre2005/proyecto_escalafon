@@ -38,21 +38,25 @@ class BitacoraAccesoLegajo extends Model
         ];
     }
 
+    /** @return BelongsTo<Legajo, $this> */
     public function legajo(): BelongsTo
     {
         return $this->belongsTo(Legajo::class, 'legajo_id', 'id');
     }
 
+    /** @return BelongsTo<DocumentoUsuario, $this> */
     public function documento(): BelongsTo
     {
         return $this->belongsTo(DocumentoUsuario::class, 'documento_id', 'id');
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'usuario_id', 'id');
     }
 
+    /** @return BelongsTo<SolicitudAccesoLegajo, $this> */
     public function solicitudAcceso(): BelongsTo
     {
         return $this->belongsTo(SolicitudAccesoLegajo::class, 'solicitud_acceso_id', 'id');

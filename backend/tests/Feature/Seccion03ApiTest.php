@@ -117,7 +117,7 @@ class Seccion03ApiTest extends TestCase
         $this->assertDatabaseHas('formacion_academica', ['documento_id' => $id, 'numero_registro_sunedu' => 'REG-001', 'registrado_por' => $this->autor->id]);
         $this->assertDatabaseHas('historial_estados_documento', ['documento_usuario_id' => $id, 'estado_nuevo' => 'aceptado', 'cambiado_por' => $this->autor->id]);
         $this->assertDatabaseHas('auditoria_eventos', ['entidad_id' => $id, 'accion' => 'formacion.documento.creado', 'actor_usuario_id' => $this->autor->id]);
-        $this->assertSame('pendiente', $doc->archivo->estado_antivirus);
+        $this->assertSame('limpio', $doc->archivo->estado_antivirus);
         $this->assertSame(hash('sha256', Storage::disk(config('legajo.disco_documentos'))->get($doc->archivo->storage_path)), $doc->archivo->hash_sha256);
         $this->assertDatabaseHas('legajo_secciones', ['legajo_id' => $this->legajo->id, 'seccion_legajo_id' => 3, 'ultimo_folio' => 1]);
         $this->assertSame($this->persona->numero_doc_identidad, $doc->titular_documento);

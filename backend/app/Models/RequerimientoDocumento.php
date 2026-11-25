@@ -57,26 +57,31 @@ class RequerimientoDocumento extends Model
         ];
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'usuario_id', 'id');
     }
 
+    /** @return BelongsTo<TipoDocumento, $this> */
     public function tipoDocumento(): BelongsTo
     {
         return $this->belongsTo(TipoDocumento::class, 'tipo_documento_id', 'id');
     }
 
+    /** @return BelongsTo<DocumentoUsuario, $this> */
     public function documento(): BelongsTo
     {
         return $this->belongsTo(DocumentoUsuario::class, 'documento_id', 'id');
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function solicitadoPor(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'solicitado_por', 'id');
     }
 
+    /** @return HasMany<NotificacionUsuario, $this> */
     public function notificacionesUsuario(): HasMany
     {
         return $this->hasMany(NotificacionUsuario::class, 'requerimiento_id', 'id');

@@ -50,21 +50,25 @@ class SolicitudAccesoLegajo extends Model
         ];
     }
 
+    /** @return BelongsTo<Legajo, $this> */
     public function legajo(): BelongsTo
     {
         return $this->belongsTo(Legajo::class, 'legajo_id', 'id');
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function solicitanteUsuario(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'solicitante_usuario_id', 'id');
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function resueltaPor(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'resuelta_por', 'id');
     }
 
+    /** @return HasMany<BitacoraAccesoLegajo, $this> */
     public function bitacoraAccesosLegajo(): HasMany
     {
         return $this->hasMany(BitacoraAccesoLegajo::class, 'solicitud_acceso_id', 'id');

@@ -86,7 +86,7 @@ class Seccion04ApiTest extends TestCase
         $this->assertDatabaseHas('experiencia_laboral', ['documento_id' => $id, 'registrado_por' => $this->autor->id, 'sector' => 'publico', 'tipo_vinculo' => 'planilla']);
         $this->assertDatabaseHas('historial_estados_documento', ['documento_usuario_id' => $id, 'estado_nuevo' => 'aceptado']);
         $this->assertDatabaseHas('auditoria_eventos', ['entidad_id' => $id, 'accion' => 'experiencia.documento.creado']);
-        $this->assertSame('pendiente', $doc->archivo->estado_antivirus);
+        $this->assertSame('limpio', $doc->archivo->estado_antivirus);
         $this->assertSame(hash('sha256', Storage::disk(config('legajo.disco_documentos'))->get($doc->archivo->storage_path)), $doc->archivo->hash_sha256);
         $this->getJson($this->url())->assertOk()->assertJsonPath('data.numero_folios', 1)->assertJsonPath('data.folio_sugerido', 2)->assertJsonPath('data.tiempo.total.dias_totales', 10);
         ParametroSistema::query()->where('clave', 'exp_incluir_pendientes')->update(['valor' => '1']);

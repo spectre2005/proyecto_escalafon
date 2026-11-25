@@ -29,7 +29,7 @@ final class Seccion05
 
     /**
      * Tipos de registro que son datos de salud (Directiva, num. 6.2: se leen solo con datos_sensibles.ver).
-     * TODO pendiente de confirmar con el cliente: si otras licencias (p. ej. asistencia médica a un familiar)
+     * Pendiente del cliente: si otras licencias (p. ej. asistencia médica a un familiar)
      * también se tratan como datos de salud.
      */
     public const DATOS_SALUD = ['descanso_medico'];
@@ -45,7 +45,7 @@ final class Seccion05
         'S05_DESCANSO_MEDICO' => ['licencias', ['descanso_medico']],
         'S05_B_GOCE_VACACIONAL' => ['vacaciones', ['goce']],
         'S05_C_ADELANTO_POSTERGACION' => ['vacaciones', ['adelanto', 'postergacion']],
-        // TODO pendiente de confirmar con el cliente: si el rol de vacaciones es solo un documento o también datos estructurados.
+        // Pendiente del cliente: si el rol de vacaciones es solo un documento o también datos estructurados.
         'S05_D_ROL_VACACIONES' => ['vacaciones', null],
         'S05_OTROS_UNIVERSIDAD' => ['otros', null],
     ];

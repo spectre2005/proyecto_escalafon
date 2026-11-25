@@ -24,7 +24,7 @@ final class Seccion11
 
     /**
      * Código del tipo de documento => [bloque, literal, acredita el registro (principal), motivos de cese admitidos (null = todos)].
-     * TODO pendiente de confirmar con el cliente:
+     * Pendiente del cliente:
      * - g) es del régimen del DL 1057: se exige que el vínculo sea de plazo determinado; el catálogo de regímenes
      *   normativos aún no permite identificar el DL 1057 por código.
      * - c) "memorando (o documento) de término de vínculo" admite cualquier motivo de cese (la directiva no lo precisa).

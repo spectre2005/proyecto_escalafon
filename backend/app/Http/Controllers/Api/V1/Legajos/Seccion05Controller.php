@@ -239,7 +239,7 @@ class Seccion05Controller extends Controller
     private function exigirLegajo(string $usuario): void
     {
         Usuario::query()->findOrFail($usuario);
-        abort_unless($this->legajoAbierto($usuario), 409, 'La persona no tiene un legajo abierto. Primero se debe abrir su legajo.');
+        abort_unless($this->legajoAbierto($usuario) !== null, 409, 'La persona no tiene un legajo abierto. Primero se debe abrir su legajo.');
     }
 
     /** Documento recién subido que el registro acredita: de esta persona, con este formulario y compatible con el tipo de movimiento. */

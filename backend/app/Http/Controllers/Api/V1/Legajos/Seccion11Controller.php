@@ -236,11 +236,11 @@ class Seccion11Controller extends Controller
         return Legajo::query()->where('usuario_id', $usuario)->where('estado_legajo', 'activo')->orderByDesc('fecha_apertura')->first();
     }
 
-    /** TODO pendiente de confirmar con el cliente: si se registra la desvinculación con el legajo ya pasivo (hoy no). */
+    /** Pendiente del cliente: si se registra la desvinculación con el legajo ya pasivo (hoy no). */
     private function exigirLegajo(string $usuario): void
     {
         Usuario::query()->findOrFail($usuario);
-        abort_unless($this->legajoAbierto($usuario), 409, 'La persona no tiene un legajo abierto (activo). Primero se debe abrir su legajo.');
+        abort_unless($this->legajoAbierto($usuario) !== null, 409, 'La persona no tiene un legajo abierto (activo). Primero se debe abrir su legajo.');
     }
 
     /** Valida y rechaza campos que no son del formulario (autor, anulación, persona, etc.). */

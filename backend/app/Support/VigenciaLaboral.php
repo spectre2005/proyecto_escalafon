@@ -3,8 +3,8 @@
 namespace App\Support;
 
 use App\Models\VinculoLaboral;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Carbon;
 
 /** Fechas efectivas incluidas, según el día institucional de Lima. */
 final class VigenciaLaboral
@@ -28,7 +28,7 @@ final class VigenciaLaboral
             ->where(fn (Builder $q) => $q->whereRaw("{$fin} IS NULL", [false])->orWhereRaw("DATE({$fin}) >= ?", [false, $fecha]));
     }
 
-    public static function fin(VinculoLaboral $vinculo): ?Carbon
+    public static function fin(VinculoLaboral $vinculo): ?CarbonInterface
     {
         $adenda = $vinculo->vinculoAdendas->where('anulado', false)->sort(function ($a, $b): int {
             return [$b->fecha_inicio?->format('Y-m-d'), $b->created_at?->format('Y-m-d H:i:s.u'), $b->id]

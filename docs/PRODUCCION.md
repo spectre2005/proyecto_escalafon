@@ -13,12 +13,14 @@ idéntico a producción. El `docker-compose.yml` de la raíz es solo para desarr
 | `worker` | Trabajos en cola (`queue:work`), cada uno con la base y los archivos de su institución. |
 | `scheduler` | Tareas programadas (`schedule:work`): cada minuto `legajo:recibir-respuestas` revisa el Gmail conectado de cada institución activa. Sin Gmail conectado no hace nada. |
 | `db` | PostgreSQL 16, sin puerto público. Una base por institución, más la de la plataforma. |
+| `clamav` | Antivirus ClamAV, sin puerto público. Revisa cada archivo antes de guardarlo; si no responde, la subida se rechaza. Actualiza sus firmas solo. |
 
-Volúmenes persistentes: `postgres` (bases), `storage` (PDF, fotos, sesiones, caché) y `caddy_datos` (certificados).
+Volúmenes persistentes: `postgres` (bases), `storage` (PDF, fotos, sesiones, caché), `caddy_datos` (certificados) y
+`clamav_firmas` (firmas del antivirus).
 
 ## Requisitos
 
-- Servidor Linux con Docker y el plugin `docker compose` (2 GB de RAM como mínimo; 4 GB recomendados).
+- Servidor Linux con Docker y el plugin `docker compose` (4 GB de RAM como mínimo, 6 GB recomendados: ClamAV usa ~1,5 GB).
 - Puertos 80 y 443 abiertos hacia el servidor.
 - Un dominio para la plataforma, por ejemplo `escalafon.pe`, con dos registros DNS hacia la IP del servidor:
   - `A escalafon.pe` (panel de plataforma)
@@ -206,11 +208,15 @@ aplica las migraciones pendientes:
   `/expedientes`. `API_CRUD_GENERICO_ESCRITURA=true` lo abriría: no hacerlo sin auditar antes cada recurso.
 - Caddy agrega HSTS y cabeceras de seguridad, limita las peticiones a 4 MB y solo pasa a PHP `/api`, `/sanctum` y `/up`.
 - PostgreSQL no publica su puerto.
+- Antivirus: todo archivo (PDF del legajo, entregas, adjuntos de Gmail, escáner, logo) se revisa con ClamAV antes de
+  guardarse. Al arrancar, ClamAV tarda unos minutos en cargar sus firmas y mientras tanto las subidas se rechazan.
+  Los PDF cargados antes del antivirus se revisan con `php artisan antivirus:escanear` (también lo hace el scheduler
+  cada noche).
 - `.env.produccion` y `respaldos/` están en `.gitignore`, pero eso no impide un `git add -f`: los respaldos con datos
   reales conviene guardarlos fuera del repositorio (`RESPALDO_DIR`), y los protegidos lo exigen.
 
 **Pendiente antes de recibir datos reales:**
-- Cifrado en reposo de los PDF (pendiente 9 de `ESTADO_PROYECTO.md`) y antivirus de las cargas.
+- Cifrado en reposo de los PDF (pendiente 9 de `ESTADO_PROYECTO.md`).
 - La aplicación usa el usuario administrador de PostgreSQL (lo necesita para crear las bases al aprovisionar).
   Separar un usuario con permisos mínimos para la operación diaria.
 - Configurar la copia externa cifrada de los respaldos (`RESPALDO_REMOTO`, «Copia externa cifrada») y programar

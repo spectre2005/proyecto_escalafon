@@ -25,16 +25,19 @@ class RecursoImpugnatorio extends Model
         return ['fecha' => 'date', 'created_at' => 'datetime', 'updated_at' => 'datetime'];
     }
 
+    /** @return BelongsTo<Sancion, $this> */
     public function sancion(): BelongsTo
     {
         return $this->belongsTo(Sancion::class, 'sancion_id', 'id');
     }
 
+    /** @return BelongsTo<DocumentoUsuario, $this> */
     public function documento(): BelongsTo
     {
         return $this->belongsTo(DocumentoUsuario::class, 'documento_id', 'id');
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function registradoPor(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'registrado_por', 'id');

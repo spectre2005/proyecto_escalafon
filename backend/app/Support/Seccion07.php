@@ -27,7 +27,7 @@ final class Seccion07
      * Código del tipo de documento => [subsección, literal, formulario_datos, tipos de desplazamiento que acredita].
      * 7.2 a): progresiones_carrera para administrativos; para docentes el mismo documento acredita una ratificación o
      * promoción (FormulariosDatos::ALTERNATIVOS).
-     * TODO pendiente de confirmar con el cliente: la directiva no menciona las ratificaciones docentes; se enlazan al
+     * Pendiente del cliente: la directiva no menciona las ratificaciones docentes; se enlazan al
      * tipo "Resolución de progresión en la carrera".
      */
     public const TIPOS_DOCUMENTO = [
@@ -46,13 +46,13 @@ final class Seccion07
 
     /**
      * Días de anticipación para avisar que vence el período de una ratificación docente.
-     * TODO pendiente de confirmar con el cliente: cuántos días de anticipación.
+     * Pendiente del cliente: cuántos días de anticipación.
      */
     public const DIAS_AVISO_RATIFICACION = 90;
 
     /**
      * Ciclo de evaluación cuyo registro se espera (aviso sin bloqueo): el del año en curso.
-     * TODO pendiente de confirmar con el cliente: si el ciclo a revisar es el del año en curso o el del año anterior.
+     * Pendiente del cliente: si el ciclo a revisar es el del año en curso o el del año anterior.
      */
     public static function cicloEnCurso(): int
     {

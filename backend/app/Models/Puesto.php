@@ -38,6 +38,7 @@ class Puesto extends Model
         });
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function registradoPor(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'registrado_por', 'id');

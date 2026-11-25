@@ -67,6 +67,7 @@ final class ModulosSistema
 
         $resultado = DB::connection('plataforma')->transaction(function () use ($institucion, $codigo, $activa, $esperada, $motivo, $request): Institucion {
             $registro = Institucion::query()->lockForUpdate()->findOrFail($institucion->id);
+            /** @var array<string, array{activa?: bool}> $modulos */
             $modulos = $registro->modulos_sistema ?? [];
             $antes = $modulos[$codigo]['activa'] ?? true;
             self::comprobarEstado($antes, $esperada, $activa);

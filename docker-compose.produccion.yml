@@ -55,6 +55,15 @@ services:
     depends_on:
       - app
 
+  # Antivirus (config/antivirus.php): todo archivo se revisa antes de guardarse y, si no responde, la subida se
+  # rechaza. Sin puerto publicado. Necesita ~1,5 GB de RAM y unos minutos al arrancar para cargar sus firmas, que
+  # actualiza solo (freshclam) y guarda en su volumen.
+  clamav:
+    image: clamav/clamav:1.4.3
+    restart: unless-stopped
+    volumes:
+      - clamav_firmas:/var/lib/clamav
+
   db:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -74,6 +83,7 @@ services:
       - ./docker/produccion/initdb:/docker-entrypoint-initdb.d:ro
 
 volumes:
+  clamav_firmas:
   storage:
   postgres:
   caddy_datos:

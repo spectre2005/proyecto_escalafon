@@ -14,6 +14,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
+use Tests\Fixtures\AntivirusFalso;
 use Tests\TestCase;
 
 class SolicitudLegajoTest extends TestCase
@@ -203,5 +204,27 @@ class SolicitudLegajoTest extends TestCase
             'descripcion' => 'Plazo de hoy en Perú', 'fecha_limite' => '2026-10-21'])
             ->assertCreated()->assertJsonPath('data.fecha_requerimiento', fn (string $fecha): bool => str_starts_with($fecha, '2026-10-21'));
         $this->getJson('/api/v1/solicitudes-legajo')->assertOk()->assertJsonPath('data.0.atrasado', false);
+    }
+
+    public function test_manual_delivery_pdf_is_scanned_and_infected_files_are_rejected(): void
+    {
+        Storage::fake(config('legajo.disco_documentos'));
+        $this->actuarComo();
+        $u = $this->titular();
+        $id = $this->crear($u);
+        $datos = ['remitente' => $u->email_institucional, 'referencia_correo' => 'Correo recibido de prueba', 'mensaje' => 'Adjunto el documento'];
+        $infectado = UploadedFile::fake()->createWithContent('entrega.pdf', "%PDF-1.4\n1 0 obj<</Type/Pages/Count 1>>endobj\n%".AntivirusFalso::EICAR."\n%%EOF\n");
+
+        $this->post('/api/v1/solicitudes-legajo/'.$id.'/registrar-entrega', [...$datos, 'pdf' => $infectado], ['Accept' => 'application/json'])
+            ->assertUnprocessable()->assertJsonValidationErrors('pdf');
+        $this->antivirus->caido = true;
+        $limpio = UploadedFile::fake()->createWithContent('entrega.pdf', "%PDF-1.4\n1 0 obj<</Type/Pages/Count 1>>endobj\n%%EOF\n");
+        $this->post('/api/v1/solicitudes-legajo/'.$id.'/registrar-entrega', [...$datos, 'pdf' => $limpio], ['Accept' => 'application/json'])->assertStatus(503);
+        $this->assertCount(0, Storage::disk(config('legajo.disco_documentos'))->allFiles());
+        $this->assertSame('abierto', RequerimientoDocumento::query()->findOrFail($id)->estado);
+
+        $this->antivirus->caido = false;
+        $this->post('/api/v1/solicitudes-legajo/'.$id.'/registrar-entrega', [...$datos, 'pdf' => $limpio], ['Accept' => 'application/json'])->assertOk();
+        $this->assertCount(1, Storage::disk(config('legajo.disco_documentos'))->allFiles());
     }
 }

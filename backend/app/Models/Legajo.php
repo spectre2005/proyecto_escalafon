@@ -90,6 +90,7 @@ class Legajo extends Model
             'provincia', 'distrito', 'telefono', 'tiene_derechohabientes', 'con_discapacidad']));
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'usuario_id', 'id');
@@ -102,41 +103,49 @@ class Legajo extends Model
             ->orderByDesc('fecha_apertura')->orderByDesc('created_at')->orderByDesc('id')->first();
     }
 
+    /** @return HasMany<LegajoSeccion, $this> */
     public function legajoSecciones(): HasMany
     {
         return $this->hasMany(LegajoSeccion::class, 'legajo_id', 'id');
     }
 
+    /** @return HasMany<DocumentoUsuario, $this> */
     public function documentosUsuario(): HasMany
     {
         return $this->hasMany(DocumentoUsuario::class, 'legajo_id', 'id');
     }
 
+    /** @return HasMany<CompromisoEntregaOriginal, $this> */
     public function compromisosEntregaOriginales(): HasMany
     {
         return $this->hasMany(CompromisoEntregaOriginal::class, 'legajo_id', 'id');
     }
 
+    /** @return HasMany<ReferenciaLegajoPasivo, $this> */
     public function referenciasLegajoPasivo(): HasMany
     {
         return $this->hasMany(ReferenciaLegajoPasivo::class, 'legajo_id', 'id');
     }
 
+    /** @return HasMany<SolicitudAccesoLegajo, $this> */
     public function solicitudesAccesoLegajo(): HasMany
     {
         return $this->hasMany(SolicitudAccesoLegajo::class, 'legajo_id', 'id');
     }
 
+    /** @return HasMany<MovimientoCustodiaLegajo, $this> */
     public function movimientosCustodiaLegajo(): HasMany
     {
         return $this->hasMany(MovimientoCustodiaLegajo::class, 'legajo_id', 'id');
     }
 
+    /** @return HasMany<ProcesoFiscalizacion, $this> */
     public function procesosFiscalizacion(): HasMany
     {
         return $this->hasMany(ProcesoFiscalizacion::class, 'legajo_id', 'id');
     }
 
+    /** @return HasMany<BitacoraAccesoLegajo, $this> */
     public function bitacoraAccesosLegajo(): HasMany
     {
         return $this->hasMany(BitacoraAccesoLegajo::class, 'legajo_id', 'id');

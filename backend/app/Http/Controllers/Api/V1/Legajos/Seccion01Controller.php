@@ -179,7 +179,7 @@ class Seccion01Controller extends Controller
         abort_unless($record->pdf_path && $disk->exists($record->pdf_path), 404, 'Este registro no tiene un PDF disponible.');
         $legajo = Legajo::query()->where('usuario_id', $usuario)
             ->orderByRaw("CASE WHEN estado_legajo = 'activo' THEN 0 ELSE 1 END")->orderByDesc('fecha_apertura')->value('id');
-        abort_unless($legajo, 409, 'La persona no tiene legajo: no se puede registrar el acceso al PDF en la bitácora.');
+        abort_unless($legajo !== null, 409, 'La persona no tiene legajo: no se puede registrar el acceso al PDF en la bitácora.');
         BitacoraAccesoLegajo::query()->create([
             'legajo_id' => $legajo, 'documento_id' => null, 'usuario_id' => $request->user()->getAuthIdentifier(),
             'accion' => 'descargar', 'ip_origen' => $request->ip(), 'user_agent' => mb_substr((string) $request->userAgent(), 0, 300), 'fecha_acceso' => now(),

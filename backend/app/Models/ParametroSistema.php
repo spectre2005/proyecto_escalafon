@@ -35,6 +35,7 @@ class ParametroSistema extends Model
         ];
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function actualizadoPor(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'actualizado_por', 'id');

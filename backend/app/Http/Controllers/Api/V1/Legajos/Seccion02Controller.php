@@ -213,7 +213,7 @@ class Seccion02Controller extends Controller
     /**
      * Con datos del puesto registrados (perfil_docente o perfil_administrativo), el tipo de personal del vínculo no se
      * cambia: el perfil quedaría sin relación válida. No se borra ni se reescribe el perfil.
-     * TODO pendiente de confirmar con el cliente: si cambiar de tipo exige registrar un vínculo nuevo.
+     * Pendiente del cliente: si cambiar de tipo exige registrar un vínculo nuevo.
      */
     private function exigirTipoSinDatosPuesto(VinculoLaboral $vinculo, array $cambios): void
     {
@@ -230,7 +230,7 @@ class Seccion02Controller extends Controller
     /**
      * Registrar o corregir los datos del puesto (perfil_docente o perfil_administrativo) de un vínculo. Igual que el
      * vínculo: solo mientras no tenga fecha de cese ni esté anulado. Las tablas de perfil no tienen anulación.
-     * TODO pendiente de confirmar con el cliente: si el perfil debe conservar historial (hoy se corrige en el mismo registro).
+     * Pendiente del cliente: si el perfil debe conservar historial (hoy se corrige en el mismo registro).
      */
     public function guardarDatosPuesto(Request $request, string $usuario, string $vinculo): JsonResource|JsonResponse
     {
@@ -336,7 +336,7 @@ class Seccion02Controller extends Controller
             ? VinculoAdenda::query()->whereHas('vinculoLaboral', fn ($q) => $q->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id))
             : $modelo::query()->where('usuario_id', $usuario)->delLegajo(Legajo::paraConsulta($usuario)?->id);
 
-        // TODO pendiente de confirmar con el cliente: anular un vínculo no anula sus adendas, inducciones ni
+        // Pendiente del cliente: anular un vínculo no anula sus adendas, inducciones ni
         // períodos de prueba (quedan registrados; el vínculo ya no recibe registros nuevos).
         return $this->anular($request, $query->findOrFail($registro));
     }
@@ -348,7 +348,7 @@ class Seccion02Controller extends Controller
 
     /**
      * Vínculo con su vigencia, sus adendas en orden cronológico y su fin efectivo.
-     * TODO pendiente de confirmar con el cliente: se toma como fin efectivo la fecha_fin de la última adenda
+     * Pendiente del cliente: se toma como fin efectivo la fecha_fin de la última adenda
      * (la de inicio más reciente) y, si no hay adendas, la fecha_fin_prevista del vínculo.
      *
      * @param  Collection<int, Induccion>  $inducciones
@@ -439,7 +439,7 @@ class Seccion02Controller extends Controller
     private function exigirLegajo(string $usuario): void
     {
         Usuario::query()->findOrFail($usuario);
-        abort_unless($this->legajoAbierto($usuario), 409, 'La persona no tiene un legajo abierto. Primero se debe abrir su legajo.');
+        abort_unless($this->legajoAbierto($usuario) !== null, 409, 'La persona no tiene un legajo abierto. Primero se debe abrir su legajo.');
     }
 
     /** Documento recién subido al que se enlaza el registro (el formulario se abre al subirlo). */

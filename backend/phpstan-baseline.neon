@@ -1,0 +1,229 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Instanceof between App\\Support\\Antivirus\\ClamAv and App\\Support\\Antivirus\\ClamAv will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: app/Console/Commands/VerificarProduccion.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\UnidadOrganica\:\:\$vinculos\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/V1/CatalogosVinculoController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\UnidadOrganica\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/V1/CatalogosVinculoController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Api\\V1\\EquipoAccesoController\:\:bloquear\(\) should return App\\Models\\UsuarioRol but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Controllers/Api/V1/EquipoAccesoController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array, Closure\(App\\Models\\UsuarioRol\)\: array given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/V1/EquipoAccesoController.php
+
+		-
+			message: '#^Call to an undefined method App\\Models\\Afiliacion\|App\\Models\\ArchivoDocumento\|App\\Models\\AuditoriaEvento\|App\\Models\\BitacoraAccesoLegajo\|App\\Models\\Capacitacion\|App\\Models\\CertificadoDiscapacidad\|App\\Models\\Colegiatura\|App\\Models\\CompensacionBeneficio\|App\\Models\\CompromisoDocumento\|App\\Models\\CompromisoEntregaOriginal\|App\\Models\\Controversia\|App\\Models\\DeclaracionVerificacion\|App\\Models\\Desplazamiento\|App\\Models\\Desvinculacion\|App\\Models\\DocumentoUsuario\|App\\Models\\EvaluacionDesempeno\|App\\Models\\ExperienciaLaboral\|App\\Models\\Familiar\|App\\Models\\FormacionAcademica\|App\\Models\\GoceVacacional\|App\\Models\\HistorialEstadoDocumento\|App\\Models\\Induccion\|App\\Models\\Legajo\|App\\Models\\LegajoSeccion\|App\\Models\\LicenciaPermiso\|App\\Models\\MovimientoCustodiaLegajo\|App\\Models\\NotificacionUsuario\|App\\Models\\ObservacionDocumento\|App\\Models\\PerfilAdministrativo\|App\\Models\\PerfilDocente\|App\\Models\\PeriodoPrueba\|App\\Models\\PeriodoVacacional\|App\\Models\\ProcesoFiscalizacion\|App\\Models\\ProgresionCarrera\|App\\Models\\RatificacionDocente\|App\\Models\\Reconocimiento\|App\\Models\\ReferenciaLegajoPasivo\|App\\Models\\RegistroSstBienestar\|App\\Models\\RequerimientoDocumento\|App\\Models\\Sancion\|App\\Models\\SolicitudAccesoLegajo\|App\\Models\\SolicitudFiscalizacion\|App\\Models\\TiempoServicioReconocido\|App\\Models\\TipoDocumento\|App\\Models\\UsuarioRol\|App\\Models\\VinculoAdenda\|App\\Models\\VinculoLaboral\:\:ubigeo\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/V1/Legajos/ExpedienteController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Legajo\>\:\:map\(\) expects \(callable\(App\\Models\\Afiliacion, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\ArchivoDocumento, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\AuditoriaEvento, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\BitacoraAccesoLegajo, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\Capacitacion, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\CertificadoDiscapacidad, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\Colegiatura, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\CompensacionBeneficio, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\CompromisoDocumento, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\CompromisoEntregaOriginal, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\Controversia, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\DeclaracionVerificacion, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\Desplazamiento, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\Desvinculacion, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\DocumentoUsuario, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\EvaluacionDesempeno, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\ExperienciaLaboral, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\Familiar, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\FormacionAcademica, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\GoceVacacional, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\HistorialEstadoDocumento, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\Induccion, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\Legajo, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\LegajoSeccion, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\LicenciaPermiso, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\MovimientoCustodiaLegajo, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\NotificacionUsuario, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\ObservacionDocumento, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\PerfilAdministrativo, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\PerfilDocente, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\PeriodoPrueba, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\PeriodoVacacional, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\ProcesoFiscalizacion, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\ProgresionCarrera, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\RatificacionDocente, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\Reconocimiento, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\ReferenciaLegajoPasivo, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\RegistroSstBienestar, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\RequerimientoDocumento, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\Sancion, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\SolicitudAccesoLegajo, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\SolicitudFiscalizacion, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\TiempoServicioReconocido, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\TipoDocumento, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\UsuarioRol, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\VinculoAdenda, int\)\: non\-empty\-array\)\|\(callable\(App\\Models\\VinculoLaboral, int\)\: non\-empty\-array\), Closure\(array\)\: non\-empty\-array given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/V1/Legajos/ExpedienteController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:filter\(\) expects \(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: bool\)\|null, Closure\(App\\Models\\VinculoLaboral\)\: bool given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/V1/Legajos/ExpedienteController.php
+
+		-
+			message: '#^Parameter \#1 \$array \(list\<array\{exigido\: mixed, literal\: mixed, nombre\: mixed, cargado\: mixed, recepcionado\: mixed\}\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: app/Http/Controllers/Api/V1/Legajos/Seccion01Controller.php
+
+		-
+			message: '#^Parameter \#1 \$registros of method App\\Http\\Controllers\\Api\\V1\\Legajos\\Seccion02Controller\:\:filas\(\) expects Illuminate\\Support\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Induccion\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/V1/Legajos/Seccion02Controller.php
+
+		-
+			message: '#^Parameter \#1 \$registros of method App\\Http\\Controllers\\Api\\V1\\Legajos\\Seccion02Controller\:\:filas\(\) expects Illuminate\\Support\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\PeriodoPrueba\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/V1/Legajos/Seccion02Controller.php
+
+		-
+			message: '#^Parameter \#1 \$registros of method App\\Http\\Controllers\\Api\\V1\\Legajos\\Seccion02Controller\:\:filas\(\) expects Illuminate\\Support\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\VinculoAdenda\> given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Api/V1/Legajos/Seccion02Controller.php
+
+		-
+			message: '#^Parameter \#1 \$registros of method App\\Http\\Controllers\\Api\\V1\\Legajos\\Seccion05Controller\:\:filas\(\) expects Illuminate\\Support\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\GoceVacacional\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/V1/Legajos/Seccion05Controller.php
+
+		-
+			message: '#^Parameter \#1 \$registros of method App\\Http\\Controllers\\Api\\V1\\Legajos\\Seccion05Controller\:\:filas\(\) expects Illuminate\\Support\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Support\\Collection\<int, App\\Models\\PeriodoVacacional\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/V1/Legajos/Seccion05Controller.php
+
+		-
+			message: '#^Parameter \#1 \$registros of method App\\Http\\Controllers\\Api\\V1\\Legajos\\Seccion07Controller\:\:filas\(\) expects Illuminate\\Support\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\EvaluacionDesempeno\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/V1/Legajos/Seccion07Controller.php
+
+		-
+			message: '#^Parameter \#1 \$items of static method App\\Support\\ResumenSeccion08\:\:resumen\(\) expects Illuminate\\Support\\Collection\<int, array\<string, mixed\>\>, Illuminate\\Support\\Collection\<int, array\{id\: string, codigo\: string, nombre\: string, permite_multiples\: bool, descripcion\: string\|null, requiere_docente\: bool, requiere_num_resolucion\: bool, letra\: string, \.\.\.\}\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/V1/Legajos/Seccion08Controller.php
+
+		-
+			message: '#^Parameter \#1 \$documentos of static method App\\Support\\ResumenSeccion10\:\:folios\(\) expects Illuminate\\Support\\Collection\<int, array\<string, mixed\>\>, Illuminate\\Support\\Collection\<int, array\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/V1/Legajos/Seccion10Controller.php
+
+		-
+			message: '#^Parameter \#2 \$documentos of static method App\\Support\\ResumenSeccion10\:\:item\(\) expects Illuminate\\Support\\Collection\<int, array\<string, mixed\>\>, Illuminate\\Support\\Collection\<int, array\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/V1/Legajos/Seccion10Controller.php
+
+		-
+			message: '#^Anonymous function should return App\\Models\\Desvinculacion but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Controllers/Api/V1/Legajos/Seccion11Controller.php
+
+		-
+			message: '#^Parameter \#1 \$registros of method App\\Http\\Controllers\\Api\\V1\\Legajos\\Seccion11Controller\:\:filas\(\) expects Illuminate\\Support\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Desvinculacion\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/V1/Legajos/Seccion11Controller.php
+
+		-
+			message: '#^Parameter \#1 \$registros of method App\\Http\\Controllers\\Api\\V1\\Legajos\\Seccion11Controller\:\:filas\(\) expects Illuminate\\Support\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Support\\Collection\<int, App\\Models\\Desvinculacion\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/V1/Legajos/Seccion11Controller.php
+
+		-
+			message: '#^Parameter \#2 \$registro of method App\\Http\\Controllers\\Api\\V1\\Legajos\\Seccion11Controller\:\:cerrarTrasCese\(\) expects App\\Models\\Desvinculacion, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/V1/Legajos/Seccion11Controller.php
+
+		-
+			message: '#^Dead catch \- Illuminate\\Database\\QueryException is never thrown in the try block\.$#'
+			identifier: catch.neverThrown
+			count: 1
+			path: app/Http/Controllers/Api/V1/ResourceController.php
+
+		-
+			message: '#^Dead catch \- Illuminate\\Contracts\\Encryption\\DecryptException is never thrown in the try block\.$#'
+			identifier: catch.neverThrown
+			count: 1
+			path: app/Models/Legajo.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Relations\\Relation\<\*, \*, \*\>\:\:noAnulados\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Support/ConsultaReportes.php
+
+		-
+			message: '#^Parameter \#1 \$persona of static method App\\Support\\ConsultaReportes\:\:contexto\(\) expects App\\Models\\Usuario, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 3
+			path: app/Support/ConsultaReportes.php
+
+		-
+			message: '#^Parameter \#2 \$persona of static method App\\Support\\ConsultaReportes\:\:pendientes\(\) expects App\\Models\\Usuario, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/ConsultaReportes.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\DocumentoUsuario\:\:\$subsanado_por\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Documentos/ExpedienteImprimible.php
+
+		-
+			message: '#^Result of && is always true\.$#'
+			identifier: booleanAnd.alwaysTrue
+			count: 2
+			path: app/Support/EmisionesPersonales.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between int and null will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 3
+			path: app/Support/EmisionesPersonales.php
+
+		-
+			message: '#^Parameter \#1 \$array \(array\{0\: ''Responde a este…'', 1\: non\-falsy\-string, 2\: non\-falsy\-string, 3\?\: ''No necesitas…''\}\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: app/Support/MensajeRequerimiento.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between bool and null will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Support/PerfilPendiente.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Relations\\HasMany\:\:etapaActual\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Support/PuestoActual.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Usuario\:\:\$tiene_legajo_activo\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/SituacionLaboral.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Usuario\:\:\$tiene_vinculo_vigente\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/SituacionLaboral.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Builder\:\:etapaActual\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Support/SituacionLaboral.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Builder\:\:etapaActual\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Support/VigenciaLaboral.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between Carbon\\Carbon and null will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: app/Support/VigenciaLaboral.php

@@ -5,16 +5,15 @@ namespace App\Support;
 /**
  * Resumen de la sección 02: estado de cada subsección y conteo de tipos de documento.
  *
- * No es la fórmula de completitud del legajo (decisión abierta del cliente: ¿cuentan los cargados, los
- * recepcionados o solo los verificados?). Por eso se entregan los números por separado, calculados con los
- * documentos reales (documentos_usuario). El estado "completa" de una subsección usa los cargados.
- * TODO pendiente de confirmar con el cliente: si "completa" debe exigir documentos verificados.
+ * Los documentos llegan ya validados (CLAUDE.md, «Documentos ya validados»): el estado "completa" de una subsección
+ * usa los cargados y no exige recepción ni verificación. Los demás números se entregan por separado, calculados con
+ * los documentos reales (documentos_usuario).
  */
 final class ResumenSeccion02
 {
     /**
-     * TODO pendiente de confirmar con el cliente: qué estados cuentan como "cargado". Observado se
-     * incluye porque el documento está en el legajo; falso no.
+     * Estados que cuentan como "cargado" (el documento está en el legajo). Observado se incluye por eso, pero no
+     * cuenta como aprobado (EstadoDocumento::aprobado) y los reportes lo listan como pendiente; falso no.
      */
     public const ESTADOS_CARGADO = ['aceptado', 'cargado', 'en_fiscalizacion', 'verificado', 'observado'];
 

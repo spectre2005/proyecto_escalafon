@@ -40,6 +40,7 @@ class Respaldo extends Model
         return ['base_bytes' => 'integer', 'archivos_bytes' => 'integer', 'verificado_en' => 'datetime'];
     }
 
+    /** @return BelongsTo<Institucion, $this> */
     public function institucion(): BelongsTo
     {
         return $this->belongsTo(Institucion::class, 'institucion_id');

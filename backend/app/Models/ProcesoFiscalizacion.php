@@ -49,26 +49,31 @@ class ProcesoFiscalizacion extends Model
         ];
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'usuario_id', 'id');
     }
 
+    /** @return BelongsTo<Legajo, $this> */
     public function legajo(): BelongsTo
     {
         return $this->belongsTo(Legajo::class, 'legajo_id', 'id');
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function responsable(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'responsable_id', 'id');
     }
 
+    /** @return BelongsTo<DocumentoUsuario, $this> */
     public function informeDocumento(): BelongsTo
     {
         return $this->belongsTo(DocumentoUsuario::class, 'informe_documento_id', 'id');
     }
 
+    /** @return HasMany<SolicitudFiscalizacion, $this> */
     public function solicitudesFiscalizacion(): HasMany
     {
         return $this->hasMany(SolicitudFiscalizacion::class, 'proceso_fiscalizacion_id', 'id');

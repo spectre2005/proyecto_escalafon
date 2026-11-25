@@ -1,0 +1,24 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+    - phpstan-baseline.neon
+
+# Análisis estático: docker compose exec app ./vendor/bin/phpstan analyse --memory-limit=2G
+# Todo aviso nuevo debe corregirse; no se agrega a la línea base sin revisarlo.
+parameters:
+    paths:
+        - app/
+        - config/
+        - database/
+        - routes/
+    level: 5
+    tmpDir: storage/framework/cache/phpstan
+    # Los modelos declaran sus casts en el método casts() (Laravel 11+): sin esto, una fecha se lee como string.
+    parseModelCastsMethod: true
+    ignoreErrors:
+        # Los «?->» se dejan a propósito: el esquema actual dice NOT NULL, pero hay datos cargados antes de las
+        # migraciones que endurecieron columnas, y quitar la protección convertiría un dato antiguo vacío en un error 500.
+        - identifier: nullsafe.neverNull
+        # Código que trabaja con cualquier modelo (CRUD genérico, anulación y reportes por tabla): el modelo concreto
+        # se conoce solo en ejecución y PHPStan lo ve como Model.
+        - message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model::#'
+          identifier: property.notFound

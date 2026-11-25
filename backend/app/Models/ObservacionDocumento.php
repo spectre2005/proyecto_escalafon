@@ -46,31 +46,37 @@ class ObservacionDocumento extends Model
         ];
     }
 
+    /** @return BelongsTo<DocumentoUsuario, $this> */
     public function documento(): BelongsTo
     {
         return $this->belongsTo(DocumentoUsuario::class, 'documento_id', 'id');
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function registradaPor(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'registrada_por', 'id');
     }
 
+    /** @return BelongsTo<DocumentoUsuario, $this> */
     public function documentoSubsanacion(): BelongsTo
     {
         return $this->belongsTo(DocumentoUsuario::class, 'documento_subsanacion_id', 'id');
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function verificadaPor(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'verificada_por', 'id');
     }
 
+    /** @return HasMany<HistorialEstadoDocumento, $this> */
     public function historialEstadosDocumento(): HasMany
     {
         return $this->hasMany(HistorialEstadoDocumento::class, 'observacion_id', 'id');
     }
 
+    /** @return HasMany<NotificacionUsuario, $this> */
     public function notificacionesUsuario(): HasMany
     {
         return $this->hasMany(NotificacionUsuario::class, 'observacion_id', 'id');

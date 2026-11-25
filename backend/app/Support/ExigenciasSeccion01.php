@@ -17,7 +17,7 @@ use Illuminate\Support\Collection;
  *   Sin fecha no se puede determinar (exigido = null). Al cumplir 18 años deja de exigirse; el documento se conserva.
  * Sin familiares registrados, g, i y j dependen de tiene_derechohabientes (AplicacionDocumental): Sí, por determinar
  * con aviso «falta registrar familiares»; No, no aplican; Sin responder, por determinar.
- * TODO PENDIENTE de confirmar con el cliente (ESTADO_PROYECTO.md, pregunta 18): la directiva no condiciona g, i ni j
+ * Pendiente del cliente (ESTADO_PROYECTO.md, pregunta 18): la directiva no condiciona g, i ni j
  * a una bandera; antes dependían solo de los familiares registrados.
  *
  * El resumen no es la fórmula de completitud del legajo (decisión abierta del cliente): entrega cargados y

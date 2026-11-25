@@ -91,51 +91,56 @@ class Seccion07Controller extends Controller
         return response()->json($pagina);
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * El registro es de un modelo distinto según $tipo (EvaluacionDesempeno, ProgresionCarrera, …): se lee por nombre de columna.
+     *
+     * @return array<string, mixed>
+     */
     private function presentar(string $tipo, Model $r, bool $veCalificacion): array
     {
         $base = [
-            'id' => $r->id,
-            'persona' => $this->persona($r->usuario),
-            'tiene_documento' => $r->documento_id !== null,
+            'id' => $r->getAttribute('id'),
+            'persona' => $this->persona($r->getAttribute('usuario')),
+            'tiene_documento' => $r->getAttribute('documento_id') !== null,
         ];
 
         return $base + match ($tipo) {
             'evaluaciones' => [
-                'ciclo_anio' => $r->ciclo_anio,
-                'fecha' => $this->fecha($r->fecha_evaluacion),
+                'ciclo_anio' => $r->getAttribute('ciclo_anio'),
+                'fecha' => $this->fecha($r->getAttribute('fecha_evaluacion')),
                 // Pendiente de decisión del cliente: sin seccion07.ver_calificacion no se envían.
-                'calificacion' => $veCalificacion ? $r->calificacion : null,
-                'puntaje' => $veCalificacion ? $r->puntaje : null,
+                'calificacion' => $veCalificacion ? $r->getAttribute('calificacion') : null,
+                'puntaje' => $veCalificacion ? $r->getAttribute('puntaje') : null,
                 'calificacion_oculta' => ! $veCalificacion,
-                'plan_mejora' => $r->plan_mejora,
-                'evaluador' => $r->evaluador ? $this->nombre($r->evaluador) : null,
+                'plan_mejora' => $r->getAttribute('plan_mejora'),
+                'evaluador' => $r->getAttribute('evaluador') ? $this->nombre($r->getAttribute('evaluador')) : null,
             ],
             'progresiones' => [
-                'fecha' => $this->fecha($r->fecha_efectiva),
-                'nivel_anterior' => $r->nivel_anterior,
-                'nivel_nuevo' => $r->nivel_nuevo,
-                'numero_resolucion' => $r->numero_resolucion,
+                'fecha' => $this->fecha($r->getAttribute('fecha_efectiva')),
+                'nivel_anterior' => $r->getAttribute('nivel_anterior'),
+                'nivel_nuevo' => $r->getAttribute('nivel_nuevo'),
+                'numero_resolucion' => $r->getAttribute('numero_resolucion'),
             ],
             'ratificaciones' => [
-                'fecha' => $this->fecha($r->fecha_resolucion),
-                'tipo' => $r->tipo,
-                'categoria_anterior' => $r->categoria_anterior,
-                'categoria_nueva' => $r->categoria_nueva,
-                'numero_resolucion' => $r->numero_resolucion,
-                'periodo_inicio' => $this->fecha($r->fecha_inicio_periodo),
-                'periodo_vencimiento' => $this->fecha($r->fecha_vencimiento_periodo),
-                'resultado' => $r->resultado,
+                'fecha' => $this->fecha($r->getAttribute('fecha_resolucion')),
+                'tipo' => $r->getAttribute('tipo'),
+                'categoria_anterior' => $r->getAttribute('categoria_anterior'),
+                'categoria_nueva' => $r->getAttribute('categoria_nueva'),
+                'numero_resolucion' => $r->getAttribute('numero_resolucion'),
+                'periodo_inicio' => $this->fecha($r->getAttribute('fecha_inicio_periodo')),
+                'periodo_vencimiento' => $this->fecha($r->getAttribute('fecha_vencimiento_periodo')),
+                'resultado' => $r->getAttribute('resultado'),
             ],
             'desplazamientos' => [
-                'fecha' => $this->fecha($r->fecha_inicio),
-                'fecha_fin' => $this->fecha($r->fecha_fin),
-                'tipo' => $r->tipo,
-                'unidad_origen' => $r->unidadOrigen?->nombre,
-                'unidad_destino' => $r->unidadDestino?->nombre,
-                'puesto_destino' => $r->puesto_destino,
-                'numero_documento' => $r->numero_documento,
+                'fecha' => $this->fecha($r->getAttribute('fecha_inicio')),
+                'fecha_fin' => $this->fecha($r->getAttribute('fecha_fin')),
+                'tipo' => $r->getAttribute('tipo'),
+                'unidad_origen' => $r->getAttribute('unidadOrigen')?->nombre,
+                'unidad_destino' => $r->getAttribute('unidadDestino')?->nombre,
+                'puesto_destino' => $r->getAttribute('puesto_destino'),
+                'numero_documento' => $r->getAttribute('numero_documento'),
             ],
+            default => abort(404),
         };
     }
 

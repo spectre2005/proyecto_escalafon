@@ -84,7 +84,7 @@ class FormatosDirectivaTest extends TestCase
     {
         $this->actuarComo();
         $legajo = Legajo::factory()->create(['estado_legajo' => 'activo']);
-        $this->documento($legajo)->update(['folio_inicio' => 25, 'folio_fin' => 27, 'fecha_incorporacion' => '2026-10-10', 'motivo_incorporacion' => 'Obtención de grado']);
+        DocumentoUsuario::query()->whereKey($this->documento($legajo)->id)->update(['folio_inicio' => 25, 'folio_fin' => 27, 'fecha_incorporacion' => '2026-10-10', 'motivo_incorporacion' => 'Obtención de grado']);
         $this->documento($legajo)->update(['estado' => 'anulado', 'fecha_incorporacion' => '2026-10-11']);
         $this->documento($legajo, 1, ['es_dato_sensible' => true])->update(['fecha_incorporacion' => '2026-10-12']);
 

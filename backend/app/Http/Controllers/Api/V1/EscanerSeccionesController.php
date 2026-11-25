@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Legajo;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
+use App\Support\Antivirus\Antivirus;
 use App\Support\Auditoria;
 use App\Support\ConfiguracionFuncionalidades;
 use App\Support\Documentos\ArchivoPdf;
@@ -40,6 +41,8 @@ class EscanerSeccionesController extends Controller
         abort_if($seccion === 7 && ! $request->user()->can('seccion07.ver'), 403);
         abort_if(ConfiguracionFuncionalidades::inactivaPorTipo($tipo->id) !== null, 409, 'Esta funcionalidad está desactivada.');
         abort_unless(ArchivoPdf::esPdf($request->file('pdf')), 422, 'Adjunta un PDF válido.');
+        // El PDF no se guarda, pero lo procesan herramientas externas (OCR): se revisa igual antes de abrirlo.
+        Antivirus::revisarArchivo((string) $request->file('pdf')->getRealPath());
         $bloqueo = Cache::lock('escaner-documentos-local', 280);
         abort_unless($bloqueo->get(), 429, 'Hay otra lectura en curso. Espera a que termine y vuelve a intentarlo.');
         $inicio = microtime(true);

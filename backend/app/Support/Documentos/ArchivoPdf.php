@@ -51,7 +51,7 @@ final class ArchivoPdf
     private static function contar(string $contenido): ?int
     {
         if (preg_match_all('#/Type\s*/Pages\b[^>]*?/Count\s+(\d+)|/Count\s+(\d+)[^>]*?/Type\s*/Pages\b#s', $contenido, $m)) {
-            $conteos = array_map('intval', array_filter([...$m[1], ...$m[2]], 'strlen'));
+            $conteos = array_map('intval', array_filter([...$m[1], ...$m[2]], fn (string $valor): bool => $valor !== ''));
             if ($conteos !== []) {
                 return max($conteos);
             }

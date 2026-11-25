@@ -46,21 +46,25 @@ class ReferenciaLegajoPasivo extends Model
         ];
     }
 
+    /** @return BelongsTo<Legajo, $this> */
     public function legajo(): BelongsTo
     {
         return $this->belongsTo(Legajo::class, 'legajo_id', 'id');
     }
 
+    /** @return BelongsTo<VinculoLaboral, $this> */
     public function vinculoLaboral(): BelongsTo
     {
         return $this->belongsTo(VinculoLaboral::class, 'vinculo_laboral_id', 'id');
     }
 
+    /** @return BelongsTo<TipoDocumento, $this> */
     public function tipoDocumento(): BelongsTo
     {
         return $this->belongsTo(TipoDocumento::class, 'tipo_documento_id', 'id');
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function responsableLegajo(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'responsable_legajo_id', 'id');

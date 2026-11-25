@@ -26,7 +26,7 @@ import RegistroPdf from './RegistroPdf'
 
 const fecha = value => value ? value.split('-').reverse().join('/') : 'No registrada'
 const enlace = 'text-sm font-semibold text-teal-700 disabled:opacity-50'
-// TODO pendiente de decidir si manda el Anexo 01 o el 05: estos tipos de declaración solo figuran en el Anexo 05.
+// Pendiente del cliente: decidir si manda el Anexo 01 o el 05: estos tipos de declaración solo figuran en el Anexo 05.
 const declaracionesAnexo05 = ['antecedente_judicial', 'dj_intereses']
 const relacionPorTipo = { S01_I_DNI_CONYUGE_CONCUBINO: 'conyuge_concubino', S01_J_DNI_HIJOS_MENORES: 'hijo' }
 

@@ -37,7 +37,7 @@ final class RevisionDocumento
         }
         $registro = DB::transaction(function () use ($request, $usuario, $documento, $datos, $seccion, $accion, $hoy): DocumentoUsuario {
             $legajo = Legajo::query()->where('usuario_id', $usuario)->where('estado_legajo', 'activo')->lockForUpdate()->first();
-            abort_unless($legajo, 409, 'El legajo está cerrado y no admite revisiones.');
+            abort_unless($legajo !== null, 409, 'El legajo está cerrado y no admite revisiones.');
             $doc = DocumentoUsuario::query()->where('usuario_id', $usuario)->where('legajo_id', $legajo->id)->where('seccion_legajo_id', $seccion)->with(['tipoDocumento', 'archivo'])
                 ->lockForUpdate()->findOrFail($documento);
             abort_if(($doc->tipoDocumento->es_dato_sensible || $doc->tipoDocumento->es_dato_salud) && ! $request->user()->veDatosSensibles(), 403, 'Tu perfil no tiene acceso a este documento sensible.');

@@ -174,7 +174,7 @@ class UsuarioController extends Controller
             }
             $incorporacion = Usuario::query()->findOrFail($registro['id'])->legajos()->count() + 1;
             $legajo = AperturaLegajo::abrir($registro['id']);
-            abort_unless($legajo, 409, 'La persona ya tiene un legajo activo.');
+            abort_unless($legajo !== null, 409, 'La persona ya tiene un legajo activo.');
             // El tipo de personal y la ley del vínculo son los de la persona; el tipo de vínculo, el que se indicó.
             // El puesto y la unidad escritos quedan en las listas de la institución si aún no estaban.
             $datosVinculo = CatalogosVinculo::aplicar($request->vinculo(), $registro['tipo_personal'], $actor->getAuthIdentifier(), null, 'vinculo.');

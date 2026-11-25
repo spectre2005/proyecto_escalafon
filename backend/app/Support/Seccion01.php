@@ -48,7 +48,7 @@ final class Seccion01
         return preg_match('/^S01_([A-L])_/', $codigo, $match) ? strtolower($match[1]) : null;
     }
 
-    /** TODO pendiente de decidir si manda el Anexo 01 o el 05: estos tipos solo figuran en el Anexo 05. */
+    /** Pendiente del cliente: decidir si manda el Anexo 01 o el 05: estos tipos solo figuran en el Anexo 05. */
     public static function soloAnexo05(string $codigo): bool
     {
         return str_starts_with($codigo, 'S01_X_');

@@ -22,7 +22,7 @@ class EmisionPersonalController extends Controller
     {
         $persona = Usuario::query()->findOrFail($usuario);
         $legajo = Legajo::paraConsulta($persona->id);
-        abort_unless($legajo, 409, 'La persona no tiene legajo: no se puede emitir este documento.');
+        abort_unless($legajo !== null, 409, 'La persona no tiene legajo: no se puede emitir este documento.');
         $datos = EmisionesPersonales::emitir($request->user(), $persona, $legajo, $documento);
         Auditoria::registrar($request, 'reporte.exportado', 'reportes', (string) Str::uuid(), $persona->id, null,
             ['formato' => $documento, 'emitible' => $datos['emitible'] ?? true]);

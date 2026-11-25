@@ -92,12 +92,12 @@ final class ReportesSecciones
     {
         $definicion = self::DEFINICIONES[$tipo];
         $relacion = $definicion['relacion'];
-        $consulta->with(['legajos' => fn (Builder|Relation $q): Builder|Relation => $q->orderByDesc('fecha_apertura')->orderBy('id')]);
+        $consulta->with(['legajos' => fn (Relation $q): Relation => $q->orderByDesc('fecha_apertura')->orderBy('id')]);
         if ($relacion) {
             $extras = match ($tipo) {
                 'discapacidad' => ['familiar'], 'desplazamientos' => ['unidadOrigen', 'unidadDestino'], default => [],
             };
-            $consulta->with([$relacion => fn (Builder|Relation $q): Builder|Relation => $q->where('anulado', false)->with(['documento.tipoDocumento', ...$extras])->orderBy('id')]);
+            $consulta->with([$relacion => fn (Relation $q): Relation => $q->where('anulado', false)->with(['documento.tipoDocumento', ...$extras])->orderBy('id')]);
         }
         foreach ($consulta->lazy(100) as $persona) {
             $base = $contexto($persona);

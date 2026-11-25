@@ -1,0 +1,12 @@
+# Configuración de gitleaks (búsqueda de secretos en el repositorio y su historial).
+#   docker run --rm -v "$PWD":/repo:ro zricethezav/gitleaks:v8.21.2 detect --source /repo --redact
+# Usa las reglas por defecto y solo excluye las contraseñas ficticias de las pruebas automáticas (nunca son cuentas
+# reales). Hallazgos puntuales revisados: .gitleaksignore.
+title = "escalafon"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Contraseñas ficticias de las pruebas automáticas"
+paths = ['''(^|/)backend/tests/''']

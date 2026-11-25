@@ -60,7 +60,7 @@ class Seccion06Controller extends Controller
     {
         $persona = Usuario::query()->findOrFail($usuario);
         $legajo = $this->legajo($persona);
-        abort_unless($legajo, 409, 'Primero abre el legajo para agregar documentos.');
+        abort_unless($legajo !== null, 409, 'Primero abre el legajo para agregar documentos.');
         $request->validate(['tipo_documento_id' => ['required', 'uuid', Rule::exists('tipos_documento', 'id')->where('seccion_legajo_id', 6)->where('activo', true)]]);
         $tipo = TipoDocumento::query()->findOrFail($request->input('tipo_documento_id'));
         abort_unless(isset(ResumenSeccion06::ITEMS[$tipo->codigo]), 422, 'Selecciona un tipo del catálogo de compensaciones.');

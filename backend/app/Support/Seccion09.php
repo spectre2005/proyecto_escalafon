@@ -23,14 +23,14 @@ final class Seccion09
 
     /**
      * Único tipo de afiliaciones que maneja esta sección (literal c).
-     * TODO pendiente de confirmar con el cliente: dónde van las afiliaciones eps, seguro_social y otro de la misma tabla;
+     * Pendiente del cliente: dónde van las afiliaciones eps, seguro_social y otro de la misma tabla;
      * la sección 09 no las muestra, no las registra ni las anula.
      */
     public const AFILIACION = 'sindicato';
 
     /**
      * Código del tipo de documento => [bloque de la ficha, literal, formulario_datos, valores de "tipo" del registro que acredita].
-     * TODO pendiente de confirmar con el cliente:
+     * Pendiente del cliente:
      * - Una controversia puede tener varios documentos (demanda, resoluciones, apelaciones); el registro guarda uno solo
      *   (documento_id). Los demás se suben como documentos adicionales del mismo tipo. Puede requerir una mejora del esquema.
      * - Una controversia colectiva se registra solo en el legajo donde se carga; no se copia a otras personas.

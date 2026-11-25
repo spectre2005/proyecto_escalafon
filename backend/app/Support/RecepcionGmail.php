@@ -3,6 +3,8 @@
 namespace App\Support;
 
 use App\Models\RequerimientoDocumento;
+use App\Support\Antivirus\Antivirus;
+use App\Support\Antivirus\AntivirusNoDisponible;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -41,6 +43,9 @@ final class RecepcionGmail
                 $pagina = $lista['nextPageToken'] ?? null;
             } while ($pagina);
             $conexion->update(['recepcion_revisada_en' => $hasta, 'recepcion_error' => null]);
+        } catch (AntivirusNoDisponible) {
+            $conexion->update(['recepcion_error' => 'El antivirus no está disponible: los adjuntos no se incorporaron. Se reintentará sin duplicar entregas.']);
+            throw new RuntimeException('No se pudo completar la recepción de Gmail: antivirus no disponible.');
         } catch (Throwable) {
             $conexion->update(['recepcion_error' => 'No se pudo completar la recepción. Revisa la conexión de Gmail; se reintentará sin duplicar entregas.']);
             throw new RuntimeException('No se pudo completar la recepción de Gmail.');
@@ -68,7 +73,7 @@ final class RecepcionGmail
         }
         $asunto = $headers['subject'][0] ?? '';
         preg_match_all('/\[REQ-([a-f0-9-]{36})\]/i', $asunto, $referencias);
-        $ids = array_unique($referencias[1] ?? []);
+        $ids = array_unique($referencias[1]);
         $referencia = count($ids) === 1 ? strtolower(reset($ids)) : '';
         $r = Str::isUuid($referencia) ? RequerimientoDocumento::query()->etapaActual()->find($referencia) : null;
         try {
@@ -137,6 +142,13 @@ final class RecepcionGmail
                     $contenido = self::contenido($parte, $id, $maximo);
                     if (! str_contains(substr($contenido, 0, 1024), '%PDF-') || (new \finfo(FILEINFO_MIME_TYPE))->buffer($contenido) !== 'application/pdf') {
                         $avisos[] = mb_substr($nombre, 0, 150).': el contenido no es un PDF válido.';
+
+                        continue;
+                    }
+                    // Si el antivirus no responde, la excepción anula la importación de este correo y se reintenta en
+                    // la siguiente revisión (el correo aún no queda registrado): nada entra sin revisar.
+                    if (($amenaza = Antivirus::amenaza($contenido)) !== null) {
+                        $avisos[] = mb_substr($nombre, 0, 150).": no incorporado: el antivirus detectó una amenaza ({$amenaza}).";
 
                         continue;
                     }

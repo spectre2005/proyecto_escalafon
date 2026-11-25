@@ -70,7 +70,7 @@ class AceptacionDirectaMigracionTest extends TestCase
     public function test_missing_infected_observed_annulled_and_superseded_documents_are_preserved(): void
     {
         $sinArchivo = $this->documento(10);
-        $sinArchivo->update(['archivo_id' => null]);
+        DocumentoUsuario::query()->whereKey($sinArchivo->id)->update(['archivo_id' => null]); // dato antiguo: sin pasar por el modelo
         $infectado = $this->documento(4);
         $infectado->archivo->update(['estado_antivirus' => 'infectado']);
         $observado = $this->documento(3, 'observado');

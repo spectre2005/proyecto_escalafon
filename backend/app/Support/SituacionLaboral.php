@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
  * Situación laboral de una persona en los listados, separada de su acceso al sistema (usuarios.activo, la cuenta).
  * Vínculo vigente con el mismo criterio de PuestoActual (no anulado y sin fecha de cese), y legajo activo como en la
  * apertura (AperturaLegajo). Un vínculo vigente manda: la persona no aparece sin vínculo por no tener legajo activo.
- * TODO pendiente de confirmar con el cliente: criterio único de vigencia (un vínculo vencido sin cese sigue vigente aquí).
+ * Pendiente del cliente: criterio único de vigencia (un vínculo vencido sin cese sigue vigente aquí).
  */
 final class SituacionLaboral
 {

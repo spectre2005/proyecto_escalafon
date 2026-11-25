@@ -9,6 +9,7 @@ use App\Models\NotificacionUsuario;
 use App\Models\RequerimientoDocumento;
 use App\Models\TipoDocumento;
 use App\Models\Usuario;
+use App\Support\Antivirus\Antivirus;
 use App\Support\AplicacionDocumental;
 use App\Support\ConsultaReportes;
 use App\Support\CorreoRequerimiento;
@@ -44,6 +45,7 @@ class SolicitudLegajoController extends Controller
 {
     private const ABIERTOS = ['abierto', 'observado', 'en_revision'];
 
+    /** @return Builder<RequerimientoDocumento> */
     private function consulta(Request $request): Builder
     {
         $consulta = RequerimientoDocumento::query()
@@ -108,6 +110,7 @@ class SolicitudLegajoController extends Controller
             'plazo_dias_habiles' => DiasHabiles::PLAZO_DOCUMENTOS]);
     }
 
+    /** @return Builder<TipoDocumento> */
     private function tiposDisponibles(): Builder
     {
         $catalogos = [
@@ -245,6 +248,9 @@ class SolicitudLegajoController extends Controller
         if ($pdf && ! ArchivoPdf::esPdf($pdf)) {
             throw ValidationException::withMessages(['pdf' => 'El archivo debe ser un PDF válido.']);
         }
+        if ($pdf) {
+            Antivirus::revisarArchivo((string) $pdf->getRealPath());
+        }
         $ruta = null;
         $disco = (string) config('legajo.disco_documentos');
         try {
@@ -300,7 +306,7 @@ class SolicitudLegajoController extends Controller
                 if ($r->tipo_documento_id) {
                     $doc = DocumentoUsuario::query()->where('usuario_id', $r->usuario_id)->where('tipo_documento_id', $r->tipo_documento_id)
                         ->where('estado', 'aceptado')->whereHas('legajo', fn (Builder $q) => $q->where('estado_legajo', 'activo'))
-                        ->whereDoesntHave('documentosUsuarioPorSubsanaADocumento')->find($data['documento_id'] ?? '');
+                        ->sinSubsanar()->find($data['documento_id'] ?? '');
                     if (! $doc) {
                         throw ValidationException::withMessages(['documento_id' => 'Incorpora y acepta el documento en su sección del legajo; luego selecciónalo para cerrar la solicitud.']);
                     }
@@ -352,7 +358,7 @@ class SolicitudLegajoController extends Controller
 
         return response()->json(['data' => DocumentoUsuario::query()->where('usuario_id', $r->usuario_id)->where('tipo_documento_id', $r->tipo_documento_id)
             ->where('estado', 'aceptado')->whereHas('legajo', fn (Builder $q) => $q->where('estado_legajo', 'activo'))
-            ->whereDoesntHave('documentosUsuarioPorSubsanaADocumento')->get(['id', 'nombre', 'fecha_incorporacion', 'num_resolucion'])]);
+            ->sinSubsanar()->get(['id', 'nombre', 'fecha_incorporacion', 'num_resolucion'])]);
     }
 
     public function archivo(Request $request, string $record, int $indice, int $adjunto = 0): StreamedResponse
@@ -380,7 +386,7 @@ class SolicitudLegajoController extends Controller
 
     private function legajoActivo(string $usuario): void
     {
-        abort_unless(Legajo::query()->where('usuario_id', $usuario)->where('estado_legajo', 'activo')->lockForUpdate()->first(), 409, 'La persona no tiene un legajo activo.');
+        abort_unless(Legajo::query()->where('usuario_id', $usuario)->where('estado_legajo', 'activo')->lockForUpdate()->first() !== null, 409, 'La persona no tiene un legajo activo.');
     }
 
     /**

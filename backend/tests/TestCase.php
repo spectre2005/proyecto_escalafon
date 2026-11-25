@@ -5,11 +5,23 @@ namespace Tests;
 use App\Models\Rol;
 use App\Models\Usuario;
 use App\Models\UsuarioRol;
+use App\Support\Antivirus\EscanerAntivirus;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Laravel\Sanctum\Sanctum;
+use Tests\Fixtures\AntivirusFalso;
 
 abstract class TestCase extends BaseTestCase
 {
+    /** Antivirus de la prueba: sin contenedor ClamAV, detecta EICAR y se puede «caer» ($this->antivirus->caido = true). */
+    protected AntivirusFalso $antivirus;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->antivirus = new AntivirusFalso;
+        $this->app->instance(EscanerAntivirus::class, $this->antivirus);
+    }
+
     /** Asigna un rol vigente al usuario (lo crea si no existe el rol). */
     protected function asignarRol(Usuario $usuario, string $codigo = 'ADMIN', array $asignacion = [], array $rol = []): Usuario
     {

@@ -19,15 +19,15 @@ trait AnulaConMotivo
     protected function anular(Request $request, Model $registro): JsonResource|JsonResponse
     {
         $data = $request->validate(['motivo_anulacion' => 'required|string|min:5|max:1000']);
-        if ($registro->anulado) {
+        if ($registro->getAttribute('anulado')) {
             return response()->json(['message' => 'El registro ya está anulado.'], 409);
         }
         DB::transaction(function () use ($registro, $data, $request): void {
             $registro->update(['anulado' => true, 'motivo_anulacion' => trim($data['motivo_anulacion'])]);
             // Las adendas no guardan la persona: es la de su vínculo.
-            $titular = $registro->getAttribute('usuario_id') ?? (method_exists($registro, 'vinculoLaboral') ? $registro->vinculoLaboral?->usuario_id : null);
+            $titular = $registro->getAttribute('usuario_id') ?? (method_exists($registro, 'vinculoLaboral') ? $registro->getRelationValue('vinculoLaboral')?->getAttribute('usuario_id') : null);
             Auditoria::registrar($request, $registro->getTable().'.anular', $registro->getTable(), $registro->getKey(), $titular,
-                ['anulado' => false], ['anulado' => true, 'motivo_anulacion' => $registro->motivo_anulacion]);
+                ['anulado' => false], ['anulado' => true, 'motivo_anulacion' => $registro->getAttribute('motivo_anulacion')]);
         });
 
         return new JsonResource($registro->refresh());

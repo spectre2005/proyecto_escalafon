@@ -40,21 +40,25 @@ class UsuarioRol extends Model
         ];
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'usuario_id', 'id');
     }
 
+    /** @return BelongsTo<Rol, $this> */
     public function rol(): BelongsTo
     {
         return $this->belongsTo(Rol::class, 'rol_id', 'id');
     }
 
+    /** @return BelongsTo<UnidadOrganica, $this> */
     public function unidadOrganica(): BelongsTo
     {
         return $this->belongsTo(UnidadOrganica::class, 'unidad_organica_id', 'id');
     }
 
+    /** @return BelongsTo<Usuario, $this> */
     public function asignadoPor(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'asignado_por', 'id');

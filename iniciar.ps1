@@ -17,6 +17,8 @@ try {
     }
 
     Invoke-Docker @('compose', 'up', '-d', '--build', '--wait', 'db', 'app', 'nginx')
+    # Antivirus: sin esperar, tarda unos minutos en cargar sus firmas (mientras tanto las subidas de PDF se rechazan).
+    Invoke-Docker @('compose', 'up', '-d', 'clamav')
     Invoke-Docker @('compose', 'exec', '-T', '-e', 'COMPOSER_HOME=/tmp/composer', 'app', 'composer', 'install', '--no-interaction', '--prefer-dist')
     Invoke-Docker @('compose', 'exec', '-T', 'app', 'php', 'artisan', 'config:clear', '--no-interaction')
 

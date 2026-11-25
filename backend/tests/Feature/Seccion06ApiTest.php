@@ -91,7 +91,7 @@ class Seccion06ApiTest extends TestCase
         $this->assertSame($doc->fecha_emision->toDateString(), $tiempo->fecha_resolucion->toDateString());
         $this->assertDatabaseHas('historial_estados_documento', ['documento_usuario_id' => $id, 'estado_nuevo' => 'aceptado']);
         $this->assertDatabaseHas('auditoria_eventos', ['entidad_id' => $id, 'accion' => 'compensaciones.documento.creado']);
-        $this->assertSame('pendiente', $doc->archivo->estado_antivirus);
+        $this->assertSame('limpio', $doc->archivo->estado_antivirus);
         $this->assertSame(hash('sha256', Storage::disk(config('legajo.disco_documentos'))->get($doc->archivo->storage_path)), $doc->archivo->hash_sha256);
         $this->assertSame($this->persona->numero_doc_identidad, $doc->titular_documento);
         $this->getJson($this->url())->assertOk()->assertJsonPath('data.items.0.documentos.0.tiempos_reconocidos.0.anios', 12)->assertJsonPath('data.resumen.pendientes', 0)->assertJsonPath('data.resumen.aceptados', 1);
@@ -295,7 +295,7 @@ class Seccion06ApiTest extends TestCase
         $this->actuarComo();
         $this->aceptar($id)->assertUnprocessable();
         $this->getJson('/api/v1/expedientes/'.$this->persona->id.'/documentos/'.$id.'/archivo')->assertStatus(423);
-        $doc->update(['archivo_id' => null]);
+        DocumentoUsuario::query()->whereKey($doc->id)->update(['archivo_id' => null]); // dato antiguo: sin pasar por el modelo
         $this->aceptar($id)->assertUnprocessable();
     }
 
